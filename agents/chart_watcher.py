@@ -682,7 +682,7 @@ def analyze_chart() -> dict:
 
     sr_text    = format_sr_text(h4_sr, h1_sr, key_lvl, current)
     all_levels = h4_sr["resistance"] + h4_sr["support"] + h1_sr["resistance"] + h1_sr["support"]
-    sr_actions = detect_sr_action(h4["df"], h4_sr["resistance"] + h4_sr["support"])
+    sr_actions = detect_sr_action(m15["df"], h4_sr["resistance"] + h4_sr["support"] + h1_sr["resistance"] + h1_sr["support"])
     candle_pat = detect_candle_pattern(m15["df"])
 
     # SL จาก wick แท่งก่อนหน้า M15 (ทั้งสองทิศทาง)

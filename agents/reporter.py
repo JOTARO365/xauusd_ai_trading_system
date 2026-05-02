@@ -41,6 +41,16 @@ def _known_tickets(log: dict) -> set:
 #  MANUAL ORDER SCANNER
 # ─────────────────────────────────────────────────────────────
 
+def _best_scan_setup(scan: dict, direction: str) -> dict | None:
+    """คืน setup ที่ score สูงสุดในทิศทางที่ต้องการ หรือ None"""
+    if not scan:
+        return None
+    setups = [s for s in scan.get("setups", []) if s.get("direction") == direction.upper()]
+    if not setups:
+        setups = scan.get("setups", [])
+    return max(setups, key=lambda x: x.get("score", 0)) if setups else None
+
+
 def _infer_manual_analysis(price: float, direction: str, chart_data: dict | None) -> dict:
     """
     วิเคราะห์ context ทาง technical ของ manual order จาก chart_data ปัจจุบัน
@@ -71,10 +81,21 @@ def _infer_manual_analysis(price: float, direction: str, chart_data: dict | None
     candle_pat  = chart_data.get("candle_pat", {})
     scan        = chart_data.get("scan", {})
 
-    pa_action   = sr_actions[0].get("action", "NONE") if sr_actions else "NONE"
-    pa_zone     = sr_actions[0].get("zone",   "—")    if sr_actions else "—"
-    pa_level    = sr_actions[0].get("level",  None)   if sr_actions else None
     pa_patterns = candle_pat.get("patterns", [])
+    if sr_actions:
+        pa_action = sr_actions[0].get("action", "NONE")
+        pa_zone   = sr_actions[0].get("zone",   "—")
+        pa_level  = sr_actions[0].get("level",  None)
+    else:
+        best_setup = _best_scan_setup(scan, direction)
+        if best_setup:
+            pa_action = best_setup["type"]
+            pa_zone   = f"{best_setup['tf']}_{best_setup['type']}"
+            pa_level  = best_setup.get("level")
+        else:
+            pa_action = "NONE"
+            pa_zone   = "—"
+            pa_level  = None
 
     # สร้างคำอธิบาย
     notes = []
@@ -111,14 +132,32 @@ def _infer_manual_analysis(price: float, direction: str, chart_data: dict | None
     }
 
 
+def _get_close_times(days: int = 7) -> dict[str, str]:
+    """ดึง close_time ของ positions ที่ปิดแล้ว → {position_id: iso_datetime}"""
+    import MetaTrader5 as mt5
+    from datetime import timedelta
+    date_from = datetime.now() - timedelta(days=days)
+    close_map: dict[str, str] = {}
+    try:
+        all_deals = mt5.history_deals_get(date_from, datetime.now())
+        if all_deals:
+            for d in all_deals:
+                if d.entry == 1:  # DEAL_ENTRY_OUT
+                    close_map[str(d.position_id)] = datetime.fromtimestamp(d.time).isoformat()
+    except Exception:
+        pass
+    return close_map
+
+
 def _sync_closed_trades(log: dict):
-    """ตรวจ trade ที่ยัง OPEN ใน log — ถ้า MT5 ปิดไปแล้วให้อัปเดต status + PnL"""
+    """ตรวจ trade ที่ยัง OPEN ใน log — ถ้า MT5 ปิดไปแล้วให้อัปเดต status + PnL + close_time"""
     open_in_log = [t for t in log.get("trades", []) if t.get("status") == "OPEN" and t.get("ticket")]
     if not open_in_log:
         return
 
-    open_tickets = {str(p["ticket"]) for p in get_open_positions()}
-    changed = False
+    open_tickets  = {str(p["ticket"]) for p in get_open_positions()}
+    close_map     = _get_close_times()
+    changed       = False
 
     for t in open_in_log:
         tk = str(t.get("ticket"))
@@ -131,6 +170,8 @@ def _sync_closed_trades(log: dict):
 
         t["status"] = "CLOSED"
         t["pnl"]    = pnl
+        if not t.get("close_time"):
+            t["close_time"] = close_map.get(tk, datetime.now().isoformat())
         changed = True
         logger.info(f"Trade closed — Ticket:{t['ticket']} PnL:{pnl:+.2f}")
 
@@ -278,13 +319,13 @@ def scan_manual_orders(chart_data: dict | None = None) -> int:
 
 
 def _sync_manual_sl_tp(log: dict):
-    """อัปเดต SL/TP ของ manual orders ที่ยังเปิดอยู่จาก MT5 positions"""
+    """อัปเดต SL/TP ของ ALL open trades (MANUAL + SYSTEM) จาก MT5 positions"""
     positions = get_open_positions()
     pos_map = {str(p["ticket"]): p for p in positions}
     changed = False
 
     for t in log["trades"]:
-        if t.get("source") != "MANUAL" or t.get("status") != "OPEN":
+        if t.get("status") != "OPEN":
             continue
         tk = str(t.get("ticket"))
         if tk in pos_map:
@@ -317,18 +358,40 @@ def log_trade(decision_result: dict):
 
     sr_actions  = tech.get("sr_actions", [])
     candle_pat  = tech.get("candle_pat", {})
-    pa_action   = sr_actions[0].get("action", "NONE") if sr_actions else "NONE"
-    pa_zone     = sr_actions[0].get("zone",   "—")    if sr_actions else "—"
-    pa_level    = sr_actions[0].get("level",  None)   if sr_actions else None
+    scan        = tech.get("scan", {})
+    direction   = decision_result.get("direction", "")
     pa_patterns = candle_pat.get("patterns", [])
 
-    account = get_account_info()
+    if sr_actions:
+        pa_action = sr_actions[0].get("action", "NONE")
+        pa_zone   = sr_actions[0].get("zone",   "—")
+        pa_level  = sr_actions[0].get("level",  None)
+    else:
+        best_setup = _best_scan_setup(scan, direction)
+        if best_setup:
+            pa_action = best_setup["type"]
+            pa_zone   = f"{best_setup['tf']}_{best_setup['type']}"
+            pa_level  = best_setup.get("level")
+        else:
+            pa_action = "NONE"
+            pa_zone   = "—"
+            pa_level  = None
+
+    entry_type = tech.get("entry_type", "NONE")
+    if entry_type == "NONE":
+        best_setup = _best_scan_setup(scan, direction)
+        if best_setup:
+            entry_type = best_setup["type"]
+
+    account  = get_account_info()
+    ticket   = order.get("ticket")
+    sent_obj = decision_result.get("sentiment") or {}
     trade_entry = {
         # ── Source ────────────────────────────────────
         "source":      "SYSTEM",
         # ── Order info ────────────────────────────────
         "timestamp":   datetime.now().isoformat(),
-        "ticket":      order.get("ticket"),
+        "ticket":      ticket,
         "direction":   order.get("direction"),
         "lot":         order.get("lot"),
         "entry_price": order.get("price"),
@@ -338,8 +401,8 @@ def log_trade(decision_result: dict):
         "technical_signal":     tech.get("signal"),
         "technical_confidence": tech.get("confidence"),
         "trend":                tech.get("trend"),
-        "entry_type":           tech.get("entry_type", "NONE"),
-        "sentiment":            decision_result.get("sentiment", {}).get("sentiment"),
+        "entry_type":           entry_type,
+        "sentiment":            sent_obj.get("sentiment"),
         # ── Price action ──────────────────────────────
         "pa_action":   pa_action,
         "pa_zone":     pa_zone,
@@ -347,6 +410,8 @@ def log_trade(decision_result: dict):
         "pa_patterns": pa_patterns,
         "sr_zone":     tech.get("sr_zone"),
         "sr_strength": tech.get("sr_strength"),
+        # ── Analysis (Claude's decision reasoning) ────
+        "analysis":    decision_result.get("analysis", ""),
         # ── Manual fields (ว่างสำหรับ system trades) ─
         "manual_analysis": None,
         "manual_reason":   None,
@@ -357,10 +422,18 @@ def log_trade(decision_result: dict):
         "pnl":    None,
     }
 
+    # Upsert: update existing skeleton entry if ticket already in log (e.g. added by dashboard sync)
+    for i, t in enumerate(log["trades"]):
+        if t.get("ticket") == ticket:
+            log["trades"][i].update(trade_entry)
+            _save_log(log)
+            logger.info(f"System trade updated — Ticket:{ticket} | PA:{pa_action} | Type:{entry_type}")
+            return
+
     log["trades"].append(trade_entry)
     log["summary"]["total"] += 1
     _save_log(log)
-    logger.info(f"System trade logged — Ticket:{order.get('ticket')} | PA:{pa_action} | Type:{tech.get('entry_type')}")
+    logger.info(f"System trade logged — Ticket:{ticket} | PA:{pa_action} | Type:{entry_type}")
 
 
 # ─────────────────────────────────────────────────────────────

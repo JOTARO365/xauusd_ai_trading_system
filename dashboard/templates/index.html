@@ -1328,8 +1328,11 @@ function renderTable(trades) {
         ? `<div class="reason">"${reason}"</div>`
         : (extra ? `<div class="reason">${extra}</div>` : '')}</div>`;
     } else {
-      analysisHtml = tags.length
-        ? `<div class="analysis-cell">${tags.join('')}</div>`
+      const aiReason = t.analysis
+        ? `<div class="reason">${t.analysis.substring(0, 220)}${t.analysis.length > 220 ? '…' : ''}</div>`
+        : '';
+      analysisHtml = (tags.length || aiReason)
+        ? `<div class="analysis-cell">${tags.join('')}${aiReason}</div>`
         : '<span style="color:var(--muted2)">—</span>';
     }
 

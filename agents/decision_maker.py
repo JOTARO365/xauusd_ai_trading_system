@@ -327,6 +327,7 @@ Threshold ที่ใช้: Technical ≥ {min_tech_conf}%
             "order":            order_result,
             "technical":        chart_data,
             "sentiment":        sentiment_data,
+            "analysis":         decision_text,
         }
 
     return {
