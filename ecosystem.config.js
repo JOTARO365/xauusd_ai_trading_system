@@ -3,7 +3,7 @@ module.exports = {
     {
       name: "main",
       script: "pm2_main.js",
-      cwd: "D:\\claude_workspace\\claude_trading_system",
+      cwd: "D:\\claude_workspace\\xauusd_ai_tranding_system",
       autorestart: true,
       watch: false,
       max_restarts: 5,
@@ -12,7 +12,7 @@ module.exports = {
     {
       name: "dashboard",
       script: "pm2_dashboard.js",
-      cwd: "D:\\claude_workspace\\claude_trading_system",
+      cwd: "D:\\claude_workspace\\xauusd_ai_tranding_system",
       autorestart: true,
       watch: false,
       max_restarts: 10,
