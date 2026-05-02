@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import sys
+import time
 from datetime import date as _date
 from loguru import logger
 from connectors.price_feed import connect_mt5, disconnect_mt5
@@ -12,6 +13,12 @@ from agents.analyst import analyze_sentiment
 from agents.decision_maker import make_decision
 from agents.reporter import log_trade, print_summary, scan_manual_orders
 from agents.pending_manager import auto_place_pending_orders, place_weekly_calendar_pending
+import agents.chart_watcher  as _cw_mod
+import agents.market_advisor as _ma_mod
+import agents.analyst        as _an_mod
+import agents.decision_maker as _dm_mod
+import agents.reporter       as _rp_mod
+from agents.accountant import record_cycle
 from utils.display import (
     console, print_header, print_cycle_start, print_cycle_end,
     print_step, print_signal_box, print_advisor_box,
@@ -191,10 +198,14 @@ async def run_cycle() -> tuple[dict, dict]:
     _cycle += 1
     print_cycle_start(_cycle)
 
+    _lat_cw = _lat_ma = _lat_an = _lat_dm = 0   # latencies (ms)
+
     # ── Step 1: Chart Watcher ──────────────────────────────────────
     print_step(0, "running", "กำลังดึงข้อมูลกราฟ...")
     try:
+        _t = time.monotonic()
         chart_data = analyze_chart()
+        _lat_cw = int((time.monotonic() - _t) * 1000)
         _last_chart_data = chart_data
         signal = chart_data.get("signal", "NO_TRADE")
         conf   = chart_data.get("confidence", 0)
@@ -209,7 +220,9 @@ async def run_cycle() -> tuple[dict, dict]:
     # ── Step 2: Market Advisor ─────────────────────────────────────
     print_step(1, "running", "กำลังวิเคราะห์ market regime...")
     try:
+        _t = time.monotonic()
         advisor_data = analyze_market_regime(chart_data)
+        _lat_ma = int((time.monotonic() - _t) * 1000)
         regime = advisor_data.get("regime", "—")
         conf   = advisor_data.get("regime_confidence", 0)
         bias   = advisor_data.get("bias", "—")
@@ -233,7 +246,9 @@ async def run_cycle() -> tuple[dict, dict]:
     # ── Step 4: Sentiment Analyst ──────────────────────────────────
     print_step(3, "running", "กำลังวิเคราะห์ sentiment...")
     try:
+        _t = time.monotonic()
         sentiment_data = analyze_sentiment(news_data)
+        _lat_an = int((time.monotonic() - _t) * 1000)
         sent  = sentiment_data.get("sentiment", "NEUTRAL")
         sconf = sentiment_data.get("confidence", 0)
         sentiment_data["news_count"] = news_data.get("count", 0)
@@ -248,7 +263,9 @@ async def run_cycle() -> tuple[dict, dict]:
     # ── Step 5: Decision Maker ─────────────────────────────────────
     print_step(4, "running", "กำลังตัดสินใจ...")
     try:
+        _t = time.monotonic()
         decision = make_decision(chart_data, sentiment_data, advisor_data)
+        _lat_dm = int((time.monotonic() - _t) * 1000)
         action = decision.get("action", "SKIP")
         step_detail = f"EXECUTE {decision.get('direction','')}" if action == "EXECUTE" else "SKIP"
         step_status = "done" if action == "EXECUTE" else "skip"
@@ -288,6 +305,32 @@ async def run_cycle() -> tuple[dict, dict]:
     except Exception as e:
         print_step(5, "error", str(e)[:60])
         logger.error(f"Reporter error: {e}")
+
+    # ── Accounting ─────────────────────────────────────────────────
+    try:
+        _ticket = (
+            decision.get("order", {}).get("ticket")
+            if decision.get("action") == "EXECUTE" else None
+        )
+        record_cycle(
+            symbol       = config.SYMBOL,
+            agent_usages = {
+                "chart_watcher":  ("claude-haiku-4-5-20251001", _cw_mod._last_usage),
+                "market_advisor": ("claude-haiku-4-5-20251001", _ma_mod._last_usage),
+                "analyst":        ("claude-haiku-4-5-20251001", _an_mod._last_usage),
+                "decision_maker": ("claude-sonnet-4-6",         _dm_mod._last_usage),
+                "reporter":       ("claude-haiku-4-5-20251001", _rp_mod._last_usage),
+            },
+            ticket       = _ticket,
+            latencies_ms = {
+                "chart_watcher":  _lat_cw,
+                "market_advisor": _lat_ma,
+                "analyst":        _lat_an,
+                "decision_maker": _lat_dm,
+            },
+        )
+    except Exception as e:
+        logger.error(f"Accounting error: {e}")
 
     return chart_data, sentiment_data
 

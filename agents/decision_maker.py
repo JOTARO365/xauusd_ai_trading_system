@@ -13,6 +13,8 @@ SYSTEM_PROMPT = Path("agents/prompts/decision_maker.md").read_text(encoding="utf
 
 MIN_TECHNICAL_CONFIDENCE = 45   # threshold เดียว — ไม่แยก มีข่าว/ไม่มีข่าว
 
+_last_usage = None   # set after each API call — read by accountant
+
 _MAX_TP_SCALE = 2.0   # TP ขยายได้สูงสุด 2× default_tp_pips
 
 
@@ -165,6 +167,7 @@ Threshold ที่ใช้: Technical ≥ {min_tech_conf}%
 {advisor_section}
 ตัดสินใจตามกฎที่กำหนดและตอบในรูปแบบที่ระบุไว้"""
 
+    global _last_usage
     response = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=350,
@@ -172,6 +175,7 @@ Threshold ที่ใช้: Technical ≥ {min_tech_conf}%
                  "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user", "content": user_message}],
     )
+    _last_usage = response.usage
 
     decision_text = response.content[0].text
     logger.info(f"Decision:\n{decision_text}")

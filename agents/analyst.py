@@ -8,6 +8,8 @@ client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 SYSTEM_PROMPT = Path("agents/prompts/analyst.md").read_text(encoding="utf-8")
 
+_last_usage = None   # set after each API call — read by accountant
+
 
 def analyze_sentiment(news_data: dict) -> dict:
     logger.info("Agent 3 (ผู้วิเคราะห์): กำลังวิเคราะห์ sentiment...")
@@ -60,6 +62,7 @@ def analyze_sentiment(news_data: dict) -> dict:
 
 หมายเหตุ: ให้น้ำหนัก ForexFactory calendar สูงสุด (เป็น hard data) รองลงมาคือ Investing.com แล้วค่อย Twitter/X"""
 
+    global _last_usage
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=400,
@@ -67,6 +70,7 @@ def analyze_sentiment(news_data: dict) -> dict:
                  "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user", "content": user_message}],
     )
+    _last_usage = response.usage
 
     analysis_text = response.content[0].text
     logger.info(f"Sentiment Analysis:\n{analysis_text}")

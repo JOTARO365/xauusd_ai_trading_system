@@ -12,6 +12,8 @@ client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 SYSTEM_PROMPT = Path("agents/prompts/chart_watcher.md").read_text(encoding="utf-8")
 
+_last_usage = None   # set after each API call — read by accountant
+
 SR_ZONE_PCT   = 0.004   # 0.4% = "อยู่ในโซน S/R" (ขยายสำหรับ scalping)
 EMA_TOUCH_PCT = 0.002   # 0.2% = "แตะ EMA"
 SL_MIN_PIPS   = 1000
@@ -753,6 +755,7 @@ RSI:{m15['rsi']} MACD Hist:{m15['macd_hist']}
 
 วิเคราะห์ตามกฎที่กำหนดและตอบในรูปแบบที่ระบุไว้"""
 
+    global _last_usage
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=800,
@@ -760,6 +763,7 @@ RSI:{m15['rsi']} MACD Hist:{m15['macd_hist']}
                  "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user", "content": user_message}],
     )
+    _last_usage = response.usage
 
     analysis_text = response.content[0].text
     logger.info(f"Chart result: {analysis_text[:200]}")

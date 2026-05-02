@@ -7,6 +7,8 @@ from loguru import logger
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 SYSTEM_PROMPT = Path("agents/prompts/market_advisor.md").read_text(encoding="utf-8")
 
+_last_usage = None   # set after each API call — read by accountant
+
 
 def analyze_market_regime(chart_data: dict) -> dict:
     logger.info("Agent 2.5 (Market Advisor): กำลังวิเคราะห์ market regime...")
@@ -61,6 +63,8 @@ Entry Type: {chart_data.get("entry_type", "—")}
 {entry_perf}
 Reply in the exact output format only. No extra text."""
 
+    global _last_usage
+    _last_usage = None
     try:
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
@@ -69,6 +73,7 @@ Reply in the exact output format only. No extra text."""
                      "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_message}],
         )
+        _last_usage = response.usage
         text = response.content[0].text
         logger.info(f"Market Advisor:\n{text}")
         return _parse_response(text)

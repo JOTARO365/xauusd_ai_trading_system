@@ -14,6 +14,7 @@ LOG_FILE = "logs/trades.json"
 _REPORTER_PROMPT  = Path("agents/prompts/reporter.md").read_text(encoding="utf-8")
 _ANALYSIS_COOLDOWN = 900  # วิเคราะห์ใหม่ได้ทุก 15 นาที
 _last_analysis_at: datetime | None = None
+_last_usage = None   # set after each API call — read by accountant
 
 
 def _load_log() -> dict:
@@ -617,6 +618,8 @@ Losing Streak : {history['losing_streak']}
 {json.dumps(closed[-30:], ensure_ascii=False, indent=2)}
 """
 
+    global _last_usage
+    _last_usage = None
     try:
         from config import ANTHROPIC_API_KEY
         client   = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -627,6 +630,7 @@ Losing Streak : {history['losing_streak']}
                      "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_msg}],
         )
+        _last_usage = response.usage
         report = response.content[0].text
         _last_analysis_at = now
         logger.info("Performance analysis completed")
