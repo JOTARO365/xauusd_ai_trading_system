@@ -1,0 +1,27 @@
+# ─────────────────────────────────────────────────────────────
+# Full system — Windows containers mode
+#
+# ข้อกำหนด:
+#   1. Docker Desktop โหมด Windows containers
+#      (right-click tray icon → Switch to Windows containers...)
+#   2. MetaTrader5 terminal เปิดและ Login บน host แล้ว
+#
+# รัน:  docker compose -f docker-compose.windows.yml up -d
+# หยุด: docker compose -f docker-compose.windows.yml down
+# Logs: docker compose -f docker-compose.windows.yml logs -f
+# ─────────────────────────────────────────────────────────────
+
+services:
+  trading:
+    build:
+      context: .
+      dockerfile: Dockerfile.windows
+    container_name: xauusd-trading
+    ports:
+      - "5050:5050"
+    volumes:
+      - type: bind
+        source: .\logs
+        target: C:\app\logs
+    env_file: .env
+    restart: unless-stopped

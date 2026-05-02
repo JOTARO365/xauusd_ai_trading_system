@@ -1,17 +1,25 @@
 services:
   dashboard:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: xauusd-dashboard
     ports:
       - "5050:5050"
     volumes:
-      - ./.env:/app/.env          # mount .env จาก host — แก้ไขได้โดยไม่ต้อง rebuild
-      - ./logs:/app/logs          # persist trade logs
+      - ./.env:/app/.env:ro        # mount .env จาก host
+      - ./logs:/app/logs           # persist trade logs
     restart: unless-stopped
     environment:
-      - PYTHONUNBUFFERED=1
+      PYTHONUNBUFFERED: "1"
 
-  # ─────────────────────────────────────────────────────────────
-  # trading-bot (main.py) รัน MetaTrader5 ซึ่งรองรับเฉพาะ Windows
-  # ต้องรันบน Windows host โดยตรงด้วย PM2:
-  #   pm2 start ecosystem.config.js --only main
-  # ─────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────
+# Trading Bot (main.py) ต้องรันบน Windows host
+# เพราะ MetaTrader5 Python API ใช้ Windows IPC เชื่อมต่อ MT5 terminal
+#
+# รันผ่าน start.bat  (แนะนำ — จัดการทุกอย่างอัตโนมัติ)
+# หรือรันตรงๆ:  python main.py
+#
+# ถ้าต้องการ 100% Docker ให้ใช้ Windows containers:
+#   docker compose -f docker-compose.windows.yml up -d
+# ─────────────────────────────────────────────────────────────

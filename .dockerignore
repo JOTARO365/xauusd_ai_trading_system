@@ -1,7 +1,35 @@
+# Secrets (never in image)
 .env
+
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+
+# Runtime data (mounted as volumes)
 logs/
+*.log
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Development tools
+.claude/
+docs/
+*.md
+
+# PM2 / Node (runtime dirs only — keep config files for Windows container)
 .pm2/
 node_modules/
+package*.json
+
+# Windows startup scripts (host-only)
+start.bat
+start_main.cmd
+start_dashboard.cmd
+
+# One-off scripts
+backfill_*.py

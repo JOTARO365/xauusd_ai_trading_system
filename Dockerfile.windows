@@ -1,0 +1,43 @@
+# ─────────────────────────────────────────────────────────────
+# Windows container — full system (bot + dashboard)
+#
+# ข้อกำหนด:
+#   Docker Desktop โหมด Windows containers
+#   (right-click tray icon → Switch to Windows containers...)
+#   MT5 terminal เปิดและ Login บน host ก่อนรัน
+#
+# รัน: docker compose -f docker-compose.windows.yml up -d
+# ─────────────────────────────────────────────────────────────
+FROM python:3.11-windowsservercore-ltsc2022
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+WORKDIR C:\app
+
+# ── Install Node.js LTS ────────────────────────────────────────
+RUN Invoke-WebRequest -Uri 'https://nodejs.org/dist/v20.13.1/node-v20.13.1-x64.msi' \
+        -OutFile 'node.msi'; \
+    Start-Process -Wait -FilePath 'msiexec.exe' \
+        -ArgumentList '/i node.msi /qn ADDLOCAL=ALL'; \
+    Remove-Item -Force node.msi; \
+    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine'); \
+    node --version; npm --version
+
+# ── Install PM2 ────────────────────────────────────────────────
+RUN $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine'); \
+    npm install -g pm2; \
+    pm2 --version
+
+# ── Install Python packages (MetaTrader5 included) ────────────
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ── Copy project ───────────────────────────────────────────────
+COPY . .
+RUN New-Item -ItemType Directory -Force -Path logs | Out-Null
+
+ENV PYTHONUNBUFFERED=1
+EXPOSE 5050
+
+# ── Startup: refresh PATH then launch PM2 runtime ─────────────
+CMD ["powershell", "-File", "C:\\app\\docker-start.ps1"]

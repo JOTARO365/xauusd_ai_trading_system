@@ -125,20 +125,88 @@ python dashboard/app.py
 
 ---
 
-## Docker (Dashboard เท่านั้น)
+## Docker
+
+มี 2 โหมด ขึ้นอยู่กับความต้องการ:
+
+---
+
+### โหมด A — Linux containers (Dashboard เท่านั้น)
+
+ใช้ Docker Desktop ปกติ (Linux mode) — **ไม่ต้องสลับ mode**
 
 ```bash
 # สร้าง .env ก่อน
-cp .env.example .env
+copy .env.example .env   # Windows
+# หรือ: cp .env.example .env
 
-# รัน dashboard ใน Docker
+# รัน dashboard
 docker compose up -d
 
 # ดู logs
-docker compose logs -f dashboard
+docker compose logs -f
+
+# หยุด
+docker compose down
 ```
 
-> Trading bot ต้องรันบน Windows host แยกต่างหากด้วย PM2
+- Dashboard เปิดที่ `http://localhost:5050`
+- Trading bot (`main.py`) ต้องรันแยกบน Windows host ด้วย PM2 หรือ `python main.py`
+
+---
+
+### โหมด B — Windows containers (ระบบเต็ม — Bot + Dashboard)
+
+Docker ติดตั้งทุกอย่างในตัว: **Python, Node.js, PM2** และ Python packages ทั้งหมด  
+ใช้สำหรับคนที่ต้องการรันทุกอย่างใน Docker โดยไม่ต้องติดตั้งอะไรเพิ่มบน host
+
+**ข้อกำหนด:**
+1. Docker Desktop บน Windows
+2. สลับเป็น Windows containers mode:
+   - right-click ไอคอน Docker ใน system tray
+   - เลือก **"Switch to Windows containers..."**
+3. MetaTrader5 terminal เปิดและ Login ไว้บน host
+
+```bash
+# สร้าง .env ก่อน
+copy .env.example .env
+
+# Build และรัน (ครั้งแรก build นาน ~15-30 นาที เพราะ image ใหญ่)
+docker compose -f docker-compose.windows.yml up -d
+
+# ดู logs แบบ real-time
+docker compose -f docker-compose.windows.yml logs -f
+
+# ดูสถานะ PM2 ภายใน container
+docker exec xauusd-trading powershell -Command "pm2 list"
+
+# Restart process ใด process หนึ่ง
+docker exec xauusd-trading powershell -Command "pm2 restart main"
+docker exec xauusd-trading powershell -Command "pm2 restart dashboard"
+
+# หยุดทั้งหมด
+docker compose -f docker-compose.windows.yml down
+```
+
+- Dashboard เปิดที่ `http://localhost:5050`
+- PM2 จัดการ `main.py` (bot) และ `dashboard/app.py` ใน container เดียว
+- Docker restart container อัตโนมัติถ้า PM2 หยุด (`restart: unless-stopped`)
+
+> **หมายเหตุ:** Windows container image (`windowsservercore-ltsc2022`) ขนาด ~5-7 GB  
+> Build ครั้งแรกใช้เวลานาน ครั้งถัดไปใช้ cache เร็วขึ้นมาก
+
+---
+
+### เปรียบเทียบ 2 โหมด
+
+| | โหมด A (Linux) | โหมด B (Windows) |
+|---|---|---|
+| **คำสั่ง** | `docker compose up -d` | `docker compose -f docker-compose.windows.yml up -d` |
+| **Trading Bot** | ต้องรันแยกบน host | รันในตัว |
+| **Image size** | ~500 MB | ~5-7 GB |
+| **Build time** | ~2-5 นาที | ~15-30 นาที |
+| **MetaTrader5** | ไม่รองรับ | รองรับ (Windows IPC) |
+| **Docker mode** | Linux (default) | Windows containers |
 
 ---
 
@@ -147,9 +215,13 @@ docker compose logs -f dashboard
 ```
 ├── main.py                  # Entry point — trading loop
 ├── config.py                # โหลด config จาก .env
-├── ecosystem.config.js      # PM2 config
-├── Dockerfile               # Dashboard Docker image
-├── docker-compose.yml
+├── ecosystem.config.js      # PM2 config (ใช้ทั้ง host และ Windows container)
+├── Dockerfile               # Linux image — dashboard เท่านั้น
+├── Dockerfile.windows       # Windows image — bot + dashboard (Node.js + PM2 + MT5)
+├── docker-compose.yml       # Linux mode (dashboard only)
+├── docker-compose.windows.yml  # Windows containers mode (ระบบเต็ม)
+├── docker-start.ps1         # Startup script สำหรับ Windows container
+├── start.bat                # One-click startup สำหรับ Windows host
 │
 ├── agents/
 │   ├── chart_watcher.py     # วิเคราะห์กราฟ + หา setup

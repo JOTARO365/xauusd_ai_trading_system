@@ -1,9 +1,12 @@
+const path = require('path');
+const APP_DIR = path.resolve(__dirname);
+
 module.exports = {
   apps: [
     {
       name: "main",
       script: "pm2_main.js",
-      cwd: "D:\\claude_workspace\\xauusd_ai_tranding_system",
+      cwd: APP_DIR,
       autorestart: true,
       watch: false,
       max_restarts: 5,
@@ -12,7 +15,7 @@ module.exports = {
     {
       name: "dashboard",
       script: "pm2_dashboard.js",
-      cwd: "D:\\claude_workspace\\xauusd_ai_tranding_system",
+      cwd: APP_DIR,
       autorestart: true,
       watch: false,
       max_restarts: 10,
