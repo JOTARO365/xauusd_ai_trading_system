@@ -150,6 +150,14 @@ def record_cycle(
         f"Accounting: ${cycle['total_cost_usd']:.5f}/cycle | "
         f"total ${s['total_cost_usd']:.4f} | ticket={ticket}"
     )
+
+    # ── write-through to PostgreSQL (optional — ถ้า DB ไม่พร้อมก็ไม่ crash) ──
+    try:
+        from db.writer import write_cycle as _db_write_cycle
+        _db_write_cycle(cycle)
+    except Exception as _e:
+        logger.debug(f"DB cycle write skipped: {_e}")
+
     return cycle
 
 

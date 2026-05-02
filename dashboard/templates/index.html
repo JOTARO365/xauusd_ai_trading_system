@@ -663,6 +663,63 @@
     @media (max-width: 600px) {
       .settings-grid { grid-template-columns: 1fr; }
     }
+
+    /* ─── ACCOUNTING TAB ──────────────────────────────── */
+    .agent-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .agent-table th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+    .agent-table th.num, .agent-table td.num { text-align: right; }
+    .agent-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    .agent-table tr:last-child td { border-bottom: none; }
+    .agent-table tr:hover td { background: var(--surface2); }
+    .model-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .model-haiku  { background: rgba(38,166,154,0.15); color: var(--green); }
+    .model-sonnet { background: rgba(245,200,66,0.15);  color: var(--gold); }
+    .hit-bar {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .hit-bar-track {
+      width: 60px; height: 4px;
+      background: var(--border2);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .hit-bar-fill {
+      height: 100%;
+      background: var(--green);
+      border-radius: 2px;
+      transition: width 0.4s;
+    }
+    .acc-db-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; padding: 3px 8px;
+      border-radius: 4px;
+    }
+    .acc-db-ok  { background: var(--green-dim); color: var(--green); }
+    .acc-db-off { background: var(--red-dim);   color: var(--red); }
   </style>
 </head>
 <body>
@@ -679,8 +736,9 @@
 
   <!-- TABS -->
   <div class="tab-nav">
-    <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
-    <button class="tab-btn"        data-tab="settings" onclick="switchTab('settings')">⚙ Settings</button>
+    <button class="tab-btn active" data-tab="overview"    onclick="switchTab('overview')">Overview</button>
+    <button class="tab-btn"        data-tab="accounting"  onclick="switchTab('accounting')">$ Accounting</button>
+    <button class="tab-btn"        data-tab="settings"    onclick="switchTab('settings')">⚙ Settings</button>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
@@ -897,6 +955,69 @@
   </section>
 
   </div><!-- /tab-overview -->
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-accounting">
+
+    <!-- SUMMARY CARDS -->
+    <section>
+      <div class="section-title">ค่าใช้จ่าย AI</div>
+      <div class="stat-grid">
+        <div class="card">
+          <div class="label">Cost วันนี้</div>
+          <div class="value gold" id="acc-today-cost">—</div>
+          <div class="sub" id="acc-today-cycles">— cycles</div>
+        </div>
+        <div class="card">
+          <div class="label">Cost รวม (All-time)</div>
+          <div class="value" id="acc-total-cost">—</div>
+          <div class="sub" id="acc-total-cycles">— cycles total</div>
+        </div>
+        <div class="card">
+          <div class="label">เฉลี่ย / Cycle</div>
+          <div class="value" id="acc-avg-cycle">—</div>
+          <div class="sub">ต้นทุน AI ต่อรอบ</div>
+        </div>
+        <div class="card">
+          <div class="label">เฉลี่ย / Trade</div>
+          <div class="value" id="acc-avg-trade">—</div>
+          <div class="sub" id="acc-total-trades-sub">— trades ที่มี AI cost</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DAILY COST CHART -->
+    <section>
+      <div class="section-title">AI Cost รายวัน (14 วันล่าสุด)</div>
+      <div class="chart-card">
+        <canvas id="dailyCostChart" height="90"></canvas>
+      </div>
+    </section>
+
+    <!-- AGENT BREAKDOWN TABLE -->
+    <section>
+      <div class="section-title">ต้นทุน per Agent</div>
+      <div class="table-card">
+        <table class="agent-table">
+          <thead>
+            <tr>
+              <th>Agent</th>
+              <th>Model</th>
+              <th class="num">Calls</th>
+              <th class="num">Total Cost</th>
+              <th class="num">Cost / Call</th>
+              <th>Cache Hit Rate</th>
+              <th class="num">Avg Latency</th>
+            </tr>
+          </thead>
+          <tbody id="agent-cost-tbody">
+            <tr><td colspan="7" class="no-data">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </div><!-- /tab-accounting -->
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-settings">
@@ -1421,7 +1542,138 @@ function switchTab(name) {
     b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.tab-content').forEach(c =>
     c.classList.toggle('active', c.id === 'tab-' + name));
-  if (name === 'settings') loadConfig();
+  if (name === 'settings')   loadConfig();
+  if (name === 'accounting') loadAccounting();
+}
+
+// ─── ACCOUNTING ──────────────────────────────────────────────
+let dailyCostChart = null;
+
+function fmtUsd(v) {
+  if (v === null || v === undefined) return '—';
+  if (v < 0.001) return '$' + Number(v).toFixed(6);
+  if (v < 0.01)  return '$' + Number(v).toFixed(5);
+  return '$' + Number(v).toFixed(4);
+}
+
+async function loadAccounting() {
+  try {
+    const res  = await fetch('/api/accounting');
+    const data = await res.json();
+    if (!data.ok) return;
+
+    const s       = data.summary || {};
+    const today   = data.today   || {};
+    const agents  = data.agents  || {};
+    const daily   = data.daily   || {};
+
+    // ── summary cards ────────────────────────────────────────
+    const todayCycles = today.cycles || 0;
+    const todayTrades = today.trades || 0;
+    document.getElementById('acc-today-cost').textContent    = fmtUsd(today.total_cost_usd || 0);
+    document.getElementById('acc-today-cycles').textContent  = `${todayCycles} cycles, ${todayTrades} trades`;
+    document.getElementById('acc-total-cost').textContent    = fmtUsd(s.total_cost_usd || 0);
+    document.getElementById('acc-total-cycles').textContent  = `${s.total_cycles || 0} cycles total`;
+
+    const totalCycles = s.total_cycles || 1;
+    const totalTrades = s.total_trades || 0;
+    const avgCycle    = (s.total_cost_usd || 0) / totalCycles;
+    document.getElementById('acc-avg-cycle').textContent = fmtUsd(avgCycle);
+
+    if (totalTrades > 0) {
+      // sum cost only from cycles that had a trade
+      const tradeCycles = Object.values(daily).reduce((sum, d) => sum + (d.trades || 0), 0);
+      const tradeCost   = (s.total_cost_usd || 0) * (tradeCycles / totalCycles);
+      document.getElementById('acc-avg-trade').textContent     = fmtUsd(tradeCost / totalTrades);
+      document.getElementById('acc-total-trades-sub').textContent = `${totalTrades} trades ที่มี AI cost`;
+    } else {
+      document.getElementById('acc-avg-trade').textContent = '—';
+    }
+
+    // ── agent table ──────────────────────────────────────────
+    const ORDER = ['chart_watcher','market_advisor','analyst','decision_maker','reporter'];
+    const rows = ORDER.filter(k => agents[k]).concat(
+      Object.keys(agents).filter(k => !ORDER.includes(k))
+    );
+
+    const tbody = document.getElementById('agent-cost-tbody');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data">ยังไม่มีข้อมูล — รัน bot อย่างน้อย 1 cycle</td></tr>';
+    } else {
+      tbody.innerHTML = rows.map(name => {
+        const a       = agents[name];
+        const calls   = a.total_calls || 0;
+        const cost    = a.total_cost_usd || 0;
+        const perCall = calls > 0 ? cost / calls : 0;
+        const hitRate = a.avg_cache_hit_rate ?? 0;
+        const isHaiku = (a.model || '').includes('haiku');
+        const modelCls   = isHaiku ? 'model-haiku' : 'model-sonnet';
+        const modelLabel = isHaiku ? 'Haiku' : 'Sonnet';
+        const barWidth   = Math.min(hitRate, 100).toFixed(0);
+        const hitColor   = hitRate >= 70 ? 'var(--green)' : hitRate >= 40 ? '#f09642' : 'var(--red)';
+        return `<tr>
+          <td><strong>${name}</strong></td>
+          <td><span class="model-badge ${modelCls}">${modelLabel}</span></td>
+          <td class="num">${calls.toLocaleString()}</td>
+          <td class="num">${fmtUsd(cost)}</td>
+          <td class="num">${fmtUsd(perCall)}</td>
+          <td>
+            <div class="hit-bar">
+              <div class="hit-bar-track">
+                <div class="hit-bar-fill" style="width:${barWidth}%;background:${hitColor}"></div>
+              </div>
+              <span style="font-size:12px;color:${hitColor}">${hitRate.toFixed(1)}%</span>
+            </div>
+          </td>
+          <td class="num">${a.avg_latency_ms ? (a.avg_latency_ms / 1000).toFixed(1) + 's' : '—'}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ── daily cost chart ─────────────────────────────────────
+    const sortedDays = Object.keys(daily).sort().slice(-14);
+    const labels     = sortedDays.map(d => d.slice(5));   // MM-DD
+    const costs      = sortedDays.map(d => +(daily[d].total_cost_usd || 0).toFixed(5));
+
+    if (dailyCostChart) dailyCostChart.destroy();
+    const ctx = document.getElementById('dailyCostChart').getContext('2d');
+    dailyCostChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'AI Cost (USD)',
+          data: costs,
+          backgroundColor: 'rgba(245,200,66,0.25)',
+          borderColor: 'rgba(245,200,66,0.8)',
+          borderWidth: 1,
+          borderRadius: 3,
+        }],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: { label: ctx => '$' + ctx.parsed.y.toFixed(5) }
+          }
+        },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#5a5a5a' } },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: {
+              color: '#5a5a5a',
+              callback: v => '$' + v.toFixed(4)
+            },
+          },
+        },
+      },
+    });
+
+  } catch (e) {
+    console.error('loadAccounting error:', e);
+  }
 }
 
 // ─── CONFIG LOAD ─────────────────────────────────────────────

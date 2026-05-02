@@ -460,6 +460,26 @@ def api_data():
     return resp
 
 
+@app.route("/api/accounting")
+def api_accounting():
+    """ค่าใช้จ่าย AI — อ่านจาก accounting.json (primary) + DB (ถ้ามี)"""
+    try:
+        from agents.accountant import get_summary
+        data = get_summary()
+        # คำนวณ avg cache hit rate รวมทุก agent
+        agents = data.get("agents", {})
+        for info in agents.values():
+            total_in = (info.get("total_input_tokens", 0)
+                      + info.get("total_cache_read_tokens", 0)
+                      + info.get("total_cache_write_tokens", 0))
+            cr = info.get("total_cache_read_tokens", 0)
+            info["avg_cache_hit_rate"] = round(cr / total_in * 100, 1) if total_in > 0 else 0.0
+        return jsonify({**data, "ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e),
+                        "summary": {}, "agents": {}, "today": {}, "daily": {}})
+
+
 @app.route("/api/calendar")
 def api_calendar():
     """ดึง economic calendar สัปดาห์นี้ (High + Medium impact events)"""

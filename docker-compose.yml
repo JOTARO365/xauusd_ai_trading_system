@@ -1,4 +1,24 @@
 services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: xauusd-postgres
+    environment:
+      POSTGRES_DB:       trading
+      POSTGRES_USER:     trading
+      POSTGRES_PASSWORD: trading
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trading -d trading"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   dashboard:
     build:
       context: .
@@ -7,11 +27,19 @@ services:
     ports:
       - "5050:5050"
     volumes:
-      - ./.env:/app/.env:ro        # mount .env จาก host
-      - ./logs:/app/logs           # persist trade logs
-    restart: unless-stopped
+      - ./.env:/app/.env:ro
+      - ./logs:/app/logs
+    env_file: .env
     environment:
       PYTHONUNBUFFERED: "1"
+      DATABASE_URL: "postgresql://trading:trading@postgres:5432/trading"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
 
 # ─────────────────────────────────────────────────────────────
 # Trading Bot (main.py) ต้องรันบน Windows host

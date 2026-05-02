@@ -429,12 +429,22 @@ def log_trade(decision_result: dict):
             log["trades"][i].update(trade_entry)
             _save_log(log)
             logger.info(f"System trade updated — Ticket:{ticket} | PA:{pa_action} | Type:{entry_type}")
+            _db_write_trade(trade_entry)
             return
 
     log["trades"].append(trade_entry)
     log["summary"]["total"] += 1
     _save_log(log)
     logger.info(f"System trade logged — Ticket:{ticket} | PA:{pa_action} | Type:{entry_type}")
+    _db_write_trade(trade_entry)
+
+
+def _db_write_trade(trade: dict) -> None:
+    try:
+        from db.writer import write_trade
+        write_trade(trade)
+    except Exception as e:
+        logger.debug(f"DB trade write skipped: {e}")
 
 
 # ─────────────────────────────────────────────────────────────
