@@ -1,0 +1,17 @@
+services:
+  dashboard:
+    build: .
+    ports:
+      - "5050:5050"
+    volumes:
+      - ./.env:/app/.env          # mount .env จาก host — แก้ไขได้โดยไม่ต้อง rebuild
+      - ./logs:/app/logs          # persist trade logs
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  # ─────────────────────────────────────────────────────────────
+  # trading-bot (main.py) รัน MetaTrader5 ซึ่งรองรับเฉพาะ Windows
+  # ต้องรันบน Windows host โดยตรงด้วย PM2:
+  #   pm2 start ecosystem.config.js --only main
+  # ─────────────────────────────────────────────────────────────

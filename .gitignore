@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.py[cod]
+logs/
+*.log
+.venv/
+venv/
+.pm2/
+node_modules/
+*.cmd
+accounts.txt
+accounts.db
+.claude/

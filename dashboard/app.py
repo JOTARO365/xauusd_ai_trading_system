@@ -1,0 +1,476 @@
+import json
+import os
+import subprocess
+import sys
+from datetime import datetime, date, timedelta
+from flask import Flask, render_template, jsonify, make_response, request
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+try:
+    import MetaTrader5 as mt5
+    _MT5_AVAILABLE = True
+except ImportError:
+    _MT5_AVAILABLE = False
+    class _MT5Stub:
+        """Stub สำหรับ non-Windows (Docker/Linux) — ทุก call คืน None/empty"""
+        def __getattr__(self, _):
+            return lambda *a, **kw: None
+    mt5 = _MT5Stub()
+
+import urllib.request
+from config import MT5_LOGIN, MT5_PASSWORD, MT5_SERVER, SYMBOL
+
+app = Flask(__name__)
+
+LOG_FILE    = os.path.join(os.path.dirname(__file__), "../logs/trades.json")
+SYSTEM_MAGIC = 20260429   # ต้องตรงกับ mt5_connector.py
+ENV_FILE = os.path.join(os.path.dirname(__file__), "../.env")
+
+# Keys ที่อนุญาตให้แก้ไขผ่าน dashboard (ไม่รวม credentials)
+_EDITABLE_KEYS = {
+    "SYMBOL", "START_BALANCE",
+    "LOT_MODE", "FIXED_LOT", "MIN_LOT", "MAX_LOT",
+    "RISK_PER_TRADE", "MAX_DAILY_LOSS", "MAX_OPEN_TRADES",
+    "DEFAULT_SL_PIPS", "DEFAULT_TP_PIPS", "MIN_RR_RATIO", "HEDGE_BUFFER_PIPS",
+    "MAX_PENDING_BUY", "MAX_PENDING_SELL", "PENDING_EXPIRY_HOURS",
+    "MAX_LOSING_STREAK", "STREAK_MIN_CONFIDENCE",
+    "PORTFOLIO_PROTECTION", "STREAK_PROTECTION", "DYNAMIC_TP",
+    "X_ACCOUNTS_TO_FOLLOW", "X_KEYWORDS",
+}
+
+_usd_thb_cache = {"rate": 33.0, "fetched_at": None}
+
+
+def get_usd_thb() -> float:
+    """ดึงอัตราแลกเปลี่ยน USD/THB จาก Yahoo Finance และ cache ไว้ 5 นาที"""
+    from datetime import timedelta
+    now = datetime.now()
+    if _usd_thb_cache["fetched_at"] and (now - _usd_thb_cache["fetched_at"]) < timedelta(minutes=5):
+        return _usd_thb_cache["rate"]
+    try:
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/USDTHB=X?interval=1m&range=1d"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=5) as res:
+            data = json.loads(res.read())
+        rate = data["chart"]["result"][0]["meta"]["regularMarketPrice"]
+        _usd_thb_cache["rate"] = round(rate, 4)
+        _usd_thb_cache["fetched_at"] = now
+    except Exception:
+        pass
+    return _usd_thb_cache["rate"]
+
+
+def _sync_from_mt5(data: dict) -> bool:
+    """
+    Pull positions + deal history จาก MT5 แล้ว merge เข้า trades.json (ต้อง initialize MT5 ก่อน)
+    - Existing entry: อัปเดต status / pnl / sl / tp / lot
+    - New entry ไม่มีใน log: เพิ่มเป็น MANUAL (ไม่มี AI context)
+    คืน True ถ้ามีการเปลี่ยนแปลง
+    """
+    # สร้าง ticket_map โดย prefer SYSTEM over MANUAL เมื่อ ticket ซ้ำกัน
+    ticket_map: dict[str, dict] = {}
+    for t in data.get("trades", []):
+        tk = str(t.get("ticket", ""))
+        if not tk:
+            continue
+        existing = ticket_map.get(tk)
+        if existing is None:
+            ticket_map[tk] = t
+        elif t.get("source") == "SYSTEM" and existing.get("source") != "SYSTEM":
+            # SYSTEM entry มาทีหลัง → ให้ทับ MANUAL ที่ซ้ำกัน
+            ticket_map[tk] = t
+    changed = False
+
+    # ── 1. Open positions ──────────────────────────────────────────
+    open_pos = mt5.positions_get(symbol=SYMBOL) or []
+    open_ids = {str(p.ticket) for p in open_pos}
+
+    for pos in open_pos:
+        tk = str(pos.ticket)
+        sl = pos.sl  if pos.sl  != 0 else None
+        tp = pos.tp  if pos.tp  != 0 else None
+
+        if tk in ticket_map:
+            t = ticket_map[tk]
+            floating_pnl = round(pos.profit, 2)
+            entry_price  = t.get("entry_price") or pos.price_open
+            if (t.get("status") != "OPEN" or t.get("sl") != sl
+                    or t.get("tp") != tp or t.get("lot") != pos.volume
+                    or t.get("pnl") != floating_pnl
+                    or not t.get("entry_price")):
+                t.update({"status": "OPEN", "pnl": floating_pnl,
+                          "sl": sl, "tp": tp, "lot": pos.volume,
+                          "entry_price": entry_price})
+                changed = True
+        else:
+            direction  = "BUY" if pos.type == 0 else "SELL"
+            is_system  = pos.magic == SYSTEM_MAGIC
+            src        = "SYSTEM" if is_system else "MANUAL"
+            entry_type = "RECOVERED" if is_system else "MANUAL"
+            entry = {
+                "source": src, "timestamp": datetime.fromtimestamp(pos.time).isoformat(),
+                "ticket": pos.ticket, "direction": direction,
+                "lot": pos.volume, "entry_price": pos.price_open,
+                "sl": sl, "tp": tp,
+                "technical_signal": direction, "technical_confidence": None,
+                "trend": None, "sr_zone": None, "sr_strength": None,
+                "pa_action": "NONE", "pa_zone": "—", "pa_level": None,
+                "pa_patterns": [], "entry_type": entry_type, "sentiment": None,
+                "manual_analysis": None if is_system else "Detected from MT5",
+                "manual_reason": pos.comment or "",
+                "status": "OPEN", "pnl": None,
+            }
+            data["trades"].append(entry)
+            ticket_map[tk] = entry
+            changed = True
+
+    # ── 2. Closed positions from deal history ──────────────────────
+    from_dt = datetime.now() - timedelta(days=60)
+    all_deals = mt5.history_deals_get(from_dt, datetime.now()) or []
+
+    deals_by_pos: dict[int, list] = {}
+    for d in all_deals:
+        if d.symbol != SYMBOL:
+            continue
+        pid = d.position_id
+        if pid not in deals_by_pos:
+            deals_by_pos[pid] = []
+        deals_by_pos[pid].append(d)
+
+    for pid, pos_deals in deals_by_pos.items():
+        tk = str(pid)
+        if tk in open_ids:
+            continue  # ยังเปิดอยู่ จัดการแล้วข้างบน
+
+        out_deal = next((d for d in pos_deals if d.entry == 1), None)
+        if out_deal is None:
+            continue  # ยังไม่มี closing deal
+
+        pnl        = round(sum(d.profit + d.swap + d.commission for d in pos_deals), 2)
+        close_time = datetime.fromtimestamp(out_deal.time).isoformat()
+
+        if tk in ticket_map:
+            t = ticket_map[tk]
+            if (t.get("status") != "CLOSED" or t.get("pnl") != pnl):
+                t["status"]     = "CLOSED"
+                t["pnl"]        = pnl
+                t["close_time"] = close_time
+                changed         = True
+        else:
+            # เพิ่ม closed trade ใหม่ที่ไม่เคยเห็น
+            entry_deal = next((d for d in pos_deals if d.entry == 0), None)
+            if entry_deal is None:
+                continue
+            direction  = "BUY" if entry_deal.type == 0 else "SELL"
+            is_system  = entry_deal.magic == SYSTEM_MAGIC
+            src        = "SYSTEM" if is_system else "MANUAL"
+            entry_type = "RECOVERED" if is_system else "MANUAL"
+            entry = {
+                "source": src, "timestamp": datetime.fromtimestamp(entry_deal.time).isoformat(),
+                "close_time": close_time,
+                "ticket": pid, "direction": direction,
+                "lot": entry_deal.volume, "entry_price": entry_deal.price,
+                "sl": None, "tp": None,
+                "technical_signal": direction, "technical_confidence": None,
+                "trend": None, "sr_zone": None, "sr_strength": None,
+                "pa_action": "NONE", "pa_zone": "—", "pa_level": None,
+                "pa_patterns": [], "entry_type": entry_type, "sentiment": None,
+                "manual_analysis": None if is_system else "Detected from MT5 history",
+                "manual_reason": entry_deal.comment or "",
+                "status": "CLOSED", "pnl": pnl,
+            }
+            data["trades"].append(entry)
+            ticket_map[tk] = entry
+            changed = True
+
+    if not changed:
+        return False
+
+    # อัปเดต summary
+    closed = [t for t in data["trades"] if t.get("status") == "CLOSED"]
+    data["summary"] = {
+        "total":     len(closed),
+        "win":       sum(1 for t in closed if (t.get("pnl") or 0) > 0),
+        "loss":      sum(1 for t in closed if (t.get("pnl") or 0) < 0),
+        "total_pnl": round(sum(t.get("pnl") or 0 for t in closed), 2),
+    }
+    try:
+        with open(LOG_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    return True
+
+
+def get_mt5_account(data_to_sync: dict | None = None) -> dict:
+    """ดึงข้อมูลบัญชีจาก MT5 — ถ้าส่ง data_to_sync จะ sync trades จาก MT5 ด้วยในครั้งเดียว"""
+    try:
+        if not mt5.initialize():
+            return {}
+        if not mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
+            mt5.shutdown()
+            return {}
+        info = mt5.account_info()
+        if info is None:
+            mt5.shutdown()
+            return {}
+        result = {
+            "balance":     info.balance,
+            "equity":      info.equity,
+            "margin":      info.margin,
+            "free_margin": info.margin_free,
+            "profit":      info.profit,
+            "currency":    info.currency,
+        }
+        if data_to_sync is not None:
+            _sync_from_mt5(data_to_sync)
+        mt5.shutdown()
+        return result
+    except Exception:
+        try:
+            mt5.shutdown()
+        except Exception:
+            pass
+        return {}
+
+
+def load_trades() -> dict:
+    _empty = {"trades": [], "summary": {"total": 0, "win": 0, "loss": 0, "total_pnl": 0.0}}
+    if not os.path.exists(LOG_FILE):
+        return _empty
+    try:
+        with open(LOG_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        return _empty
+
+
+def calc_stats(trades: list) -> dict:
+    closed    = [t for t in trades if t.get("status") == "CLOSED"]
+    today_str = date.today().isoformat()
+
+    # today = trades ที่ปิดวันนี้ (ใช้ close_time ถ้ามี ไม่งั้น fallback timestamp)
+    def _closed_date(t):
+        return (t.get("close_time") or t.get("timestamp") or "")[:10]
+    today_closed = [t for t in closed if _closed_date(t) == today_str]
+
+    wins   = [t for t in closed if (t.get("pnl") or 0) > 0]
+    losses = [t for t in closed if (t.get("pnl") or 0) < 0]
+
+    total_pnl = sum(t.get("pnl") or 0 for t in closed)
+    today_pnl = sum(t.get("pnl") or 0 for t in today_closed)
+    win_rate  = round(len(wins) / len(closed) * 100, 1) if closed else 0
+    avg_win   = round(sum(t.get("pnl", 0) for t in wins)   / len(wins),   2) if wins   else 0
+    avg_loss  = round(sum(t.get("pnl", 0) for t in losses) / len(losses), 2) if losses else 0
+    profit_factor = round(
+        abs(sum(t.get("pnl", 0) for t in wins)) / abs(sum(t.get("pnl", 0) for t in losses)), 2
+    ) if losses and sum(t.get("pnl", 0) for t in losses) != 0 else 0
+
+    equity_curve = []
+    running = 0
+    for t in closed:
+        running += t.get("pnl") or 0
+        equity_curve.append({"time": t.get("timestamp", "")[:16], "equity": round(running, 2)})
+
+    today_closed  = [t for t in closed if t.get("timestamp", "").startswith(today_str)]
+    losing_streak = 0
+    for t in reversed(today_closed):
+        if (t.get("pnl") or 0) < 0:
+            losing_streak += 1
+        else:
+            break
+
+    # ── Source breakdown ──────────────────────────────────────────
+    sys_trades    = [t for t in closed if t.get("source") == "SYSTEM"]
+    manual_trades = [t for t in closed if t.get("source") == "MANUAL"]
+    sys_wins      = sum(1 for t in sys_trades    if (t.get("pnl") or 0) > 0)
+    manual_wins   = sum(1 for t in manual_trades if (t.get("pnl") or 0) > 0)
+
+    # ── Entry type breakdown (system trades only) ─────────────────
+    entry_type_stats: dict[str, dict] = {}
+    for t in sys_trades:
+        et = t.get("entry_type") or "UNKNOWN"
+        if et not in entry_type_stats:
+            entry_type_stats[et] = {"count": 0, "wins": 0, "pnl": 0.0}
+        entry_type_stats[et]["count"] += 1
+        if (t.get("pnl") or 0) > 0:
+            entry_type_stats[et]["wins"] += 1
+        entry_type_stats[et]["pnl"] = round(entry_type_stats[et]["pnl"] + (t.get("pnl") or 0), 2)
+
+    return {
+        "total":          len(closed),
+        "wins":           len(wins),
+        "losses":         len(losses),
+        "win_rate":       win_rate,
+        "total_pnl":      round(total_pnl, 2),
+        "today_pnl":      round(today_pnl, 2),
+        "today_trades":   len(today_closed),
+        "avg_win":        avg_win,
+        "avg_loss":       avg_loss,
+        "profit_factor":  profit_factor,
+        "losing_streak":  losing_streak,
+        "equity_curve":   equity_curve,
+        # new
+        "system_count":   len(sys_trades),
+        "manual_count":   len(manual_trades),
+        "system_winrate": round(sys_wins   / len(sys_trades)    * 100, 1) if sys_trades    else 0,
+        "manual_winrate": round(manual_wins/ len(manual_trades) * 100, 1) if manual_trades else 0,
+        "entry_type_stats": entry_type_stats,
+    }
+
+
+def _read_env_file() -> dict[str, str]:
+    """อ่าน .env file โดยตรง → dict  (strip quotes, skip comments)"""
+    result: dict[str, str] = {}
+    try:
+        with open(ENV_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#") or "=" not in stripped:
+                    continue
+                key, _, val = stripped.partition("=")
+                result[key.strip()] = val.strip().strip('"').strip("'")
+    except FileNotFoundError:
+        pass
+    return result
+
+
+@app.route("/api/config", methods=["GET"])
+def api_get_config():
+    """คืน trading config ปัจจุบัน — อ่านจาก .env file โดยตรง (ไม่ใช่ runtime env vars)"""
+    defaults = {
+        "SYMBOL": "XAUUSD", "START_BALANCE": "2000",
+        "LOT_MODE": "auto", "FIXED_LOT": "0.01", "MIN_LOT": "0.01", "MAX_LOT": "0.01",
+        "RISK_PER_TRADE": "0.50", "MAX_DAILY_LOSS": "1.00", "MAX_OPEN_TRADES": "4",
+        "DEFAULT_SL_PIPS": "1000", "DEFAULT_TP_PIPS": "3000", "MIN_RR_RATIO": "1.5",
+        "MAX_PENDING_BUY": "3", "MAX_PENDING_SELL": "3", "PENDING_EXPIRY_HOURS": "48",
+        "MAX_LOSING_STREAK": "5", "STREAK_MIN_CONFIDENCE": "62",
+        "PORTFOLIO_PROTECTION": "true", "STREAK_PROTECTION": "true", "DYNAMIC_TP": "true",
+        "X_ACCOUNTS_TO_FOLLOW": "kun_purich,cnnbrk,BBCBreaking,ZeroHedge,markets",
+        "X_KEYWORDS": "XAUUSD,gold,XAU,bullion,Fed,inflation",
+    }
+    env = _read_env_file()
+    return jsonify({k: env.get(k, v) for k, v in defaults.items()})
+
+
+@app.route("/api/config", methods=["POST"])
+def api_set_config():
+    """รับ JSON → อัปเดต .env เฉพาะ trading keys → เขียนคืน"""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "no JSON body"}), 400
+
+    updates = {k.upper(): str(v) for k, v in data.items() if k.upper() in _EDITABLE_KEYS}
+    if not updates:
+        return jsonify({"error": "no editable keys found"}), 400
+
+    # อ่าน .env ปัจจุบัน (ถ้ามี)
+    try:
+        with open(ENV_FILE, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        lines = []
+
+    # อัปเดต keys ที่มีอยู่แล้ว
+    seen: set[str] = set()
+    new_lines: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            new_lines.append(line)
+            continue
+        key = stripped.split("=", 1)[0].strip().upper()
+        if key in updates:
+            new_lines.append(f"{key}={updates[key]}\n")
+            seen.add(key)
+        else:
+            new_lines.append(line)
+
+    # เพิ่ม keys ใหม่ที่ยังไม่มีใน file
+    for key, val in updates.items():
+        if key not in seen:
+            new_lines.append(f"{key}={val}\n")
+
+    try:
+        with open(ENV_FILE, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    # ── PM2 restart (ถ้ามี) ───────────────────────────────────────
+    pm2_ok, pm2_msg = _pm2_restart()
+    return jsonify({"ok": True, "updated": sorted(updates.keys()),
+                    "pm2_ok": pm2_ok, "pm2_msg": pm2_msg})
+
+
+def _pm2_restart() -> tuple[bool, str]:
+    """เรียก pm2 restart ตาม PM2_APP_NAME ใน .env (default: 'main')"""
+    app_name = _read_env_file().get("PM2_APP_NAME", os.getenv("PM2_APP_NAME", "main"))
+    try:
+        result = subprocess.run(
+            f"pm2 restart {app_name}",
+            shell=True, capture_output=True, text=True, timeout=15,
+        )
+        if result.returncode == 0:
+            return True, f"pm2 restart {app_name} — OK"
+        err = (result.stderr or result.stdout).strip().splitlines()[0]
+        return False, err or f"exit code {result.returncode}"
+    except FileNotFoundError:
+        return False, "pm2 not found in PATH"
+    except subprocess.TimeoutExpired:
+        return False, "pm2 timeout"
+    except Exception as e:
+        return False, str(e)
+
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
+@app.route("/api/data")
+def api_data():
+    data    = load_trades()
+    usd_thb = get_usd_thb()
+    account = get_mt5_account(data_to_sync=data)  # syncs OPEN→CLOSED in-place ถ้า MT5 available
+    trades  = data.get("trades", [])
+    stats   = calc_stats(trades)
+
+    if account:
+        currency = account.get("currency", "USD")
+        if currency == "THB":
+            account["balance_thb"]     = account["balance"]
+            account["equity_thb"]      = account["equity"]
+            account["profit_thb"]      = account.get("profit", 0)
+            account["free_margin_thb"] = account.get("free_margin", 0)
+        else:
+            account["balance_thb"]     = round(account["balance"]            * usd_thb, 2)
+            account["equity_thb"]      = round(account["equity"]             * usd_thb, 2)
+            account["profit_thb"]      = round(account.get("profit", 0)      * usd_thb, 2)
+            account["free_margin_thb"] = round(account.get("free_margin", 0) * usd_thb, 2)
+
+    resp = make_response(jsonify({
+        "stats":   stats,
+        "trades":  list(reversed(trades)),
+        "account": account,
+        "usd_thb": usd_thb,
+    }))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return resp
+
+
+@app.route("/api/calendar")
+def api_calendar():
+    """ดึง economic calendar สัปดาห์นี้ (High + Medium impact events)"""
+    try:
+        from connectors.web_news import fetch_forexfactory_calendar
+        events = fetch_forexfactory_calendar(hours_ahead=168)
+        return jsonify({"events": events, "ok": True})
+    except Exception as e:
+        return jsonify({"events": [], "ok": False, "error": str(e)})
+
+
+if __name__ == "__main__":
+    from waitress import serve
+    serve(app, host="0.0.0.0", port=5050, threads=4)

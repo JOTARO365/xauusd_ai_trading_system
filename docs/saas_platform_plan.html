@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SaaS Trading Platform — Business & Technical Plan</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 40px;
+  }
+
+  /* ── Cover ── */
+  .cover {
+    text-align: center;
+    padding: 80px 0 60px;
+    border-bottom: 1px solid #2d3748;
+    margin-bottom: 60px;
+  }
+  .cover .badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #f6c90e, #d4a017);
+    color: #0f1117;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 5px 16px;
+    border-radius: 20px;
+    margin-bottom: 24px;
+  }
+  .cover h1 {
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #f6c90e;
+    margin-bottom: 16px;
+  }
+  .cover p {
+    font-size: 16px;
+    color: #94a3b8;
+    max-width: 560px;
+    margin: 0 auto 32px;
+  }
+  .cover .meta {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    font-size: 13px;
+    color: #64748b;
+  }
+  .cover .meta span strong { color: #94a3b8; }
+
+  /* ── Section ── */
+  h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #f6c90e;
+    margin: 48px 0 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #2d3748;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2 .num {
+    background: #f6c90e;
+    color: #0f1117;
+    font-size: 12px;
+    font-weight: 700;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin: 24px 0 10px;
+  }
+  p { margin-bottom: 12px; color: #94a3b8; }
+
+  /* ── Cards ── */
+  .card-grid {
+    display: grid;
+    gap: 16px;
+  }
+  .card-grid.col2 { grid-template-columns: 1fr 1fr; }
+  .card-grid.col3 { grid-template-columns: 1fr 1fr 1fr; }
+
+  .card {
+    background: #1a1f2e;
+    border: 1px solid #2d3748;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .card .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #f6c90e;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card p { font-size: 13px; margin: 0; }
+
+  /* ── Table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 13px;
+  }
+  th {
+    background: #1e2433;
+    color: #f6c90e;
+    font-weight: 600;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid #2d3748;
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #1e2433;
+    color: #94a3b8;
+    vertical-align: top;
+  }
+  tr:hover td { background: #1a1f2e; }
+  td.num-col { text-align: right; font-family: monospace; }
+  td.highlight { color: #e2e8f0; font-weight: 500; }
+  td.green { color: #4ade80; }
+  td.red { color: #f87171; }
+  td.yellow { color: #f6c90e; }
+  td.dim { color: #64748b; font-size: 12px; }
+
+  /* ── Tier Cards ── */
+  .tier-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .tier {
+    background: #1a1f2e;
+    border: 1px solid #2d3748;
+    border-radius: 12px;
+    padding: 24px 20px;
+    text-align: center;
+  }
+  .tier.featured {
+    border-color: #f6c90e;
+    background: #1e2433;
+  }
+  .tier .tier-name { font-size: 13px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .tier.featured .tier-name { color: #f6c90e; }
+  .tier .tier-price { font-size: 36px; font-weight: 700; color: #e2e8f0; margin: 8px 0 4px; }
+  .tier .tier-price span { font-size: 14px; font-weight: 400; color: #64748b; }
+  .tier .tier-desc { font-size: 12px; color: #64748b; margin-bottom: 16px; }
+  .tier ul { list-style: none; text-align: left; }
+  .tier ul li { font-size: 13px; color: #94a3b8; padding: 5px 0; border-bottom: 1px solid #1e2433; }
+  .tier ul li::before { content: "✓ "; color: #4ade80; font-weight: 700; }
+  .tier ul li.no::before { content: "✗ "; color: #64748b; }
+  .tier ul li.no { color: #4a5568; }
+
+  /* ── Timeline ── */
+  .timeline { margin: 16px 0; }
+  .phase {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .phase-marker {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .phase-dot {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #1e2433;
+    border: 2px solid #f6c90e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #f6c90e;
+  }
+  .phase-line {
+    flex: 1;
+    width: 2px;
+    background: #2d3748;
+    margin-top: 4px;
+  }
+  .phase-body {
+    padding-top: 6px;
+    flex: 1;
+  }
+  .phase-body h4 { font-size: 14px; font-weight: 600; color: #e2e8f0; margin-bottom: 4px; }
+  .phase-body .phase-meta { font-size: 12px; color: #f6c90e; margin-bottom: 8px; }
+  .phase-body ul { list-style: none; }
+  .phase-body ul li { font-size: 13px; color: #94a3b8; padding: 3px 0; }
+  .phase-body ul li::before { content: "→ "; color: #64748b; }
+
+  /* ── Callout ── */
+  .callout {
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 13px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .callout.warn { background: #1e1a0e; border: 1px solid #d97706; }
+  .callout.info { background: #0e1a2e; border: 1px solid #3b82f6; }
+  .callout.success { background: #0e1a14; border: 1px solid #22c55e; }
+  .callout .icon { font-size: 18px; flex-shrink: 0; }
+  .callout .content { color: #94a3b8; }
+  .callout .content strong { color: #e2e8f0; display: block; margin-bottom: 4px; }
+
+  /* ── Summary Box ── */
+  .summary-box {
+    background: linear-gradient(135deg, #1a1f2e, #1e2433);
+    border: 1px solid #f6c90e;
+    border-radius: 16px;
+    padding: 32px;
+    margin: 32px 0;
+    text-align: center;
+  }
+  .summary-box h3 { font-size: 20px; color: #f6c90e; margin-bottom: 24px; }
+  .summary-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+  }
+  .stat .stat-val { font-size: 28px; font-weight: 700; color: #e2e8f0; }
+  .stat .stat-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+  /* ── Tag ── */
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin: 0 2px;
+  }
+  .tag.hard { background: #450a0a; color: #f87171; }
+  .tag.medium { background: #451a03; color: #fb923c; }
+  .tag.easy { background: #052e16; color: #4ade80; }
+
+  /* ── Print ── */
+  @media print {
+    body { background: white; color: #1a1a1a; font-size: 12px; }
+    .cover h1 { color: #b8860b; }
+    h2 { color: #b8860b; border-color: #ddd; }
+    h2 .num { background: #b8860b; }
+    .card, .tier, .callout { border: 1px solid #ddd; background: #f9f9f9 !important; }
+    td, th { border-color: #ddd; }
+    th { background: #f0f0f0 !important; color: #333; }
+    p, td, .phase-body ul li, .tier ul li { color: #444; }
+    .tier .tier-price { color: #1a1a1a; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Cover -->
+  <div class="cover">
+    <div class="badge">Business Plan</div>
+    <h1>XAUUSD AI Trading<br>SaaS Platform</h1>
+    <p>แผนแปลงระบบ trading bot เป็น Web Platform ให้ผู้ใช้ทั่วไป Subscribe ใช้งาน พร้อมประมาณค่าใช้จ่ายและ roadmap</p>
+    <div class="meta">
+      <span><strong>เวอร์ชัน</strong> 1.0</span>
+      <span><strong>วันที่</strong> พฤษภาคม 2026</span>
+      <span><strong>ประเภท</strong> Internal Planning</span>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-box">
+    <h3>Overview</h3>
+    <div class="summary-stats">
+      <div class="stat"><div class="stat-val">$200–450</div><div class="stat-label">ค่าใช้จ่ายต่อเดือน (infra)</div></div>
+      <div class="stat"><div class="stat-val">6–9 เดือน</div><div class="stat-label">ระยะเวลาพัฒนา MVP</div></div>
+      <div class="stat"><div class="stat-val">~20 users</div><div class="stat-label">Break-even point</div></div>
+      <div class="stat"><div class="stat-val">$29–149</div><div class="stat-label">ช่วงราคา subscription</div></div>
+    </div>
+  </div>
+
+  <!-- Section 1: Challenge -->
+  <h2><span class="num">1</span> ความท้าทายหลัก — MT5 Architecture</h2>
+
+  <p>ปัญหาใหญ่ที่สุดของการทำ SaaS คือ <strong style="color:#f87171">MetaTrader 5 เป็น Windows Desktop App</strong> ไม่มี native REST API ดังนั้นต้องออกแบบ architecture ให้ดีก่อน</p>
+
+  <div class="card-grid col2">
+    <div class="card">
+      <div class="card-title">🖥️ Option A — Hybrid (แนะนำ)</div>
+      <p>AI agents รันบน cloud server ของเรา, MT5 รันบนเครื่อง user เอง โดย user ติดตั้ง <strong>Agent Connector</strong> (โปรแกรมเล็กๆ) ที่เชื่อม MT5 ↔ Cloud</p>
+      <br>
+      <p><span class="tag easy">✓ ค่าใช้จ่ายถูก</span> <span class="tag easy">✓ Scalable</span> <span class="tag medium">△ User ต้องรัน MT5 เอง</span></p>
+    </div>
+    <div class="card">
+      <div class="card-title">☁️ Option B — Full Cloud (ยาก)</div>
+      <p>รัน MT5 บน Windows VPS สำหรับแต่ละ user, ควบคุมผ่าน Wine หรือ Windows Server VM</p>
+      <br>
+      <p><span class="tag easy">✓ User ไม่ต้องทำอะไร</span> <span class="tag hard">✗ $30-50/user/month</span> <span class="tag hard">✗ Scale ยาก</span></p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="icon">⚠️</div>
+    <div class="content">
+      <strong>แนะนำ Option A (Hybrid)</strong>
+      Option B ราคาต่อ user สูงมาก ($30–50/user/month เฉพาะ Windows VPS) ทำให้ margin บาง
+      Option A ให้ user รัน MT5 บน PC ตัวเองแล้วติดตั้ง lightweight agent connector — เหมือน EA (Expert Advisor) ที่คุ้นเคยอยู่แล้ว
+    </div>
+  </div>
+
+  <!-- Section 2: Architecture -->
+  <h2><span class="num">2</span> สถาปัตยกรรมระบบ (Option A)</h2>
+
+  <div class="card-grid col3">
+    <div class="card">
+      <div class="card-title">👤 User Side</div>
+      <p><strong>MT5 Terminal</strong> + Agent Connector (Python script หรือ MT5 EA) รันบนเครื่อง Windows ของ user</p>
+      <p>ส่ง tick data + receive orders ผ่าน WebSocket ไปยัง Cloud</p>
+    </div>
+    <div class="card">
+      <div class="card-title">☁️ Cloud Backend</div>
+      <p><strong>FastAPI/Flask</strong> รับ data จาก user, รัน AI agents (Chart Watcher → Decision Maker), ส่ง signal กลับ</p>
+      <p>Queue: Celery + Redis รัน trading cycle ต่อ user</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🌐 Web Dashboard</div>
+      <p><strong>React/Next.js</strong> หน้า web ที่ user login, ดู trades, ตั้งค่า, ดู performance</p>
+      <p>Database: PostgreSQL เก็บ user, trades, subscriptions</p>
+    </div>
+  </div>
+
+  <h3>Components ที่ต้องสร้างใหม่</h3>
+  <table>
+    <tr><th>Component</th><th>รายละเอียด</th><th>Difficulty</th><th>เวลาโดยประมาณ</th></tr>
+    <tr>
+      <td class="highlight">User Auth System</td>
+      <td>Register / Login / JWT tokens / Email verify</td>
+      <td><span class="tag easy">Easy</span></td>
+      <td>1-2 สัปดาห์</td>
+    </tr>
+    <tr>
+      <td class="highlight">Subscription + Payment</td>
+      <td>Stripe integration, plan management, invoice</td>
+      <td><span class="tag medium">Medium</span></td>
+      <td>2-3 สัปดาห์</td>
+    </tr>
+    <tr>
+      <td class="highlight">Multi-tenant Backend</td>
+      <td>แยก data per user, run trading cycle per user</td>
+      <td><span class="tag hard">Hard</span></td>
+      <td>4-8 สัปดาห์</td>
+    </tr>
+    <tr>
+      <td class="highlight">Agent Connector</td>
+      <td>Python script ที่ user รันบนเครื่องตัวเอง เชื่อม MT5 ↔ Cloud</td>
+      <td><span class="tag hard">Hard</span></td>
+      <td>3-5 สัปดาห์</td>
+    </tr>
+    <tr>
+      <td class="highlight">Web Dashboard</td>
+      <td>Rebrand + extend dashboard ปัจจุบัน, trades, settings</td>
+      <td><span class="tag medium">Medium</span></td>
+      <td>3-4 สัปดาห์</td>
+    </tr>
+    <tr>
+      <td class="highlight">Admin Panel</td>
+      <td>จัดการ users, subscriptions, monitor system</td>
+      <td><span class="tag easy">Easy</span></td>
+      <td>1-2 สัปดาห์</td>
+    </tr>
+    <tr>
+      <td class="highlight">Legal Pages</td>
+      <td>Terms, Privacy Policy, Risk Disclaimer</td>
+      <td><span class="tag easy">Easy</span></td>
+      <td>1 สัปดาห์</td>
+    </tr>
+  </table>
+
+  <!-- Section 3: Pricing -->
+  <h2><span class="num">3</span> Subscription Tiers ที่แนะนำ</h2>
+
+  <div class="tier-grid">
+    <div class="tier">
+      <div class="tier-name">Starter</div>
+      <div class="tier-price">$29<span>/เดือน</span></div>
+      <div class="tier-desc">สำหรับ trader ที่เริ่มต้น</div>
+      <ul>
+        <li>Signal แจ้งเตือน (ไม่ auto-trade)</li>
+        <li>Dashboard ดู performance</li>
+        <li>1 MT5 account</li>
+        <li>Cycle ทุก 15 นาที</li>
+        <li class="no">Auto-execute orders</li>
+        <li class="no">Fibonacci + Momentum</li>
+        <li class="no">Priority support</li>
+      </ul>
+    </div>
+    <div class="tier featured">
+      <div class="tier-name">⭐ Pro (แนะนำ)</div>
+      <div class="tier-price">$79<span>/เดือน</span></div>
+      <div class="tier-desc">Auto-trade ครบชุด</div>
+      <ul>
+        <li>Auto-execute orders</li>
+        <li>Fibonacci + Momentum analysis</li>
+        <li>Pending orders auto-place</li>
+        <li>1 MT5 account</li>
+        <li>Cycle ทุก 5 นาที</li>
+        <li>Email alerts</li>
+        <li class="no">Multiple accounts</li>
+      </ul>
+    </div>
+    <div class="tier">
+      <div class="tier-name">Elite</div>
+      <div class="tier-price">$149<span>/เดือน</span></div>
+      <div class="tier-desc">สำหรับ professional</div>
+      <ul>
+        <li>ทุกอย่างใน Pro</li>
+        <li>3 MT5 accounts</li>
+        <li>Custom risk settings</li>
+        <li>Cycle ทุก 1-5 นาที</li>
+        <li>Priority support (Line/Discord)</li>
+        <li>Performance report รายสัปดาห์</li>
+        <li>Early access features</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <div class="icon">💡</div>
+    <div class="content">
+      <strong>Annual discount แนะนำ: ลด 20%</strong>
+      Pro annual = $758/ปี (เทียบกับ $948 รายเดือน) — ช่วย cash flow และลด churn ได้ดีมาก
+    </div>
+  </div>
+
+  <!-- Section 4: Costs -->
+  <h2><span class="num">4</span> ค่าใช้จ่ายรายเดือน (Infrastructure)</h2>
+
+  <h3>Fixed Costs — ต้องจ่ายไม่ว่าจะมี user กี่คน</h3>
+  <table>
+    <tr><th>บริการ</th><th>สเปก</th><th>Provider แนะนำ</th><th class="num-col">USD/เดือน</th></tr>
+    <tr>
+      <td class="highlight">App Server (Backend)</td>
+      <td>4 vCPU, 8GB RAM — รัน FastAPI + Celery workers</td>
+      <td>DigitalOcean / Hetzner</td>
+      <td class="num-col green">$40–60</td>
+    </tr>
+    <tr>
+      <td class="highlight">PostgreSQL Database</td>
+      <td>Managed DB, 1GB storage เริ่มต้น</td>
+      <td>DigitalOcean Managed DB</td>
+      <td class="num-col green">$25–50</td>
+    </tr>
+    <tr>
+      <td class="highlight">Redis (Queue + Cache)</td>
+      <td>1GB managed Redis</td>
+      <td>DigitalOcean / Upstash</td>
+      <td class="num-col green">$15–25</td>
+    </tr>
+    <tr>
+      <td class="highlight">CDN + Static Files</td>
+      <td>Frontend build, images</td>
+      <td>Cloudflare / Vercel</td>
+      <td class="num-col green">$0–20</td>
+    </tr>
+    <tr>
+      <td class="highlight">Domain + SSL</td>
+      <td>.com domain + Let's Encrypt</td>
+      <td>Namecheap</td>
+      <td class="num-col green">$2</td>
+    </tr>
+    <tr>
+      <td class="highlight">Email (Transactional)</td>
+      <td>ส่ง OTP, alerts, invoices</td>
+      <td>Resend / SendGrid</td>
+      <td class="num-col green">$0–20</td>
+    </tr>
+    <tr>
+      <td class="highlight">Monitoring</td>
+      <td>Uptime, error tracking</td>
+      <td>Sentry + UptimeRobot</td>
+      <td class="num-col green">$0–25</td>
+    </tr>
+    <tr>
+      <td><strong>รวม Fixed</strong></td>
+      <td></td>
+      <td></td>
+      <td class="num-col yellow"><strong>~$82–202/เดือน</strong></td>
+    </tr>
+  </table>
+
+  <h3>Variable Costs — เพิ่มตาม user</h3>
+  <table>
+    <tr><th>รายการ</th><th>วิธีคำนวณ</th><th class="num-col">ราคาต่อ User/เดือน</th></tr>
+    <tr>
+      <td class="highlight">Claude API (Haiku)</td>
+      <td>Agents 1,2,3 — ~288 cycles/วัน × 30 วัน</td>
+      <td class="num-col green">~$2–4</td>
+    </tr>
+    <tr>
+      <td class="highlight">Claude API (Sonnet)</td>
+      <td>Agent 4 (Decision Maker) — cycle เดียวกัน</td>
+      <td class="num-col green">~$3–6</td>
+    </tr>
+    <tr>
+      <td class="highlight">Stripe Payment</td>
+      <td>2.9% + $0.30 ต่อ transaction</td>
+      <td class="num-col green">~$2–4 (Pro plan)</td>
+    </tr>
+    <tr>
+      <td class="highlight">Storage per user</td>
+      <td>trade logs, settings ~10MB/user</td>
+      <td class="num-col green">~$0.01</td>
+    </tr>
+    <tr>
+      <td><strong>รวม Variable</strong></td>
+      <td></td>
+      <td class="num-col yellow"><strong>~$7–14/user/เดือน</strong></td>
+    </tr>
+  </table>
+
+  <h3>Break-even Analysis</h3>
+  <table>
+    <tr><th>จำนวน Users</th><th>Revenue (Pro $79)</th><th>ต้นทุนรวม</th><th>Gross Margin</th><th>สถานะ</th></tr>
+    <tr>
+      <td>5 users</td>
+      <td class="num-col">$395</td>
+      <td class="num-col">$200 + $55 = $255</td>
+      <td class="num-col">$140</td>
+      <td class="green">กำไร</td>
+    </tr>
+    <tr>
+      <td>10 users</td>
+      <td class="num-col">$790</td>
+      <td class="num-col">$200 + $110 = $310</td>
+      <td class="num-col">$480</td>
+      <td class="green">กำไรดี</td>
+    </tr>
+    <tr>
+      <td>20 users</td>
+      <td class="num-col">$1,580</td>
+      <td class="num-col">$200 + $220 = $420</td>
+      <td class="num-col">$1,160</td>
+      <td class="green">~73% margin</td>
+    </tr>
+    <tr>
+      <td>50 users</td>
+      <td class="num-col">$3,950</td>
+      <td class="num-col">$350 + $550 = $900</td>
+      <td class="num-col">$3,050</td>
+      <td class="green">~77% margin</td>
+    </tr>
+    <tr>
+      <td>100 users</td>
+      <td class="num-col">$7,900</td>
+      <td class="num-col">$500 + $1,100 = $1,600</td>
+      <td class="num-col">$6,300</td>
+      <td class="green">~80% margin</td>
+    </tr>
+  </table>
+
+  <div class="callout success">
+    <div class="icon">✅</div>
+    <div class="content">
+      <strong>Break-even อยู่ที่ประมาณ 3–4 users (Pro plan)</strong>
+      Gross margin สูงมาก (~70–80%) เพราะ variable cost ต่ำ ถ้าได้ 20 users ก็มีรายได้สุทธิ ~$1,160/เดือน หรือ ~41,000 บาท
+    </div>
+  </div>
+
+  <!-- Section 5: Legal -->
+  <h2><span class="num">5</span> ข้อกฎหมายและ Compliance</h2>
+
+  <div class="card-grid col2">
+    <div class="card">
+      <div class="card-title">⚖️ Risk Disclaimer (สำคัญมาก)</div>
+      <p>ต้องมี <strong>Risk Disclosure</strong> ชัดเจนว่า "ระบบ AI นี้ไม่ใช่คำแนะนำการลงทุน ผลตอบแทนในอดีตไม่รับประกันอนาคต"</p>
+      <p>ให้ user กด Accept ก่อน activate</p>
+    </div>
+    <div class="card">
+      <div class="card-title">📄 เอกสารที่ต้องมี</div>
+      <p>• Terms of Service<br>• Privacy Policy (PDPA หากกลุ่ม user เป็นคนไทย)<br>• Risk Disclosure<br>• Refund Policy</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🏦 ใบอนุญาต</div>
+      <p>ถ้า <strong>ให้สัญญาณซื้อขาย (Signal Service)</strong> อาจต้องขอใบอนุญาต Investment Advisor ในบางประเทศ</p>
+      <p>ถ้า <strong>เป็นแค่ tools/automation software</strong> มักไม่ต้อง</p>
+    </div>
+    <div class="card">
+      <div class="card-title">💳 Payment</div>
+      <p>ใช้ <strong>Stripe</strong> — รองรับบัตร Visa/MC, international, automatic invoicing, subscription management ครบครัน</p>
+      <p>ไม่ต้องขอ payment gateway เองซึ่งยุ่งยากมาก</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="icon">⚠️</div>
+    <div class="content">
+      <strong>กลุ่ม user ในไทย — ระวัง พ.ร.บ. หลักทรัพย์</strong>
+      การให้บริการ "คำแนะนำการลงทุน" ในไทยต้องขออนุญาตจาก ก.ล.ต. แต่ถ้าตลาดเป็น International Forex (ไม่ใช่ SET/TFEX) และ position ว่าเป็น "Software Tool" ไม่ใช่ Advisory Service มักอยู่ใน grey area ปรึกษาทนายก่อน Launch
+    </div>
+  </div>
+
+  <!-- Section 6: Timeline -->
+  <h2><span class="num">6</span> Roadmap การพัฒนา</h2>
+
+  <div class="timeline">
+    <div class="phase">
+      <div class="phase-marker">
+        <div class="phase-dot">1</div>
+        <div class="phase-line"></div>
+      </div>
+      <div class="phase-body">
+        <h4>Phase 1 — Foundation</h4>
+        <div class="phase-meta">เดือนที่ 1–2 | ~$0 ค่าใช้จ่าย (dev phase)</div>
+        <ul>
+          <li>ออกแบบ multi-tenant database schema</li>
+          <li>สร้าง User Auth API (register, login, JWT)</li>
+          <li>Stripe integration — subscription plans</li>
+          <li>Migrate Flask dashboard → standalone frontend</li>
+          <li>ทดสอบ local multi-user scenario</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-marker">
+        <div class="phase-dot">2</div>
+        <div class="phase-line"></div>
+      </div>
+      <div class="phase-body">
+        <h4>Phase 2 — Agent Connector</h4>
+        <div class="phase-meta">เดือนที่ 3–4 | งานยากที่สุด</div>
+        <ul>
+          <li>พัฒนา lightweight Agent Connector สำหรับ user ติดตั้งบน Windows</li>
+          <li>WebSocket bridge: MT5 ↔ Cloud (รับ tick, ส่ง order)</li>
+          <li>Test กับ broker หลายเจ้า (XM, Exness, IC Markets)</li>
+          <li>Auto-reconnect, error handling, offline detection</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-marker">
+        <div class="phase-dot">3</div>
+        <div class="phase-line"></div>
+      </div>
+      <div class="phase-body">
+        <h4>Phase 3 — Beta Launch</h4>
+        <div class="phase-meta">เดือนที่ 5–6 | เริ่มเก็บ revenue</div>
+        <ul>
+          <li>Deploy cloud infrastructure (DigitalOcean)</li>
+          <li>Beta test กับ 5–10 users ที่รู้จัก (อาจ free หรือ discount)</li>
+          <li>Monitor performance, fix bugs, optimize token cost</li>
+          <li>เขียน documentation + onboarding guide</li>
+          <li>Launch landing page + เปิด public subscription</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-marker">
+        <div class="phase-dot">4</div>
+        <div class="phase-line"></div>
+      </div>
+      <div class="phase-body">
+        <h4>Phase 4 — Growth</h4>
+        <div class="phase-meta">เดือนที่ 7–12 | Scale</div>
+        <ul>
+          <li>เพิ่ม features ตาม feedback (backtesting, more symbols)</li>
+          <li>Referral program / Affiliate</li>
+          <li>Line OA / Discord community สำหรับ subscribers</li>
+          <li>Elite tier — multi-account management</li>
+          <li>Auto-scale infrastructure ตาม user growth</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 7: Tech Stack -->
+  <h2><span class="num">7</span> Tech Stack แนะนำ</h2>
+
+  <table>
+    <tr><th>Layer</th><th>เทคโนโลยี</th><th>เหตุผล</th></tr>
+    <tr>
+      <td class="highlight">Backend API</td>
+      <td>FastAPI (Python)</td>
+      <td>ใช้ Python เหมือนโค้ดปัจจุบัน, async native, เร็วมาก</td>
+    </tr>
+    <tr>
+      <td class="highlight">Frontend</td>
+      <td>Next.js + TailwindCSS</td>
+      <td>SSR ดี SEO, component library ครบ, deploy บน Vercel ฟรี</td>
+    </tr>
+    <tr>
+      <td class="highlight">Database</td>
+      <td>PostgreSQL</td>
+      <td>Relational, multi-tenant schema ง่าย, managed service ถูก</td>
+    </tr>
+    <tr>
+      <td class="highlight">Task Queue</td>
+      <td>Celery + Redis</td>
+      <td>รัน trading cycle แยก per user, retry, scheduling</td>
+    </tr>
+    <tr>
+      <td class="highlight">Auth</td>
+      <td>JWT + bcrypt หรือ Supabase Auth</td>
+      <td>Supabase ทำให้ง่ายขึ้นมาก มี dashboard ฟรี</td>
+    </tr>
+    <tr>
+      <td class="highlight">Payment</td>
+      <td>Stripe</td>
+      <td>Standard ที่สุด, webhook subscription, auto-invoice</td>
+    </tr>
+    <tr>
+      <td class="highlight">Deployment</td>
+      <td>DigitalOcean App Platform หรือ Hetzner VPS</td>
+      <td>Hetzner ถูกที่สุด (EU), DigitalOcean เริ่มต้นง่าย</td>
+    </tr>
+    <tr>
+      <td class="highlight">Monitoring</td>
+      <td>Sentry + Grafana Cloud</td>
+      <td>Error tracking + metrics, free tier เพียงพอช่วงแรก</td>
+    </tr>
+    <tr>
+      <td class="highlight">Agent Connector</td>
+      <td>Python + MetaTrader5 library + websockets</td>
+      <td>ใช้ library เดิมที่มีอยู่แล้ว package เป็น .exe ด้วย PyInstaller</td>
+    </tr>
+  </table>
+
+  <!-- Section 8: Risks -->
+  <h2><span class="num">8</span> ความเสี่ยงและวิธีรับมือ</h2>
+
+  <table>
+    <tr><th>ความเสี่ยง</th><th>โอกาสเกิด</th><th>วิธีรับมือ</th></tr>
+    <tr>
+      <td class="highlight">System ขาดทุน → user ยกเลิก</td>
+      <td class="yellow">สูง</td>
+      <td>ให้ทดลองใช้ฟรี 14 วัน, disclaimerชัดเจน, ระบบ risk management เข้มข้น</td>
+    </tr>
+    <tr>
+      <td class="highlight">MT5 API เปลี่ยน / broker บล็อก</td>
+      <td class="yellow">ปานกลาง</td>
+      <td>test กับหลาย broker, fallback manual mode</td>
+    </tr>
+    <tr>
+      <td class="highlight">Claude API cost spike</td>
+      <td class="green">ต่ำ</td>
+      <td>ใช้ Haiku สำหรับ agents ที่ไม่ critical, set max_tokens</td>
+    </tr>
+    <tr>
+      <td class="highlight">Legal / regulatory</td>
+      <td class="yellow">ปานกลาง</td>
+      <td>ระบุชัดว่าเป็น "automation tool" ไม่ใช่ advisory, ปรึกษาทนาย</td>
+    </tr>
+    <tr>
+      <td class="highlight">Competition</td>
+      <td class="yellow">ปานกลาง</td>
+      <td>focus on XAUUSD niche + Thai market + ราคาถูกกว่า</td>
+    </tr>
+    <tr>
+      <td class="highlight">User churn สูง</td>
+      <td class="yellow">ปานกลาง</td>
+      <td>community (Discord/Line), weekly performance report, free trial → annual upgrade</td>
+    </tr>
+  </table>
+
+  <!-- Section 9: Quick Wins -->
+  <h2><span class="num">9</span> Quick Wins ก่อน Full Platform</h2>
+
+  <p>ถ้ายังไม่พร้อม build full SaaS ลองเริ่มจาก steps เล็กๆ เพื่อ validate market demand:</p>
+
+  <div class="card-grid col3">
+    <div class="card">
+      <div class="card-title">📢 Step 1 — Signal Service</div>
+      <p>ส่ง signal ผ่าน <strong>Line OA หรือ Discord</strong> ก่อน โดยไม่ต้อง auto-trade</p>
+      <p>ทดสอบว่าคนยอมจ่ายหรือเปล่า (ราคา $10–20/เดือน)</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🤝 Step 2 — Managed Account</div>
+      <p>รับ <strong>PAMM/Copy Trade</strong> โดย user link account ให้เรา trade ให้แล้วแบ่ง % กำไร</p>
+      <p>ไม่ต้องสร้าง platform ก็เริ่ม earn ได้</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🚀 Step 3 — MVP Web</div>
+      <p>หลัง validate ว่ามี demand แล้ว ค่อย build web platform ให้ user <strong>self-service</strong></p>
+      <p>ใช้ beta waitlist เก็บ email ก่อน launch</p>
+    </div>
+  </div>
+
+  <!-- Final Summary -->
+  <div class="summary-box" style="margin-top: 48px;">
+    <h3>สรุปงบประมาณ</h3>
+    <div class="summary-stats">
+      <div class="stat">
+        <div class="stat-val" style="font-size:20px; color:#f87171;">$0–500</div>
+        <div class="stat-label">Dev phase (6 เดือน)<br>ถ้าทำเอง</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" style="font-size:20px; color:#fb923c;">$82–200</div>
+        <div class="stat-label">Fixed infra<br>ต่อเดือน</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" style="font-size:20px; color:#facc15;">$7–14</div>
+        <div class="stat-label">Variable cost<br>ต่อ user/เดือน</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" style="font-size:20px; color:#4ade80;">3–4 users</div>
+        <div class="stat-label">Break-even<br>(Pro $79/เดือน)</div>
+      </div>
+    </div>
+  </div>
+
+  <p style="text-align:center; font-size:12px; color:#4a5568; margin-top:40px; padding-top:20px; border-top: 1px solid #1e2433;">
+    XAUUSD AI Trading System — Internal Planning Document — พฤษภาคม 2026
+  </p>
+
+</div>
+</body>
+</html>

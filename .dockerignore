@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+logs/
+.pm2/
+node_modules/

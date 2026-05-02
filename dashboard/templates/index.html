@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XAUUSD Trading Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:       #0a0a0a;
+      --surface:  #141414;
+      --surface2: #1c1c1c;
+      --border:   #252525;
+      --border2:  #2e2e2e;
+      --gold:     #f5c842;
+      --gold-dim: rgba(245,200,66,0.12);
+      --green:    #26a69a;
+      --green-dim:#0d2e2b;
+      --red:      #ef5350;
+      --red-dim:  #2d0e0e;
+      --text:     #d4d4d4;
+      --muted:    #5a5a5a;
+      --muted2:   #3a3a3a;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    /* ─── HEADER ─────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 16px; }
+
+    header h1 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .live-dot {
+      width: 7px; height: 7px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    #last-update { font-size: 12px; color: var(--muted); }
+
+    /* ─── LAYOUT ─────────────────────────────────────── */
+    .container { padding: 24px 32px; max-width: 1600px; margin: 0 auto; }
+
+    section { margin-bottom: 24px; }
+
+    .section-title {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ─── ALERT BAR ───────────────────────────────────── */
+    .alert-bar {
+      background: rgba(245,200,66,0.08);
+      border: 1px solid rgba(245,200,66,0.3);
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: var(--gold);
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ─── PORTFOLIO BAR ───────────────────────────────── */
+    .portfolio-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      overflow: hidden;
+    }
+
+    .port-item {
+      padding: 20px 24px;
+      border-right: 1px solid var(--border);
+      position: relative;
+    }
+    .port-item:last-child { border-right: none; }
+
+    .port-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 10px;
+    }
+
+    .port-thb {
+      font-size: 30px;
+      font-weight: 700;
+      color: var(--gold);
+      line-height: 1;
+      letter-spacing: -0.5px;
+    }
+
+    .port-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* ─── AGENT PIPELINE ──────────────────────────────── */
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .pipeline-step {
+      padding: 16px 18px;
+      border-right: 1px solid var(--border);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .pipeline-step:last-child { border-right: none; }
+
+    .pipeline-step::after {
+      content: '›';
+      position: absolute;
+      right: -9px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--border2);
+      font-size: 20px;
+      z-index: 1;
+    }
+    .pipeline-step:last-child::after { display: none; }
+
+    .step-num {
+      font-size: 10px;
+      color: var(--muted2);
+      font-weight: 600;
+      letter-spacing: 1px;
+    }
+
+    .step-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .step-desc {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .step-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .step-status .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+    }
+
+    .status-ready   .dot { background: var(--green); }
+    .status-ready        { color: var(--green); }
+    .status-waiting .dot { background: var(--muted); }
+    .status-waiting      { color: var(--muted); }
+    .status-active  .dot { background: var(--gold); box-shadow: 0 0 6px var(--gold); }
+    .status-active       { color: var(--gold); animation: pulse 2s infinite; }
+
+    /* ─── STAT CARDS ──────────────────────────────────── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .card .label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+    }
+
+    .card .value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.1;
+      letter-spacing: -0.5px;
+    }
+
+    .card .sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .value.green { color: var(--green); }
+    .value.red   { color: var(--red); }
+    .value.gold  { color: var(--gold); }
+
+    /* ─── CHART ROW ───────────────────────────────────── */
+    .chart-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 12px;
+    }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 24px;
+    }
+
+    .chart-card .chart-title {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      margin-bottom: 16px;
+    }
+
+    /* ─── TRADE TABLE ─────────────────────────────────── */
+    .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .table-toolbar {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .table-toolbar h3 {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .filter-row select {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      outline: none;
+    }
+    .filter-row select:focus { border-color: var(--gold); }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 820px;
+    }
+
+    thead th {
+      padding: 10px 16px;
+      text-align: left;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      background: var(--surface);
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.12s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,0.025); }
+
+    tbody td {
+      padding: 11px 16px;
+      color: var(--text);
+      vertical-align: middle;
+    }
+
+    /* Column alignment */
+    td.num, th.num { text-align: right; }
+    td.center, th.center { text-align: center; }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    .badge-buy    { background: rgba(38,166,154,0.15); color: var(--green); border: 1px solid rgba(38,166,154,0.25); }
+    .badge-sell   { background: rgba(239,83,80,0.15);  color: var(--red);   border: 1px solid rgba(239,83,80,0.25); }
+    .badge-open   { background: rgba(245,200,66,0.12); color: var(--gold);  border: 1px solid rgba(245,200,66,0.25); }
+    .badge-closed { background: var(--surface2);       color: var(--muted); border: 1px solid var(--border); }
+    .badge-win    { background: rgba(38,166,154,0.12); color: var(--green); }
+    .badge-loss   { background: rgba(239,83,80,0.12);  color: var(--red); }
+    .badge-system { background: rgba(126,200,227,0.12); color: #7ec8e3; border: 1px solid rgba(126,200,227,0.25); }
+    .badge-manual { background: rgba(240,165,0,0.12);   color: #f0a500;  border: 1px solid rgba(240,165,0,0.25); }
+
+    .analysis-cell { font-size: 11px; color: var(--muted); line-height: 1.5; max-width: 260px; }
+    .analysis-cell .tag {
+      display: inline-block; background: var(--surface2); border: 1px solid var(--border2);
+      border-radius: 4px; padding: 1px 6px; font-size: 10px; color: var(--muted); margin: 1px 2px 1px 0;
+    }
+    .analysis-cell .reason { color: var(--text); font-style: italic; margin-top: 3px; }
+
+    tr.manual-row { border-left: 2px solid rgba(240,165,0,0.4); }
+    tr.manual-row td:first-child { padding-left: 14px; }
+
+    .pnl-pos { color: var(--green); font-weight: 700; }
+    .pnl-neg { color: var(--red);   font-weight: 700; }
+
+    .no-data {
+      text-align: center;
+      padding: 60px;
+      color: var(--muted2);
+      font-size: 13px;
+    }
+
+    /* Signal pill */
+    .signal-pill {
+      display: inline-block;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      color: var(--muted);
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Confidence bar */
+    .conf-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .conf-track {
+      flex: 1;
+      height: 4px;
+      background: var(--border2);
+      border-radius: 2px;
+      overflow: hidden;
+      min-width: 48px;
+    }
+    .conf-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: var(--gold);
+    }
+    .conf-num { font-size: 11px; color: var(--muted); min-width: 26px; text-align: right; }
+
+    /* ─── TABS ───────────────────────────────────────────── */
+    .tab-nav {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 22px;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn:hover  { color: var(--text); }
+    .tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+    .tab-content    { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ─── SETTINGS ───────────────────────────────────────── */
+    .settings-notice {
+      background: rgba(245,200,66,0.06);
+      border: 1px solid rgba(245,200,66,0.2);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 12px;
+      color: var(--gold);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .settings-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .settings-card h3 {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .field-group { display: flex; flex-direction: column; gap: 11px; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .field input[type=text],
+    .field input[type=number],
+    .field select {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+      width: 100%;
+    }
+    .field input:focus, .field select:focus { border-color: var(--gold); }
+    .field select option { background: var(--surface2); }
+
+    /* Toggle switch */
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+    }
+    .toggle-label-text { font-size: 13px; color: var(--text); }
+    .toggle-label-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .toggle {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .toggle input { display: none; }
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--border2);
+      border-radius: 11px;
+      transition: background 0.2s;
+    }
+    .toggle input:checked + .toggle-track { background: var(--gold); }
+    .toggle-thumb {
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 16px; height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+      pointer-events: none;
+    }
+    .toggle input:checked ~ .toggle-thumb { transform: translateX(18px); }
+
+    /* Save button */
+    .save-btn {
+      background: var(--gold);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 28px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      transition: opacity 0.15s;
+    }
+    .save-btn:hover    { opacity: 0.85; }
+    .save-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ─── ECONOMIC CALENDAR ──────────────────────────── */
+    .cal-container { display: flex; flex-direction: column; gap: 18px; }
+
+    .cal-day-group { display: flex; flex-direction: column; gap: 8px; }
+
+    .cal-day-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .cal-day-label.is-today { color: var(--gold); }
+
+    .cal-day-dot {
+      width: 6px; height: 6px;
+      background: var(--gold);
+      border-radius: 50%;
+      box-shadow: 0 0 5px var(--gold);
+    }
+
+    .cal-cards { display: flex; flex-wrap: wrap; gap: 10px; }
+
+    .cal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--border2);
+      border-radius: 10px;
+      padding: 12px 14px;
+      min-width: 160px;
+      max-width: 230px;
+      flex: 1 1 160px;
+      position: relative;
+    }
+    .cal-card.impact-high   { border-left-color: var(--red); }
+    .cal-card.impact-medium { border-left-color: #f09642; }
+    .cal-card.is-today-card { background: var(--surface2); }
+
+    .cal-curr {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    .cal-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.35;
+      margin-bottom: 7px;
+      padding-right: 36px;
+    }
+    .cal-time { font-size: 11px; color: var(--muted); }
+
+    .cal-badge {
+      position: absolute;
+      top: 9px;
+      right: 9px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 2px 5px;
+      border-radius: 3px;
+    }
+    .impact-high   .cal-badge { background: rgba(239,83,80,0.18); color: var(--red); }
+    .impact-medium .cal-badge { background: rgba(240,150,66,0.18); color: #f09642; }
+
+    /* Responsive */
+    @media (max-width: 1200px) {
+      .stat-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+    @media (max-width: 900px) {
+      .portfolio-bar { grid-template-columns: repeat(2, 1fr); }
+      .pipeline { grid-template-columns: repeat(3, 1fr); }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .chart-row { grid-template-columns: 1fr; }
+      .settings-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .settings-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="live-dot"></div>
+    <h1>XAUUSD &middot; Trading Dashboard</h1>
+  </div>
+  <span id="last-update">กำลังโหลด...</span>
+</header>
+
+<div class="container">
+
+  <!-- TABS -->
+  <div class="tab-nav">
+    <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+    <button class="tab-btn"        data-tab="settings" onclick="switchTab('settings')">⚙ Settings</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="tab-content active" id="tab-overview">
+
+  <!-- ALERT -->
+  <div class="alert-bar" id="alert-bar"></div>
+
+  <!-- PORTFOLIO -->
+  <section>
+    <div class="portfolio-bar">
+      <div class="port-item">
+        <div class="port-label">Balance (เงินคงเหลือ)</div>
+        <div class="port-thb" id="port-balance-thb">—</div>
+        <div class="port-sub" id="port-rate">—</div>
+      </div>
+      <div class="port-item">
+        <div class="port-label">Equity (มูลค่าจริง)</div>
+        <div class="port-thb" id="port-equity-thb">—</div>
+        <div class="port-sub" id="port-equity-usd">—</div>
+      </div>
+      <div class="port-item">
+        <div class="port-label">กำไร / ขาดทุน (Open)</div>
+        <div class="port-thb" id="port-profit-thb" style="font-size:28px">—</div>
+        <div class="port-sub" id="port-profit-usd">—</div>
+      </div>
+      <div class="port-item">
+        <div class="port-label">Free Margin</div>
+        <div class="port-thb" id="port-margin-thb">—</div>
+        <div class="port-sub" id="port-margin-usd">—</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AGENT PIPELINE -->
+  <section>
+    <div class="section-title">ขั้นตอนการทำงาน (Agent Pipeline)</div>
+    <div class="pipeline">
+      <div class="pipeline-step">
+        <div class="step-num">STEP 01</div>
+        <div class="step-name">Chart Watcher</div>
+        <div class="step-desc">วิเคราะห์กราฟ H4/H1/M15<br>S/R zone + Candle pattern</div>
+        <div class="step-status status-ready"><span class="dot"></span>READY</div>
+      </div>
+      <div class="pipeline-step">
+        <div class="step-num">STEP 02</div>
+        <div class="step-name">Sentiment Analyst</div>
+        <div class="step-desc">วิเคราะห์ข่าว Twitter/X<br>ความเชื่อมั่นตลาด</div>
+        <div class="step-status status-ready"><span class="dot"></span>READY</div>
+      </div>
+      <div class="pipeline-step">
+        <div class="step-num">STEP 03</div>
+        <div class="step-name">Risk Guard</div>
+        <div class="step-desc">คำนวณ lot size<br>ตรวจ daily loss limit</div>
+        <div class="step-status status-ready"><span class="dot"></span>READY</div>
+      </div>
+      <div class="pipeline-step">
+        <div class="step-num">STEP 04</div>
+        <div class="step-name">Decision Maker</div>
+        <div class="step-desc">ตัดสินใจ BUY/SELL/NO_TRADE<br>จากทุก agent รวมกัน</div>
+        <div class="step-status status-ready"><span class="dot"></span>READY</div>
+      </div>
+      <div class="pipeline-step">
+        <div class="step-num">STEP 05</div>
+        <div class="step-name">Reporter</div>
+        <div class="step-desc">ส่ง order ไปยัง MT5<br>บันทึกผลลัพธ์</div>
+        <div class="step-status status-ready"><span class="dot"></span>READY</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ECONOMIC CALENDAR -->
+  <section>
+    <div class="section-title">ปฏิทินเศรษฐกิจสัปดาห์นี้</div>
+    <div class="cal-container" id="cal-container">
+      <div style="color:var(--muted);font-size:13px">กำลังโหลด...</div>
+    </div>
+  </section>
+
+  <!-- STAT CARDS -->
+  <section>
+    <div class="section-title">สถิติภาพรวม</div>
+    <div class="stat-grid">
+      <div class="card">
+        <div class="label">P&L รวม</div>
+        <div class="value" id="total-pnl">—</div>
+        <div class="sub">ปิดแล้วทั้งหมด</div>
+      </div>
+      <div class="card">
+        <div class="label">P&L วันนี้</div>
+        <div class="value" id="today-pnl">—</div>
+        <div class="sub" id="today-trades-sub">— trades</div>
+      </div>
+      <div class="card">
+        <div class="label">Win Rate</div>
+        <div class="value gold" id="win-rate">—</div>
+        <div class="sub" id="wl-sub">— W / — L</div>
+      </div>
+      <div class="card">
+        <div class="label">Profit Factor</div>
+        <div class="value" id="profit-factor">—</div>
+        <div class="sub">Gross P / Gross L</div>
+      </div>
+      <div class="card">
+        <div class="label">Avg Win</div>
+        <div class="value green" id="avg-win">—</div>
+        <div class="sub">per trade</div>
+      </div>
+      <div class="card">
+        <div class="label">Avg Loss</div>
+        <div class="value red" id="avg-loss">—</div>
+        <div class="sub">per trade</div>
+      </div>
+      <div class="card">
+        <div class="label">Losing Streak</div>
+        <div class="value" id="losing-streak">—</div>
+        <div class="sub">ปัจจุบัน</div>
+      </div>
+      <div class="card">
+        <div class="label">Total Trades</div>
+        <div class="value" id="total-trades">—</div>
+        <div class="sub">ปิดแล้ว</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHARTS -->
+  <section>
+    <div class="section-title">กราฟ</div>
+    <div class="chart-row">
+      <div class="chart-card">
+        <div class="chart-title">Equity Curve</div>
+        <canvas id="equityChart" height="110"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Win / Loss Ratio</div>
+        <canvas id="winlossChart" height="110"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- SOURCE BREAKDOWN -->
+  <section>
+    <div class="section-title">System vs Manual</div>
+    <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="card">
+        <div class="label">System Trades</div>
+        <div class="value" id="sys-count" style="color:#7ec8e3">—</div>
+        <div class="sub" id="sys-winrate">Win rate —</div>
+      </div>
+      <div class="card">
+        <div class="label">Manual Trades</div>
+        <div class="value" id="man-count" style="color:#f0a500">—</div>
+        <div class="sub" id="man-winrate">Win rate —</div>
+      </div>
+      <div class="card" style="grid-column:span 2">
+        <div class="label">Strategy Breakdown (System)</div>
+        <div id="entry-type-stats" style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.8">—</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRADE HISTORY TABLE -->
+  <section>
+    <div class="table-card">
+      <div class="table-toolbar">
+        <h3>ประวัติการเทรด</h3>
+        <div class="filter-row">
+          <select id="filter-source">
+            <option value="">ทุก Source</option>
+            <option value="SYSTEM">SYSTEM</option>
+            <option value="MANUAL">MANUAL</option>
+          </select>
+          <select id="filter-dir">
+            <option value="">ทุกทิศทาง</option>
+            <option value="BUY">BUY</option>
+            <option value="SELL">SELL</option>
+          </select>
+          <select id="filter-status">
+            <option value="">ทุกสถานะ</option>
+            <option value="OPEN">OPEN</option>
+            <option value="CLOSED">CLOSED</option>
+          </select>
+          <select id="filter-result">
+            <option value="">ทุกผลลัพธ์</option>
+            <option value="win">WIN</option>
+            <option value="loss">LOSS</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:130px">เวลา</th>
+              <th class="center" style="width:72px">Source</th>
+              <th class="center" style="width:64px">Dir</th>
+              <th class="num"    style="width:56px">Lot</th>
+              <th class="num"    style="width:76px">Entry</th>
+              <th class="num"    style="width:68px">SL</th>
+              <th class="num"    style="width:68px">TP</th>
+              <th style="width:130px">Strategy</th>
+              <th style="min-width:180px">Analysis / Rationale</th>
+              <th class="num"    style="width:84px">P&L</th>
+              <th class="center" style="width:100px">Result</th>
+            </tr>
+          </thead>
+          <tbody id="trade-tbody">
+            <tr><td colspan="11" class="no-data">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  </div><!-- /tab-overview -->
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-settings">
+
+    <div class="settings-notice">
+      ✓ &nbsp;กด <strong>บันทึกการตั้งค่า</strong> — ระบบจะ restart ผ่าน PM2 อัตโนมัติ
+    </div>
+
+    <div class="settings-grid">
+
+      <!-- General -->
+      <div class="settings-card">
+        <h3>ทั่วไป</h3>
+        <div class="field-group">
+          <div class="field">
+            <label>Symbol</label>
+            <input type="text" id="cfg-SYMBOL" placeholder="XAUUSD">
+          </div>
+          <div class="field">
+            <label>Start Balance (ทุนเริ่มต้น)</label>
+            <input type="number" id="cfg-START_BALANCE" step="100" min="100">
+          </div>
+        </div>
+      </div>
+
+      <!-- Money Management -->
+      <div class="settings-card">
+        <h3>Money Management</h3>
+        <div class="field-group">
+          <div class="field">
+            <label>Risk per Trade (%)</label>
+            <input type="number" id="cfg-RISK_PER_TRADE" step="0.1" min="0.1" max="10">
+          </div>
+          <div class="field">
+            <label>Max Daily Loss (%)</label>
+            <input type="number" id="cfg-MAX_DAILY_LOSS" step="0.1" min="0.1" max="20">
+          </div>
+          <div class="field">
+            <label>Max Open Trades</label>
+            <input type="number" id="cfg-MAX_OPEN_TRADES" step="1" min="1" max="20">
+          </div>
+          <div class="field">
+            <label>Default SL (pips)</label>
+            <input type="number" id="cfg-DEFAULT_SL_PIPS" step="50" min="100">
+          </div>
+          <div class="field">
+            <label>Default TP (pips)</label>
+            <input type="number" id="cfg-DEFAULT_TP_PIPS" step="50" min="100">
+          </div>
+          <div class="field">
+            <label>Min RR Ratio</label>
+            <input type="number" id="cfg-MIN_RR_RATIO" step="0.1" min="0.5" max="10">
+          </div>
+          <div class="field">
+            <label>Hedge Buffer (จุด)</label>
+            <input type="number" id="cfg-HEDGE_BUFFER_PIPS" step="100" min="0" max="10000"
+                   title="ช่องไฟเปิด order ฝั่งตรงข้าม — ราคาสวนทาง opposing position ได้สูงสุดกี่จุด (default 1000)">
+          </div>
+        </div>
+      </div>
+
+      <!-- Lot Size -->
+      <div class="settings-card">
+        <h3>Lot Size</h3>
+        <div class="field-group">
+          <div class="field">
+            <label>Lot Mode</label>
+            <select id="cfg-LOT_MODE">
+              <option value="auto">Auto (% Risk)</option>
+              <option value="fixed">Fixed</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Fixed Lot</label>
+            <input type="number" id="cfg-FIXED_LOT" step="0.01" min="0.01">
+          </div>
+          <div class="field">
+            <label>Min Lot</label>
+            <input type="number" id="cfg-MIN_LOT" step="0.01" min="0.01">
+          </div>
+          <div class="field">
+            <label>Max Lot</label>
+            <input type="number" id="cfg-MAX_LOT" step="0.01" min="0.01">
+          </div>
+        </div>
+      </div>
+
+      <!-- Streak Protection -->
+      <div class="settings-card">
+        <h3>Streak Protection</h3>
+        <div class="field-group">
+          <div class="field">
+            <label>Max Losing Streak (ครั้ง)</label>
+            <input type="number" id="cfg-MAX_LOSING_STREAK" step="1" min="2" max="20">
+          </div>
+          <div class="field">
+            <label>Min Confidence เมื่อติด Streak (%)</label>
+            <input type="number" id="cfg-STREAK_MIN_CONFIDENCE" step="1" min="50" max="100">
+          </div>
+        </div>
+      </div>
+
+      <!-- Pending Orders -->
+      <div class="settings-card">
+        <h3>Pending Orders</h3>
+        <div class="field-group">
+          <div class="field">
+            <label>Max Pending BUY</label>
+            <input type="number" id="cfg-MAX_PENDING_BUY" step="1" min="0" max="10">
+          </div>
+          <div class="field">
+            <label>Max Pending SELL</label>
+            <input type="number" id="cfg-MAX_PENDING_SELL" step="1" min="0" max="10">
+          </div>
+          <div class="field">
+            <label>Expiry Hours</label>
+            <input type="number" id="cfg-PENDING_EXPIRY_HOURS" step="1" min="1" max="168">
+          </div>
+        </div>
+      </div>
+
+      <!-- News / Twitter -->
+      <div class="settings-card">
+        <h3>News &amp; Twitter</h3>
+        <div class="field-group">
+          <div class="field">
+            <label>Accounts to Follow (คั่นด้วย ,)</label>
+            <textarea id="cfg-X_ACCOUNTS_TO_FOLLOW" rows="3"
+              style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);
+                     padding:8px 12px;border-radius:6px;font-size:13px;outline:none;
+                     width:100%;resize:vertical;font-family:inherit"
+              placeholder="kun_purich,cnnbrk,BBCBreaking"></textarea>
+            <span style="font-size:10px;color:var(--muted)">username เท่านั้น ไม่มี @</span>
+          </div>
+          <div class="field">
+            <label>Keywords (คั่นด้วย ,)</label>
+            <textarea id="cfg-X_KEYWORDS" rows="3"
+              style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);
+                     padding:8px 12px;border-radius:6px;font-size:13px;outline:none;
+                     width:100%;resize:vertical;font-family:inherit"
+              placeholder="XAUUSD,gold,XAU,Fed,inflation"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature Toggles -->
+      <div class="settings-card">
+        <h3>Feature Toggles</h3>
+        <div class="field-group">
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label-text">Portfolio Protection</div>
+              <div class="toggle-label-sub">จำกัด max trades + daily loss</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="cfg-PORTFOLIO_PROTECTION">
+              <span class="toggle-track"></span>
+              <span class="toggle-thumb"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label-text">Streak Protection</div>
+              <div class="toggle-label-sub">เพิ่ม threshold เมื่อแพ้ติดกัน</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="cfg-STREAK_PROTECTION">
+              <span class="toggle-track"></span>
+              <span class="toggle-thumb"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label-text">Dynamic TP</div>
+              <div class="toggle-label-sub">ขยาย TP เมื่อ momentum แรง</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="cfg-DYNAMIC_TP">
+              <span class="toggle-track"></span>
+              <span class="toggle-thumb"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /settings-grid -->
+
+    <div style="margin-top:20px;display:flex;align-items:center;gap:14px">
+      <button class="save-btn" onclick="saveConfig()">บันทึกการตั้งค่า</button>
+      <span id="cfg-status" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+
+  </div><!-- /tab-settings -->
+
+</div>
+
+<script>
+let equityChart, winlossChart;
+let allTrades = [];
+
+function fmtPnl(v) {
+  if (v === null || v === undefined) return '<span style="color:var(--muted2)">—</span>';
+  const cls  = v >= 0 ? 'pnl-pos' : 'pnl-neg';
+  const sign = v >= 0 ? '+' : '';
+  return `<span class="${cls}">${sign}${v.toFixed(2)}</span>`;
+}
+
+function fmtNum(v, d = 2) {
+  return (v !== null && v !== undefined) ? Number(v).toFixed(d) : '—';
+}
+
+function fmtThb(v) {
+  if (v === null || v === undefined) return '—';
+  return v.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ฿';
+}
+
+function fmtUsd(v) {
+  if (v === null || v === undefined) return '—';
+  return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' THB';
+}
+
+function confBar(pct) {
+  const capped = Math.min(100, Math.max(0, pct || 0));
+  const color = capped >= 70 ? 'var(--green)' : capped >= 50 ? 'var(--gold)' : 'var(--muted)';
+  return `<div class="conf-bar">
+    <div class="conf-track"><div class="conf-fill" style="width:${capped}%;background:${color}"></div></div>
+    <span class="conf-num">${capped}%</span>
+  </div>`;
+}
+
+function initCharts() {
+  const gridColor = '#1f1f1f';
+  const tickColor = '#4a4a4a';
+
+  equityChart = new Chart(document.getElementById('equityChart'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [],
+        borderColor: '#f5c842',
+        borderWidth: 2,
+        fill: true,
+        backgroundColor: 'rgba(245,200,66,0.05)',
+        tension: 0.35,
+        pointRadius: 2,
+        pointBackgroundColor: '#f5c842',
+      }]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          ticks: { color: tickColor, maxTicksLimit: 7, maxRotation: 0, font: { size: 11 } },
+          grid: { color: gridColor },
+        },
+        y: {
+          ticks: { color: tickColor, font: { size: 11 } },
+          grid: { color: gridColor },
+        },
+      },
+    },
+  });
+
+  winlossChart = new Chart(document.getElementById('winlossChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['WIN', 'LOSS'],
+      datasets: [{
+        data: [0, 0],
+        backgroundColor: ['rgba(38,166,154,0.85)', 'rgba(239,83,80,0.85)'],
+        borderWidth: 0,
+        hoverOffset: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      cutout: '68%',
+      plugins: {
+        legend: {
+          labels: { color: tickColor, font: { size: 12 }, boxWidth: 12, padding: 16 }
+        }
+      }
+    },
+  });
+}
+
+function updateStats(stats) {
+  function setVal(id, val, unit, cls) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = val + (unit || '');
+    if (cls) el.className = 'value ' + cls;
+  }
+
+  const pnl  = stats.total_pnl || 0;
+  const tpnl = stats.today_pnl || 0;
+
+  setVal('total-pnl',  (pnl  >= 0 ? '+' : '') + pnl.toFixed(2),  ' THB', pnl  >= 0 ? 'green' : 'red');
+  setVal('today-pnl',  (tpnl >= 0 ? '+' : '') + tpnl.toFixed(2), ' THB', tpnl >= 0 ? 'green' : 'red');
+
+  const todayTrades = document.getElementById('today-trades-sub');
+  if (todayTrades) todayTrades.textContent = (stats.today_trades || 0) + ' trades';
+
+  document.getElementById('win-rate').textContent  = (stats.win_rate || 0) + '%';
+  document.getElementById('wl-sub').textContent    = (stats.wins || 0) + ' W  /  ' + (stats.losses || 0) + ' L';
+  document.getElementById('profit-factor').textContent = stats.profit_factor || '—';
+  document.getElementById('profit-factor').className   = 'value ' + ((stats.profit_factor || 0) >= 1 ? 'green' : 'red');
+  document.getElementById('avg-win').textContent   = '+' + fmtThb(stats.avg_win  || 0);
+  document.getElementById('avg-loss').textContent  = fmtThb(stats.avg_loss || 0);
+  document.getElementById('total-trades').textContent = stats.total;
+
+  const streak = stats.losing_streak || 0;
+  document.getElementById('losing-streak').textContent  = streak;
+  document.getElementById('losing-streak').className    = 'value ' + (streak >= 3 ? 'red' : 'gold');
+
+  // Alert bar
+  const alert = document.getElementById('alert-bar');
+  if (streak >= 5) {
+    alert.style.display = 'flex';
+    alert.textContent = '⚠  Losing streak ' + streak + ' — ต้อง confidence ≥ 62% ถึงจะเข้า order';
+  } else if (streak >= 3) {
+    alert.style.display = 'flex';
+    alert.textContent = '⚠  Losing streak ' + streak + ' — ระวัง กำลังติดลบต่อเนื่อง';
+  } else {
+    alert.style.display = 'none';
+  }
+
+  // Equity curve
+  const eq = stats.equity_curve || [];
+  equityChart.data.labels              = eq.map(e => e.time.substring(5));
+  equityChart.data.datasets[0].data   = eq.map(e => e.equity);
+  equityChart.update('none');
+
+  // Win/Loss doughnut
+  winlossChart.data.datasets[0].data = [stats.wins || 0, stats.losses || 0];
+  winlossChart.update('none');
+
+  // System vs Manual breakdown
+  document.getElementById('sys-count').textContent = stats.system_count || 0;
+  document.getElementById('sys-winrate').textContent = 'Win rate ' + (stats.system_winrate || 0) + '%';
+  document.getElementById('man-count').textContent = stats.manual_count || 0;
+  document.getElementById('man-winrate').textContent = 'Win rate ' + (stats.manual_winrate || 0) + '%';
+
+  const etStats = stats.entry_type_stats || {};
+  const etKeys  = Object.keys(etStats);
+  const etEl    = document.getElementById('entry-type-stats');
+  if (!etKeys.length) {
+    etEl.textContent = '—';
+  } else {
+    etEl.innerHTML = etKeys.map(k => {
+      const s   = etStats[k];
+      const wr  = s.count ? Math.round(s.wins / s.count * 100) : 0;
+      const pnlColor = s.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+      const pnlSign  = s.pnl >= 0 ? '+' : '';
+      return `<div style="display:flex;justify-content:space-between;gap:16px;padding:1px 0">
+        <span style="color:var(--text)">${k}</span>
+        <span>${s.count} trades &nbsp;·&nbsp; ${wr}% WR &nbsp;·&nbsp; <span style="color:${pnlColor}">${pnlSign}${s.pnl.toFixed(2)}</span></span>
+      </div>`;
+    }).join('');
+  }
+}
+
+function renderTable(trades) {
+  const sourceF = document.getElementById('filter-source').value;
+  const dirF    = document.getElementById('filter-dir').value;
+  const statusF = document.getElementById('filter-status').value;
+  const resultF = document.getElementById('filter-result').value;
+
+  const filtered = trades.filter(t => {
+    if (sourceF && t.source    !== sourceF)                          return false;
+    if (dirF    && t.direction !== dirF)                             return false;
+    if (statusF && t.status    !== statusF)                          return false;
+    if (resultF === 'win'  && (t.pnl == null || t.pnl <= 0))        return false;
+    if (resultF === 'loss' && (t.pnl == null || t.pnl >= 0))        return false;
+    return true;
+  });
+
+  const tbody = document.getElementById('trade-tbody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="11" class="no-data">ไม่มีข้อมูล</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(t => {
+    const dir      = (t.direction || '').toLowerCase();
+    const status   = (t.status   || '').toLowerCase();
+    const isManual = t.source === 'MANUAL';
+    const rowCls   = isManual ? ' class="manual-row"' : '';
+
+    const result = t.pnl !== null
+      ? (t.pnl > 0
+          ? '<span class="badge badge-win">WIN</span>'
+          : '<span class="badge badge-loss">LOSS</span>')
+      : '';
+
+    // Source badge
+    const srcBadge = isManual
+      ? '<span class="badge badge-manual">MANUAL</span>'
+      : '<span class="badge badge-system">SYS</span>';
+
+    // Strategy column
+    let strategyCell = '<span style="color:var(--muted2)">—</span>';
+    if (!isManual && t.entry_type && t.entry_type !== 'NONE') {
+      strategyCell = `<div style="font-size:12px">
+        <div style="color:var(--text);margin-bottom:4px">${t.entry_type}</div>
+        ${confBar(t.technical_confidence || 0)}
+      </div>`;
+    } else if (isManual) {
+      strategyCell = '<span style="color:#f0a500;font-size:11px">MANUAL</span>';
+    }
+
+    // Analysis / Rationale column
+    const tags = [];
+    if (t.trend)      tags.push(`<span class="tag">Trend: ${t.trend}</span>`);
+    if (t.sr_zone && t.sr_zone !== 'NONE') tags.push(`<span class="tag">SR: ${t.sr_zone}</span>`);
+    if (t.pa_action && t.pa_action !== 'NONE') tags.push(`<span class="tag">PA: ${t.pa_action}</span>`);
+    if (t.pa_patterns && t.pa_patterns.length && t.pa_patterns[0] !== 'NORMAL')
+      tags.push(`<span class="tag">${t.pa_patterns.join(', ')}</span>`);
+    if (!isManual && t.sentiment) tags.push(`<span class="tag">Sent: ${t.sentiment}</span>`);
+
+    let analysisHtml;
+    if (isManual) {
+      const reason = t.manual_reason || '';
+      const extra  = t.manual_analysis || '';
+      analysisHtml = `<div class="analysis-cell">${tags.join('')}${reason
+        ? `<div class="reason">"${reason}"</div>`
+        : (extra ? `<div class="reason">${extra}</div>` : '')}</div>`;
+    } else {
+      analysisHtml = tags.length
+        ? `<div class="analysis-cell">${tags.join('')}</div>`
+        : '<span style="color:var(--muted2)">—</span>';
+    }
+
+    return `<tr${rowCls}>
+      <td style="color:var(--muted);font-size:12px">${(t.timestamp || '').substring(0, 16).replace('T', ' ')}</td>
+      <td class="center">${srcBadge}</td>
+      <td class="center"><span class="badge badge-${dir}">${t.direction || '—'}</span></td>
+      <td class="num">${fmtNum(t.lot, 2)}</td>
+      <td class="num" style="font-variant-numeric:tabular-nums">${fmtNum(t.entry_price, 2)}</td>
+      <td class="num" style="color:var(--red);font-size:12px">${fmtNum(t.sl, 2)}</td>
+      <td class="num" style="color:var(--green);font-size:12px">${fmtNum(t.tp, 2)}</td>
+      <td>${strategyCell}</td>
+      <td>${analysisHtml}</td>
+      <td class="num">${fmtPnl(t.pnl)}</td>
+      <td class="center"><span class="badge badge-${status}">${t.status || '—'}</span> ${result}</td>
+    </tr>`;
+  }).join('');
+}
+
+function updatePortfolio(account, usd_thb) {
+  if (!account || !account.balance) {
+    document.getElementById('port-balance-thb').textContent = 'ไม่ได้เชื่อมต่อ MT5';
+    return;
+  }
+
+  const isTHB = account.currency === 'THB';
+
+  document.getElementById('port-balance-thb').textContent = fmtThb(account.balance_thb);
+  document.getElementById('port-rate').textContent = isTHB
+    ? 'สกุลเงิน: THB'
+    : '1 USD = ' + (usd_thb || '—') + ' THB';
+
+  document.getElementById('port-equity-thb').textContent = fmtThb(account.equity_thb);
+  document.getElementById('port-equity-usd').textContent = isTHB ? '' : fmtUsd(account.equity);
+
+  const profitThb = account.profit_thb || 0;
+  const profEl = document.getElementById('port-profit-thb');
+  profEl.textContent = (profitThb >= 0 ? '+' : '') + fmtThb(profitThb);
+  profEl.style.color = profitThb >= 0 ? 'var(--green)' : 'var(--red)';
+
+  document.getElementById('port-profit-usd').textContent = isTHB ? '' : fmtUsd(account.profit);
+  document.getElementById('port-margin-thb').textContent = fmtThb(account.free_margin_thb);
+  document.getElementById('port-margin-usd').textContent = isTHB ? '' : fmtUsd(account.free_margin);
+}
+
+async function fetchData() {
+  let data = null;
+  try {
+    const res = await fetch('/api/data');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    data = await res.json();
+  } catch (e) {
+    document.getElementById('last-update').textContent = 'เชื่อมต่อ server ไม่ได้ — ' + e.message;
+    return;
+  }
+
+  // stats + trades มาจาก trades.json — แสดงได้เสมอ ไม่ขึ้นกับ MT5
+  try {
+    allTrades = data.trades || [];
+    updateStats(data.stats || {});
+    renderTable(allTrades);
+  } catch (e) {
+    console.error('stats/table error:', e);
+    document.getElementById('last-update').textContent = 'Dashboard error: ' + e.message;
+  }
+
+  // portfolio มาจาก MT5 — ถ้าไม่ได้เชื่อมต่อให้แสดง placeholder
+  try {
+    updatePortfolio(data.account, data.usd_thb);
+  } catch (e) {
+    document.getElementById('port-balance-thb').textContent = 'MT5 ไม่ได้เชื่อมต่อ';
+  }
+
+  document.getElementById('last-update').textContent =
+    'อัปเดต ' + new Date().toLocaleTimeString('th-TH') +
+    (data.account && data.account.balance ? '' : '  (MT5 offline)');
+}
+
+['filter-source', 'filter-dir', 'filter-status', 'filter-result'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => renderTable(allTrades));
+});
+
+// ─── TAB SWITCHING ───────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(c =>
+    c.classList.toggle('active', c.id === 'tab-' + name));
+  if (name === 'settings') loadConfig();
+}
+
+// ─── CONFIG LOAD ─────────────────────────────────────────────
+const _NUM_KEYS  = ['START_BALANCE','RISK_PER_TRADE','MAX_DAILY_LOSS','MAX_OPEN_TRADES',
+  'DEFAULT_SL_PIPS','DEFAULT_TP_PIPS','MIN_RR_RATIO','FIXED_LOT','MIN_LOT','MAX_LOT',
+  'MAX_LOSING_STREAK','STREAK_MIN_CONFIDENCE','MAX_PENDING_BUY','MAX_PENDING_SELL',
+  'PENDING_EXPIRY_HOURS','HEDGE_BUFFER_PIPS'];
+const _TXT_KEYS  = ['SYMBOL','LOT_MODE','X_ACCOUNTS_TO_FOLLOW','X_KEYWORDS'];
+const _BOOL_KEYS = ['PORTFOLIO_PROTECTION','STREAK_PROTECTION','DYNAMIC_TP'];
+
+async function loadConfig() {
+  document.getElementById('cfg-status').textContent = '';
+  try {
+    const res = await fetch('/api/config');
+    const cfg = await res.json();
+    _NUM_KEYS.forEach(k => {
+      const el = document.getElementById('cfg-' + k);
+      if (el && cfg[k] !== undefined) el.value = cfg[k];
+    });
+    _TXT_KEYS.forEach(k => {
+      const el = document.getElementById('cfg-' + k);
+      if (!el || cfg[k] === undefined) return;
+      // textarea: แสดงแต่ละ item บนบรรทัดแยก เพื่อให้อ่านง่าย
+      if (el.tagName === 'TEXTAREA') {
+        el.value = cfg[k].split(',').map(s => s.trim()).join(',\n');
+      } else {
+        el.value = cfg[k];
+      }
+    });
+    _BOOL_KEYS.forEach(k => {
+      const el = document.getElementById('cfg-' + k);
+      if (el) el.checked = String(cfg[k]).toLowerCase() !== 'false';
+    });
+  } catch (e) {
+    document.getElementById('cfg-status').textContent = 'โหลด config ไม่ได้: ' + e.message;
+  }
+}
+
+// ─── CONFIG SAVE ─────────────────────────────────────────────
+async function saveConfig() {
+  const btn    = document.querySelector('.save-btn');
+  const status = document.getElementById('cfg-status');
+  btn.disabled = true;
+  status.style.color   = 'var(--muted)';
+  status.textContent   = 'กำลังบันทึก...';
+
+  const payload = {};
+  [..._NUM_KEYS, ..._TXT_KEYS].forEach(k => {
+    const el = document.getElementById('cfg-' + k);
+    if (!el) return;
+    // textarea: normalize newlines/spaces → comma-separated single line
+    if (el.tagName === 'TEXTAREA') {
+      payload[k] = el.value.split(/[\n,]+/).map(s => s.trim()).filter(Boolean).join(',');
+    } else {
+      payload[k] = el.value;
+    }
+  });
+  _BOOL_KEYS.forEach(k => {
+    const el = document.getElementById('cfg-' + k);
+    if (el) payload[k] = el.checked ? 'true' : 'false';
+  });
+
+  try {
+    const res  = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      if (data.pm2_ok) {
+        status.textContent = '✓ บันทึกแล้ว — ' + data.pm2_msg;
+      } else if (data.pm2_msg && data.pm2_msg.includes('not found')) {
+        status.textContent = '✓ บันทึกแล้ว — restart main.py เองด้วย (pm2 not found)';
+      } else {
+        status.textContent = '✓ บันทึกแล้ว — PM2: ' + (data.pm2_msg || 'ไม่ตอบสนอง');
+      }
+      status.style.color = data.pm2_ok ? 'var(--green)' : 'var(--gold)';
+    } else {
+      status.textContent = 'Error: ' + (data.error || 'unknown');
+      status.style.color = 'var(--red)';
+    }
+  } catch (e) {
+    status.textContent   = 'Error: ' + e.message;
+    status.style.color   = 'var(--red)';
+  }
+  btn.disabled = false;
+}
+
+// ─── ECONOMIC CALENDAR ───────────────────────────────────────
+async function fetchCalendar() {
+  try {
+    const res  = await fetch('/api/calendar');
+    const data = await res.json();
+    renderCalendar(data.events || []);
+  } catch(e) {
+    const el = document.getElementById('cal-container');
+    if (el) el.innerHTML = '<div style="color:var(--muted);font-size:13px">โหลด calendar ไม่ได้: ' + e.message + '</div>';
+  }
+}
+
+function renderCalendar(events) {
+  const container = document.getElementById('cal-container');
+  if (!container) return;
+  if (!events.length) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:13px">ไม่มี high-impact events สัปดาห์นี้</div>';
+    return;
+  }
+
+  const todayStr  = new Date().toISOString().slice(0, 10);
+  const DAY_TH    = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
+  const MONTH_TH  = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+  // Group by date
+  const byDay = {};
+  events.forEach(ev => {
+    const d = ev.timestamp_iso ? ev.timestamp_iso.slice(0, 10) : '?';
+    if (!byDay[d]) byDay[d] = [];
+    byDay[d].push(ev);
+  });
+
+  let html = '';
+  Object.keys(byDay).sort().forEach(dateStr => {
+    const isToday = dateStr === todayStr;
+    const dt      = new Date(dateStr + 'T12:00:00');
+    const label   = DAY_TH[dt.getDay()] + ' ' + dt.getDate() + ' ' + MONTH_TH[dt.getMonth()];
+
+    html += `<div class="cal-day-group">`;
+    html += `<div class="cal-day-label${isToday ? ' is-today' : ''}">`;
+    if (isToday) html += `<span class="cal-day-dot"></span>`;
+    html += label;
+    if (isToday) html += `<span style="font-size:10px;color:var(--gold);margin-left:4px">— วันนี้</span>`;
+    html += `</div><div class="cal-cards">`;
+
+    byDay[dateStr].forEach(ev => {
+      const impClass  = ev.impact === 'High' ? 'impact-high' : 'impact-medium';
+      const todayCls  = isToday ? ' is-today-card' : '';
+
+      // UTC → BKK (+7)
+      let bkkTime = ev.time || '';
+      if (ev.timestamp_iso) {
+        const d = new Date(ev.timestamp_iso);
+        const h = (d.getUTCHours() + 7) % 24;
+        const m = d.getUTCMinutes().toString().padStart(2, '0');
+        bkkTime = h.toString().padStart(2, '0') + ':' + m + ' BKK';
+      }
+
+      html += `<div class="cal-card ${impClass}${todayCls}">
+        <span class="cal-badge">${(ev.impact || '').toUpperCase()}</span>
+        <div class="cal-curr">${ev.currency || '—'}</div>
+        <div class="cal-name">${ev.title || '—'}</div>
+        <div class="cal-time">${bkkTime}</div>
+      </div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+initCharts();
+fetchData();
+fetchCalendar();
+setInterval(fetchData, 10000);
+setInterval(fetchCalendar, 1800000);  // refresh calendar ทุก 30 นาที
+</script>
+</body>
+</html>

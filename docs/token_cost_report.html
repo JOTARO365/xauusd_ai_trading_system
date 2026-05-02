@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>XAUUSD AI Trading System — Token Cost Report</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #fff; padding: 32px 40px; max-width: 900px; margin: 0 auto; }
+
+  h1 { font-size: 22px; color: #1a1a1a; border-bottom: 3px solid #c8a400; padding-bottom: 10px; margin-bottom: 6px; }
+  .subtitle { color: #666; font-size: 12px; margin-bottom: 28px; }
+
+  h2 { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #444; margin: 28px 0 12px; border-left: 4px solid #c8a400; padding-left: 10px; }
+  h3 { font-size: 13px; font-weight: 700; color: #333; margin: 18px 0 8px; }
+
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 12.5px; }
+  th { background: #2b2b2b; color: #fff; padding: 8px 12px; text-align: left; font-weight: 600; }
+  th.right, td.right { text-align: right; }
+  th.center, td.center { text-align: center; }
+  td { padding: 7px 12px; border-bottom: 1px solid #e8e8e8; }
+  tr:nth-child(even) td { background: #fafafa; }
+  tr.total td { font-weight: 700; background: #fff8e1; border-top: 2px solid #c8a400; }
+  tr.highlight td { background: #e8f5e9; }
+  tr.warn td { background: #fff3e0; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge-green { background: #e8f5e9; color: #2e7d32; }
+  .badge-orange { background: #fff3e0; color: #e65100; }
+  .badge-blue { background: #e3f2fd; color: #1565c0; }
+  .badge-red { background: #ffebee; color: #c62828; }
+  .badge-gray { background: #f5f5f5; color: #555; }
+
+  .callout { border-left: 4px solid #c8a400; background: #fffde7; padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; }
+  .callout.green { border-color: #43a047; background: #e8f5e9; }
+  .callout.red { border-color: #e53935; background: #ffebee; }
+  .callout strong { color: #333; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; }
+  .card h3 { margin-top: 0; }
+  .card .price { font-size: 26px; font-weight: 700; color: #c8a400; margin: 8px 0 4px; }
+  .card .price-sub { font-size: 11px; color: #888; }
+
+  .rec-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+  .rec-row:last-child { border-bottom: none; }
+  .rec-agent { font-weight: 700; width: 150px; flex-shrink: 0; }
+  .rec-arrow { color: #c8a400; font-size: 16px; }
+  .rec-body { flex: 1; }
+  .rec-saving { font-size: 11px; color: #2e7d32; font-weight: 600; }
+
+  footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 11px; color: #999; }
+
+  @media print {
+    body { padding: 16px 20px; }
+    h2 { break-before: auto; }
+  }
+</style>
+</head>
+<body>
+
+<h1>XAUUSD AI Trading System</h1>
+<div class="subtitle">Token Cost Report &nbsp;·&nbsp; Generated: <span id="dt"></span> &nbsp;·&nbsp; Model: claude-sonnet-4-6</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2>1. Agents &amp; Models ที่ใช้ปัจจุบัน</h2>
+
+<table>
+  <tr>
+    <th>Agent</th>
+    <th>Model ปัจจุบัน</th>
+    <th>max_tokens</th>
+    <th class="right">Input (est.)</th>
+    <th class="right">Output (est.)</th>
+    <th class="right">รวม/cycle</th>
+  </tr>
+  <tr>
+    <td><strong>Agent 1 — Chart Watcher</strong><br><small style="color:#888">วิเคราะห์ indicator H4/H1/M15</small></td>
+    <td><span class="badge badge-blue">claude-sonnet-4-6</span></td>
+    <td class="center">800</td>
+    <td class="right">1,575 T</td>
+    <td class="right">300 T</td>
+    <td class="right">1,875 T</td>
+  </tr>
+  <tr>
+    <td><strong>Agent 2.5 — Market Advisor</strong><br><small style="color:#888">วิเคราะห์ regime + แนะนำ indicator</small></td>
+    <td><span class="badge badge-blue">claude-sonnet-4-6</span></td>
+    <td class="center">700</td>
+    <td class="right">1,025 T</td>
+    <td class="right">250 T</td>
+    <td class="right">1,275 T</td>
+  </tr>
+  <tr>
+    <td><strong>Agent 3 — Sentiment Analyst</strong><br><small style="color:#888">วิเคราะห์ tweet / ข่าว (เฉพาะมีข่าว)</small></td>
+    <td><span class="badge badge-blue">claude-sonnet-4-6</span></td>
+    <td class="center">600</td>
+    <td class="right">2,320 T</td>
+    <td class="right">400 T</td>
+    <td class="right">2,720 T</td>
+  </tr>
+  <tr>
+    <td><strong>Agent 4 — Decision Maker</strong><br><small style="color:#888">ตัดสินใจ BUY/SELL/SKIP</small></td>
+    <td><span class="badge badge-blue">claude-sonnet-4-6</span></td>
+    <td class="center">1,000</td>
+    <td class="right">1,950 T</td>
+    <td class="right">125 T</td>
+    <td class="right">2,075 T</td>
+  </tr>
+  <tr class="total">
+    <td colspan="5"><strong>รวม (full cycle — มีข่าว)</strong></td>
+    <td class="right"><strong>7,945 T</strong></td>
+  </tr>
+  <tr class="total">
+    <td colspan="5"><strong>รวม (full cycle — ไม่มีข่าว)</strong></td>
+    <td class="right"><strong>5,225 T</strong></td>
+  </tr>
+</table>
+
+<div class="callout">
+  <strong>หมายเหตุ:</strong> Agent 3 (Sentiment) จะไม่ถูกเรียกเมื่อไม่มี tweet — ประหยัด 2,720 T ต่อรอบ<br>
+  News Gatherer (scraping) <strong>ไม่ใช้ Claude API</strong> — ไม่มีค่าใช้จ่าย token
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2>2. ราคา Model (Anthropic — per 1M tokens)</h2>
+
+<table>
+  <tr>
+    <th>Model</th>
+    <th class="right">Input ($/1M)</th>
+    <th class="right">Output ($/1M)</th>
+    <th>เหมาะกับ</th>
+  </tr>
+  <tr class="warn">
+    <td><strong>claude-opus-4-7</strong></td>
+    <td class="right">$15.00</td>
+    <td class="right">$75.00</td>
+    <td>งานที่ต้องการ reasoning ซับซ้อนมาก</td>
+  </tr>
+  <tr>
+    <td><strong>claude-sonnet-4-6</strong> <span class="badge badge-blue">ใช้อยู่</span></td>
+    <td class="right">$3.00</td>
+    <td class="right">$15.00</td>
+    <td>Balanced — ตัดสินใจ + วิเคราะห์</td>
+  </tr>
+  <tr class="highlight">
+    <td><strong>claude-haiku-4-5</strong> <span class="badge badge-green">แนะนำ</span></td>
+    <td class="right">$0.80</td>
+    <td class="right">$4.00</td>
+    <td>Structured output, pattern classification</td>
+  </tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2>3. ค่าใช้จ่ายรายเดือน — สถานการณ์ปัจจุบัน (all Sonnet)</h2>
+
+<p style="color:#666; margin-bottom:12px; font-size:12px;">
+  สมมติฐาน: เทรด 22 วัน/เดือน · active 18 ชั่วโมง/วัน · interval 5 นาที · 25% เป็น status-only cycle (ไม่เรียก AI) · 40% ของรอบ AI มี tweet
+</p>
+
+<table>
+  <tr>
+    <th>รายการ</th>
+    <th class="right">จำนวน/วัน</th>
+    <th class="right">ต้นทุน/cycle</th>
+    <th class="right">ต้นทุน/วัน</th>
+    <th class="right">ต้นทุน/เดือน</th>
+  </tr>
+  <tr>
+    <td>AI cycles — มีข่าว (40%)</td>
+    <td class="right">65 cycles</td>
+    <td class="right">$0.036</td>
+    <td class="right">$2.34</td>
+    <td class="right">$51.50</td>
+  </tr>
+  <tr>
+    <td>AI cycles — ไม่มีข่าว (60%)</td>
+    <td class="right">97 cycles</td>
+    <td class="right">$0.025</td>
+    <td class="right">$2.43</td>
+    <td class="right">$53.40</td>
+  </tr>
+  <tr>
+    <td>Status-only cycles (order เต็ม)</td>
+    <td class="right">54 cycles</td>
+    <td class="right">$0.00</td>
+    <td class="right">$0.00</td>
+    <td class="right">$0.00</td>
+  </tr>
+  <tr>
+    <td>Performance report (15 นาที)</td>
+    <td class="right">72 cycles</td>
+    <td class="right">$0.005</td>
+    <td class="right">$0.36</td>
+    <td class="right">$7.90</td>
+  </tr>
+  <tr class="total">
+    <td colspan="3"><strong>รวมต่อเดือน (ปัจจุบัน)</strong></td>
+    <td class="right"><strong>$5.13/วัน</strong></td>
+    <td class="right"><strong>$112.80/เดือน</strong></td>
+  </tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2>4. ค่าใช้จ่าย — หลังเปลี่ยนบาง Agent เป็น Haiku</h2>
+
+<table>
+  <tr>
+    <th>รายการ</th>
+    <th class="right">จำนวน/วัน</th>
+    <th class="right">ต้นทุน/cycle</th>
+    <th class="right">ต้นทุน/วัน</th>
+    <th class="right">ต้นทุน/เดือน</th>
+  </tr>
+  <tr>
+    <td>AI cycles — มีข่าว</td>
+    <td class="right">65 cycles</td>
+    <td class="right">$0.016</td>
+    <td class="right">$1.04</td>
+    <td class="right">$22.90</td>
+  </tr>
+  <tr>
+    <td>AI cycles — ไม่มีข่าว</td>
+    <td class="right">97 cycles</td>
+    <td class="right">$0.012</td>
+    <td class="right">$1.16</td>
+    <td class="right">$25.60</td>
+  </tr>
+  <tr>
+    <td>Status-only cycles</td>
+    <td class="right">54 cycles</td>
+    <td class="right">$0.00</td>
+    <td class="right">$0.00</td>
+    <td class="right">$0.00</td>
+  </tr>
+  <tr>
+    <td>Performance report</td>
+    <td class="right">72 cycles</td>
+    <td class="right">$0.003</td>
+    <td class="right">$0.22</td>
+    <td class="right">$4.80</td>
+  </tr>
+  <tr class="total highlight">
+    <td colspan="3"><strong>รวมต่อเดือน (หลัง optimize)</strong></td>
+    <td class="right"><strong>$2.42/วัน</strong></td>
+    <td class="right"><strong>$53.30/เดือน</strong></td>
+  </tr>
+</table>
+
+<div class="two-col" style="margin: 20px 0;">
+  <div class="card">
+    <h3>ปัจจุบัน (all Sonnet)</h3>
+    <div class="price">$112.80 <small style="font-size:14px">/ เดือน</small></div>
+    <div class="price-sub">~$5.13 / วัน</div>
+  </div>
+  <div class="card" style="border-color:#43a047;">
+    <h3>หลัง optimize (Haiku + Sonnet)</h3>
+    <div class="price" style="color:#2e7d32;">$53.30 <small style="font-size:14px">/ เดือน</small></div>
+    <div class="price-sub">~$2.42 / วัน &nbsp;·&nbsp; <strong style="color:#2e7d32;">ประหยัด ~$59.50/เดือน (53%)</strong></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2>5. คำแนะนำ — ควรเปลี่ยน Model ตัวไหน</h2>
+
+<div class="rec-row">
+  <div class="rec-agent">Agent 1<br>Chart Watcher</div>
+  <div class="rec-arrow">→</div>
+  <div class="rec-body">
+    <span class="badge badge-green">เปลี่ยนเป็น Haiku 4.5 ได้เลย</span><br>
+    งานหลักคืออ่าน indicator ที่เป็น <strong>ตัวเลขล้วน</strong> แล้ว output format ตายตัว<br>
+    Haiku รับได้ดีมาก และเร็วกว่า — ไม่ต้องการ reasoning ซับซ้อน
+    <div class="rec-saving">ประหยัด ~$22/เดือน</div>
+  </div>
+</div>
+
+<div class="rec-row">
+  <div class="rec-agent">Agent 2.5<br>Market Advisor</div>
+  <div class="rec-arrow">→</div>
+  <div class="rec-body">
+    <span class="badge badge-green">เปลี่ยนเป็น Haiku 4.5 ได้</span><br>
+    วิเคราะห์ EMA + S/R แล้วจำแนก regime 4 ประเภท — เป็น classification task ที่ Haiku ทำได้ดี<br>
+    Input ส่วนใหญ่เป็น structured numbers ไม่ใช่ natural language
+    <div class="rec-saving">ประหยัด ~$16/เดือน</div>
+  </div>
+</div>
+
+<div class="rec-row">
+  <div class="rec-agent">Agent 3<br>Sentiment Analyst</div>
+  <div class="rec-arrow">→</div>
+  <div class="rec-body">
+    <span class="badge badge-orange">ทดสอบ Haiku ก่อน — มีความเสี่ยงด้านคุณภาพ</span><br>
+    วิเคราะห์ tweet ต้องเข้าใจ nuance และ context เช่น irony, macro narrative<br>
+    <strong>แนะนำ:</strong> ลอง Haiku 1 สัปดาห์ เปรียบเทียบ sentiment output กับ Sonnet<br>
+    ถ้าผลต่างกันน้อย → เปลี่ยนได้
+    <div class="rec-saving">ประหยัด ~$12/เดือน (ถ้าเปลี่ยน)</div>
+  </div>
+</div>
+
+<div class="rec-row">
+  <div class="rec-agent">Agent 4<br>Decision Maker</div>
+  <div class="rec-arrow">→</div>
+  <div class="rec-body">
+    <span class="badge badge-red">ไม่ควรลด — ควรคง Sonnet ไว้</span><br>
+    นี่คือ agent ที่ส่งผลต่อเงินจริงโดยตรง ต้องการ reasoning ที่ดีที่สุด<br>
+    ถ้าอยากได้ดีขึ้น สามารถเปลี่ยนเป็น <span class="badge badge-orange">Opus 4.7</span> ได้ แต่ค่าเพิ่ม ~5×<br>
+    <strong>คำแนะนำ:</strong> คง Sonnet 4.6 — balance ระหว่างคุณภาพและค่าใช้จ่ายดีที่สุด
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2>6. สรุปแผน Optimize แนะนำ</h2>
+
+<table>
+  <tr>
+    <th>Agent</th>
+    <th>ปัจจุบัน</th>
+    <th>แนะนำ</th>
+    <th>เหตุผล</th>
+    <th class="right">ประหยัด/เดือน</th>
+  </tr>
+  <tr>
+    <td>Chart Watcher</td>
+    <td><span class="badge badge-blue">Sonnet 4.6</span></td>
+    <td><span class="badge badge-green">Haiku 4.5</span></td>
+    <td>Structured indicator analysis</td>
+    <td class="right">~$22</td>
+  </tr>
+  <tr>
+    <td>Market Advisor</td>
+    <td><span class="badge badge-blue">Sonnet 4.6</span></td>
+    <td><span class="badge badge-green">Haiku 4.5</span></td>
+    <td>Classification task, structured input</td>
+    <td class="right">~$16</td>
+  </tr>
+  <tr>
+    <td>Sentiment Analyst</td>
+    <td><span class="badge badge-blue">Sonnet 4.6</span></td>
+    <td><span class="badge badge-orange">ทดสอบก่อน</span></td>
+    <td>Tweet nuance อาจลดคุณภาพ</td>
+    <td class="right">~$12</td>
+  </tr>
+  <tr>
+    <td>Decision Maker</td>
+    <td><span class="badge badge-blue">Sonnet 4.6</span></td>
+    <td><span class="badge badge-blue">Sonnet 4.6</span></td>
+    <td>กระทบเงินจริง — ต้องการ reasoning</td>
+    <td class="right">$0</td>
+  </tr>
+  <tr class="total highlight">
+    <td colspan="4"><strong>รวมประหยัดได้ (เปลี่ยน 1+2 แน่นอน, 3 ถ้าผ่านทดสอบ)</strong></td>
+    <td class="right"><strong>~$38–50 / เดือน</strong></td>
+  </tr>
+</table>
+
+<div class="callout green">
+  <strong>แผนที่แนะนำ:</strong> เปลี่ยน Agent 1 และ 2.5 เป็น Haiku 4.5 ทันที → ประหยัด ~$38/เดือน (34%) โดยไม่มีความเสี่ยง<br>
+  Agent 3 ทดสอบ 1 สัปดาห์ก่อน → ถ้าโอเคประหยัดเพิ่มอีก ~$12/เดือน<br>
+  Agent 4 คง Sonnet — คุ้มค่าที่สุดสำหรับ decision-critical task
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<h2>7. วิธีเปลี่ยน Model (2 บรรทัด)</h2>
+
+<pre style="background:#1e1e1e; color:#d4d4d4; padding:16px; border-radius:6px; font-size:12px; overflow-x:auto;">
+<span style="color:#6a9955"># agents/chart_watcher.py  และ  agents/market_advisor.py</span>
+model=<span style="color:#ce9178">"claude-haiku-4-5-20251001"</span>   <span style="color:#6a9955"># เปลี่ยนจาก "claude-sonnet-4-6"</span>
+
+<span style="color:#6a9955"># agents/decision_maker.py — คงไว้</span>
+model=<span style="color:#ce9178">"claude-sonnet-4-6"</span>
+</pre>
+
+<footer>
+  XAUUSD AI Trading System &nbsp;·&nbsp; Token Cost Report &nbsp;·&nbsp;
+  ราคา Anthropic อาจเปลี่ยนแปลงได้ — ตรวจสอบล่าสุดที่ anthropic.com/pricing &nbsp;·&nbsp;
+  ค่าประมาณการณ์ขึ้นอยู่กับปริมาณ tweet และ S/R zones จริง
+</footer>
+
+<script>
+  document.getElementById('dt').textContent = new Date().toLocaleDateString('th-TH', {
+    year:'numeric', month:'long', day:'numeric'
+  });
+</script>
+</body>
+</html>
