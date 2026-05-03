@@ -469,6 +469,32 @@
     .tab-content    { display: none; }
     .tab-content.active { display: block; }
 
+    /* ─── SYSTEM SWITCHER ───────────────────────────── */
+    .sys-switcher {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-right: 20px;
+    }
+    .sys-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 5px 12px;
+      cursor: pointer;
+      letter-spacing: 0.8px;
+      transition: all 0.15s;
+    }
+    .sys-btn:hover { color: var(--text); border-color: var(--border2); }
+    .sys-btn.active {
+      background: var(--gold-dim);
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
     /* ─── SETTINGS ───────────────────────────────────────── */
     .settings-notice {
       background: rgba(245,200,66,0.06);
@@ -727,9 +753,15 @@
 <header>
   <div class="header-left">
     <div class="live-dot"></div>
-    <h1>XAUUSD &middot; Trading Dashboard</h1>
+    <h1 id="dashboard-title">XAUUSD &middot; Trading Dashboard</h1>
   </div>
-  <span id="last-update">กำลังโหลด...</span>
+  <div style="display:flex;align-items:center;gap:16px;">
+    <div class="sys-switcher">
+      <button class="sys-btn active" data-system="xauusd" onclick="switchSystem('xauusd')">XAUUSD</button>
+      <button class="sys-btn"        data-system="btcusd"  onclick="switchSystem('btcusd')">BTC</button>
+    </div>
+    <span id="last-update">กำลังโหลด...</span>
+  </div>
 </header>
 
 <div class="container">
@@ -1499,10 +1531,23 @@ function updatePortfolio(account, usd_thb) {
   document.getElementById('port-margin-usd').textContent = isTHB ? '' : fmtUsd(account.free_margin);
 }
 
+let activeSystem = 'xauusd';
+
+function switchSystem(sys) {
+  activeSystem = sys;
+  document.querySelectorAll('.sys-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.system === sys));
+  const titles = { xauusd: 'XAUUSD · Trading Dashboard', btcusd: 'BTC · Trading Dashboard' };
+  document.getElementById('dashboard-title').textContent = titles[sys] || sys.toUpperCase() + ' · Trading Dashboard';
+  fetchData();
+  const activeTab = document.querySelector('.tab-btn.active');
+  if (activeTab && activeTab.dataset.tab === 'accounting') loadAccounting();
+}
+
 async function fetchData() {
   let data = null;
   try {
-    const res = await fetch('/api/data');
+    const res = await fetch('/api/data?system=' + activeSystem);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     data = await res.json();
   } catch (e) {
@@ -1558,7 +1603,7 @@ function fmtUsd(v) {
 
 async function loadAccounting() {
   try {
-    const res  = await fetch('/api/accounting');
+    const res  = await fetch('/api/accounting?system=' + activeSystem);
     const data = await res.json();
     if (!data.ok) return;
 

@@ -3,6 +3,7 @@ import os
 from datetime import datetime, date, timedelta
 from pathlib import Path
 import anthropic
+import config as _cfg
 from connectors.price_feed import get_account_info
 from connectors.mt5_connector import (
     get_open_positions, get_mt5_history, get_closed_deal_pnl,
@@ -10,7 +11,10 @@ from connectors.mt5_connector import (
 )
 from loguru import logger
 
-LOG_FILE = "logs/trades.json"
+
+def _log_file() -> str:
+    sym = _cfg.SYMBOL.upper().replace("/", "")
+    return "logs/trades.json" if sym == "XAUUSD" else f"logs/{sym.lower()}_trades.json"
 _REPORTER_PROMPT  = Path("agents/prompts/reporter.md").read_text(encoding="utf-8")
 _ANALYSIS_COOLDOWN = 900  # วิเคราะห์ใหม่ได้ทุก 15 นาที
 _last_analysis_at: datetime | None = None
@@ -19,10 +23,11 @@ _last_usage = None   # set after each API call — read by accountant
 
 def _load_log() -> dict:
     _empty = {"trades": [], "summary": {"total": 0, "win": 0, "loss": 0, "total_pnl": 0.0}}
-    if not os.path.exists(LOG_FILE):
+    path = _log_file()
+    if not os.path.exists(path):
         return _empty
     try:
-        with open(LOG_FILE, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, ValueError):
         return _empty
@@ -30,7 +35,7 @@ def _load_log() -> dict:
 
 def _save_log(data: dict):
     os.makedirs("logs", exist_ok=True)
-    with open(LOG_FILE, "w", encoding="utf-8") as f:
+    with open(_log_file(), "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
@@ -390,6 +395,7 @@ def log_trade(decision_result: dict):
     trade_entry = {
         # ── Source ────────────────────────────────────
         "source":      "SYSTEM",
+        "symbol":      _cfg.SYMBOL,
         # ── Order info ────────────────────────────────
         "timestamp":   datetime.now().isoformat(),
         "ticket":      ticket,
@@ -466,6 +472,7 @@ def log_pending_order(decision_result: dict):
 
     trade_entry = {
         "source":        "SYSTEM",
+        "symbol":        _cfg.SYMBOL,
         "order_type":    f"PENDING_{pt}",
         "timestamp":     datetime.now().isoformat(),
         "ticket":        order.get("ticket"),

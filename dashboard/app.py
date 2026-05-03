@@ -23,9 +23,18 @@ from config import MT5_LOGIN, MT5_PASSWORD, MT5_SERVER, SYMBOL
 
 app = Flask(__name__)
 
-LOG_FILE    = os.path.join(os.path.dirname(__file__), "../logs/trades.json")
-SYSTEM_MAGIC = 20260429   # ต้องตรงกับ mt5_connector.py
-ENV_FILE = os.path.join(os.path.dirname(__file__), "../.env")
+_BASE = os.path.dirname(__file__)
+_SYSTEM_LOGS = {
+    "xauusd": os.path.join(_BASE, "../logs/trades.json"),
+    "btcusd": os.path.join(_BASE, "../logs/btcusd_trades.json"),
+}
+
+def _log_file(system: str = "xauusd") -> str:
+    return _SYSTEM_LOGS.get(system.lower(), _SYSTEM_LOGS["xauusd"])
+
+LOG_FILE     = _SYSTEM_LOGS["xauusd"]   # backward-compat alias
+SYSTEM_MAGIC = 20260429                 # ต้องตรงกับ mt5_connector.py
+ENV_FILE     = os.path.join(_BASE, "../.env")
 
 # Keys ที่อนุญาตให้แก้ไขผ่าน dashboard (ไม่รวม credentials)
 _EDITABLE_KEYS = {
@@ -235,12 +244,13 @@ def get_mt5_account(data_to_sync: dict | None = None) -> dict:
         return {}
 
 
-def load_trades() -> dict:
+def load_trades(system: str = "xauusd") -> dict:
     _empty = {"trades": [], "summary": {"total": 0, "win": 0, "loss": 0, "total_pnl": 0.0}}
-    if not os.path.exists(LOG_FILE):
+    path = _log_file(system)
+    if not os.path.exists(path):
         return _empty
     try:
-        with open(LOG_FILE, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, ValueError):
         return _empty
@@ -431,9 +441,10 @@ def index():
 
 @app.route("/api/data")
 def api_data():
-    data    = load_trades()
+    system  = request.args.get("system", "xauusd").lower()
+    data    = load_trades(system)
     usd_thb = get_usd_thb()
-    account = get_mt5_account(data_to_sync=data)  # syncs OPEN→CLOSED in-place ถ้า MT5 available
+    account = get_mt5_account(data_to_sync=data) if system == "xauusd" else {}
     trades  = data.get("trades", [])
     stats   = calc_stats(trades)
 
@@ -462,21 +473,20 @@ def api_data():
 
 @app.route("/api/accounting")
 def api_accounting():
-    """ค่าใช้จ่าย AI — อ่านจาก accounting.json (primary) + DB (ถ้ามี)"""
+    """ค่าใช้จ่าย AI — รองรับ ?system=xauusd|btcusd|all (default=all)"""
+    system = request.args.get("system", "all").lower()
     try:
-        from agents.accountant import get_summary
-        data = get_summary()
-        # คำนวณ avg cache hit rate รวมทุก agent
-        agents = data.get("agents", {})
-        for info in agents.values():
+        from agents.accountant import get_summary, get_summary_by_symbol
+        data = get_summary_by_symbol(system.upper()) if system != "all" else get_summary()
+        for info in data.get("agents", {}).values():
             total_in = (info.get("total_input_tokens", 0)
                       + info.get("total_cache_read_tokens", 0)
                       + info.get("total_cache_write_tokens", 0))
             cr = info.get("total_cache_read_tokens", 0)
             info["avg_cache_hit_rate"] = round(cr / total_in * 100, 1) if total_in > 0 else 0.0
-        return jsonify({**data, "ok": True})
+        return jsonify({**data, "ok": True, "system": system})
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e),
+        return jsonify({"ok": False, "error": str(e), "system": system,
                         "summary": {}, "agents": {}, "today": {}, "daily": {}})
 
 

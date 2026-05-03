@@ -164,11 +164,67 @@ def record_cycle(
 # ── Report helpers ────────────────────────────────────────────────────────────
 
 def get_summary() -> dict:
-    """คืน summary สำหรับ dashboard"""
+    """คืน summary รวมทุก symbol สำหรับ dashboard"""
     data = _load()
     return {
         "summary": data.get("summary", {}),
         "agents":  data.get("agents",  {}),
         "today":   data.get("daily", {}).get(date.today().isoformat(), {}),
         "daily":   data.get("daily",   {}),
+    }
+
+
+def get_summary_by_symbol(symbol: str) -> dict:
+    """คืน summary filtered by symbol — ใช้สำหรับ dashboard multi-system"""
+    data     = _load()
+    sym_up   = symbol.upper()
+    today_str = date.today().isoformat()
+
+    cycles = [c for c in data.get("cycles", [])
+              if c.get("symbol", "XAUUSD").upper() == sym_up]
+
+    # per-agent aggregates
+    agents: dict = {}
+    for c in cycles:
+        for name, info in c.get("agents", {}).items():
+            agg = agents.setdefault(name, {
+                "model":                    info.get("model", ""),
+                "total_calls":              0,
+                "total_cost_usd":           0.0,
+                "total_input_tokens":       0,
+                "total_output_tokens":      0,
+                "total_cache_read_tokens":  0,
+                "total_cache_write_tokens": 0,
+            })
+            agg["total_calls"]              += 1
+            agg["total_cost_usd"]            = round(agg["total_cost_usd"] + info.get("cost_usd", 0), 6)
+            agg["total_input_tokens"]       += info.get("input_tokens", 0)
+            agg["total_output_tokens"]      += info.get("output_tokens", 0)
+            agg["total_cache_read_tokens"]  += info.get("cache_read_tokens", 0)
+            agg["total_cache_write_tokens"] += info.get("cache_write_tokens", 0)
+
+    # daily costs
+    daily: dict = {}
+    for c in cycles:
+        day = (c.get("at") or "")[:10]
+        if not day:
+            continue
+        d = daily.setdefault(day, {"total_cost_usd": 0.0, "cycles": 0, "trades": 0})
+        d["total_cost_usd"] = round(d["total_cost_usd"] + c.get("total_cost_usd", 0), 6)
+        d["cycles"] += 1
+        if c.get("ticket"):
+            d["trades"] += 1
+
+    total_cost   = sum(c.get("total_cost_usd", 0) for c in cycles)
+    total_trades = sum(1 for c in cycles if c.get("ticket"))
+
+    return {
+        "summary": {
+            "total_cost_usd": round(total_cost, 6),
+            "total_cycles":   len(cycles),
+            "total_trades":   total_trades,
+        },
+        "agents": agents,
+        "today":  daily.get(today_str, {}),
+        "daily":  daily,
     }

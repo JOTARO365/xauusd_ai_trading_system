@@ -18,7 +18,7 @@ X_EMAIL    = os.getenv("X_EMAIL", "")
 
 # ── Trading ───────────────────────────────────────────────────
 SYMBOL        = os.getenv("SYMBOL", "XAUUSD")
-START_BALANCE = float(os.getenv("START_BALANCE", 2000))
+START_BALANCE = float(os.getenv("START_BALANCE", 5000))
 
 # ── Lot size ──────────────────────────────────────────────────
 LOT_MODE  = os.getenv("LOT_MODE",  "auto")    # "auto" | "fixed"
@@ -50,18 +50,18 @@ STREAK_PROTECTION = os.getenv("STREAK_PROTECTION", "true").lower() != "false"
 
 # ── Money Management ──────────────────────────────────────────
 MONEY_MANAGEMENT = {
-    "risk_per_trade":        float(os.getenv("RISK_PER_TRADE",        0.50)),
-    "max_daily_loss":        float(os.getenv("MAX_DAILY_LOSS",        1.00)),
-    "max_open_trades":       int(os.getenv("MAX_OPEN_TRADES",         4)),
-    "default_sl_pips":       int(os.getenv("DEFAULT_SL_PIPS",         1000)),
-    "default_tp_pips":       int(os.getenv("DEFAULT_TP_PIPS",         3000)),
-    "min_rr_ratio":          float(os.getenv("MIN_RR_RATIO",          1.5)),
-    "max_pending_buy":        int(os.getenv("MAX_PENDING_BUY",         4)),
-    "max_pending_sell":       int(os.getenv("MAX_PENDING_SELL",        4)),
-    "pending_expiry_hours":  int(os.getenv("PENDING_EXPIRY_HOURS",    48)),
-    "max_losing_streak":     int(os.getenv("MAX_LOSING_STREAK",       5)),
-    "streak_min_confidence": int(os.getenv("STREAK_MIN_CONFIDENCE",   62)),
-    "hedge_buffer_pips":     int(os.getenv("HEDGE_BUFFER_PIPS",       1000)),
+    "risk_per_trade":        float(os.getenv("RISK_PER_TRADE")        or 0.50),
+    "max_daily_loss":        float(os.getenv("MAX_DAILY_LOSS")        or 1.00),
+    "max_open_trades":       int(os.getenv("MAX_OPEN_TRADES")         or 4),
+    "default_sl_pips":       int(os.getenv("DEFAULT_SL_PIPS")         or 1000),
+    "default_tp_pips":       int(os.getenv("DEFAULT_TP_PIPS")         or 3000),
+    "min_rr_ratio":          float(os.getenv("MIN_RR_RATIO")          or 1.5),
+    "max_pending_buy":        int(os.getenv("MAX_PENDING_BUY")         or 4),
+    "max_pending_sell":       int(os.getenv("MAX_PENDING_SELL")        or 4),
+    "pending_expiry_hours":  int(os.getenv("PENDING_EXPIRY_HOURS")    or 48),
+    "max_losing_streak":     int(os.getenv("MAX_LOSING_STREAK")       or 5),
+    "streak_min_confidence": int(os.getenv("STREAK_MIN_CONFIDENCE")   or 62),
+    "hedge_buffer_pips":     int(os.getenv("HEDGE_BUFFER_PIPS")       or 1000),
 }
 
 # ── X accounts to follow ──────────────────────────────────────
