@@ -729,10 +729,28 @@ def manage_dynamic_tp() -> int:
     return extended
 
 
-def manage_post_event_tp() -> int:
+def _find_sr_tp(entry: float, is_buy: bool, chart_data: dict, point: float) -> float | None:
+    """
+    หา S/R level ที่ใกล้ที่สุดในทิศทาง TP จาก chart_data
+    BUY  → resistance ที่ต่ำสุดที่สูงกว่า entry (จะเดินไปชน)
+    SELL → support ที่สูงสุดที่ต่ำกว่า entry
+    คืน None ถ้าหาไม่เจอ
+    """
+    sr = chart_data.get("sr_zones", {})
+    min_dist = entry * 0.001   # ห่างขั้นต่ำ 0.1% จาก entry
+
+    if is_buy:
+        candidates = [r for r in sr.get("resistance", []) if r > entry + min_dist]
+        return round(min(candidates), 2) if candidates else None
+    else:
+        candidates = [s for s in sr.get("support", []) if s < entry - min_dist]
+        return round(max(candidates), 2) if candidates else None
+
+
+def manage_post_event_tp(chart_data: dict | None = None) -> int:
     """
     ตรวจ open positions ที่เปิดแบบ No-TP (tp=0) — เมื่อเวลาผ่านไปครบ NO_TP_WAIT_MINUTES
-    และ momentum สงบแล้ว ให้ตั้ง TP = entry ± default_tp_pips
+    และ momentum สงบแล้ว ให้ตั้ง TP ที่ S/R level ใกล้สุด (ถ้ามี) หรือ default_tp_pips
     คืนจำนวน positions ที่ตั้ง TP แล้ว
     """
     info = mt5.symbol_info(SYMBOL)
@@ -748,6 +766,7 @@ def manage_post_event_tp() -> int:
     tick = mt5.symbol_info_tick(SYMBOL)
     now  = int(_time.time())
     default_tp_pips = MONEY_MANAGEMENT["default_tp_pips"]
+    min_rr          = MONEY_MANAGEMENT["min_rr_ratio"]
     set_count = 0
 
     for pos in positions:
@@ -772,9 +791,31 @@ def manage_post_event_tp() -> int:
             )
             continue
 
-        # คำนวณ TP จาก entry price
-        new_tp = round(pos.price_open + default_tp_pips * point, 2) if is_buy \
-            else round(pos.price_open - default_tp_pips * point, 2)
+        entry   = pos.price_open
+        sl_dist = abs(entry - pos.sl) / point if pos.sl else default_tp_pips / min_rr
+
+        # ── หา TP จาก S/R level ก่อน ──────────────────────────────
+        sr_tp = _find_sr_tp(entry, is_buy, chart_data or {}, point)
+        if sr_tp is not None:
+            sr_dist = abs(sr_tp - entry) / point
+            rr      = sr_dist / sl_dist if sl_dist > 0 else 0
+            if rr >= min_rr * 0.8:   # ผ่อนปรน 20% เพราะเปิดไปแล้ว
+                new_tp = sr_tp
+                logger.info(
+                    f"No-TP ticket={pos.ticket} {direction} "
+                    f"ตั้ง TP ที่ S/R {new_tp:.2f} (dist={sr_dist:.0f}pips RR={rr:.2f})"
+                )
+            else:
+                sr_tp = None   # RR ต่ำเกิน → ใช้ default แทน
+
+        if sr_tp is None:
+            # fallback: fixed pips จาก entry
+            new_tp = round(entry + default_tp_pips * point, 2) if is_buy \
+                else round(entry - default_tp_pips * point, 2)
+            logger.info(
+                f"No-TP ticket={pos.ticket} {direction} "
+                f"ตั้ง TP default {new_tp:.2f} (ไม่มี S/R หรือ RR ต่ำ)"
+            )
 
         # ตรวจ stops_level จากราคาปัจจุบัน
         if tick is not None and stops_min > 0:

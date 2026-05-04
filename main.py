@@ -179,7 +179,7 @@ async def run_status_cycle() -> None:
         dtp = manage_dynamic_tp()
         if dtp:
             print_warning(f"Dynamic TP: ขยับ TP ออก {dtp} position (momentum แรง)")
-        ptp = manage_post_event_tp()
+        ptp = manage_post_event_tp(_last_chart_data)
         if ptp:
             print_warning(f"Post-event TP: ตั้ง TP {ptp} position (momentum สงบแล้ว)")
         n = scan_manual_orders(_last_chart_data or None)
@@ -287,7 +287,7 @@ async def run_cycle() -> tuple[dict, dict]:
         dtp = manage_dynamic_tp()
         if dtp:
             print_warning(f"Dynamic TP: ขยับ TP ออก {dtp} position (momentum แรง)")
-        ptp = manage_post_event_tp()
+        ptp = manage_post_event_tp(chart_data)
         if ptp:
             print_warning(f"Post-event TP: ตั้ง TP {ptp} position (momentum สงบแล้ว)")
         log_trade(decision)
