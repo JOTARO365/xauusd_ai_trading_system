@@ -1,24 +1,32 @@
 import asyncio
-from connectors.twitter_client import fetch_gold_news, fetch_from_accounts
+from connectors.twitter_client import fetch_from_accounts
 from connectors.web_news import fetch_forexfactory_calendar, fetch_investing_news
+from config import X_KEYWORDS
 from loguru import logger
 
 
 async def gather_news() -> dict:
     logger.info("Agent 2 (ผู้หาข้อมูล): กำลังดึงข่าวจาก X + ForexFactory + Investing.com...")
 
-    # รัน Twitter + web news พร้อมกัน
-    (keyword_tweets, account_tweets, calendar, articles) = await asyncio.gather(
-        fetch_gold_news(limit=30),
-        fetch_from_accounts(limit_per_account=10),
+    # ดึงข้อมูลทุกแหล่งพร้อมกัน — Twitter ดึงครั้งเดียว แล้วแยก filtered vs raw ทีหลัง
+    (raw_tweets, calendar, articles) = await asyncio.gather(
+        fetch_from_accounts(limit_per_account=15),
         asyncio.to_thread(fetch_forexfactory_calendar, 24),
         asyncio.to_thread(fetch_investing_news, 10),
     )
 
-    # กรอง tweet ซ้ำ
+    # กรอง keyword (gold/XAU/etc) จาก raw tweets
+    keywords_lower = [k.lower() for k in X_KEYWORDS]
+    keyword_tweets = [
+        t for t in raw_tweets
+        if any(kw in t["text"].lower() for kw in keywords_lower)
+    ]
+    logger.info(f"กรอง keyword แล้ว: {len(keyword_tweets)}/{len(raw_tweets)} tweets")
+
+    # dedup โดย id
     seen: set = set()
     unique_tweets: list = []
-    for t in keyword_tweets + account_tweets:
+    for t in keyword_tweets + raw_tweets:
         if t["id"] not in seen:
             seen.add(t["id"])
             unique_tweets.append(t)
@@ -30,14 +38,14 @@ async def gather_news() -> dict:
     )
 
     return {
-        "tweets":         unique_tweets,
-        "count":          len(unique_tweets),
-        "calendar":       calendar,       # high-impact economic events
-        "web_articles":   articles,       # investing.com headlines
+        "tweets":       unique_tweets,
+        "count":        len(unique_tweets),
+        "calendar":     calendar,
+        "web_articles": articles,
         "sources": {
-            "keyword_search":  len(keyword_tweets),
-            "account_feed":    len(account_tweets),
-            "forexfactory":    len(calendar),
-            "investing_com":   len(articles),
+            "keyword_search": len(keyword_tweets),
+            "account_feed":   len(raw_tweets),
+            "forexfactory":   len(calendar),
+            "investing_com":  len(articles),
         },
     }
