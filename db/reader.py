@@ -1,11 +1,9 @@
-"""Read layer — DB primary, JSON fallback is handled by callers."""
+"""Read layer — Supabase primary, JSON fallback is handled by callers."""
 
-from datetime import date, datetime
-from decimal import Decimal
-
+from datetime import date, datetime, timedelta
 from loguru import logger
 
-from db.connection import get_conn
+from db.connection import get_client
 
 _ALIASES = {
     "GOLD": "XAUUSD", "GOLD#": "XAUUSD", "XAUUSD": "XAUUSD",
@@ -17,63 +15,49 @@ def _norm(sym: str) -> str:
     return _ALIASES.get(sym.upper(), sym.upper())
 
 
-def _to_py(val):
-    if isinstance(val, Decimal):
-        return float(val)
-    if isinstance(val, datetime):
-        return val.isoformat()
-    return val
-
-
 def get_trades(symbol: str = "XAUUSD") -> list[dict] | None:
     normed = _norm(symbol)
     raw = symbol.upper()
+    symbols = list({normed, raw})
     try:
-        conn = get_conn()
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT ticket, symbol, source, direction, entry_type, status,
-                           lot, entry_price, sl, tp, pnl,
-                           opened_at, closed_at,
-                           technical_signal, technical_confidence,
-                           trend, sr_zone, sr_strength, pa_action,
-                           sentiment, analysis
-                    FROM trades
-                    WHERE symbol IN (%s, %s)
-                    ORDER BY opened_at ASC NULLS LAST
-                    """,
-                    (normed, raw),
-                )
-                rows = cur.fetchall()
-        finally:
-            conn.close()
-
+        res = (
+            get_client()
+            .table("trades")
+            .select(
+                "ticket,symbol,source,direction,entry_type,status,"
+                "lot,entry_price,sl,tp,pnl,"
+                "opened_at,closed_at,"
+                "technical_signal,technical_confidence,"
+                "trend,sr_zone,sr_strength,pa_action,sentiment,analysis"
+            )
+            .in_("symbol", symbols)
+            .order("opened_at", desc=False)
+            .execute()
+        )
         result = []
-        for r in rows:
+        for r in res.data:
             result.append({
-                "ticket":                r["ticket"],
-                "symbol":                r["symbol"],
-                "source":                r["source"],
-                "direction":             r["direction"],
-                "entry_type":            r["entry_type"],
-                "status":                r["status"],
-                "lot":                   _to_py(r["lot"]),
-                "entry_price":           _to_py(r["entry_price"]),
-                "sl":                    _to_py(r["sl"]),
-                "tp":                    _to_py(r["tp"]),
-                "pnl":                   _to_py(r["pnl"]),
-                "timestamp":             _to_py(r["opened_at"]),
-                "close_time":            _to_py(r["closed_at"]),
-                "technical_signal":      r["technical_signal"],
-                "technical_confidence":  r["technical_confidence"],
-                "trend":                 r["trend"],
-                "sr_zone":               r["sr_zone"],
-                "sr_strength":           r["sr_strength"],
-                "pa_action":             r["pa_action"],
-                "sentiment":             r["sentiment"],
-                "analysis":              r["analysis"],
+                "ticket":                r.get("ticket"),
+                "symbol":                r.get("symbol"),
+                "source":                r.get("source"),
+                "direction":             r.get("direction"),
+                "entry_type":            r.get("entry_type"),
+                "status":                r.get("status"),
+                "lot":                   r.get("lot"),
+                "entry_price":           r.get("entry_price"),
+                "sl":                    r.get("sl"),
+                "tp":                    r.get("tp"),
+                "pnl":                   r.get("pnl"),
+                "timestamp":             r.get("opened_at"),
+                "close_time":            r.get("closed_at"),
+                "technical_signal":      r.get("technical_signal"),
+                "technical_confidence":  r.get("technical_confidence"),
+                "trend":                 r.get("trend"),
+                "sr_zone":               r.get("sr_zone"),
+                "sr_strength":           r.get("sr_strength"),
+                "pa_action":             r.get("pa_action"),
+                "sentiment":             r.get("sentiment"),
+                "analysis":              r.get("analysis"),
             })
         return result
     except Exception as e:
@@ -83,136 +67,87 @@ def get_trades(symbol: str = "XAUUSD") -> list[dict] | None:
 
 def get_accounting(symbol: str | None = None) -> dict | None:
     use_filter = symbol is not None and symbol.lower() != "all"
-    normed = _norm(symbol) if use_filter else None
-    raw = symbol.upper() if use_filter else None
     today_str = date.today().isoformat()
+    cutoff = (datetime.utcnow() - timedelta(days=30)).isoformat()
 
     try:
-        conn = get_conn()
-        try:
-            with conn.cursor() as cur:
-                # ── Query 1: agent aggregates ─────────────────────────────
-                if use_filter:
-                    cur.execute(
-                        """
-                        SELECT agent_name, model,
-                               COUNT(*)                        AS total_calls,
-                               SUM(cost_usd)                  AS total_cost_usd,
-                               SUM(input_tokens)              AS total_input_tokens,
-                               SUM(output_tokens)             AS total_output_tokens,
-                               SUM(cache_read_tokens)         AS total_cache_read_tokens,
-                               SUM(cache_write_tokens)        AS total_cache_write_tokens
-                        FROM agent_usage
-                        WHERE symbol IN (%s, %s)
-                        GROUP BY agent_name, model
-                        """,
-                        (normed, raw),
-                    )
-                else:
-                    cur.execute(
-                        """
-                        SELECT agent_name, model,
-                               COUNT(*)                        AS total_calls,
-                               SUM(cost_usd)                  AS total_cost_usd,
-                               SUM(input_tokens)              AS total_input_tokens,
-                               SUM(output_tokens)             AS total_output_tokens,
-                               SUM(cache_read_tokens)         AS total_cache_read_tokens,
-                               SUM(cache_write_tokens)        AS total_cache_write_tokens
-                        FROM agent_usage
-                        GROUP BY agent_name, model
-                        """
-                    )
-                agent_rows = cur.fetchall()
+        client = get_client()
+        symbols = []
+        if use_filter:
+            normed = _norm(symbol)
+            symbols = list({normed, symbol.upper()})
 
-                # ── Query 2: daily costs (last 30 days) ───────────────────
-                if use_filter:
-                    cur.execute(
-                        """
-                        SELECT DATE(cycle_at)  AS day,
-                               SUM(total_cost_usd) AS total_cost_usd,
-                               COUNT(*)            AS cycles,
-                               COUNT(ticket)       AS trades
-                        FROM cycles
-                        WHERE symbol IN (%s, %s)
-                          AND cycle_at >= NOW() - INTERVAL '30 days'
-                        GROUP BY DATE(cycle_at)
-                        ORDER BY day
-                        """,
-                        (normed, raw),
-                    )
-                else:
-                    cur.execute(
-                        """
-                        SELECT DATE(cycle_at)  AS day,
-                               SUM(total_cost_usd) AS total_cost_usd,
-                               COUNT(*)            AS cycles,
-                               COUNT(ticket)       AS trades
-                        FROM cycles
-                        WHERE cycle_at >= NOW() - INTERVAL '30 days'
-                        GROUP BY DATE(cycle_at)
-                        ORDER BY day
-                        """
-                    )
-                daily_rows = cur.fetchall()
+        # ── agent_usage rows ──────────────────────────────────
+        q = client.table("agent_usage").select(
+            "agent_name,model,cost_usd,input_tokens,output_tokens,"
+            "cache_read_tokens,cache_write_tokens"
+        )
+        if use_filter:
+            q = q.in_("symbol", symbols)
+        agent_rows = q.execute().data
 
-                # ── Query 3: global totals ────────────────────────────────
-                if use_filter:
-                    cur.execute(
-                        """
-                        SELECT SUM(total_cost_usd) AS total_cost_usd,
-                               COUNT(*)            AS total_cycles,
-                               COUNT(ticket)       AS total_trades
-                        FROM cycles
-                        WHERE symbol IN (%s, %s)
-                        """,
-                        (normed, raw),
-                    )
-                else:
-                    cur.execute(
-                        """
-                        SELECT SUM(total_cost_usd) AS total_cost_usd,
-                               COUNT(*)            AS total_cycles,
-                               COUNT(ticket)       AS total_trades
-                        FROM cycles
-                        """
-                    )
-                totals = cur.fetchone()
-        finally:
-            conn.close()
+        # ── cycles rows (last 30 days) ────────────────────────
+        q = client.table("cycles").select("cycle_at,total_cost_usd,ticket").gte("cycle_at", cutoff)
+        if use_filter:
+            q = q.in_("symbol", symbols)
+        cycle_rows = q.execute().data
 
-        agents = {}
+        # ── aggregate agent stats in Python ──────────────────
+        agents: dict = {}
         for r in agent_rows:
-            agents[r["agent_name"]] = {
-                "model":                    r["model"],
-                "total_calls":              int(r["total_calls"]),
-                "total_cost_usd":           float(_to_py(r["total_cost_usd"]) or 0),
-                "total_input_tokens":       int(r["total_input_tokens"] or 0),
-                "total_output_tokens":      int(r["total_output_tokens"] or 0),
-                "total_cache_read_tokens":  int(r["total_cache_read_tokens"] or 0),
-                "total_cache_write_tokens": int(r["total_cache_write_tokens"] or 0),
-            }
+            name = r["agent_name"]
+            if name not in agents:
+                agents[name] = {
+                    "model":                    r.get("model", ""),
+                    "total_calls":              0,
+                    "total_cost_usd":           0.0,
+                    "total_input_tokens":       0,
+                    "total_output_tokens":      0,
+                    "total_cache_read_tokens":  0,
+                    "total_cache_write_tokens": 0,
+                }
+            a = agents[name]
+            a["total_calls"]              += 1
+            a["total_cost_usd"]           += float(r.get("cost_usd") or 0)
+            a["total_input_tokens"]       += int(r.get("input_tokens") or 0)
+            a["total_output_tokens"]      += int(r.get("output_tokens") or 0)
+            a["total_cache_read_tokens"]  += int(r.get("cache_read_tokens") or 0)
+            a["total_cache_write_tokens"] += int(r.get("cache_write_tokens") or 0)
+        for a in agents.values():
+            a["total_cost_usd"] = round(a["total_cost_usd"], 6)
 
-        daily = {}
-        today_entry = {}
-        for r in daily_rows:
-            day_key = r["day"].isoformat() if isinstance(r["day"], date) else str(r["day"])
-            entry = {
-                "total_cost_usd": float(_to_py(r["total_cost_usd"]) or 0),
-                "cycles":         int(r["cycles"]),
-                "trades":         int(r["trades"]),
-            }
-            daily[day_key] = entry
-            if day_key == today_str:
-                today_entry = entry
+        # ── aggregate daily costs in Python ──────────────────
+        daily: dict = {}
+        for r in cycle_rows:
+            day_key = (r.get("cycle_at") or "")[:10]
+            if not day_key:
+                continue
+            if day_key not in daily:
+                daily[day_key] = {"total_cost_usd": 0.0, "cycles": 0, "trades": 0}
+            daily[day_key]["total_cost_usd"] += float(r.get("total_cost_usd") or 0)
+            daily[day_key]["cycles"]         += 1
+            if r.get("ticket"):
+                daily[day_key]["trades"]     += 1
+        for d in daily.values():
+            d["total_cost_usd"] = round(d["total_cost_usd"], 6)
 
-        summary = {
-            "total_cost_usd": float(_to_py(totals["total_cost_usd"]) or 0) if totals else 0.0,
-            "total_cycles":   int(totals["total_cycles"] or 0) if totals else 0,
-            "total_trades":   int(totals["total_trades"] or 0) if totals else 0,
-        }
+        today_entry = daily.get(today_str, {})
+        total_cost  = round(sum(d["total_cost_usd"] for d in daily.values()), 6)
+
+        # ── all-time totals ───────────────────────────────────
+        q2 = client.table("cycles").select("total_cost_usd,ticket")
+        if use_filter:
+            q2 = q2.in_("symbol", symbols)
+        all_cycles = q2.execute().data
+        all_cost   = round(sum(float(r.get("total_cost_usd") or 0) for r in all_cycles), 6)
+        all_trades = sum(1 for r in all_cycles if r.get("ticket"))
 
         return {
-            "summary": summary,
+            "summary": {
+                "total_cost_usd": all_cost,
+                "total_cycles":   len(all_cycles),
+                "total_trades":   all_trades,
+            },
             "agents":  agents,
             "today":   today_entry,
             "daily":   daily,
