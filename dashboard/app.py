@@ -51,6 +51,15 @@ _EDITABLE_KEYS = {
 _usd_thb_cache = {"rate": 33.0, "fetched_at": None}
 
 
+def _db_sync_trade(trade: dict) -> None:
+    """Sync trade dict to DB (best-effort, silent on failure)"""
+    try:
+        from db.writer import write_trade
+        write_trade(trade)
+    except Exception:
+        pass
+
+
 def get_usd_thb() -> float:
     """ดึงอัตราแลกเปลี่ยน USD/THB จาก Yahoo Finance และ cache ไว้ 5 นาที"""
     from datetime import timedelta
@@ -168,6 +177,7 @@ def _sync_from_mt5(data: dict) -> bool:
                 t["pnl"]        = pnl
                 t["close_time"] = close_time
                 changed         = True
+                _db_sync_trade(t)
         else:
             # เพิ่ม closed trade ใหม่ที่ไม่เคยเห็น
             entry_deal = next((d for d in pos_deals if d.entry == 0), None)
@@ -195,6 +205,7 @@ def _sync_from_mt5(data: dict) -> bool:
             data["trades"].append(entry)
             ticket_map[tk] = entry
             changed = True
+            _db_sync_trade(entry)
 
     if not changed:
         return False
