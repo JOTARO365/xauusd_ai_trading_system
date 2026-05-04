@@ -4,7 +4,7 @@ import sys
 import time
 from datetime import date as _date
 from loguru import logger
-from connectors.price_feed import connect_mt5, disconnect_mt5
+from connectors.price_feed import connect_mt5, disconnect_mt5, is_mt5_connected
 from connectors.mt5_connector import get_open_positions, manage_breakeven, manage_dynamic_tp, manage_post_event_tp, count_protected_slots, is_hedge_active, check_open_slot
 from agents.chart_watcher import analyze_chart
 from agents.market_advisor import analyze_market_regime
@@ -315,10 +315,10 @@ async def run_cycle() -> tuple[dict, dict]:
         record_cycle(
             symbol       = config.SYMBOL,
             agent_usages = {
-                "chart_watcher":  ("claude-haiku-4-5-20251001", _cw_mod._last_usage),
-                "market_advisor": ("claude-haiku-4-5-20251001", _ma_mod._last_usage),
-                "analyst":        ("claude-haiku-4-5-20251001", _an_mod._last_usage),
-                "decision_maker": ("claude-sonnet-4-6",         _dm_mod._last_usage),
+                "chart_watcher":  ("claude-sonnet-4-6", _cw_mod._last_usage),
+                "market_advisor": ("claude-sonnet-4-6", _ma_mod._last_usage),
+                "analyst":        ("claude-sonnet-4-6", _an_mod._last_usage),
+                "decision_maker": ("claude-sonnet-4-6", _dm_mod._last_usage),
                 "reporter":       ("claude-haiku-4-5-20251001", _rp_mod._last_usage),
             },
             ticket       = _ticket,
@@ -350,6 +350,13 @@ async def main():
 
     console.print(f"  [green]✓[/green]  เชื่อมต่อ MT5 สำเร็จ\n")
 
+    # ── DB connectivity check ──────────────────────────────────
+    from db.connection import is_available, get_url
+    if is_available():
+        console.print(f"  [green]✓[/green]  Database: {get_url()}\n")
+    else:
+        console.print(f"  [yellow]⚠[/yellow]  Database ต่อไม่ได้ ({get_url()}) — บันทึกลง JSON อย่างเดียว\n")
+
     # รอบแรกใช้ DEFAULT เพราะยังไม่มีข้อมูล
     interval = DEFAULT_INTERVAL
     reason   = "เริ่มต้นระบบ"
@@ -364,6 +371,13 @@ async def main():
                 console.print(f"  [dim]💤 {sleep_reason} — รอ {mins_left} นาที...[/dim]")
                 await asyncio.sleep(chunk)
                 should_sleep, sleep_secs, sleep_reason = market_sleep_status()
+
+            # ── Auto-reconnect MT5 ถ้าหลุด ────────────────────────────────
+            if not is_mt5_connected():
+                console.print("  [yellow]⚠[/yellow]  MT5 หลุด — reconnect...\n")
+                if not connect_mt5():
+                    await asyncio.sleep(10)
+                    continue
 
             open_pos = get_open_positions()
             hedge    = is_hedge_active()
@@ -385,14 +399,16 @@ async def main():
                 interval, reason = next_interval(chart_data, sentiment_data)
                 logger.info(f"Next interval: {interval}s — {reason}")
 
-                # ── Weekly calendar pending (จันทร์เช้า) ─────────────
-                global _last_weekly_pending_date
-                today = _date.today()
-                if today.weekday() == 0 and today != _last_weekly_pending_date:
-                    _last_weekly_pending_date = today
-                    wkly = place_weekly_calendar_pending(chart_data)
-                    if wkly:
-                        print_warning(f"Weekly calendar pending: วาง {wkly} orders ตามปฏิทิน")
+            # ── Weekly calendar pending (จันทร์เช้า) — รันเสมอไม่ขึ้นกับ slots ──
+            global _last_weekly_pending_date
+            today = _date.today()
+            if today.weekday() == 0 and today != _last_weekly_pending_date:
+                _last_weekly_pending_date = today
+                wkly = place_weekly_calendar_pending(_last_chart_data or {})
+                if wkly:
+                    print_warning(f"Weekly calendar pending: วาง {wkly} orders ตามปฏิทิน")
+                else:
+                    logger.info("Weekly calendar pending: ไม่วาง order (ดู system.log)")
 
             print_cycle_end(interval, reason)
             await asyncio.sleep(interval)

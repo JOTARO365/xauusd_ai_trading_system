@@ -3,15 +3,13 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://trading:trading@localhost:5432/trading",
-)
+_DEFAULT_URL = "postgresql://trading:trading@localhost:5433/trading"
 
 
 def get_conn():
-    """คืน connection ใหม่ — caller ต้อง close() เอง"""
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    """คืน connection ใหม่ — อ่าน DATABASE_URL ทุกครั้งที่เรียก เพื่อให้รับค่าจาก load_dotenv()"""
+    url = os.getenv("DATABASE_URL", _DEFAULT_URL)
+    return psycopg2.connect(url, cursor_factory=RealDictCursor)
 
 
 def is_available() -> bool:
@@ -22,3 +20,7 @@ def is_available() -> bool:
         return True
     except Exception:
         return False
+
+
+def get_url() -> str:
+    return os.getenv("DATABASE_URL", _DEFAULT_URL)

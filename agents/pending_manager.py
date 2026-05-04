@@ -157,6 +157,9 @@ def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = No
 
     current = chart_data.get("indicators", {}).get("h4", {}).get("close", 0)
     if not current:
+        tick = mt5.symbol_info_tick(SYMBOL)
+        current = tick.bid if tick else 0
+    if not current:
         logger.warning("ไม่มีราคาปัจจุบัน — ข้าม auto-pending")
         return 0
 
@@ -301,6 +304,9 @@ def place_weekly_calendar_pending(chart_data: dict) -> int:
 
     # ── ราคาปัจจุบันและ S/R levels ───────────────────────────────
     current = chart_data.get("indicators", {}).get("h4", {}).get("close", 0)
+    if not current:
+        tick = mt5.symbol_info_tick(SYMBOL)
+        current = tick.bid if tick else 0
     if not current:
         logger.warning("Weekly pending: ไม่มีราคาปัจจุบัน — ข้าม")
         return 0

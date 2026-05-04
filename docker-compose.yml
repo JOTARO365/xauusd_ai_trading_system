@@ -11,7 +11,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
     ports:
-      - "5432:5432"
+      - "5433:5432"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U trading -d trading"]
@@ -36,6 +36,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
+
+  adminer:
+    image: adminer
+    container_name: xauusd-adminer
+    ports:
+      - "8300:8080"
+    depends_on:
+      - postgres
     restart: unless-stopped
 
 volumes:

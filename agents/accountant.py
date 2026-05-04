@@ -26,6 +26,18 @@ _FALLBACK = _PRICING["claude-haiku-4-5-20251001"]
 _LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "logs", "accounting.json")
 _MAX_CYCLES = 500   # เก็บไว้ใน memory เท่านี้ (aggregate ยังครบ)
 
+# MT5 symbol aliases → canonical names
+_SYMBOL_ALIASES: dict[str, str] = {
+    "GOLD":   "XAUUSD",
+    "GOLD#":  "XAUUSD",
+    "XAUUSD": "XAUUSD",
+    "BTCUSD": "BTCUSD",
+    "BTC":    "BTCUSD",
+}
+
+def _norm_symbol(sym: str) -> str:
+    return _SYMBOL_ALIASES.get(sym.upper(), sym.upper())
+
 
 # ── I/O ──────────────────────────────────────────────────────────────────────
 
@@ -90,6 +102,7 @@ def record_cycle(
     data = _load()
     lat  = latencies_ms or {}
     today = date.today().isoformat()
+    symbol = _norm_symbol(symbol)
 
     cycle: dict = {
         "at":             datetime.now(timezone.utc).isoformat(),
@@ -177,11 +190,11 @@ def get_summary() -> dict:
 def get_summary_by_symbol(symbol: str) -> dict:
     """คืน summary filtered by symbol — ใช้สำหรับ dashboard multi-system"""
     data     = _load()
-    sym_up   = symbol.upper()
+    sym_up   = _norm_symbol(symbol)
     today_str = date.today().isoformat()
 
     cycles = [c for c in data.get("cycles", [])
-              if c.get("symbol", "XAUUSD").upper() == sym_up]
+              if _norm_symbol(c.get("symbol", "XAUUSD")) == sym_up]
 
     # per-agent aggregates
     agents: dict = {}

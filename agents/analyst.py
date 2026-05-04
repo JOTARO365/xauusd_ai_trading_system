@@ -64,7 +64,7 @@ def analyze_sentiment(news_data: dict) -> dict:
 
     global _last_usage
     response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model="claude-sonnet-4-6",
         max_tokens=400,
         system=[{"type": "text", "text": SYSTEM_PROMPT,
                  "cache_control": {"type": "ephemeral"}}],

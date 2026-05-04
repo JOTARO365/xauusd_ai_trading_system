@@ -1,6 +1,19 @@
+import time
 import MetaTrader5 as mt5
 from config import MT5_LOGIN, MT5_PASSWORD, MT5_SERVER, SYMBOL
 from loguru import logger
+
+
+def is_mt5_connected() -> bool:
+    """ตรวจว่า MT5 ยังต่ออยู่ไหม โดยไม่ทำ initialize/shutdown"""
+    try:
+        info = mt5.terminal_info()
+        if info is None:
+            return False
+        acc = mt5.account_info()
+        return acc is not None
+    except Exception:
+        return False
 
 
 def connect_mt5() -> bool:
@@ -54,13 +67,17 @@ def get_current_price(symbol: str = SYMBOL) -> dict:
 
 
 def get_ohlcv(symbol: str = SYMBOL, timeframe=mt5.TIMEFRAME_H1, count: int = 100):
-    # ตรวจสอบ symbol ก่อนดึงข้อมูล
     mt5.symbol_select(symbol, True)
-    rates = mt5.copy_rates_from_pos(symbol, timeframe, 0, count)
-    if rates is None or len(rates) == 0:
-        logger.error(f"Cannot get OHLCV for {symbol}: {mt5.last_error()}")
-        return None
-    return rates
+    for attempt in range(3):
+        rates = mt5.copy_rates_from_pos(symbol, timeframe, 0, count)
+        if rates is not None and len(rates) > 0:
+            return rates
+        err = mt5.last_error()
+        if attempt < 2:
+            logger.debug(f"OHLCV retry {attempt+1}/3 for {symbol}: {err}")
+            time.sleep(1.5)
+    logger.error(f"Cannot get OHLCV for {symbol}: {mt5.last_error()}")
+    return None
 
 
 def get_account_info() -> dict:

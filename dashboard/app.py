@@ -213,16 +213,18 @@ def _sync_from_mt5(data: dict) -> bool:
 
 
 def get_mt5_account(data_to_sync: dict | None = None) -> dict:
-    """ดึงข้อมูลบัญชีจาก MT5 — ถ้าส่ง data_to_sync จะ sync trades จาก MT5 ด้วยในครั้งเดียว"""
+    """ดึงข้อมูลบัญชีจาก MT5 — ไม่เรียก shutdown() เพื่อไม่ตัด connection ของ main.py"""
+    if not _MT5_AVAILABLE:
+        return {}
     try:
-        if not mt5.initialize():
-            return {}
-        if not mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
-            mt5.shutdown()
-            return {}
+        already_init = mt5.terminal_info() is not None
+        if not already_init:
+            if not mt5.initialize():
+                return {}
+            if not mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
+                return {}
         info = mt5.account_info()
         if info is None:
-            mt5.shutdown()
             return {}
         result = {
             "balance":     info.balance,
@@ -234,13 +236,10 @@ def get_mt5_account(data_to_sync: dict | None = None) -> dict:
         }
         if data_to_sync is not None:
             _sync_from_mt5(data_to_sync)
-        mt5.shutdown()
+        if not already_init:
+            mt5.shutdown()
         return result
     except Exception:
-        try:
-            mt5.shutdown()
-        except Exception:
-            pass
         return {}
 
 
