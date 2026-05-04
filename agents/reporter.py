@@ -180,6 +180,7 @@ def _sync_closed_trades(log: dict):
             t["close_time"] = close_map.get(tk, datetime.now().isoformat())
         changed = True
         logger.info(f"Trade closed — Ticket:{t['ticket']} PnL:{pnl:+.2f}")
+        _db_write_trade(t)
 
     if changed:
         closed = [t for t in log["trades"] if t.get("status") == "CLOSED"]
