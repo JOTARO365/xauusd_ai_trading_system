@@ -231,7 +231,7 @@ def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = No
                 price=level,
                 sl_pips=sl_pips,
                 tp_pips=tp_pips,
-                comment=f"AUTO:{pending_type}|{sent_dir}|{level:.2f}",
+                comment=f"AP {pending_type} {sent_dir[:3]} {level:.0f}",
                 expiry_hours=MONEY_MANAGEMENT["pending_expiry_hours"],
             )
             if result.get("success"):
@@ -260,7 +260,7 @@ def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = No
 #  WEEKLY CALENDAR PENDING (จันทร์เช้า)
 # ─────────────────────────────────────────────────────────────
 
-_WEEKLY_TAG = "WEEKLY:"
+_WEEKLY_TAG = "WK-"
 
 
 def _has_weekly_pending() -> bool:
@@ -355,7 +355,7 @@ def place_weekly_calendar_pending(chart_data: dict) -> int:
                     price=buy_lv,
                     sl_pips=sl_pips,
                     tp_pips=tp_pips,
-                    comment=f"{_WEEKLY_TAG}BUY|{short_tag}",
+                    comment=f"{_WEEKLY_TAG}BUY {short_tag}",
                     expiry_hours=168,
                 )
                 if res.get("success"):
@@ -377,7 +377,7 @@ def place_weekly_calendar_pending(chart_data: dict) -> int:
                     price=sell_lv,
                     sl_pips=sl_pips,
                     tp_pips=tp_pips,
-                    comment=f"{_WEEKLY_TAG}SELL|{short_tag}",
+                    comment=f"{_WEEKLY_TAG}SELL {short_tag}",
                     expiry_hours=168,
                 )
                 if res.get("success"):

@@ -7,8 +7,11 @@ from loguru import logger
 
 
 def _safe_comment(text: str) -> str:
-    """กรองเฉพาะ ASCII printable และตัดให้ไม่เกิน 31 ตัวอักษร (ขีดจำกัด MT5)"""
-    cleaned = re.sub(r"[^\x20-\x7E]", "", text)
+    """กรองเฉพาะตัวอักษรที่ broker ยอมรับ และตัดให้ไม่เกิน 31 ตัวอักษร
+    ตัดออก: | : @ # $ % ^ & * ( ) + = [ ] { } ; ' " < > ? \\
+    เหลือ: A-Z a-z 0-9 space _ - . / !
+    """
+    cleaned = re.sub(r"[^A-Za-z0-9 _.!\-/]", "", text)
     return cleaned[:31]
 
 PENDING_TYPE_MAP = {
