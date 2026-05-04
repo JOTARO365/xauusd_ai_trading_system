@@ -245,6 +245,20 @@ def get_mt5_account(data_to_sync: dict | None = None) -> dict:
 
 def load_trades(system: str = "xauusd") -> dict:
     _empty = {"trades": [], "summary": {"total": 0, "win": 0, "loss": 0, "total_pnl": 0.0}}
+    try:
+        from db.reader import get_trades
+        rows = get_trades(system)
+        if rows is not None:
+            closed = [t for t in rows if t.get("status") == "CLOSED"]
+            summary = {
+                "total":     len(closed),
+                "win":       sum(1 for t in closed if (t.get("pnl") or 0) > 0),
+                "loss":      sum(1 for t in closed if (t.get("pnl") or 0) < 0),
+                "total_pnl": round(sum(t.get("pnl") or 0 for t in closed), 2),
+            }
+            return {"trades": rows, "summary": summary}
+    except Exception:
+        pass
     path = _log_file(system)
     if not os.path.exists(path):
         return _empty
@@ -475,6 +489,19 @@ def api_accounting():
     """ค่าใช้จ่าย AI — รองรับ ?system=xauusd|btcusd|all (default=all)"""
     system = request.args.get("system", "all").lower()
     try:
+        from db.reader import get_accounting
+        data = get_accounting(None if system == "all" else system)
+        if data is not None:
+            for info in data.get("agents", {}).values():
+                total_in = (info.get("total_input_tokens", 0)
+                          + info.get("total_cache_read_tokens", 0)
+                          + info.get("total_cache_write_tokens", 0))
+                cr = info.get("total_cache_read_tokens", 0)
+                info["avg_cache_hit_rate"] = round(cr / total_in * 100, 1) if total_in > 0 else 0.0
+            return jsonify({**data, "ok": True, "system": system, "source": "db"})
+    except Exception:
+        pass
+    try:
         from agents.accountant import get_summary, get_summary_by_symbol
         data = get_summary_by_symbol(system.upper()) if system != "all" else get_summary()
         for info in data.get("agents", {}).values():
@@ -483,7 +510,7 @@ def api_accounting():
                       + info.get("total_cache_write_tokens", 0))
             cr = info.get("total_cache_read_tokens", 0)
             info["avg_cache_hit_rate"] = round(cr / total_in * 100, 1) if total_in > 0 else 0.0
-        return jsonify({**data, "ok": True, "system": system})
+        return jsonify({**data, "ok": True, "system": system, "source": "json"})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e), "system": system,
                         "summary": {}, "agents": {}, "today": {}, "daily": {}})

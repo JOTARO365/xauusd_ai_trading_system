@@ -157,7 +157,7 @@ docker compose down
 
 ### โหมด B — Windows containers (ระบบเต็ม — Bot + Dashboard)
 
-Docker ติดตั้งทุกอย่างในตัว: **Python, Node.js, PM2** และ Python packages ทั้งหมด  
+Docker ติดตั้งทุกอย่างในตัว: **Python, Node.js, PM2** และ Python packages ทั้งหมด
 ใช้สำหรับคนที่ต้องการรันทุกอย่างใน Docker โดยไม่ต้องติดตั้งอะไรเพิ่มบน host
 
 **ข้อกำหนด:**
@@ -192,7 +192,7 @@ docker compose -f docker-compose.windows.yml down
 - PM2 จัดการ `main.py` (bot) และ `dashboard/app.py` ใน container เดียว
 - Docker restart container อัตโนมัติถ้า PM2 หยุด (`restart: unless-stopped`)
 
-> **หมายเหตุ:** Windows container image (`windowsservercore-ltsc2022`) ขนาด ~5-7 GB  
+> **หมายเหตุ:** Windows container image (`windowsservercore-ltsc2022`) ขนาด ~5-7 GB
 > Build ครั้งแรกใช้เวลานาน ครั้งถัดไปใช้ cache เร็วขึ้นมาก
 
 ---
@@ -275,7 +275,7 @@ docker compose -f docker-compose.windows.yml down
 | `MT5_PASSWORD` | — | MT5 password (required) |
 | `MT5_SERVER` | — | Broker server name (required) |
 | `SYMBOL` | `XAUUSD` | Trading symbol |
-| `START_BALANCE` | `2000` | ทุนเริ่มต้น (USD) |
+| `START_BALANCE` | `2000` | ทุนเริ่มต้น (THB) |
 | `RISK_PER_TRADE` | `0.50` | % risk ต่อ trade |
 | `MAX_DAILY_LOSS` | `1.00` | % loss สูงสุดต่อวัน |
 | `MAX_OPEN_TRADES` | `4` | จำนวน trade สูงสุด |

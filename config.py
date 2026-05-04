@@ -61,7 +61,7 @@ MONEY_MANAGEMENT = {
     "pending_expiry_hours":  int(os.getenv("PENDING_EXPIRY_HOURS")    or 48),
     "max_losing_streak":     int(os.getenv("MAX_LOSING_STREAK")       or 5),
     "streak_min_confidence": int(os.getenv("STREAK_MIN_CONFIDENCE")   or 62),
-    "hedge_buffer_pips":     int(os.getenv("HEDGE_BUFFER_PIPS")       or 1000),
+    "hedge_buffer_pips":     int(os.getenv("HEDGE_BUFFER_PIPS")       or 2500),
 }
 
 # ── X accounts to follow ──────────────────────────────────────
