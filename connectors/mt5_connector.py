@@ -413,7 +413,7 @@ def place_pending_order(pending_type: str, price: float, sl_pips: float, tp_pips
         "comment":      _safe_comment(comment),
         "type_time":    mt5.ORDER_TIME_SPECIFIED,
         "expiration":   expiry_ts,
-        "type_filling": mt5.ORDER_FILLING_IOC,
+        "type_filling": mt5.ORDER_FILLING_RETURN,
     }
 
     result = mt5.order_send(request)

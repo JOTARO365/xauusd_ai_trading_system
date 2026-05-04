@@ -31,7 +31,8 @@ from config import MONEY_MANAGEMENT, STREAK_PROTECTION
 DEFAULT_INTERVAL  = 300
 STATUS_INTERVAL   = 60
 _cycle            = 0
-_last_chart_data: dict = {}
+_last_chart_data:     dict = {}
+_last_sentiment_data: dict = {}
 _last_weekly_pending_date: "_date | None" = None
 
 
@@ -194,7 +195,7 @@ async def run_status_cycle() -> None:
 
 async def run_cycle() -> tuple[dict, dict]:
     """รัน 1 รอบ คืน (chart_data, sentiment_data) สำหรับคำนวณ interval"""
-    global _cycle, _last_chart_data
+    global _cycle, _last_chart_data, _last_sentiment_data
     _cycle += 1
     print_cycle_start(_cycle)
 
@@ -252,6 +253,7 @@ async def run_cycle() -> tuple[dict, dict]:
         sent  = sentiment_data.get("sentiment", "NEUTRAL")
         sconf = sentiment_data.get("confidence", 0)
         sentiment_data["news_count"] = news_data.get("count", 0)
+        _last_sentiment_data = sentiment_data
         print_step(3, "done", f"{sent}  ({sconf}%)")
         print_sentiment_box(sentiment_data)
     except Exception as e:
@@ -394,6 +396,13 @@ async def main():
                 reason   = f"slots full — {reason_buy} | {reason_sell}"
                 if hedge:
                     reason += "  [hedge]"
+                # Auto-pending รันเสมอแม้ slots จะเต็ม (pending ไม่ขึ้นกับ open slot)
+                try:
+                    p = auto_place_pending_orders(_last_chart_data or {}, _last_sentiment_data)
+                    if p:
+                        print_warning(f"Auto-pending: วาง {p} order ที่ key S/R levels (H4+Daily)")
+                except Exception as pe:
+                    logger.error(f"Auto-pending error: {pe}")
             else:
                 chart_data, sentiment_data = await run_cycle()
                 interval, reason = next_interval(chart_data, sentiment_data)
