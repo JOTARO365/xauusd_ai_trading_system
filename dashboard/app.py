@@ -248,7 +248,7 @@ def load_trades(system: str = "xauusd") -> dict:
     try:
         from db.reader import get_trades
         rows = get_trades(system)
-        if rows is not None:
+        if rows:  # fall through to JSON if DB connected but empty
             closed = [t for t in rows if t.get("status") == "CLOSED"]
             summary = {
                 "total":     len(closed),
