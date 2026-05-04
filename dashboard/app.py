@@ -113,20 +113,22 @@ def _sync_from_mt5(data: dict) -> bool:
                           "entry_price": entry_price})
                 changed = True
         else:
-            direction  = "BUY" if pos.type == 0 else "SELL"
-            is_system  = pos.magic == SYSTEM_MAGIC
-            src        = "SYSTEM" if is_system else "MANUAL"
-            entry_type = "RECOVERED" if is_system else "MANUAL"
+            is_system = pos.magic == SYSTEM_MAGIC
+            if is_system:
+                # SYSTEM trade ที่ยังไม่อยู่ใน log — main.py จัดการเอง
+                # ไม่เพิ่มที่นี่เพื่อป้องกัน race condition ทับข้อมูล AI
+                continue
+            direction = "BUY" if pos.type == 0 else "SELL"
             entry = {
-                "source": src, "timestamp": datetime.fromtimestamp(pos.time).isoformat(),
+                "source": "MANUAL", "timestamp": datetime.fromtimestamp(pos.time).isoformat(),
                 "ticket": pos.ticket, "direction": direction,
                 "lot": pos.volume, "entry_price": pos.price_open,
                 "sl": sl, "tp": tp,
                 "technical_signal": direction, "technical_confidence": None,
                 "trend": None, "sr_zone": None, "sr_strength": None,
                 "pa_action": "NONE", "pa_zone": "—", "pa_level": None,
-                "pa_patterns": [], "entry_type": entry_type, "sentiment": None,
-                "manual_analysis": None if is_system else "Detected from MT5",
+                "pa_patterns": [], "entry_type": "MANUAL", "sentiment": None,
+                "manual_analysis": "Detected from MT5",
                 "manual_reason": pos.comment or "",
                 "status": "OPEN", "pnl": None,
             }
@@ -171,12 +173,13 @@ def _sync_from_mt5(data: dict) -> bool:
             entry_deal = next((d for d in pos_deals if d.entry == 0), None)
             if entry_deal is None:
                 continue
-            direction  = "BUY" if entry_deal.type == 0 else "SELL"
-            is_system  = entry_deal.magic == SYSTEM_MAGIC
-            src        = "SYSTEM" if is_system else "MANUAL"
-            entry_type = "RECOVERED" if is_system else "MANUAL"
+            is_system = entry_deal.magic == SYSTEM_MAGIC
+            if is_system:
+                # SYSTEM trade ที่ปิดแล้วแต่ไม่อยู่ใน log — main.py จัดการเอง ไม่ทับข้อมูล AI
+                continue
+            direction = "BUY" if entry_deal.type == 0 else "SELL"
             entry = {
-                "source": src, "timestamp": datetime.fromtimestamp(entry_deal.time).isoformat(),
+                "source": "MANUAL", "timestamp": datetime.fromtimestamp(entry_deal.time).isoformat(),
                 "close_time": close_time,
                 "ticket": pid, "direction": direction,
                 "lot": entry_deal.volume, "entry_price": entry_deal.price,
@@ -184,8 +187,8 @@ def _sync_from_mt5(data: dict) -> bool:
                 "technical_signal": direction, "technical_confidence": None,
                 "trend": None, "sr_zone": None, "sr_strength": None,
                 "pa_action": "NONE", "pa_zone": "—", "pa_level": None,
-                "pa_patterns": [], "entry_type": entry_type, "sentiment": None,
-                "manual_analysis": None if is_system else "Detected from MT5 history",
+                "pa_patterns": [], "entry_type": "MANUAL", "sentiment": None,
+                "manual_analysis": "Detected from MT5 history",
                 "manual_reason": entry_deal.comment or "",
                 "status": "CLOSED", "pnl": pnl,
             }
