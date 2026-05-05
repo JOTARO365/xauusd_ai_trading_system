@@ -214,16 +214,13 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
             logger.warning(f"RR ratio {rr:.2f} ต่ำกว่าขั้นต่ำ {effective_min_rr:.1f} (dynamic)")
             return {"success": False, "error": f"RR ratio too low: {rr:.2f} (min={effective_min_rr:.1f})"}
 
-    # ตรวจจำนวน order ที่เปิดอยู่
-    # hedge active → reset limit กลับเป็น base (ไม่นับ protected slots)
-    # ป้องกัน protected bonus ถูก exploit ขณะ hedge
-    open_positions = mt5.positions_get(symbol=SYMBOL)
-    if is_hedge_active():
-        effective_limit = MONEY_MANAGEMENT["max_open_trades"]
-        logger.info("Hedge active — base limit only (protected bonus reset)")
-    else:
-        effective_limit = MONEY_MANAGEMENT["max_open_trades"] + count_protected_slots()
-    if open_positions and len(open_positions) >= effective_limit:
+    # ตรวจจำนวน order ต่อฝั่ง (สอดคล้องกับ check_open_slot)
+    # นับเฉพาะ same-direction positions — positions ที่ SL หน้าทุนแล้วให้ bonus slot
+    dir_type = 0 if direction.upper() == "BUY" else 1
+    open_positions = mt5.positions_get(symbol=SYMBOL) or []
+    same_dir_count = sum(1 for p in open_positions if p.type == dir_type)
+    effective_limit = MONEY_MANAGEMENT["max_open_trades"] + count_protected_slots()
+    if same_dir_count >= effective_limit:
         return {"success": False, "error": "Max open trades reached"}
 
     # ตรวจ margin ก่อนส่ง — คำนวณ margin ที่ต้องการสำหรับ lot นี้
@@ -262,6 +259,11 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         return {"success": False, "error": result.comment, "retcode": result.retcode}
 
     logger.info(f"Order opened: {direction} {lot} lots @ {price} SL={sl:.2f} TP={tp:.2f}")
+
+    # ขยับ SL ฝั่งตรงข้ามทุก order มาหน้าทุนทันที (ไม่รอ 1000 pips)
+    n = _force_breakeven_opposing(direction)
+    logger.info(f"Force-BE result: {n} opposing position(s) protected after opening {direction}")
+
     return {
         "success": True,
         "ticket": result.order,
@@ -552,6 +554,94 @@ def manage_breakeven() -> int:
             )
             modified += 1
 
+    return modified
+
+
+def _force_breakeven_opposing(new_direction: str) -> int:
+    """เมื่อเปิด order ใหม่ ขยับ SL ของทุก position ฝั่งตรงข้ามมาหน้าทุนทันที
+    ไม่รอ BREAKEVEN_TRIGGER_PIPS — trigger เพราะมี order ฝั่งตรงข้ามเปิดใหม่"""
+    info = mt5.symbol_info(SYMBOL)
+    if info is None:
+        logger.warning("Force-BE: symbol_info None")
+        return 0
+    positions = mt5.positions_get(symbol=SYMBOL)
+    if not positions:
+        logger.debug("Force-BE: no open positions")
+        return 0
+    tick = mt5.symbol_info_tick(SYMBOL)
+    if tick is None:
+        logger.warning("Force-BE: tick None")
+        return 0
+
+    point    = info.point
+    opp_type = 1 if new_direction == "BUY" else 0   # new BUY → protect SELL(1), new SELL → protect BUY(0)
+    modified = 0
+
+    logger.debug(
+        f"Force-BE scan: new={new_direction} protecting={'SELL' if opp_type==1 else 'BUY'} "
+        f"positions — total open={len(positions)} bid={tick.bid:.2f} ask={tick.ask:.2f}"
+    )
+
+    for pos in positions:
+        tag = f"ticket={pos.ticket} type={'BUY' if pos.type==0 else 'SELL'} entry={pos.price_open:.2f} sl={pos.sl:.2f}"
+
+        if pos.type != opp_type:
+            logger.debug(f"Force-BE skip {tag}: same direction as new order")
+            continue
+
+        entry   = pos.price_open
+        is_buy  = pos.type == 0
+        current = tick.bid if is_buy else tick.ask
+        profit_pips = ((current - entry) if is_buy else (entry - current)) / point
+
+        # ข้ามถ้าขาดทุนอยู่ — ตั้ง BE ไม่ได้
+        if profit_pips <= 0:
+            logger.debug(f"Force-BE skip {tag}: in loss ({profit_pips:.0f}pips)")
+            continue
+
+        # ลด buffer ถ้ากำไรน้อยกว่า BREAKEVEN_BUFFER_PIPS
+        # เผื่อ spread 10 pips ก่อนถึง current price
+        safe_buffer = min(BREAKEVEN_BUFFER_PIPS, profit_pips - 10)
+        if safe_buffer < 0:
+            logger.debug(
+                f"Force-BE skip {tag}: profit {profit_pips:.0f}pips too small (need >10 pips)"
+            )
+            continue
+
+        new_sl = round(entry + safe_buffer * point, 2) if is_buy \
+            else round(entry - safe_buffer * point, 2)
+
+        # ข้ามถ้า SL อยู่หน้าทุนแล้ว
+        if is_buy and pos.sl >= new_sl:
+            logger.debug(f"Force-BE skip {tag}: SL already at/above BE ({pos.sl:.2f} >= {new_sl:.2f})")
+            continue
+        if not is_buy and pos.sl != 0 and pos.sl <= new_sl:
+            logger.debug(f"Force-BE skip {tag}: SL already at/below BE ({pos.sl:.2f} <= {new_sl:.2f})")
+            continue
+
+        req = {
+            "action":   mt5.TRADE_ACTION_SLTP,
+            "symbol":   SYMBOL,
+            "position": pos.ticket,
+            "sl":       new_sl,
+            "tp":       pos.tp,
+        }
+        result = mt5.order_send(req)
+        if result is None:
+            logger.error(f"Force-BE failed {tag}: order_send None — {mt5.last_error()}")
+        elif result.retcode != mt5.TRADE_RETCODE_DONE:
+            logger.error(f"Force-BE failed {tag}: retcode={result.retcode} comment={result.comment}")
+        else:
+            direction_str = "BUY" if is_buy else "SELL"
+            logger.info(
+                f"Force breakeven OK: ticket={pos.ticket} {direction_str} "
+                f"entry={entry:.2f} profit={profit_pips:.0f}pips "
+                f"SL {pos.sl:.2f}→{new_sl:.2f}"
+            )
+            modified += 1
+
+    if modified == 0:
+        logger.info("Force-BE: 0 positions modified (all skipped or no opposing positions)")
     return modified
 
 
