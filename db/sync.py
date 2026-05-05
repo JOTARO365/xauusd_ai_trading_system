@@ -77,7 +77,8 @@ def sync_mt5_history_to_db(days: int = 365) -> int:
             closed_at = datetime.utcfromtimestamp(last_exit.time).isoformat() + "Z"
             pnl = round(sum(d.profit + d.swap + d.commission for d in dlist), 2)
 
-        from config import SYMBOL, SYSTEM_MAGIC
+        from config import SYMBOL
+        from connectors.mt5_connector import SYSTEM_MAGIC
         trade = {
             "ticket":        ticket,
             "account_login": account_login,
