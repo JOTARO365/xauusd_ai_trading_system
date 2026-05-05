@@ -261,7 +261,7 @@ def load_trades(system: str = "xauusd") -> dict:
     _empty = {"trades": [], "summary": {"total": 0, "win": 0, "loss": 0, "total_pnl": 0.0}}
     try:
         from db.reader import get_trades
-        rows = get_trades(system)
+        rows = get_trades(system, account_login=MT5_LOGIN)
         if rows:  # fall through to JSON if DB connected but empty
             closed = [t for t in rows if t.get("status") == "CLOSED"]
             summary = {
