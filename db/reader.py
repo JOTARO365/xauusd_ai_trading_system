@@ -26,8 +26,8 @@ def _get_account_login() -> int:
 
 def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list[dict] | None:
     normed = _norm(symbol)
-    raw = symbol.upper()
-    symbols = list({normed, raw})
+    # รวมทุก alias ที่ map ไปยัง instrument เดียวกัน (เช่น GOLD, GOLD#, XAUUSD → XAUUSD)
+    symbols = list({k for k, v in _ALIASES.items() if v == normed} | {normed, symbol.upper()})
 
     login = account_login if account_login is not None else _get_account_login()
 
