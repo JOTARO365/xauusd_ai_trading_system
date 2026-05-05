@@ -257,11 +257,32 @@ def get_mt5_account(data_to_sync: dict | None = None) -> dict:
         return {}
 
 
-def load_trades(system: str = "xauusd") -> dict:
+def _get_actual_mt5_login() -> int | None:
+    """ดึง account login ที่กำลัง connect อยู่จริงจาก mt5.account_info()
+    ถ้า MT5 ยังไม่ init ให้ init/shutdown เอง — fallback เป็น MT5_LOGIN จาก .env"""
+    if not _MT5_AVAILABLE:
+        return MT5_LOGIN or None
+    try:
+        already_init = mt5.terminal_info() is not None
+        if not already_init:
+            if not mt5.initialize():
+                return MT5_LOGIN or None
+            if not mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
+                mt5.shutdown()
+                return MT5_LOGIN or None
+        info = mt5.account_info()
+        if not already_init:
+            mt5.shutdown()
+        return int(info.login) if info else (MT5_LOGIN or None)
+    except Exception:
+        return MT5_LOGIN or None
+
+
+def load_trades(system: str = "xauusd", account_login: int | None = None) -> dict:
     _empty = {"trades": [], "summary": {"total": 0, "win": 0, "loss": 0, "total_pnl": 0.0}}
     try:
         from db.reader import get_trades
-        rows = get_trades(system, account_login=MT5_LOGIN)
+        rows = get_trades(system, account_login=account_login)
         if rows:  # fall through to JSON if DB connected but empty
             closed = [t for t in rows if t.get("status") == "CLOSED"]
             summary = {
@@ -469,7 +490,8 @@ def index():
 @app.route("/api/data")
 def api_data():
     system  = request.args.get("system", "xauusd").lower()
-    data    = load_trades(system)
+    login   = _get_actual_mt5_login() if system == "xauusd" else None
+    data    = load_trades(system, account_login=login)
     usd_thb = get_usd_thb()
     account = get_mt5_account(data_to_sync=data) if system == "xauusd" else {}
     trades  = data.get("trades", [])
