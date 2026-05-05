@@ -983,6 +983,11 @@
           </tbody>
         </table>
       </div>
+      <div id="pagination" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 4px 2px;font-size:13px;color:var(--muted)">
+        <button id="pg-prev" onclick="changePage(-1)" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:4px 12px;border-radius:6px;cursor:pointer">&#8592;</button>
+        <span id="pg-info"></span>
+        <button id="pg-next" onclick="changePage(1)"  style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:4px 12px;border-radius:6px;cursor:pointer">&#8594;</button>
+      </div>
     </div>
   </section>
 
@@ -1253,6 +1258,9 @@
 <script>
 let equityChart, winlossChart;
 let allTrades = [];
+let currentPage = 1;
+const PAGE_SIZE = 20;
+let lastFiltered = [];
 
 function fmtPnl(v) {
   if (v === null || v === undefined) return '<span style="color:var(--muted2)">—</span>';
@@ -1419,28 +1427,34 @@ function updateStats(stats) {
   }
 }
 
-function renderTable(trades) {
-  const sourceF = document.getElementById('filter-source').value;
-  const dirF    = document.getElementById('filter-dir').value;
-  const statusF = document.getElementById('filter-status').value;
-  const resultF = document.getElementById('filter-result').value;
+function changePage(delta) {
+  const totalPages = Math.max(1, Math.ceil(lastFiltered.length / PAGE_SIZE));
+  currentPage = Math.min(Math.max(1, currentPage + delta), totalPages);
+  renderPage();
+}
 
-  const filtered = trades.filter(t => {
-    if (sourceF && t.source    !== sourceF)                          return false;
-    if (dirF    && t.direction !== dirF)                             return false;
-    if (statusF && t.status    !== statusF)                          return false;
-    if (resultF === 'win'  && (t.pnl == null || t.pnl <= 0))        return false;
-    if (resultF === 'loss' && (t.pnl == null || t.pnl >= 0))        return false;
-    return true;
-  });
+function renderPage() {
+  const tbody   = document.getElementById('trade-tbody');
+  const pgInfo  = document.getElementById('pg-info');
+  const pgPrev  = document.getElementById('pg-prev');
+  const pgNext  = document.getElementById('pg-next');
+  const total   = lastFiltered.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const tbody = document.getElementById('trade-tbody');
-  if (!filtered.length) {
+  if (!total) {
     tbody.innerHTML = '<tr><td colspan="11" class="no-data">ไม่มีข้อมูล</td></tr>';
+    pgInfo.textContent = '';
+    pgPrev.disabled = pgNext.disabled = true;
     return;
   }
 
-  tbody.innerHTML = filtered.map(t => {
+  const start   = (currentPage - 1) * PAGE_SIZE;
+  const pageRows = lastFiltered.slice(start, start + PAGE_SIZE);
+  pgInfo.textContent = `หน้า ${currentPage} / ${totalPages}  (${total} รายการ)`;
+  pgPrev.disabled = currentPage <= 1;
+  pgNext.disabled = currentPage >= totalPages;
+
+  tbody.innerHTML = pageRows.map(t => {
     const dir      = (t.direction || '').toLowerCase();
     const status   = (t.status   || '').toLowerCase();
     const isManual = t.source === 'MANUAL';
@@ -1507,6 +1521,24 @@ function renderTable(trades) {
       <td class="center"><span class="badge badge-${status}">${t.status || '—'}</span> ${result}</td>
     </tr>`;
   }).join('');
+}
+
+function renderTable(trades) {
+  const sourceF = document.getElementById('filter-source').value;
+  const dirF    = document.getElementById('filter-dir').value;
+  const statusF = document.getElementById('filter-status').value;
+  const resultF = document.getElementById('filter-result').value;
+
+  lastFiltered = trades.filter(t => {
+    if (sourceF && t.source    !== sourceF)                   return false;
+    if (dirF    && t.direction !== dirF)                      return false;
+    if (statusF && t.status    !== statusF)                   return false;
+    if (resultF === 'win'  && (t.pnl == null || t.pnl <= 0)) return false;
+    if (resultF === 'loss' && (t.pnl == null || t.pnl >= 0)) return false;
+    return true;
+  });
+  currentPage = 1;
+  renderPage();
 }
 
 function updatePortfolio(account, usd_thb) {
