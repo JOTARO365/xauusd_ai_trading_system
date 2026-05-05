@@ -356,6 +356,11 @@ async def main():
     from db.connection import is_available, get_url
     if is_available():
         console.print(f"  [green]✓[/green]  Database: {get_url()}\n")
+        # sync MT5 history → DB ตอน startup (เฉพาะ trades ที่ยังไม่มีใน DB)
+        from db.sync import sync_mt5_history_to_db
+        n = sync_mt5_history_to_db(days=365)
+        if n:
+            console.print(f"  [green]✓[/green]  Synced {n} trade(s) from MT5 → Database\n")
     else:
         console.print(f"  [yellow]⚠[/yellow]  Database ต่อไม่ได้ ({get_url()}) — บันทึกลง JSON อย่างเดียว\n")
 
