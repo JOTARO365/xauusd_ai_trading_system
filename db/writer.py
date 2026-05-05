@@ -17,13 +17,27 @@ def _dt(s) -> str | None:
         return None
 
 
+def _get_account_login() -> int:
+    """ดึง MT5 account login ของเครื่องนี้ — fallback 0 ถ้าไม่ได้เชื่อมต่อ"""
+    try:
+        import MetaTrader5 as mt5
+        info = mt5.account_info()
+        return int(info.login) if info else 0
+    except Exception:
+        return 0
+
+
 def write_trade(trade: dict) -> bool:
     ticket = trade.get("ticket")
     if not ticket:
         return False
     try:
+        # account_login — ใช้ค่าใน trade dict ถ้ามี ไม่งั้นดึงจาก MT5 ตอนนี้
+        account_login = int(trade["account_login"]) if trade.get("account_login") else _get_account_login()
+
         row = {
             "ticket":               int(ticket),
+            "account_login":        account_login,
             "symbol":               trade.get("symbol", "XAUUSD"),
             "source":               trade.get("source"),
             "direction":            trade.get("direction"),
@@ -47,7 +61,7 @@ def write_trade(trade: dict) -> bool:
         }
         # ลบ None values เพื่อไม่ให้ทับค่าที่มีอยู่เมื่อ upsert
         row = {k: v for k, v in row.items() if v is not None or k in ("pnl", "sl", "tp", "closed_at")}
-        get_client().table("trades").upsert(row, on_conflict="ticket").execute()
+        get_client().table("trades").upsert(row, on_conflict="ticket,account_login").execute()
         return True
     except Exception as e:
         logger.debug(f"DB write_trade: {e}")

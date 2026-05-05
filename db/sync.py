@@ -19,8 +19,13 @@ def sync_mt5_history_to_db(days: int = 365) -> int:
         logger.debug("sync_mt5_history: DB ไม่พร้อม — ข้าม")
         return 0
 
-    # ── ดึง existing tickets จาก DB ──────────────────────────────
-    existing: set[int] = _get_existing_tickets()
+    # ── ดึง account login ของเครื่องนี้ (ใช้ทั้ง filter + upsert) ──
+    account_info  = mt5.account_info()
+    account_login = int(account_info.login) if account_info else 0
+    logger.debug(f"sync_mt5_history: account_login={account_login}")
+
+    # ── ดึง existing tickets ของ account นี้จาก DB ────────────────
+    existing: set[int] = _get_existing_tickets(account_login)
 
     # ── ดึง deals จาก MT5 ────────────────────────────────────────
     date_from = datetime.now() - timedelta(days=days)
@@ -54,7 +59,7 @@ def sync_mt5_history_to_db(days: int = 365) -> int:
 
         ticket = entry_deal.order   # order ticket = trade key
 
-        # ข้าม ticket ที่มีอยู่ใน DB แล้ว (ป้องกัน overwrite AI context)
+        # ข้าม ticket ที่มีอยู่ใน DB สำหรับ account นี้แล้ว (ป้องกัน overwrite AI context)
         if ticket in existing:
             continue
 
@@ -74,18 +79,19 @@ def sync_mt5_history_to_db(days: int = 365) -> int:
 
         from config import SYMBOL, SYSTEM_MAGIC
         trade = {
-            "ticket":      ticket,
-            "symbol":      SYMBOL,
-            "source":      "SYSTEM" if entry_deal.magic == SYSTEM_MAGIC else "MANUAL",
-            "direction":   "BUY" if entry_deal.type == 0 else "SELL",
-            "status":      "CLOSED" if is_closed else "OPEN",
-            "lot":         entry_deal.volume,
-            "entry_price": entry_deal.price,
-            "sl":          sl,
-            "tp":          tp,
-            "pnl":         pnl,
-            "timestamp":   opened_at,
-            "close_time":  closed_at,
+            "ticket":        ticket,
+            "account_login": account_login,
+            "symbol":        SYMBOL,
+            "source":        "SYSTEM" if entry_deal.magic == SYSTEM_MAGIC else "MANUAL",
+            "direction":     "BUY" if entry_deal.type == 0 else "SELL",
+            "status":        "CLOSED" if is_closed else "OPEN",
+            "lot":           entry_deal.volume,
+            "entry_price":   entry_deal.price,
+            "sl":            sl,
+            "tp":            tp,
+            "pnl":           pnl,
+            "timestamp":     opened_at,
+            "close_time":    closed_at,
         }
 
         if write_trade(trade):
@@ -99,12 +105,18 @@ def sync_mt5_history_to_db(days: int = 365) -> int:
     return synced
 
 
-def _get_existing_tickets() -> set[int]:
-    """ดึง ticket ทั้งหมดที่มีใน DB แล้ว"""
+def _get_existing_tickets(account_login: int) -> set[int]:
+    """ดึง tickets ที่มีใน DB สำหรับ account นี้แล้ว"""
     try:
         from db.connection import get_client
         from config import SYMBOL
-        res = get_client().table("trades").select("ticket").eq("symbol", SYMBOL).execute()
+        res = (
+            get_client().table("trades")
+            .select("ticket")
+            .eq("symbol", SYMBOL)
+            .eq("account_login", account_login)
+            .execute()
+        )
         return {int(r["ticket"]) for r in res.data if r.get("ticket")}
     except Exception as e:
         logger.debug(f"_get_existing_tickets error: {e}")

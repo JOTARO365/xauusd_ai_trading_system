@@ -30,7 +30,8 @@ SUPABASE_KEY=<anon key จาก Settings → API → anon public>
 -- Trades
 CREATE TABLE IF NOT EXISTS trades (
     id                   BIGSERIAL PRIMARY KEY,
-    ticket               BIGINT UNIQUE NOT NULL,
+    ticket               BIGINT NOT NULL,
+    account_login        BIGINT NOT NULL DEFAULT 0,
     symbol               TEXT NOT NULL DEFAULT 'XAUUSD',
     source               TEXT,
     direction            TEXT,
@@ -52,7 +53,8 @@ CREATE TABLE IF NOT EXISTS trades (
     sentiment            TEXT,
     analysis             TEXT,
     created_at           TIMESTAMPTZ DEFAULT NOW(),
-    updated_at           TIMESTAMPTZ DEFAULT NOW()
+    updated_at           TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (ticket, account_login)
 );
 
 -- Agent usage
@@ -84,7 +86,7 @@ CREATE TABLE IF NOT EXISTS cycles (
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_trades_ticket     ON trades(ticket);
+CREATE INDEX IF NOT EXISTS idx_trades_ticket     ON trades(ticket, account_login);
 CREATE INDEX IF NOT EXISTS idx_trades_status     ON trades(status);
 CREATE INDEX IF NOT EXISTS idx_trades_opened_at  ON trades(opened_at DESC);
 CREATE INDEX IF NOT EXISTS idx_agent_usage_at    ON agent_usage(cycle_at DESC);
@@ -127,6 +129,28 @@ python db/migrate.py
 ```
 
 ใช้ได้เมื่อ SUPABASE_URL และ SUPABASE_KEY อยู่ใน `.env` แล้ว
+
+---
+
+## Migration: เพิ่ม account_login (ถ้า DB มีข้อมูลอยู่แล้ว)
+
+รัน SQL นี้ใน **SQL Editor** ครั้งเดียว:
+
+```sql
+-- เพิ่ม column (ถ้ายังไม่มี)
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS account_login BIGINT NOT NULL DEFAULT 0;
+
+-- ลบ unique constraint เดิม (ticket เดี่ยว)
+ALTER TABLE trades DROP CONSTRAINT IF EXISTS trades_ticket_key;
+
+-- เพิ่ม unique constraint ใหม่ (ticket + account_login)
+ALTER TABLE trades ADD CONSTRAINT IF NOT EXISTS trades_ticket_account_key
+    UNIQUE (ticket, account_login);
+
+-- อัปเดต index
+DROP INDEX IF EXISTS idx_trades_ticket;
+CREATE INDEX IF NOT EXISTS idx_trades_ticket ON trades(ticket, account_login);
+```
 
 ---
 
