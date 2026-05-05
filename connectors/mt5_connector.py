@@ -2,7 +2,8 @@ import re
 import time as _time
 import numpy as np
 import MetaTrader5 as mt5
-from config import SYMBOL, MONEY_MANAGEMENT, LOT_MODE, FIXED_LOT, MIN_LOT, MAX_LOT, DYNAMIC_TP, NO_TP_WAIT_MINUTES
+import config as _cfg
+from config import SYMBOL, MONEY_MANAGEMENT
 from loguru import logger
 
 
@@ -23,8 +24,8 @@ PENDING_TYPE_MAP = {
 
 
 def calculate_lot_size(account_balance: float, sl_pips: float) -> float:
-    if LOT_MODE == "fixed":
-        lot = FIXED_LOT
+    if _cfg.LOT_MODE == "fixed":
+        lot = _cfg.FIXED_LOT
         logger.info(f"Lot mode: fixed → {lot}")
     else:
         risk_amount = account_balance * MONEY_MANAGEMENT["risk_per_trade"]
@@ -32,7 +33,7 @@ def calculate_lot_size(account_balance: float, sl_pips: float) -> float:
         lot = round(risk_amount / (sl_pips * pip_value * 100), 2)
         logger.info(f"Lot mode: auto → risk ${risk_amount:.2f} / SL {sl_pips} pips = {lot} lots")
 
-    lot = max(MIN_LOT, min(lot, MAX_LOT))
+    lot = max(_cfg.MIN_LOT, min(lot, _cfg.MAX_LOT))
     return lot
 
 
@@ -241,8 +242,8 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
     if margin_needed is not None and account.equity < margin_needed:
         logger.warning(f"Margin ไม่พอ: ต้องการ {margin_needed:.2f}, equity {account.equity:.2f}")
         safe_lot = round((account.equity * 0.9) / (margin_needed / lot), 2) if lot > 0 else 0
-        safe_lot = max(MIN_LOT, min(safe_lot, lot))
-        if safe_lot < MIN_LOT:
+        safe_lot = max(_cfg.MIN_LOT, min(safe_lot, lot))
+        if safe_lot < _cfg.MIN_LOT:
             return {"success": False, "error": f"Margin ไม่พอแม้จะใช้ lot ขั้นต่ำ (equity={account.equity:.2f})"}
         logger.info(f"ลด lot จาก {lot} → {safe_lot} เพราะ margin จำกัด")
         lot = safe_lot
@@ -743,7 +744,7 @@ def manage_dynamic_tp() -> int:
     ขยับ TP ออกไปอีก TP_EXT_PIPS (สูงสุด TP_EXT_MAX ครั้ง)
     คืนจำนวน positions ที่ขยาย TP
     """
-    if not DYNAMIC_TP:
+    if not _cfg.DYNAMIC_TP:
         return 0
 
     info = mt5.symbol_info(SYMBOL)
@@ -880,9 +881,9 @@ def manage_post_event_tp(chart_data: dict | None = None) -> int:
         direction    = "BUY" if is_buy else "SELL"
         elapsed_mins = (now - pos.time) / 60
 
-        if elapsed_mins < NO_TP_WAIT_MINUTES:
+        if elapsed_mins < _cfg.NO_TP_WAIT_MINUTES:
             logger.debug(
-                f"No-TP ticket={pos.ticket} — รออีก {NO_TP_WAIT_MINUTES - elapsed_mins:.0f}min"
+                f"No-TP ticket={pos.ticket} — รออีก {_cfg.NO_TP_WAIT_MINUTES - elapsed_mins:.0f}min"
             )
             continue
 

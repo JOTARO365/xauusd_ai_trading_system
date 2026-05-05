@@ -26,7 +26,7 @@ from utils.display import (
 )
 from utils.market_clock import next_interval, market_sleep_status
 import config
-from config import MONEY_MANAGEMENT, STREAK_PROTECTION
+from config import MONEY_MANAGEMENT
 
 DEFAULT_INTERVAL  = 300
 STATUS_INTERVAL   = 60
@@ -143,6 +143,7 @@ def _setup_logger():
 
 async def run_status_cycle() -> None:
     """Lightweight cycle เมื่อ slots เต็ม — ข้าม AI agents"""
+    config.reload_config()
     global _cycle
     _cycle += 1
     print_cycle_start(_cycle)
@@ -195,6 +196,7 @@ async def run_status_cycle() -> None:
 
 async def run_cycle() -> tuple[dict, dict]:
     """รัน 1 รอบ คืน (chart_data, sentiment_data) สำหรับคำนวณ interval"""
+    config.reload_config()
     global _cycle, _last_chart_data, _last_sentiment_data
     _cycle += 1
     print_cycle_start(_cycle)

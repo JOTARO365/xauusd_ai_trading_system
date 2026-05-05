@@ -64,6 +64,40 @@ MONEY_MANAGEMENT = {
     "hedge_buffer_pips":     int(os.getenv("HEDGE_BUFFER_PIPS")       or 2500),
 }
 
+def reload_config():
+    """อ่าน .env ใหม่และอัปเดตตัวแปรทั้งหมด — เรียกทุกต้น cycle เพื่อ pick up dashboard changes"""
+    global SYMBOL, START_BALANCE, LOT_MODE, FIXED_LOT, MIN_LOT, MAX_LOT
+    global PORTFOLIO_PROTECTION, NO_TP_ON_EVENT, NO_TP_EVENT_MINS, NO_TP_WAIT_MINUTES
+    global DYNAMIC_TP, STREAK_PROTECTION
+    load_dotenv(override=True)
+    SYMBOL        = os.getenv("SYMBOL", "XAUUSD")
+    START_BALANCE = float(os.getenv("START_BALANCE", 5000))
+    LOT_MODE      = os.getenv("LOT_MODE",  "auto")
+    FIXED_LOT     = float(os.getenv("FIXED_LOT", 0.01))
+    MIN_LOT       = float(os.getenv("MIN_LOT",   0.01))
+    MAX_LOT       = float(os.getenv("MAX_LOT",   0.01))
+    PORTFOLIO_PROTECTION = os.getenv("PORTFOLIO_PROTECTION", "true").lower() != "false"
+    NO_TP_ON_EVENT     = os.getenv("NO_TP_ON_EVENT",     "true").lower() != "false"
+    NO_TP_EVENT_MINS   = int(os.getenv("NO_TP_EVENT_MINS",   "20"))
+    NO_TP_WAIT_MINUTES = int(os.getenv("NO_TP_WAIT_MINUTES", "30"))
+    DYNAMIC_TP        = os.getenv("DYNAMIC_TP", "true").lower() != "false"
+    STREAK_PROTECTION = os.getenv("STREAK_PROTECTION", "true").lower() != "false"
+    MONEY_MANAGEMENT.update({
+        "risk_per_trade":        float(os.getenv("RISK_PER_TRADE")        or 0.50),
+        "max_daily_loss":        float(os.getenv("MAX_DAILY_LOSS")        or 1.00),
+        "max_open_trades":       int(os.getenv("MAX_OPEN_TRADES")         or 4),
+        "default_sl_pips":       int(os.getenv("DEFAULT_SL_PIPS")         or 2000),
+        "default_tp_pips":       int(os.getenv("DEFAULT_TP_PIPS")         or 3000),
+        "min_rr_ratio":          float(os.getenv("MIN_RR_RATIO")          or 1.5),
+        "max_pending_buy":        int(os.getenv("MAX_PENDING_BUY")         or 4),
+        "max_pending_sell":       int(os.getenv("MAX_PENDING_SELL")        or 4),
+        "pending_expiry_hours":  int(os.getenv("PENDING_EXPIRY_HOURS")    or 48),
+        "max_losing_streak":     int(os.getenv("MAX_LOSING_STREAK")       or 5),
+        "streak_min_confidence": int(os.getenv("STREAK_MIN_CONFIDENCE")   or 62),
+        "hedge_buffer_pips":     int(os.getenv("HEDGE_BUFFER_PIPS")       or 2500),
+    })
+
+
 # ── X accounts to follow ──────────────────────────────────────
 _accounts_raw = os.getenv("X_ACCOUNTS_TO_FOLLOW", "")
 X_ACCOUNTS_TO_FOLLOW = (

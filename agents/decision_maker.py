@@ -4,7 +4,8 @@ from pathlib import Path
 from connectors.mt5_connector import open_order, get_open_positions, count_protected_slots, check_open_slot, _is_momentum_strong
 from connectors.price_feed import get_account_info
 from agents.reporter import get_trade_history_summary
-from config import ANTHROPIC_API_KEY, MONEY_MANAGEMENT, PORTFOLIO_PROTECTION, STREAK_PROTECTION, NO_TP_ON_EVENT, NO_TP_EVENT_MINS
+import config as _cfg
+from config import ANTHROPIC_API_KEY, MONEY_MANAGEMENT
 from loguru import logger
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -89,7 +90,7 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
     min_tech_conf   = MIN_TECHNICAL_CONFIDENCE
 
     # หยุดเทรดทันทีถ้าขาดทุนวันนี้เกิน max daily loss (ถ้า portfolio protection เปิด)
-    if PORTFOLIO_PROTECTION and account.get("balance", 0) > 0:
+    if _cfg.PORTFOLIO_PROTECTION and account.get("balance", 0) > 0:
         daily_loss_pct = abs(min(history["today_pnl"], 0)) / account["balance"]
         if daily_loss_pct >= MONEY_MANAGEMENT["max_daily_loss"]:
             logger.warning(f"Daily loss เกิน {MONEY_MANAGEMENT['max_daily_loss']*100}% — หยุดเทรดวันนี้")
@@ -277,7 +278,7 @@ Threshold ที่ใช้: Technical ≥ {min_tech_conf}%
 
         max_streak  = MONEY_MANAGEMENT["max_losing_streak"]
         streak_conf = MONEY_MANAGEMENT["streak_min_confidence"]
-        if STREAK_PROTECTION and history["losing_streak"] >= max_streak:
+        if _cfg.STREAK_PROTECTION and history["losing_streak"] >= max_streak:
             logger.warning(f"Losing streak {history['losing_streak']} — ต้อง confidence ≥ {streak_conf}%")
             if tech_confidence < streak_conf:
                 return {"action": "SKIP", "reason": f"Losing streak {history['losing_streak']} — confidence ต้องสูงกว่า {streak_conf}%"}
@@ -290,10 +291,10 @@ Threshold ที่ใช้: Technical ≥ {min_tech_conf}%
         # ── No-TP mode: event ใกล้ หรือ momentum แรงมาก ─────────────
         effective_tp = tp_pips
         notp_tag     = ""
-        if NO_TP_ON_EVENT:
+        if _cfg.NO_TP_ON_EVENT:
             nearest_mins = sentiment_data.get("nearest_event_minutes", 9999)
             strong_mom   = _is_momentum_strong(direction)
-            if nearest_mins <= NO_TP_EVENT_MINS:
+            if nearest_mins <= _cfg.NO_TP_EVENT_MINS:
                 effective_tp = 0
                 notp_tag     = f"EVT{nearest_mins}m"
                 logger.info(f"No-TP mode: high-impact event ใน {nearest_mins}min — เปิด order ไม่ตั้ง TP")
