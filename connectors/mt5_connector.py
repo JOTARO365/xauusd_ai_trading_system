@@ -81,7 +81,8 @@ def check_open_slot(direction: str) -> tuple[bool, str]:
 
     กฎ:
     1. นับ slot แยก BUY/SELL — ต้องไม่เกิน max_open_trades ต่อฝั่ง
-    2. ถ้ามี position ฝั่งตรงข้ามที่ขาดทุนอยู่ → ตรวจ 2 เงื่อนไข:
+    2. ถ้ามี position ฝั่งตรงข้าม → ทุกตัวต้องกำไร (profit > 0) ก่อน
+    3. ถ้ามี position ฝั่งตรงข้ามที่ขาดทุนอยู่ → ตรวจ 2 เงื่อนไข:
        a) ถ้า losing positions ทุกตัว SL อยู่หน้าทุนแล้ว (protected) → เปิดได้เลย
        b) ถ้า opposing position สวนทางยังไม่เกิน hedge_buffer_pips → เปิดได้
           hedge_buffer = จำนวนจุดที่ราคาวิ่งสวนทาง opposing position (default 1000 จุด)
@@ -107,7 +108,19 @@ def check_open_slot(direction: str) -> tuple[bool, str]:
             + (f" รวม {protected} protected" if protected else "") + ")"
         )
 
-    # ── 2. Hedge buffer — ช่องไฟเปิดฝั่งตรงข้าม ────────────────
+    # ── 2. opposing positions ทุกตัวต้องกำไรก่อนถึงจะเปิดฝั่งตรงข้ามได้ ──
+    if opp_pos:
+        not_in_profit = [p for p in opp_pos if p.profit <= 0]
+        if not_in_profit:
+            total = sum(p.profit for p in not_in_profit)
+            tickets = ", ".join(str(p.ticket) for p in not_in_profit)
+            return False, (
+                f"ไม่สามารถเปิด {direction} — {opp_name} {len(not_in_profit)} position "
+                f"ยังไม่กำไร (tickets: {tickets}, รวม {total:+.2f}) "
+                f"ต้องรอให้ทุก {opp_name} กำไรก่อน"
+            )
+
+    # ── 3. Hedge buffer — ช่องไฟเปิดฝั่งตรงข้าม ────────────────
     if opp_pos:
         losing = [p for p in opp_pos if p.profit < 0]
         if losing:
