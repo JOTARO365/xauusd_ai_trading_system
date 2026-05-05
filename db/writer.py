@@ -12,7 +12,7 @@ def _dt(s) -> str | None:
     if not s:
         return None
     try:
-        return datetime.fromisoformat(str(s)).isoformat()
+        return datetime.fromisoformat(str(s).replace("Z", "+00:00")).isoformat()
     except Exception:
         return None
 

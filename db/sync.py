@@ -67,14 +67,14 @@ def sync_mt5_history_to_db(days: int = 365) -> int:
         sl = o.sl if o and o.sl != 0.0 else None
         tp = o.tp if o and o.tp != 0.0 else None
 
-        opened_at  = datetime.utcfromtimestamp(entry_deal.time).isoformat() + "Z"
+        opened_at  = datetime.utcfromtimestamp(entry_deal.time).isoformat()
         is_closed  = len(exit_deals) > 0
         closed_at  = None
         pnl        = None
 
         if is_closed:
             last_exit = max(exit_deals, key=lambda d: d.time)
-            closed_at = datetime.utcfromtimestamp(last_exit.time).isoformat() + "Z"
+            closed_at = datetime.utcfromtimestamp(last_exit.time).isoformat()
             pnl = round(sum(d.profit + d.swap + d.commission for d in dlist), 2)
 
         from config import SYMBOL
