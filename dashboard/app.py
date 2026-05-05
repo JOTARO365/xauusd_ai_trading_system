@@ -282,25 +282,16 @@ def load_trades(system: str = "xauusd", account_login: int | None = None) -> dic
     _empty = {"trades": [], "summary": {"total": 0, "win": 0, "loss": 0, "total_pnl": 0.0}}
     try:
         from db.reader import get_trades
-        rows = get_trades(system, account_login=account_login)
-        if rows:  # fall through to JSON if DB connected but empty
-            closed = [t for t in rows if t.get("status") == "CLOSED"]
-            summary = {
-                "total":     len(closed),
-                "win":       sum(1 for t in closed if (t.get("pnl") or 0) > 0),
-                "loss":      sum(1 for t in closed if (t.get("pnl") or 0) < 0),
-                "total_pnl": round(sum(t.get("pnl") or 0 for t in closed), 2),
-            }
-            return {"trades": rows, "summary": summary}
+        rows = get_trades(system, account_login=account_login) or []
+        closed = [t for t in rows if t.get("status") == "CLOSED"]
+        summary = {
+            "total":     len(closed),
+            "win":       sum(1 for t in closed if (t.get("pnl") or 0) > 0),
+            "loss":      sum(1 for t in closed if (t.get("pnl") or 0) < 0),
+            "total_pnl": round(sum(t.get("pnl") or 0 for t in closed), 2),
+        }
+        return {"trades": rows, "summary": summary}
     except Exception:
-        pass
-    path = _log_file(system)
-    if not os.path.exists(path):
-        return _empty
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, ValueError):
         return _empty
 
 
