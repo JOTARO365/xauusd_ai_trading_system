@@ -53,7 +53,7 @@ MONEY_MANAGEMENT = {
     "risk_per_trade":        float(os.getenv("RISK_PER_TRADE")        or 0.50),
     "max_daily_loss":        float(os.getenv("MAX_DAILY_LOSS")        or 1.00),
     "max_open_trades":       int(os.getenv("MAX_OPEN_TRADES")         or 4),
-    "default_sl_pips":       int(os.getenv("DEFAULT_SL_PIPS")         or 1000),
+    "default_sl_pips":       int(os.getenv("DEFAULT_SL_PIPS")         or 2000),
     "default_tp_pips":       int(os.getenv("DEFAULT_TP_PIPS")         or 3000),
     "min_rr_ratio":          float(os.getenv("MIN_RR_RATIO")          or 1.5),
     "max_pending_buy":        int(os.getenv("MAX_PENDING_BUY")         or 4),

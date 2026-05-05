@@ -240,6 +240,14 @@ Threshold ที่ใช้: Technical ≥ {min_tech_conf}%
         sl_pips = _sell_sl
 
     if decision == "EXECUTE" and direction in ["BUY", "SELL"]:
+        # ── Wick-based SL validation ───────────────────────────────────
+        wick_sl_key = "buy_sl_pips" if direction == "BUY" else "sell_sl_pips"
+        wick_sl = chart_data.get(wick_sl_key)
+        _SL_MIN, _SL_MAX = 1000, 3000
+        if wick_sl is None or not (_SL_MIN <= wick_sl <= _SL_MAX):
+            logger.warning(f"Wick SL={wick_sl} ไม่อยู่ใน range {_SL_MIN}–{_SL_MAX} pips — ยกเลิก")
+            return {"action": "SKIP", "reason": f"Wick SL {wick_sl} out of range {_SL_MIN}–{_SL_MAX} pips"}
+
         if tech_confidence < min_tech_conf:
             logger.warning(f"Technical confidence {tech_confidence}% < {min_tech_conf}% — ยกเลิก")
             return {"action": "SKIP", "reason": f"Technical confidence too low ({tech_confidence}% < {min_tech_conf}%)"}
