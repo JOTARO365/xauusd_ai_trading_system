@@ -15,29 +15,43 @@ def _norm(sym: str) -> str:
     return _ALIASES.get(sym.upper(), sym.upper())
 
 
-def get_trades(symbol: str = "XAUUSD") -> list[dict] | None:
+def _get_account_login() -> int:
+    try:
+        import MetaTrader5 as mt5
+        info = mt5.account_info()
+        return int(info.login) if info else 0
+    except Exception:
+        return 0
+
+
+def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list[dict] | None:
     normed = _norm(symbol)
     raw = symbol.upper()
     symbols = list({normed, raw})
+
+    login = account_login if account_login is not None else _get_account_login()
+
     try:
-        res = (
+        q = (
             get_client()
             .table("trades")
             .select(
-                "ticket,symbol,source,direction,entry_type,status,"
+                "ticket,account_login,symbol,source,direction,entry_type,status,"
                 "lot,entry_price,sl,tp,pnl,"
                 "opened_at,closed_at,"
                 "technical_signal,technical_confidence,"
                 "trend,sr_zone,sr_strength,pa_action,sentiment,analysis"
             )
             .in_("symbol", symbols)
-            .order("opened_at", desc=False)
-            .execute()
         )
+        if login:
+            q = q.eq("account_login", login)
+        res = q.order("opened_at", desc=False).execute()
         result = []
         for r in res.data:
             result.append({
                 "ticket":                r.get("ticket"),
+                "account_login":         r.get("account_login"),
                 "symbol":                r.get("symbol"),
                 "source":                r.get("source"),
                 "direction":             r.get("direction"),
