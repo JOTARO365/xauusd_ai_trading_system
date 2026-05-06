@@ -295,8 +295,11 @@ def print_account_summary(account: dict, open_positions: list, history: dict, pr
     pnl    = sum(p.get("profit", 0) for p in open_positions)
     winrate= history["last_10_winrate"]
     streak = history["losing_streak"]
-    limit  = MONEY_MANAGEMENT["max_open_trades"] + protected
-    prot_s = f"  (+{protected} locked)" if protected else ""
+    max_dir = MONEY_MANAGEMENT["max_open_trades"] + protected
+    buy_n   = sum(1 for p in open_positions if p.get("direction") == "BUY")
+    sell_n  = sum(1 for p in open_positions if p.get("direction") == "SELL")
+    prot_s  = f" +{protected}🔒" if protected else ""
+    pos_str = f"B:{buy_n} S:{sell_n} / {max_dir}/dir{prot_s}"
 
     pnl_color    = GREEN if pnl >= 0 else RED
     streak_color = RED if streak > 0 else GREEN
@@ -306,7 +309,7 @@ def print_account_summary(account: dict, open_positions: list, history: dict, pr
         _kv2("Balance",   f"{bal:,.2f} {cur}",
              "Equity",    f"{eq:,.2f} {cur}"),
         _kv2("Open P&L",  f"[{pnl_color}]{pnl:+.2f}[/]",
-             "Open Pos",  f"{len(open_positions)} / {limit}{prot_s}"),
+             "Open Pos",  pos_str),
         _kv2("Win Rate",  f"[yellow]{winrate}%[/] (last 10)",
              "Streak",    streak_str),
     ]
