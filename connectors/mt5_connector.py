@@ -109,38 +109,25 @@ def check_open_slot(direction: str) -> tuple[bool, str]:
             + (f" รวม {protected} protected" if protected else "") + ")"
         )
 
-    # ── 2. opposing positions ทุกตัวต้องกำไรก่อนถึงจะเปิดฝั่งตรงข้ามได้ ──
+    # ── 2+3. opposing positions — ตรวจ protected / hedge buffer ──────
     if opp_pos:
         not_in_profit = [p for p in opp_pos if p.profit <= 0]
         if not_in_profit:
-            total = sum(p.profit for p in not_in_profit)
-            tickets = ", ".join(str(p.ticket) for p in not_in_profit)
-            return False, (
-                f"ไม่สามารถเปิด {direction} — {opp_name} {len(not_in_profit)} position "
-                f"ยังไม่กำไร (tickets: {tickets}, รวม {total:+.2f}) "
-                f"ต้องรอให้ทุก {opp_name} กำไรก่อน"
-            )
-
-    # ── 3. Hedge buffer — ช่องไฟเปิดฝั่งตรงข้าม ────────────────
-    if opp_pos:
-        losing = [p for p in opp_pos if p.profit < 0]
-        if losing:
-            # a) ตรวจว่า losing position แต่ละตัว SL อยู่หน้าทุนหรือยัง (protected)
             def _is_sl_protected(p) -> bool:
                 if p.sl == 0:
                     return False
                 return (p.type == 0 and p.sl >= p.price_open) or \
                        (p.type == 1 and p.sl <= p.price_open)
 
-            unprotected = [p for p in losing if not _is_sl_protected(p)]
+            unprotected = [p for p in not_in_profit if not _is_sl_protected(p)]
 
             if not unprotected:
-                # ทุก losing position SL หน้าทุนแล้ว — ไม่มีความเสี่ยงเพิ่ม
+                # ทุก position ที่ไม่กำไร SL อยู่หน้าทุนแล้ว — ไม่มีความเสี่ยงเพิ่ม
                 logger.debug(
-                    f"{opp_name} losing แต่ SL protected ทั้งหมด → เปิด {direction} ได้"
+                    f"{opp_name} not-in-profit แต่ SL protected ทั้งหมด → เปิด {direction} ได้"
                 )
             else:
-                # b) ตรวจ pip distance ของ unprotected positions vs hedge_buffer_pips
+                # ตรวจ pip distance ของ unprotected positions vs hedge_buffer_pips
                 sym_info  = mt5.symbol_info(SYMBOL)
                 tick      = mt5.symbol_info_tick(SYMBOL)
                 point     = sym_info.point if sym_info else 0.01
