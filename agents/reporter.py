@@ -508,8 +508,17 @@ def log_pending_order(decision_result: dict):
 # ─────────────────────────────────────────────────────────────
 
 def get_trade_history_summary() -> dict:
-    log    = _load_log()
-    trades = log.get("trades", [])
+    trades: list = []
+    try:
+        from db.reader import get_trades
+        rows = get_trades(_cfg.SYMBOL)
+        if rows is not None:
+            trades = rows
+        else:
+            raise RuntimeError("DB not available")
+    except Exception:
+        trades = _load_log().get("trades", [])
+
     closed = [t for t in trades if t.get("status") == "CLOSED"]
     today_str = date.today().isoformat()
 
