@@ -17,12 +17,36 @@ def is_mt5_connected() -> bool:
 
 
 def connect_mt5() -> bool:
-    if not mt5.initialize():
-        logger.error(f"MT5 initialize failed: {mt5.last_error()}")
-        return False
-    if not mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
-        logger.error(f"MT5 login failed: {mt5.last_error()}")
-        return False
+    # Clear stale IPC state จาก connection เดิมที่ค้าง (ป้องกัน IPC timeout)
+    try:
+        mt5.shutdown()
+    except Exception:
+        pass
+
+    # initialize + login ในขั้นตอนเดียว พร้อม timeout 10s (default 60s นานเกิน)
+    ok = mt5.initialize(
+        login=MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER,
+        timeout=10000,
+    )
+    if not ok:
+        err = mt5.last_error()
+        logger.error(f"MT5 initialize failed: {err}")
+        # ถ้าเป็น IPC timeout ลอง shutdown แล้ว retry 1 ครั้งแบบ initialize-only
+        if err and err[0] == -10005:
+            time.sleep(2)
+            try:
+                mt5.shutdown()
+            except Exception:
+                pass
+            time.sleep(1)
+            if not mt5.initialize(timeout=10000):
+                logger.error(f"MT5 retry initialize failed: {mt5.last_error()}")
+                return False
+            if not mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
+                logger.error(f"MT5 login failed: {mt5.last_error()}")
+                return False
+        else:
+            return False
     logger.info(f"MT5 connected — account: {MT5_LOGIN}")
 
     # enable symbol และหาชื่อที่ถูกต้อง
