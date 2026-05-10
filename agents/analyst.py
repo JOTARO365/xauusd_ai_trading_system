@@ -2,6 +2,7 @@ import anthropic
 from datetime import datetime, timezone
 from pathlib import Path
 from config import ANTHROPIC_API_KEY
+from agents.news_cache import get_news_context
 from loguru import logger
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -11,7 +12,16 @@ SYSTEM_PROMPT = Path("agents/prompts/analyst.md").read_text(encoding="utf-8")
 _last_usage = None   # set after each API call — read by accountant
 
 
-def analyze_sentiment(news_data: dict) -> dict:
+def _build_market_context(chart_data: dict) -> str:
+    """สร้าง query string สำหรับ vector search จาก chart context"""
+    signal = chart_data.get("signal", "")
+    trend  = chart_data.get("trend", "")
+    zone   = chart_data.get("sr_zone", "")
+    conf   = chart_data.get("confidence", 0)
+    return f"{signal} signal {trend} trend {zone} zone confidence {conf}%"
+
+
+def analyze_sentiment(news_data: dict, chart_data: dict | None = None) -> dict:
     logger.info("Agent 3 (ผู้วิเคราะห์): กำลังวิเคราะห์ sentiment...")
 
     tweets   = news_data.get("tweets",       [])
@@ -23,44 +33,46 @@ def analyze_sentiment(news_data: dict) -> dict:
         logger.warning("ไม่มีข้อมูลข่าวเลย")
         return {"sentiment": "NEUTRAL", "confidence": 0, "summary": "ไม่มีข้อมูลข่าว"}
 
-    # ── Twitter/X ─────────────────────────────────────────────
-    tweet_section = ""
-    if tweets:
-        tweet_texts   = "\n".join(f"- @{t['user']}: {t['text'][:200]}" for t in tweets[:20])
-        tweet_section = f"=== Twitter/X ({len(tweets)} tweets) ===\n{tweet_texts}"
-    else:
-        tweet_section = "=== Twitter/X ===\nไม่มี tweet"
+    # ── News Cache: Haiku summary + vector search ──────────────
+    market_ctx   = _build_market_context(chart_data) if chart_data else ""
+    news_context = get_news_context(news_data, market_context=market_ctx)
 
-    # ── ForexFactory Economic Calendar ────────────────────────
+    summary       = news_context["summary"]
+    relevant      = news_context["relevant_items"]
+    from_cache    = news_context["from_cache"]
+    token_est     = news_context["token_estimate"]
+
+    logger.info(
+        f"News context: {'cache HIT' if from_cache else 'cache MISS'} | "
+        f"~{token_est} tokens | {len(relevant)} relevant items"
+    )
+
+    # ── ForexFactory Calendar — ยังส่งตรงเพราะเป็น hard data (สั้น) ──
     if calendar:
         cal_lines = "\n".join(
             f"  [{ev['time']}] {ev['currency']} — {ev['title']} | "
-            f"Forecast: {ev['forecast']} | Prev: {ev['previous']} | Actual: {ev['actual']}"
-            for ev in calendar
+            f"Forecast: {ev.get('forecast','?')} | Actual: {ev.get('actual','pending')}"
+            for ev in calendar[:8]
         )
-        cal_section = f"=== ForexFactory Calendar (high-impact, next 24h) ===\n{cal_lines}"
+        cal_section = f"=== ForexFactory Calendar ===\n{cal_lines}"
     else:
         cal_section = "=== ForexFactory Calendar ===\nไม่มี high-impact event ใน 24h"
 
-    # ── Investing.com Headlines ────────────────────────────────
-    if articles:
-        art_lines = "\n".join(
-            f"  [{a['pub']}] {a['title']} — {a['summary']}"
-            for a in articles
-        )
-        art_section = f"=== Investing.com Headlines ===\n{art_lines}"
-    else:
-        art_section = "=== Investing.com Headlines ===\nไม่มีข่าว"
+    # ── Relevant items จาก vector search ─────────────────────
+    relevant_section = ""
+    if relevant:
+        relevant_section = "\n=== Most Relevant News (vector search) ===\n" + \
+            "\n".join(f"  - {r[:200]}" for r in relevant)
 
-    user_message = f"""วิเคราะห์ sentiment จากข้อมูลต่อไปนี้และตอบในรูปแบบที่กำหนด:
+    user_message = f"""วิเคราะห์ sentiment XAUUSD จากข้อมูลต่อไปนี้:
 
-{tweet_section}
+=== News Summary (AI-compressed) ===
+{summary}
+{relevant_section}
 
 {cal_section}
 
-{art_section}
-
-หมายเหตุ: ให้น้ำหนัก ForexFactory calendar สูงสุด (เป็น hard data) รองลงมาคือ Investing.com แล้วค่อย Twitter/X"""
+หมายเหตุ: ให้น้ำหนัก ForexFactory calendar สูงสุด (hard data) → News Summary → Relevant items"""
 
     global _last_usage
     response = client.messages.create(

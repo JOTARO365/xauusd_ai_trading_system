@@ -12,7 +12,7 @@ from agents.news_gatherer import gather_news
 from agents.analyst import analyze_sentiment
 from agents.decision_maker import make_decision
 from agents.reporter import log_trade, print_summary, scan_manual_orders
-from agents.pending_manager import auto_place_pending_orders, place_weekly_calendar_pending, manage_range_pending
+from agents.pending_manager import auto_place_pending_orders, place_weekly_calendar_pending, manage_range_pending, manage_sl_reentry
 import agents.chart_watcher  as _cw_mod
 import agents.market_advisor as _ma_mod
 import agents.analyst        as _an_mod
@@ -195,6 +195,13 @@ async def run_status_cycle() -> None:
                 print_warning(f"Range pending: วาง {rp} order ที่กรอบ sideways")
         except Exception as rpe:
             logger.error(f"Range pending error: {rpe}")
+        # Post-SL re-entry — หาจุดเข้าใหม่ที่ safe zone หลัง SL hit
+        try:
+            sr = manage_sl_reentry(_last_chart_data or {})
+            if sr:
+                print_warning(f"Post-SL: วาง {sr} re-entry order ที่ safe zone")
+        except Exception as sre:
+            logger.error(f"Post-SL re-entry error: {sre}")
         print_summary()
     except Exception as e:
         print_step(5, "error", str(e)[:60])
@@ -257,7 +264,7 @@ async def run_cycle() -> tuple[dict, dict]:
     print_step(3, "running", "กำลังวิเคราะห์ sentiment...")
     try:
         _t = time.monotonic()
-        sentiment_data = analyze_sentiment(news_data)
+        sentiment_data = analyze_sentiment(news_data, chart_data)
         _lat_an = int((time.monotonic() - _t) * 1000)
         sent  = sentiment_data.get("sentiment", "NEUTRAL")
         sconf = sentiment_data.get("confidence", 0)
@@ -319,6 +326,13 @@ async def run_cycle() -> tuple[dict, dict]:
                 print_warning(f"Range pending: วาง {rp} order ที่กรอบ sideways")
         except Exception as rpe:
             logger.error(f"Range pending error: {rpe}")
+        # ── Post-SL re-entry: หาจุดเข้าใหม่ที่ safe zone หลัง SL hit ──
+        try:
+            sr = manage_sl_reentry(chart_data)
+            if sr:
+                print_warning(f"Post-SL: วาง {sr} re-entry order ที่ safe zone")
+        except Exception as sre:
+            logger.error(f"Post-SL re-entry error: {sre}")
         print_summary()
     except Exception as e:
         print_step(5, "error", str(e)[:60])
@@ -431,6 +445,13 @@ async def main():
                         print_warning(f"Range pending: วาง {rp} order ที่กรอบ sideways")
                 except Exception as rpe:
                     logger.error(f"Range pending error: {rpe}")
+                # Post-SL re-entry: หาจุดเข้าใหม่ที่ safe zone หลัง SL hit
+                try:
+                    sr = manage_sl_reentry(_last_chart_data or {})
+                    if sr:
+                        print_warning(f"Post-SL: วาง {sr} re-entry order ที่ safe zone")
+                except Exception as sre:
+                    logger.error(f"Post-SL re-entry error: {sre}")
             else:
                 chart_data, sentiment_data = await run_cycle()
                 interval, reason = next_interval(chart_data, sentiment_data)
