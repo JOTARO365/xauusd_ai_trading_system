@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS news_embeddings (
     cache_id   BIGINT REFERENCES news_cache(id) ON DELETE CASCADE,
     source     TEXT NOT NULL,            -- 'twitter' | 'forexfactory' | 'investing'
     content    TEXT NOT NULL,
-    embedding  VECTOR(1536),             -- OpenAI text-embedding-3-small
+    embedding  VECTOR(3072),             -- OpenAI text-embedding-3-small
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -37,7 +37,7 @@ CREATE INDEX IF NOT EXISTS idx_news_emb_cache     ON news_embeddings(cache_id);
 
 -- ── RPC function: vector similarity search ────────────────────────────────────
 CREATE OR REPLACE FUNCTION search_news_relevant(
-    query_embedding VECTOR(1536),
+    query_embedding VECTOR(3072),
     match_count     INT DEFAULT 3
 )
 RETURNS TABLE (source TEXT, content TEXT, similarity FLOAT)

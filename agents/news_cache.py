@@ -1,8 +1,9 @@
 """
-News Cache — Haiku pre-summarization + pgvector search
+News Cache — Haiku pre-summarization + pgvector search (Gemini embeddings)
 ประหยัด ~83% token ของ analyst.py โดย:
   1. สรุปข่าวด้วย Haiku (ถูกกว่า Sonnet 12x) และ cache 1 ชั่วโมง
-  2. Embed ทุก news item → vector search หา top-N ที่ relevant กับ market context
+  2. Embed ด้วย Gemini text-embedding-004 (768 dim, free tier)
+     → vector search หา top-N ที่ relevant กับ market context
 """
 import hashlib
 import os
@@ -13,9 +14,9 @@ import anthropic
 
 _anthropic   = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
 _HAIKU_MODEL = "claude-haiku-4-5-20251001"
-_EMBED_MODEL = "text-embedding-3-small"
-_EMBED_DIM   = 1536
-_CACHE_TTL_H = 1          # ชั่วโมง
+_EMBED_MODEL = "models/gemini-embedding-001"  # Gemini stable embedding model
+_EMBED_DIM   = 3072                           # Gemini output dimension
+_CACHE_TTL_H = 1                              # ชั่วโมง
 
 
 # ─────────────────────────────────────────────────────────────
@@ -37,16 +38,20 @@ def _get_db():
     return get_client()
 
 
-def _get_openai():
-    """Lazy load openai client — ถ้าไม่มี OPENAI_API_KEY จะ return None"""
-    key = os.getenv("OPENAI_API_KEY", "")
+def _gemini_available() -> bool:
+    return bool(os.getenv("GEMINI_API_KEY", ""))
+
+
+def _get_gemini_client():
+    """Lazy load google-genai client — return client หรือ None"""
+    key = os.getenv("GEMINI_API_KEY", "")
     if not key:
         return None
     try:
-        from openai import OpenAI
-        return OpenAI(api_key=key)
+        from google import genai
+        return genai.Client(api_key=key)
     except ImportError:
-        logger.warning("openai package ไม่ได้ติดตั้ง — ข้าม embedding (pip install openai)")
+        logger.warning("google-genai ไม่ได้ติดตั้ง — ข้าม embedding (pip install google-genai)")
         return None
 
 
@@ -133,19 +138,27 @@ Output (5 bullets only, no extra text):
 
 
 # ─────────────────────────────────────────────────────────────
-#  EMBEDDINGS
+#  EMBEDDINGS (Gemini text-embedding-004)
 # ─────────────────────────────────────────────────────────────
 
-def _embed(text: str) -> list[float] | None:
-    """Generate embedding ด้วย OpenAI text-embedding-3-small"""
-    oa = _get_openai()
-    if not oa:
+def _embed(text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> list[float] | None:
+    """
+    Generate embedding ด้วย Gemini gemini-embedding-001 (3072 dim)
+    task_type: 'RETRIEVAL_DOCUMENT' สำหรับ store, 'RETRIEVAL_QUERY' สำหรับ search
+    """
+    client = _get_gemini_client()
+    if not client:
         return None
     try:
-        resp = oa.embeddings.create(model=_EMBED_MODEL, input=text[:2000])
-        return resp.data[0].embedding
+        from google.genai import types
+        result = client.models.embed_content(
+            model=_EMBED_MODEL,
+            contents=text[:2000],
+            config=types.EmbedContentConfig(task_type=task_type),
+        )
+        return result.embeddings[0].values
     except Exception as e:
-        logger.warning(f"Embedding error: {e}")
+        logger.warning(f"Gemini embedding error: {e}")
         return None
 
 
@@ -186,8 +199,8 @@ def _store_cache(content_hash: str, summary: str, news_data: dict) -> int | None
         # embed แต่ละ item และ insert
         embedded = 0
         for source, content in items:
-            emb  = _embed(content)
-            row  = {"cache_id": cache_id, "source": source, "content": content}
+            emb = _embed(content, task_type="retrieval_document")
+            row = {"cache_id": cache_id, "source": source, "content": content}
             if emb:
                 row["embedding"] = emb
                 embedded += 1
@@ -213,11 +226,10 @@ def vector_search(query: str, top_n: int = 3) -> list[str]:
     หา news items ที่ relevant กับ market context ปัจจุบัน
     query: เช่น "BUY signal BULLISH trend H4 resistance USD weakening"
     """
-    oa = _get_openai()
-    if not oa:
+    if not _get_gemini_client():
         return []
 
-    query_emb = _embed(query)
+    query_emb = _embed(query, task_type="RETRIEVAL_QUERY")
     if not query_emb:
         return []
 
@@ -244,11 +256,9 @@ def get_news_context(news_data: dict, market_context: str = "") -> dict:
 
     Flow:
       1. ตรวจ cache (by hash → by latest valid)
-      2. MISS → Haiku สรุป + embed + store
+      2. MISS → Haiku สรุป + Gemini embed + store
       3. vector_search หา top-3 items ที่ match กับ market context
       4. return {summary, relevant_items, from_cache, token_estimate}
-
-    token_estimate: ประมาณ input tokens ที่จะส่งต่อให้ Sonnet
     """
     content_hash = _hash_news(news_data)
 
@@ -266,16 +276,16 @@ def get_news_context(news_data: dict, market_context: str = "") -> dict:
         cache_id   = _store_cache(content_hash, summary, news_data)
         from_cache = False
 
-    # ── Vector search ──────────────────────────────────────────
+    # ── Vector search (ถ้ามี GEMINI_API_KEY) ───────────────────
     relevant: list[str] = []
-    if market_context and os.getenv("OPENAI_API_KEY"):
+    if market_context and _get_gemini_client():
         relevant = vector_search(market_context, top_n=3)
 
     # ── ประมาณ token ที่จะส่งไป Sonnet ────────────────────────
-    context_text = summary
+    context_text  = summary
     if relevant:
         context_text += "\n\nRelevant:\n" + "\n".join(f"- {r[:120]}" for r in relevant)
-    token_estimate = len(context_text.split()) * 4 // 3  # rough estimate
+    token_estimate = len(context_text.split()) * 4 // 3
 
     return {
         "summary":        summary,
