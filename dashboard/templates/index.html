@@ -769,8 +769,10 @@
   <!-- TABS -->
   <div class="tab-nav">
     <button class="tab-btn active" data-tab="overview"    onclick="switchTab('overview')">Overview</button>
+    <button class="tab-btn"        data-tab="monitor"     onclick="switchTab('monitor')">Monitor</button>
+    <button class="tab-btn"        data-tab="backtest"    onclick="switchTab('backtest')">Backtest</button>
     <button class="tab-btn"        data-tab="accounting"  onclick="switchTab('accounting')">$ Accounting</button>
-    <button class="tab-btn"        data-tab="settings"    onclick="switchTab('settings')">⚙ Settings</button>
+    <button class="tab-btn"        data-tab="settings"    onclick="switchTab('settings')">&#9881; Settings</button>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
@@ -992,6 +994,175 @@
   </section>
 
   </div><!-- /tab-overview -->
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-monitor">
+
+    <!-- BOT STATUS -->
+    <section>
+      <div class="section-title">Bot Status</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card">
+          <div class="label">Cycle</div>
+          <div class="value gold" id="mon-cycle">—</div>
+          <div class="sub" id="mon-updated">—</div>
+        </div>
+        <div class="card">
+          <div class="label">Last Action</div>
+          <div class="value" id="mon-action">—</div>
+          <div class="sub" id="mon-action-time">—</div>
+        </div>
+        <div class="card">
+          <div class="label">Last Signal</div>
+          <div class="value" id="mon-signal">—</div>
+          <div class="sub" id="mon-signal-sub">—</div>
+        </div>
+        <div class="card">
+          <div class="label">Sentiment</div>
+          <div class="value" id="mon-sentiment">—</div>
+          <div class="sub" id="mon-sent-conf">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LAST DECISION DETAIL -->
+    <section>
+      <div class="section-title">Last Decision Detail</div>
+      <div class="chart-card" style="font-size:13px;line-height:1.8">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+          <div><span style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px">Trend</span><br><span id="mon-trend" style="font-weight:600">—</span></div>
+          <div><span style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px">SR Zone</span><br><span id="mon-srzone" style="font-weight:600">—</span></div>
+          <div><span style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px">Entry Type</span><br><span id="mon-entry-type" style="font-weight:600">—</span></div>
+          <div><span style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px">Confidence</span><br><span id="mon-conf" style="font-weight:600">—</span></div>
+          <div style="grid-column:span 2"><span style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px">Reason</span><br><span id="mon-reason" style="color:var(--muted);font-style:italic">—</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PENDING ORDERS -->
+    <section>
+      <div class="section-title">Pending Orders</div>
+      <div class="table-card">
+        <div class="table-toolbar">
+          <h3>Pending Orders by Tag</h3>
+          <div id="mon-pending-summary" style="font-size:12px;color:var(--muted)">—</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tag</th>
+                <th class="center">Type</th>
+                <th class="num">Price</th>
+                <th class="num">SL</th>
+                <th class="num">TP</th>
+                <th>Comment</th>
+                <th>Expiry</th>
+              </tr>
+            </thead>
+            <tbody id="mon-pending-tbody">
+              <tr><td colspan="7" class="no-data">กำลังโหลด...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /tab-monitor -->
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-backtest">
+
+    <!-- SUMMARY -->
+    <section>
+      <div class="section-title">Backtest Overview</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card">
+          <div class="label">All Trades</div>
+          <div class="value gold" id="bt-total">—</div>
+          <div class="sub" id="bt-sys-count">— system</div>
+        </div>
+        <div class="card">
+          <div class="label">Best Entry Type</div>
+          <div class="value green" id="bt-best-entry">—</div>
+          <div class="sub" id="bt-best-entry-sub">—</div>
+        </div>
+        <div class="card">
+          <div class="label">Best Session</div>
+          <div class="value" id="bt-best-session">—</div>
+          <div class="sub" id="bt-best-session-sub">—</div>
+        </div>
+        <div class="card">
+          <div class="label">Best Hold Time</div>
+          <div class="value" id="bt-best-hold">—</div>
+          <div class="sub" id="bt-best-hold-sub">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BREAKDOWN TABLES -->
+    <section>
+      <div class="section-title">Breakdown</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+
+        <!-- Confidence Tier -->
+        <div class="table-card">
+          <div class="table-toolbar"><h3>Confidence Tier (System)</h3></div>
+          <table><thead><tr>
+            <th>Tier</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&L</th>
+          </tr></thead>
+          <tbody id="bt-tier-tbody"><tr><td colspan="4" class="no-data">โหลด...</td></tr></tbody></table>
+        </div>
+
+        <!-- Entry Type -->
+        <div class="table-card">
+          <div class="table-toolbar"><h3>Entry Type (System)</h3></div>
+          <table><thead><tr>
+            <th>Type</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&L</th>
+          </tr></thead>
+          <tbody id="bt-entry-tbody"><tr><td colspan="4" class="no-data">โหลด...</td></tr></tbody></table>
+        </div>
+
+        <!-- Trend -->
+        <div class="table-card">
+          <div class="table-toolbar"><h3>Trend (System)</h3></div>
+          <table><thead><tr>
+            <th>Trend</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&L</th>
+          </tr></thead>
+          <tbody id="bt-trend-tbody"><tr><td colspan="4" class="no-data">โหลด...</td></tr></tbody></table>
+        </div>
+
+        <!-- SR Zone -->
+        <div class="table-card">
+          <div class="table-toolbar"><h3>SR Zone (System)</h3></div>
+          <table><thead><tr>
+            <th>Zone</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&L</th>
+          </tr></thead>
+          <tbody id="bt-sr-tbody"><tr><td colspan="4" class="no-data">โหลด...</td></tr></tbody></table>
+        </div>
+
+        <!-- Session -->
+        <div class="table-card">
+          <div class="table-toolbar"><h3>Trading Session (All)</h3></div>
+          <table><thead><tr>
+            <th>Session</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&L</th>
+          </tr></thead>
+          <tbody id="bt-session-tbody"><tr><td colspan="4" class="no-data">โหลด...</td></tr></tbody></table>
+        </div>
+
+        <!-- Hold Time -->
+        <div class="table-card">
+          <div class="table-toolbar"><h3>Hold Time (All)</h3></div>
+          <table><thead><tr>
+            <th>Duration</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&L</th>
+          </tr></thead>
+          <tbody id="bt-hold-tbody"><tr><td colspan="4" class="no-data">โหลด...</td></tr></tbody></table>
+        </div>
+
+      </div>
+    </section>
+
+  </div><!-- /tab-backtest -->
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-accounting">
@@ -1625,6 +1796,8 @@ function switchTab(name) {
     c.classList.toggle('active', c.id === 'tab-' + name));
   if (name === 'settings')   loadConfig();
   if (name === 'accounting') loadAccounting();
+  if (name === 'monitor')    loadMonitor();
+  if (name === 'backtest')   loadBacktest();
 }
 
 // ─── ACCOUNTING ──────────────────────────────────────────────
@@ -1959,7 +2132,149 @@ initCharts();
 fetchData();
 fetchCalendar();
 setInterval(fetchData, 10000);
-setInterval(fetchCalendar, 1800000);  // refresh calendar ทุก 30 นาที
+setInterval(fetchCalendar, 1800000);
+
+// ─── MONITOR ─────────────────────────────────────────────────
+async function loadMonitor() {
+  try {
+    const res  = await fetch('/api/monitor');
+    const data = await res.json();
+    if (!data.ok) return;
+
+    const bs = data.bot_status || {};
+    const ls = bs.last_signal  || {};
+
+    // status cards
+    document.getElementById('mon-cycle').textContent   = bs.cycle ?? '—';
+    document.getElementById('mon-updated').textContent = bs.updated_at
+      ? 'อัปเดต ' + bs.updated_at.slice(11, 19) : '—';
+
+    const action = ls.action || '—';
+    const actionEl = document.getElementById('mon-action');
+    actionEl.textContent  = action;
+    actionEl.className    = 'value ' + (action === 'EXECUTE' ? 'green' : action === 'SKIP' ? 'gold' : '');
+    document.getElementById('mon-action-time').textContent = ls.time ? ls.time.slice(11, 19) : '—';
+
+    const dir   = ls.direction || '—';
+    const conf  = ls.confidence ?? 0;
+    const sigEl = document.getElementById('mon-signal');
+    sigEl.textContent = dir;
+    sigEl.className   = 'value ' + (dir === 'BUY' ? 'green' : dir === 'SELL' ? 'red' : 'gold');
+    document.getElementById('mon-signal-sub').textContent = `confidence ${conf}%`;
+
+    const sent    = bs.sentiment || '—';
+    const sentEl  = document.getElementById('mon-sentiment');
+    sentEl.textContent = sent;
+    sentEl.className   = 'value ' + (sent === 'BULLISH' ? 'green' : sent === 'BEARISH' ? 'red' : 'gold');
+    document.getElementById('mon-sent-conf').textContent = `${bs.sent_conf ?? 0}% confidence`;
+
+    // detail row
+    document.getElementById('mon-trend').textContent      = ls.trend      || '—';
+    document.getElementById('mon-srzone').textContent     = ls.sr_zone    || '—';
+    document.getElementById('mon-entry-type').textContent = ls.entry_type || '—';
+    document.getElementById('mon-conf').textContent       = conf + '%';
+    document.getElementById('mon-reason').textContent     = ls.reason     || '—';
+
+    // pending table
+    const orders  = data.pending_orders || [];
+    const grouped = data.pending_grouped || {};
+    const tagCounts = Object.entries(grouped).map(([k, v]) => `${k}: ${v.length}`).join('  ·  ');
+    document.getElementById('mon-pending-summary').textContent = tagCounts || 'ไม่มี pending';
+
+    const tbody = document.getElementById('mon-pending-tbody');
+    if (!orders.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data">ไม่มี pending orders</td></tr>';
+    } else {
+      const tagColors = { 'AP': '#7ec8e3', 'WK': '#f0a500', 'RNG': '#9b8aff', 'SL-RE': 'var(--red)' };
+      tbody.innerHTML = orders.map(o => {
+        const tc = tagColors[o.tag] || 'var(--muted)';
+        const typeDir = o.type.includes('BUY') ? 'green' : 'red';
+        return `<tr>
+          <td><span style="color:${tc};font-weight:700;font-size:11px">${o.tag}</span></td>
+          <td class="center"><span class="badge badge-${typeDir}" style="font-size:10px">${o.type}</span></td>
+          <td class="num">${fmtNum(o.price, 2)}</td>
+          <td class="num" style="color:var(--red)">${o.sl ? fmtNum(o.sl, 2) : '—'}</td>
+          <td class="num" style="color:var(--green)">${o.tp ? fmtNum(o.tp, 2) : '—'}</td>
+          <td style="font-size:11px;color:var(--muted)">${o.comment || '—'}</td>
+          <td style="font-size:11px;color:var(--muted)">${o.expiry ? o.expiry.slice(0, 16).replace('T', ' ') : '—'}</td>
+        </tr>`;
+      }).join('');
+    }
+  } catch(e) {
+    console.error('loadMonitor error:', e);
+  }
+}
+
+// ─── BACKTEST ────────────────────────────────────────────────
+function _btRow(key, b) {
+  const pnlCls = b.pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+  const pnlSign = b.pnl >= 0 ? '+' : '';
+  const wrColor = b.win_rate >= 55 ? 'var(--green)' : b.win_rate >= 45 ? 'var(--gold)' : 'var(--red)';
+  return `<tr>
+    <td>${key}</td>
+    <td class="num">${b.count}</td>
+    <td class="num" style="color:${wrColor};font-weight:700">${b.win_rate}%</td>
+    <td class="num"><span class="${pnlCls}">${pnlSign}${b.pnl.toFixed(2)}</span></td>
+  </tr>`;
+}
+
+function _bestBucket(buckets) {
+  return Object.entries(buckets || {})
+    .filter(([, v]) => v.count >= 3)
+    .sort(([, a], [, b]) => b.win_rate - a.win_rate)[0] || null;
+}
+
+async function loadBacktest() {
+  try {
+    const res  = await fetch('/api/backtest?system=' + activeSystem);
+    const data = await res.json();
+    if (!data.ok) return;
+
+    document.getElementById('bt-total').textContent     = data.trades_count ?? '—';
+    document.getElementById('bt-sys-count').textContent = (data.sys_count ?? 0) + ' system trades';
+
+    // Best cards
+    const bestEntry = _bestBucket(data.entry_types);
+    if (bestEntry) {
+      document.getElementById('bt-best-entry').textContent     = bestEntry[0];
+      document.getElementById('bt-best-entry-sub').textContent = `${bestEntry[1].count} trades · ${bestEntry[1].win_rate}% WR`;
+    }
+    const bestSession = _bestBucket(data.sessions);
+    if (bestSession) {
+      document.getElementById('bt-best-session').textContent     = bestSession[0];
+      document.getElementById('bt-best-session-sub').textContent = `${bestSession[1].count} trades · ${bestSession[1].win_rate}% WR`;
+    }
+    const bestHold = _bestBucket(data.hold_time);
+    if (bestHold) {
+      document.getElementById('bt-best-hold').textContent     = bestHold[0];
+      document.getElementById('bt-best-hold-sub').textContent = `${bestHold[1].count} trades · ${bestHold[1].win_rate}% WR`;
+    }
+
+    // Tables
+    const _fill = (tbodyId, buckets, sortFn) => {
+      const tbody = document.getElementById(tbodyId);
+      const rows  = Object.entries(buckets || {})
+        .sort(sortFn || (([, a], [, b]) => b.pnl - a.pnl));
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="no-data">ไม่มีข้อมูล</td></tr>';
+      } else {
+        tbody.innerHTML = rows.map(([k, v]) => _btRow(k, v)).join('');
+      }
+    };
+
+    const _TIER_ORDER = ['A+ (≥65)', 'B (50-64)', 'C (<50)', 'Unknown'];
+    _fill('bt-tier-tbody',    data.tiers,       ([a], [b]) => _TIER_ORDER.indexOf(a) - _TIER_ORDER.indexOf(b));
+    _fill('bt-entry-tbody',   data.entry_types);
+    _fill('bt-trend-tbody',   data.trends);
+    _fill('bt-sr-tbody',      data.sr_zones);
+    const _HOLD_ORDER = ['<30m', '30m-2h', '2h-8h', '>8h', 'Unknown'];
+    _fill('bt-hold-tbody',    data.hold_time,   ([a], [b]) => _HOLD_ORDER.indexOf(a) - _HOLD_ORDER.indexOf(b));
+    _fill('bt-session-tbody', data.sessions);
+
+  } catch(e) {
+    console.error('loadBacktest error:', e);
+  }
+}
 </script>
 </body>
 </html>

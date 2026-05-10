@@ -1,8 +1,10 @@
 import argparse
 import asyncio
+import json
+import os
 import sys
 import time
-from datetime import date as _date
+from datetime import date as _date, datetime as _dt
 from loguru import logger
 from connectors.price_feed import connect_mt5, disconnect_mt5, is_mt5_connected
 from connectors.mt5_connector import get_open_positions, manage_breakeven, manage_dynamic_tp, manage_post_event_tp, count_protected_slots, is_hedge_active, check_open_slot
@@ -34,6 +36,33 @@ _cycle            = 0
 _last_chart_data:     dict = {}
 _last_sentiment_data: dict = {}
 _last_weekly_pending_date: "_date | None" = None
+
+_BOT_STATUS_FILE = os.path.join(os.path.dirname(__file__), "logs", "bot_status.json")
+
+
+def _write_bot_status(chart_data: dict, sentiment_data: dict, decision: dict) -> None:
+    """Write logs/bot_status.json each cycle — read by /api/monitor in dashboard."""
+    try:
+        status = {
+            "updated_at": _dt.now().isoformat(timespec="seconds"),
+            "cycle":      _cycle,
+            "last_signal": {
+                "time":       _dt.now().isoformat(timespec="seconds"),
+                "direction":  chart_data.get("signal", ""),
+                "confidence": chart_data.get("confidence", 0),
+                "action":     decision.get("action", "SKIP"),
+                "entry_type": chart_data.get("entry_type", ""),
+                "trend":      chart_data.get("trend", ""),
+                "sr_zone":    chart_data.get("sr_zone", ""),
+                "reason":     decision.get("reason", ""),
+            },
+            "sentiment":    sentiment_data.get("sentiment", "NEUTRAL"),
+            "sent_conf":    sentiment_data.get("confidence", 0),
+        }
+        with open(_BOT_STATUS_FILE, "w", encoding="utf-8") as f:
+            json.dump(status, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.warning(f"bot_status.json write error: {e}")
 
 
 def _parse_args():
@@ -363,6 +392,12 @@ async def run_cycle() -> tuple[dict, dict]:
         )
     except Exception as e:
         logger.error(f"Accounting error: {e}")
+
+    # ── Write bot status for dashboard monitor ─────────────────────
+    try:
+        _write_bot_status(chart_data, sentiment_data, decision)
+    except Exception as e:
+        logger.warning(f"bot_status write error: {e}")
 
     return chart_data, sentiment_data
 

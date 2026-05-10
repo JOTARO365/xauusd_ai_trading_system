@@ -543,6 +543,133 @@ def api_accounting():
                         "summary": {}, "agents": {}, "today": {}, "daily": {}})
 
 
+@app.route("/api/monitor")
+def api_monitor():
+    """Bot status + pending orders for Monitor tab."""
+    # ── bot_status.json ───────────────────────────────────────────
+    status_file = os.path.join(_BASE, "../logs/bot_status.json")
+    bot_status: dict = {}
+    try:
+        with open(status_file, "r", encoding="utf-8") as f:
+            bot_status = json.load(f)
+    except Exception:
+        pass
+
+    # ── MT5 pending orders ────────────────────────────────────────
+    pending: list[dict] = []
+    if _MT5_AVAILABLE:
+        try:
+            already_init = mt5.terminal_info() is not None
+            if not already_init:
+                mt5.initialize()
+                mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER)
+            orders = mt5.orders_get(symbol=SYMBOL) or []
+            _type_map = {2: "BUY_LIMIT", 3: "SELL_LIMIT", 4: "BUY_STOP", 5: "SELL_STOP"}
+            for o in orders:
+                comment = o.comment or ""
+                if comment.startswith("SL-RE"):   tag = "SL-RE"
+                elif comment.startswith("RNG-"):   tag = "RNG"
+                elif comment.startswith("WK-"):    tag = "WK"
+                else:                              tag = "AP"
+                pending.append({
+                    "ticket":  o.ticket,
+                    "type":    _type_map.get(o.type, str(o.type)),
+                    "price":   o.price_open,
+                    "sl":      o.sl   if o.sl   != 0 else None,
+                    "tp":      o.tp   if o.tp   != 0 else None,
+                    "comment": comment,
+                    "tag":     tag,
+                    "expiry":  (datetime.fromtimestamp(o.time_expiration).isoformat()
+                                if o.time_expiration else None),
+                })
+            if not already_init:
+                mt5.shutdown()
+        except Exception:
+            pass
+
+    grouped: dict[str, list] = {}
+    for p in pending:
+        grouped.setdefault(p["tag"], []).append(p)
+
+    return jsonify({
+        "ok":             True,
+        "bot_status":     bot_status,
+        "pending_orders": pending,
+        "pending_grouped": grouped,
+    })
+
+
+@app.route("/api/backtest")
+def api_backtest():
+    """Deep historical breakdown for Backtest tab."""
+    system = request.args.get("system", "xauusd").lower()
+    login  = _get_actual_mt5_login() if system == "xauusd" else None
+    data   = load_trades(system, account_login=login)
+    all_trades = [t for t in data.get("trades", []) if t.get("status") == "CLOSED"]
+
+    if not all_trades:
+        empty = {"count": 0}
+        return jsonify({"ok": True, "trades_count": 0,
+                        "tiers": empty, "trends": empty, "entry_types": empty,
+                        "sessions": empty, "hold_time": empty, "sr_zones": empty})
+
+    def _tier(conf):
+        if conf is None:  return "Unknown"
+        if conf >= 65:    return "A+ (≥65)"
+        if conf >= 50:    return "B (50-64)"
+        return "C (<50)"
+
+    def _session(ts):
+        try:
+            h = datetime.fromisoformat(ts).hour
+            if  7 <= h < 13: return "London"
+            if 13 <= h < 22: return "NY"
+            return "Asian"
+        except Exception:
+            return "Unknown"
+
+    def _hold_bucket(t):
+        try:
+            dt_open  = datetime.fromisoformat(t["timestamp"])
+            dt_close = datetime.fromisoformat(t["close_time"])
+            mins = (dt_close - dt_open).total_seconds() / 60
+            if mins <  30:  return "<30m"
+            if mins < 120:  return "30m-2h"
+            if mins < 480:  return "2h-8h"
+            return ">8h"
+        except Exception:
+            return "Unknown"
+
+    def _buckets(group_fn, trades_list):
+        buckets: dict[str, dict] = {}
+        for t in trades_list:
+            k   = group_fn(t) or "Unknown"
+            pnl = t.get("pnl") or 0.0
+            if k not in buckets:
+                buckets[k] = {"count": 0, "wins": 0, "losses": 0, "pnl": 0.0}
+            buckets[k]["count"]  += 1
+            buckets[k]["pnl"]     = round(buckets[k]["pnl"] + pnl, 2)
+            if pnl > 0: buckets[k]["wins"]   += 1
+            else:       buckets[k]["losses"] += 1
+        for v in buckets.values():
+            v["win_rate"] = round(v["wins"] / v["count"] * 100, 1) if v["count"] else 0
+        return buckets
+
+    sys_trades = [t for t in all_trades if t.get("source") == "SYSTEM"]
+
+    return jsonify({
+        "ok":           True,
+        "trades_count": len(all_trades),
+        "sys_count":    len(sys_trades),
+        "tiers":        _buckets(lambda t: _tier(t.get("technical_confidence")), sys_trades),
+        "trends":       _buckets(lambda t: t.get("trend"),                        sys_trades),
+        "entry_types":  _buckets(lambda t: t.get("entry_type"),                   sys_trades),
+        "sr_zones":     _buckets(lambda t: t.get("sr_zone"),                      sys_trades),
+        "sessions":     _buckets(lambda t: _session(t.get("timestamp", "")),      all_trades),
+        "hold_time":    _buckets(_hold_bucket,                                     all_trades),
+    })
+
+
 @app.route("/api/calendar")
 def api_calendar():
     """ดึง economic calendar สัปดาห์นี้ (High + Medium impact events)"""
