@@ -12,7 +12,7 @@ from agents.news_gatherer import gather_news
 from agents.analyst import analyze_sentiment
 from agents.decision_maker import make_decision
 from agents.reporter import log_trade, print_summary, scan_manual_orders
-from agents.pending_manager import auto_place_pending_orders, place_weekly_calendar_pending
+from agents.pending_manager import auto_place_pending_orders, place_weekly_calendar_pending, manage_range_pending
 import agents.chart_watcher  as _cw_mod
 import agents.market_advisor as _ma_mod
 import agents.analyst        as _an_mod
@@ -188,6 +188,13 @@ async def run_status_cycle() -> None:
         print_step(5, "done", detail)
         if n:
             print_warning(f"พบ manual order {n} รายการ — บันทึก context แล้ว")
+        # Range pending — ตรวจและยกเลิก stale orders แม้ในรอบ status
+        try:
+            rp = manage_range_pending(_last_chart_data or {})
+            if rp:
+                print_warning(f"Range pending: วาง {rp} order ที่กรอบ sideways")
+        except Exception as rpe:
+            logger.error(f"Range pending error: {rpe}")
         print_summary()
     except Exception as e:
         print_step(5, "error", str(e)[:60])
@@ -305,6 +312,13 @@ async def run_cycle() -> tuple[dict, dict]:
                 print_warning(f"Auto-pending: วาง {p} order ที่ key S/R levels (H4+Daily)")
         except Exception as pe:
             logger.error(f"Auto-pending error: {pe}")
+        # ── Range pending: sideways กรอบอัตโนมัติ (แยกจาก weekly+auto) ──
+        try:
+            rp = manage_range_pending(chart_data)
+            if rp:
+                print_warning(f"Range pending: วาง {rp} order ที่กรอบ sideways")
+        except Exception as rpe:
+            logger.error(f"Range pending error: {rpe}")
         print_summary()
     except Exception as e:
         print_step(5, "error", str(e)[:60])
@@ -410,6 +424,13 @@ async def main():
                         print_warning(f"Auto-pending: วาง {p} order ที่ key S/R levels (H4+Daily)")
                 except Exception as pe:
                     logger.error(f"Auto-pending error: {pe}")
+                # Range pending: ตรวจ stale + วาง ถ้า sideways
+                try:
+                    rp = manage_range_pending(_last_chart_data or {})
+                    if rp:
+                        print_warning(f"Range pending: วาง {rp} order ที่กรอบ sideways")
+                except Exception as rpe:
+                    logger.error(f"Range pending error: {rpe}")
             else:
                 chart_data, sentiment_data = await run_cycle()
                 interval, reason = next_interval(chart_data, sentiment_data)

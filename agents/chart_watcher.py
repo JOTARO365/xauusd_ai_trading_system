@@ -491,13 +491,13 @@ def scan_entry_setups(h4: dict, h1: dict, m15: dict,
         if h4_bias == "BULLISH" and h1["close"] >= h1["ema20"]:
             setups.append({
                 "type": "EMA_PULLBACK", "tf": "H1", "direction": "BUY",
-                "score": 70, "level": h1["ema20"],
+                "score": 55, "level": h1["ema20"],
                 "note": f"ราคา H1 pullback แตะ EMA20 ({h1['ema20']:.2f}) ใน Bullish trend"
             })
         elif h4_bias == "BEARISH" and h1["close"] <= h1["ema20"]:
             setups.append({
                 "type": "EMA_PULLBACK", "tf": "H1", "direction": "SELL",
-                "score": 70, "level": h1["ema20"],
+                "score": 55, "level": h1["ema20"],
                 "note": f"ราคา H1 pullback แตะ EMA20 ({h1['ema20']:.2f}) ใน Bearish trend"
             })
 
@@ -803,7 +803,9 @@ RSI:{m15['rsi']} MACD Hist:{m15['macd_hist']}
         key = line.split(":")[0].strip()
         val = line.split(":", 1)[1].strip()
         if key == "SIGNAL":
-            result["signal"] = val
+            _sig = val.strip().upper().split()[0] if val.strip() else ""
+            if _sig in ("BUY", "SELL", "NO_TRADE"):
+                result["signal"] = _sig
         elif key == "CONFIDENCE":
             try:
                 result["confidence"] = int(val)

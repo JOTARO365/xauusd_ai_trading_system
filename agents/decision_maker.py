@@ -12,7 +12,7 @@ client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 SYSTEM_PROMPT = Path("agents/prompts/decision_maker.md").read_text(encoding="utf-8")
 
-MIN_TECHNICAL_CONFIDENCE = 45   # threshold เดียว — ไม่แยก มีข่าว/ไม่มีข่าว
+MIN_TECHNICAL_CONFIDENCE = 50   # threshold เดียว — ไม่แยก มีข่าว/ไม่มีข่าว
 
 _last_usage = None   # set after each API call — read by accountant
 
@@ -55,6 +55,38 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
     logger.info("Agent 4 (ผู้ตัดสินใจ): กำลังอ่านประวัติและตัดสินใจ...")
 
     tech_signal = chart_data.get("signal", "NO_TRADE")
+    _trend      = chart_data.get("trend", "SIDEWAYS")
+    _sr_zone    = chart_data.get("sr_zone", "NONE")
+    _sr_str     = chart_data.get("sr_strength", "NORMAL")
+    _conf_now   = chart_data.get("confidence", 0)
+
+    # ── Early exit ②: Trend Direction Filter — enforce ก่อน Claude ──────────
+    if tech_signal in ("BUY", "SELL"):
+        _is_counter = (
+            (_trend == "BULLISH" and tech_signal == "SELL") or
+            (_trend == "BEARISH" and tech_signal == "BUY")
+        )
+        if _is_counter:
+            # อนุญาต exception: H4 STRONG zone + conf ≥ 70
+            _at_strong = _sr_str == "STRONG" and _sr_zone in ("RESISTANCE", "SUPPORT")
+            if not (_at_strong and _conf_now >= 70):
+                logger.debug(
+                    f"Trend filter: {tech_signal} blocked (trend={_trend}, "
+                    f"zone={_sr_zone}/{_sr_str}, conf={_conf_now})"
+                )
+                return {"action": "SKIP",
+                        "reason": f"Counter-trend {tech_signal} blocked — trend={_trend}",
+                        "trade_quality": "C", "confidence_score": 0}
+
+        # SIDEWAYS: อนุญาตเฉพาะ Momentum Breakout (ตรวจ conf ≥ 65 ใน step หลัง)
+        if _trend == "SIDEWAYS":
+            _entry = chart_data.get("entry_type", "NONE")
+            _scan_best = chart_data.get("scan", {}).get("best_score", 0)
+            if _entry != "MOMENTUM_BREAKOUT" and _scan_best < 65 and _conf_now < 65:
+                logger.debug(f"Sideways filter: {tech_signal} blocked — not momentum breakout")
+                return {"action": "SKIP",
+                        "reason": "SIDEWAYS market — only Momentum Breakout ≥65 allowed",
+                        "trade_quality": "C", "confidence_score": 0}
 
     # ── Early exit ①: NO_TRADE + momentum override ไม่ผ่าน → ไม่เรียก Claude ──
     if tech_signal == "NO_TRADE":
@@ -229,6 +261,9 @@ Threshold ที่ใช้: Technical ≥ {min_tech_conf}%
                 decision        = "EXECUTE"
                 trade_quality   = "B"
                 tech_confidence = max(tech_confidence, 55)
+                # อัปเดต chart_data ให้ reporter บันทึกค่าที่ใช้จริง
+                chart_data["signal"]     = f"MOM_{override_dir}"
+                chart_data["confidence"] = tech_confidence
                 logger.info(
                     f"[Momentum Override] SKIP→EXECUTE {override_dir} | "
                     f"M15={m15_dir}_STRONG H1={h1_dir} H4={h4_bias}"
@@ -252,6 +287,24 @@ Threshold ที่ใช้: Technical ≥ {min_tech_conf}%
         if tech_confidence < min_tech_conf:
             logger.warning(f"Technical confidence {tech_confidence}% < {min_tech_conf}% — ยกเลิก")
             return {"action": "SKIP", "reason": f"Technical confidence too low ({tech_confidence}% < {min_tech_conf}%)"}
+
+        # ── EMA_PULLBACK gate — entry type นี้ WR ต่ำ ──────────────────
+        _entry_type = chart_data.get("entry_type", "NONE")
+        if _entry_type == "EMA_PULLBACK" and tech_confidence < 60:
+            logger.warning(f"EMA_PULLBACK entry — confidence {tech_confidence}% < 60% — ยกเลิก")
+            return {"action": "SKIP", "reason": f"EMA_PULLBACK requires confidence ≥ 60% (got {tech_confidence}%)"}
+
+        # ── NONE SR zone gate — ห้ามเข้าโดยไม่มี zone ─────────────────
+        _sr_zone = chart_data.get("sr_zone", "NONE")
+        if _sr_zone == "NONE" and tech_confidence < 62:
+            logger.warning(f"SR_ZONE=NONE — confidence {tech_confidence}% < 62% — ยกเลิก")
+            return {"action": "SKIP", "reason": f"No SR zone requires confidence ≥ 62% (got {tech_confidence}%)"}
+
+        # ── ATR volatility gate — ป้องกัน SL โดนกิน < 30 นาที ─────────
+        _h4_atr = chart_data.get("indicators", {}).get("h4", {}).get("atr", 0)
+        if _h4_atr > 20 and tech_confidence < 62:
+            logger.warning(f"H4 ATR={_h4_atr:.1f} (volatile) — confidence {tech_confidence}% < 62% — ยกเลิก")
+            return {"action": "SKIP", "reason": f"High ATR ({_h4_atr:.1f}) requires confidence ≥ 62% (got {tech_confidence}%)"}
 
         # ── Regime alignment check ─────────────────────────────────────
         regime_bias = (adv.get("bias", "NEUTRAL") if adv else "NEUTRAL")

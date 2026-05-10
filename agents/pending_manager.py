@@ -6,7 +6,7 @@ import MetaTrader5 as mt5
 import pandas as pd
 from loguru import logger
 from connectors.price_feed import get_account_info, get_ohlcv
-from connectors.mt5_connector import place_pending_order, get_pending_orders, calculate_lot_size
+from connectors.mt5_connector import place_pending_order, get_pending_orders, calculate_lot_size, cancel_pending_order
 from agents.reporter import log_pending_order, count_pending_by_direction
 from config import SYMBOL, MONEY_MANAGEMENT
 
@@ -421,3 +421,183 @@ def _log(order_result: dict, chart_data: dict, sentiment_data: dict | None = Non
         "technical":     chart_data,
         "sentiment":     sentiment_data or {},
     })
+
+
+# ─────────────────────────────────────────────────────────────
+#  SIDEWAYS RANGE PENDING SYSTEM (แยกจาก Weekly + Auto Pending)
+# ─────────────────────────────────────────────────────────────
+
+_RANGE_TAG = "RNG-"   # prefix comment สำหรับ range pending orders
+
+
+def _has_range_pending(direction: str) -> bool:
+    """ตรวจว่ามี Range pending orders ฝั่งนี้อยู่แล้วหรือไม่"""
+    tag = f"{_RANGE_TAG}{direction[:4].upper()}"   # RNG-BUY / RNG-SELL
+    return any(str(o.get("comment", "")).startswith(tag) for o in get_pending_orders())
+
+
+def cancel_stale_range_pending(current_trend: str) -> int:
+    """
+    ยกเลิก Range pending orders เมื่อ trend เปลี่ยนจาก SIDEWAYS → BULLISH/BEARISH
+    Returns: จำนวน orders ที่ยกเลิก
+    """
+    if current_trend == "SIDEWAYS":
+        return 0
+    cancelled = 0
+    for o in get_pending_orders():
+        if str(o.get("comment", "")).startswith(_RANGE_TAG):
+            if cancel_pending_order(o["ticket"]):
+                cancelled += 1
+                logger.info(
+                    f"Range pending cancelled (trend={current_trend}): "
+                    f"ticket={o['ticket']} {o.get('pending_type')} @ {o.get('price')}"
+                )
+    if cancelled:
+        logger.info(f"cancel_stale_range_pending: ยกเลิก {cancelled} range orders")
+    return cancelled
+
+
+def manage_range_pending(chart_data: dict) -> int:
+    """
+    Sideways Range Pending — วาง BUY_LIMIT/SELL_LIMIT ที่กรอบอัตโนมัติ
+
+    Logic:
+    - ถ้า TREND == SIDEWAYS: คำนวณ Range บน/ล่าง จาก H4 S/R + PDH/PDL
+    - BUY_LIMIT  @ range_lower (TP near upper, SL below lower)
+    - SELL_LIMIT @ range_upper (TP near lower, SL above upper)
+    - ถ้า TREND != SIDEWAYS: ยกเลิก range pending ที่ค้างอยู่
+
+    Guards:
+    - Range Width < 2000 pips → skip (กรอบแคบเกิน)
+    - H4 ATR > Range Width × 60% → skip (volatile เกิน)
+    - มี range pending ฝั่งนั้นอยู่แล้ว → skip
+
+    Returns: จำนวน range pending ที่วางใหม่
+    """
+    trend = chart_data.get("trend", "SIDEWAYS")
+
+    # ── ยกเลิก stale orders ถ้า trend เปลี่ยน ──────────────────────
+    cancel_stale_range_pending(trend)
+
+    if trend != "SIDEWAYS":
+        return 0
+
+    # ── ราคาปัจจุบัน ──────────────────────────────────────────────
+    current = chart_data.get("indicators", {}).get("h4", {}).get("close", 0)
+    if not current:
+        tick = mt5.symbol_info_tick(SYMBOL)
+        current = float(tick.bid) if tick else 0.0
+    if not current:
+        logger.warning("Range pending: ไม่มีราคาปัจจุบัน — ข้าม")
+        return 0
+
+    # ── สร้าง Range bounds จาก H4 S/R + PDH/PDL ──────────────────
+    sr_zones = chart_data.get("sr_zones", {})
+    key_lvl  = chart_data.get("key_levels", {}) or {}
+    h4_atr   = chart_data.get("indicators", {}).get("h4", {}).get("atr", 0)
+
+    info  = mt5.symbol_info(SYMBOL)
+    point = info.point if info else 0.01
+
+    res_list = sorted([r for r in sr_zones.get("resistance", []) if r > current])
+    sup_list = sorted([s for s in sr_zones.get("support",    []) if s < current], reverse=True)
+
+    pdh = key_lvl.get("pdh")
+    pdl = key_lvl.get("pdl")
+    if pdh and pdh > current:
+        res_list = sorted(set(res_list + [round(pdh, 2)]))
+    if pdl and pdl < current:
+        sup_list = sorted(set(sup_list + [round(pdl, 2)]), reverse=True)
+
+    if not res_list or not sup_list:
+        logger.info("Range pending: ไม่พบ Range bounds ครบทั้งสองฝั่ง — ข้าม")
+        return 0
+
+    upper = res_list[0]   # resistance ต่ำสุดเหนือราคา
+    lower = sup_list[0]   # support สูงสุดใต้ราคา
+
+    range_width      = upper - lower
+    range_width_pips = round(range_width / point)
+
+    # ── Guards ────────────────────────────────────────────────────
+    MIN_WIDTH_PIPS = 2000
+    if range_width_pips < MIN_WIDTH_PIPS:
+        logger.info(
+            f"Range pending: width={range_width_pips}p < {MIN_WIDTH_PIPS}p — กรอบแคบเกิน ข้าม"
+        )
+        return 0
+
+    if h4_atr > 0 and h4_atr > range_width * 0.60:
+        logger.info(
+            f"Range pending: ATR={h4_atr:.1f} > width×60%={range_width*0.60:.1f} — volatile ข้าม"
+        )
+        return 0
+
+    logger.info(
+        f"Range [{lower:.2f} ─ {upper:.2f}] width={range_width_pips}p | "
+        f"price={current:.2f} | ATR={h4_atr:.1f}"
+    )
+
+    # ── SL / TP ───────────────────────────────────────────────────
+    # SL = 15% ของ range width (แต่ไม่น้อยกว่า default_sl_pips)
+    # TP = 85% ของ range width (จาก entry ถึงอีกฝั่ง − buffer 15%)
+    sl_pips = max(round(range_width_pips * 0.15), MONEY_MANAGEMENT["default_sl_pips"])
+    tp_pips = round(range_width_pips * 0.85)
+    min_rr  = MONEY_MANAGEMENT["min_rr_ratio"]
+
+    if tp_pips / sl_pips < min_rr:
+        logger.info(
+            f"Range pending: RR={tp_pips/sl_pips:.2f} < {min_rr} — ข้าม"
+        )
+        return 0
+
+    min_dist = current * MIN_DIST_FROM_PRICE
+    placed   = 0
+
+    # ── BUY_LIMIT @ lower ─────────────────────────────────────────
+    if lower < current - min_dist:
+        if _has_range_pending("BUY"):
+            logger.info(f"Range BUY_LIMIT @ {lower:.2f} — มีอยู่แล้ว ข้าม")
+        else:
+            res = place_pending_order(
+                pending_type="BUY_LIMIT",
+                price=lower,
+                sl_pips=sl_pips,
+                tp_pips=tp_pips,
+                comment=f"{_RANGE_TAG}BUY {lower:.0f}",
+                expiry_hours=72,
+            )
+            if res.get("success"):
+                placed += 1
+                logger.info(
+                    f"Range BUY_LIMIT @ {lower:.2f} | "
+                    f"SL={sl_pips}p TP={tp_pips}p RR={tp_pips/sl_pips:.2f}"
+                )
+                _log(res, chart_data)
+            else:
+                logger.warning(f"Range BUY_LIMIT failed: {res.get('error')}")
+
+    # ── SELL_LIMIT @ upper ────────────────────────────────────────
+    if upper > current + min_dist:
+        if _has_range_pending("SELL"):
+            logger.info(f"Range SELL_LIMIT @ {upper:.2f} — มีอยู่แล้ว ข้าม")
+        else:
+            res = place_pending_order(
+                pending_type="SELL_LIMIT",
+                price=upper,
+                sl_pips=sl_pips,
+                tp_pips=tp_pips,
+                comment=f"{_RANGE_TAG}SELL {upper:.0f}",
+                expiry_hours=72,
+            )
+            if res.get("success"):
+                placed += 1
+                logger.info(
+                    f"Range SELL_LIMIT @ {upper:.2f} | "
+                    f"SL={sl_pips}p TP={tp_pips}p RR={tp_pips/sl_pips:.2f}"
+                )
+                _log(res, chart_data)
+            else:
+                logger.warning(f"Range SELL_LIMIT failed: {res.get('error')}"  )
+
+    return placed
