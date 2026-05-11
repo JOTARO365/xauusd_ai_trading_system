@@ -151,6 +151,19 @@ def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = No
         f"{'— strong, no hedge' if strong_sentiment else '— weak/neutral, will hedge'}"
     )
 
+    # ── Trend alignment: ห้ามวาง pending สวนเทรนด์หลัก ──────
+    _trend = chart_data.get("trend", "SIDEWAYS")
+    if _trend == "BEARISH" and buy_slots > 0:
+        logger.info("Auto-pending: BEARISH trend — ข้าม BUY_LIMIT ทั้งหมด")
+        buy_slots = 0
+    elif _trend == "BULLISH" and sell_slots > 0:
+        logger.info("Auto-pending: BULLISH trend — ข้าม SELL_LIMIT ทั้งหมด")
+        sell_slots = 0
+
+    if buy_slots <= 0 and sell_slots <= 0:
+        logger.info("Auto-pending: ไม่มี slots ที่เปิดได้ (หลัง trend filter) — ข้าม")
+        return 0
+
     # ── รวม S/R levels จาก H4 + Daily ────────────────────────
     h4_sr   = chart_data.get("sr_zones", {})
     key_lvl = chart_data.get("key_levels", {}) or {}

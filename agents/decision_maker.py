@@ -294,6 +294,11 @@ Threshold ที่ใช้: Technical ≥ {min_tech_conf}%
             logger.warning(f"EMA_PULLBACK entry — confidence {tech_confidence}% < 60% — ยกเลิก")
             return {"action": "SKIP", "reason": f"EMA_PULLBACK requires confidence ≥ 60% (got {tech_confidence}%)"}
 
+        # ── ENGULFING gate — WR 44.4% all-time, ต้องการ conf สูงมาก ──
+        if _entry_type == "ENGULFING" and tech_confidence < 75:
+            logger.warning(f"ENGULFING entry — confidence {tech_confidence}% < 75% — ยกเลิก")
+            return {"action": "SKIP", "reason": f"ENGULFING requires confidence ≥ 75% (got {tech_confidence}%)"}
+
         # ── NONE SR zone gate — ห้ามเข้าโดยไม่มี zone ─────────────────
         _sr_zone = chart_data.get("sr_zone", "NONE")
         if _sr_zone == "NONE" and tech_confidence < 62:

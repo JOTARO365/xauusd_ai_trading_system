@@ -30,12 +30,14 @@ from utils.market_clock import next_interval, market_sleep_status
 import config
 from config import MONEY_MANAGEMENT
 
-DEFAULT_INTERVAL  = 300
-STATUS_INTERVAL   = 60
+DEFAULT_INTERVAL   = 300
+STATUS_INTERVAL    = 60
+NET_ERROR_INTERVAL = 600   # รอ 10 นาทีเมื่อ network degraded
 _cycle            = 0
 _last_chart_data:     dict = {}
 _last_sentiment_data: dict = {}
 _last_weekly_pending_date: "_date | None" = None
+_net_degraded: bool = False   # True เมื่อ ChartWatcher + MarketAdvisor ทั้งคู่ fail
 
 _BOT_STATUS_FILE = os.path.join(os.path.dirname(__file__), "logs", "bot_status.json")
 
@@ -240,11 +242,12 @@ async def run_status_cycle() -> None:
 async def run_cycle() -> tuple[dict, dict]:
     """รัน 1 รอบ คืน (chart_data, sentiment_data) สำหรับคำนวณ interval"""
     config.reload_config()
-    global _cycle, _last_chart_data, _last_sentiment_data
+    global _cycle, _last_chart_data, _last_sentiment_data, _net_degraded
     _cycle += 1
     print_cycle_start(_cycle)
 
     _lat_cw = _lat_ma = _lat_an = _lat_dm = 0   # latencies (ms)
+    _cw_ok = _ma_ok = False
 
     # ── Step 1: Chart Watcher ──────────────────────────────────────
     print_step(0, "running", "กำลังดึงข้อมูลกราฟ...")
@@ -257,6 +260,7 @@ async def run_cycle() -> tuple[dict, dict]:
         conf   = chart_data.get("confidence", 0)
         print_step(0, "done", f"{signal}  ({conf}%)")
         print_signal_box(chart_data)
+        _cw_ok = True
     except Exception as e:
         print_step(0, "error", str(e)[:60])
         logger.error(f"Chart Watcher error: {e}")
@@ -274,10 +278,19 @@ async def run_cycle() -> tuple[dict, dict]:
         bias   = advisor_data.get("bias", "—")
         print_step(1, "done", f"{regime}  ({conf}%)  Bias: {bias}")
         print_advisor_box(advisor_data)
+        _ma_ok = True
     except Exception as e:
         print_step(1, "error", str(e)[:60])
         logger.error(f"Market Advisor error: {e}")
         advisor_data = {}
+
+    # ── Network degraded check — ถ้า CW+MA ทั้งคู่ fail ข้ามการเทรด ──
+    _net_degraded = not _cw_ok and not _ma_ok
+    if _net_degraded:
+        logger.warning("Network degraded — CW+MA ทั้งคู่ fail — ข้ามการตัดสินใจรอบนี้")
+        sentiment_data = _last_sentiment_data or {"sentiment": "NEUTRAL", "confidence": 0,
+                                                   "summary": "", "tweet_count": 0}
+        return chart_data, sentiment_data
 
     # ── Step 3: News Gatherer ──────────────────────────────────────
     print_step(2, "running", "กำลังดึงข่าว Twitter/X...")
@@ -489,8 +502,13 @@ async def main():
                     logger.error(f"Post-SL re-entry error: {sre}")
             else:
                 chart_data, sentiment_data = await run_cycle()
-                interval, reason = next_interval(chart_data, sentiment_data)
-                logger.info(f"Next interval: {interval}s — {reason}")
+                if _net_degraded:
+                    interval = NET_ERROR_INTERVAL
+                    reason   = "Network degraded (CW+MA fail) — รอ 10 นาที"
+                    logger.warning(f"Next interval: {interval}s — {reason}")
+                else:
+                    interval, reason = next_interval(chart_data, sentiment_data)
+                    logger.info(f"Next interval: {interval}s — {reason}")
 
             # ── Weekly calendar pending (จันทร์เช้า) — รันเสมอไม่ขึ้นกับ slots ──
             global _last_weekly_pending_date
