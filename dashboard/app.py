@@ -670,6 +670,54 @@ def api_backtest():
     })
 
 
+_MANUAL_RANGE_FILE = os.path.join(_BASE, "../logs/manual_range.json")
+
+
+@app.route("/api/manual-range", methods=["GET"])
+def api_get_manual_range():
+    try:
+        with open(_MANUAL_RANGE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return jsonify({"ok": True, "active": True, **data})
+    except FileNotFoundError:
+        return jsonify({"ok": True, "active": False, "high": None, "low": None})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/manual-range", methods=["POST"])
+def api_set_manual_range():
+    body = request.get_json(silent=True) or {}
+    try:
+        high = float(body.get("high", 0))
+        low  = float(body.get("low",  0))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "high/low ต้องเป็นตัวเลข"}), 400
+    if high <= 0 or low <= 0:
+        return jsonify({"ok": False, "error": "ต้องกรอก high และ low"}), 400
+    if high <= low:
+        return jsonify({"ok": False, "error": "high ต้องมากกว่า low"}), 400
+    data = {"high": round(high, 2), "low": round(low, 2),
+            "set_at": datetime.now().isoformat(timespec="seconds")}
+    try:
+        with open(_MANUAL_RANGE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return jsonify({"ok": True, **data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/manual-range", methods=["DELETE"])
+def api_clear_manual_range():
+    try:
+        os.remove(_MANUAL_RANGE_FILE)
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    return jsonify({"ok": True, "active": False})
+
+
 @app.route("/api/calendar")
 def api_calendar():
     """ดึง economic calendar สัปดาห์นี้ (High + Medium impact events)"""

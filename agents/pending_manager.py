@@ -2,6 +2,8 @@
 Pending Order Manager — วาง pending orders อัตโนมัติที่ key S/R levels
 ไม่พึ่ง AI signal: ตั้งไว้รอเผื่อ Sentiment เปลี่ยน คำนวณ lot ตามเงินทุน
 """
+import json
+import os
 import MetaTrader5 as mt5
 import pandas as pd
 from datetime import datetime, timedelta, timezone
@@ -10,6 +12,22 @@ from connectors.price_feed import get_account_info, get_ohlcv
 from connectors.mt5_connector import place_pending_order, get_pending_orders, calculate_lot_size, cancel_pending_order
 from agents.reporter import log_pending_order, count_pending_by_direction
 from config import SYMBOL, MONEY_MANAGEMENT
+
+_MANUAL_RANGE_FILE = os.path.join(os.path.dirname(__file__), "../logs/manual_range.json")
+
+
+def _get_manual_range() -> tuple[float, float] | tuple[None, None]:
+    """อ่าน manual range จาก logs/manual_range.json — คืน (high, low) หรือ (None, None)"""
+    try:
+        with open(_MANUAL_RANGE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        high = float(data.get("high", 0))
+        low  = float(data.get("low",  0))
+        if high > 0 and low > 0 and high > low:
+            return high, low
+    except (FileNotFoundError, Exception):
+        pass
+    return None, None
 
 DUPLICATE_ZONE_PCT = 0.003   # 0.3% — ถือว่า level เดียวกัน, ไม่วางซ้ำ
 MIN_DIST_FROM_PRICE = 0.003  # 0.3% — ห่างจากราคาปัจจุบันขั้นต่ำ (ไม่วาง pending ติดราคาเกินไป)
@@ -505,30 +523,37 @@ def manage_range_pending(chart_data: dict) -> int:
         logger.warning("Range pending: ไม่มีราคาปัจจุบัน — ข้าม")
         return 0
 
-    # ── สร้าง Range bounds จาก H4 S/R + PDH/PDL ──────────────────
-    sr_zones = chart_data.get("sr_zones", {})
-    key_lvl  = chart_data.get("key_levels", {}) or {}
-    h4_atr   = chart_data.get("indicators", {}).get("h4", {}).get("atr", 0)
-
     info  = mt5.symbol_info(SYMBOL)
     point = info.point if info else 0.01
+    h4_atr = chart_data.get("indicators", {}).get("h4", {}).get("atr", 0)
 
-    res_list = sorted([r for r in sr_zones.get("resistance", []) if r > current])
-    sup_list = sorted([s for s in sr_zones.get("support",    []) if s < current], reverse=True)
+    # ── Manual Range Override — ถ้ามีค่าจาก Dashboard ใช้เลย ────
+    _manual_high, _manual_low = _get_manual_range()
+    if _manual_high and _manual_low:
+        upper = _manual_high
+        lower = _manual_low
+        logger.info(f"Range pending: ใช้ Manual Range [{lower:.2f} ─ {upper:.2f}]")
+    else:
+        # ── Auto-detect จาก H4 S/R + PDH/PDL ─────────────────────
+        sr_zones = chart_data.get("sr_zones", {})
+        key_lvl  = chart_data.get("key_levels", {}) or {}
 
-    pdh = key_lvl.get("pdh")
-    pdl = key_lvl.get("pdl")
-    if pdh and pdh > current:
-        res_list = sorted(set(res_list + [round(pdh, 2)]))
-    if pdl and pdl < current:
-        sup_list = sorted(set(sup_list + [round(pdl, 2)]), reverse=True)
+        res_list = sorted([r for r in sr_zones.get("resistance", []) if r > current])
+        sup_list = sorted([s for s in sr_zones.get("support",    []) if s < current], reverse=True)
 
-    if not res_list or not sup_list:
-        logger.info("Range pending: ไม่พบ Range bounds ครบทั้งสองฝั่ง — ข้าม")
-        return 0
+        pdh = key_lvl.get("pdh")
+        pdl = key_lvl.get("pdl")
+        if pdh and pdh > current:
+            res_list = sorted(set(res_list + [round(pdh, 2)]))
+        if pdl and pdl < current:
+            sup_list = sorted(set(sup_list + [round(pdl, 2)]), reverse=True)
 
-    upper = res_list[0]   # resistance ต่ำสุดเหนือราคา
-    lower = sup_list[0]   # support สูงสุดใต้ราคา
+        if not res_list or not sup_list:
+            logger.info("Range pending: ไม่พบ Range bounds ครบทั้งสองฝั่ง — ข้าม")
+            return 0
+
+        upper = res_list[0]
+        lower = sup_list[0]
 
     range_width      = upper - lower
     range_width_pips = round(range_width / point)

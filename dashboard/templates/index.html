@@ -1039,6 +1039,47 @@
       </div>
     </section>
 
+    <!-- MANUAL RANGE OVERRIDE -->
+    <section>
+      <div class="section-title">Manual Range Override (Sideways)</div>
+      <div class="chart-card" style="padding:20px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:8px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">High</label>
+            <input id="range-high" type="number" step="0.01" placeholder="4750.00"
+              style="width:110px;background:var(--surface2);border:1px solid var(--border2);
+                     color:var(--text);border-radius:6px;padding:6px 10px;font-size:14px">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Low</label>
+            <input id="range-low" type="number" step="0.01" placeholder="4680.00"
+              style="width:110px;background:var(--surface2);border:1px solid var(--border2);
+                     color:var(--text);border-radius:6px;padding:6px 10px;font-size:14px">
+          </div>
+          <button onclick="setManualRange()"
+            style="background:var(--gold);color:#000;border:none;border-radius:6px;
+                   padding:7px 18px;font-weight:700;cursor:pointer;font-size:13px">
+            Set Range
+          </button>
+          <button onclick="clearManualRange()"
+            style="background:var(--surface2);color:var(--muted);border:1px solid var(--border2);
+                   border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px">
+            Clear
+          </button>
+          <div id="range-status" style="font-size:13px;color:var(--muted);margin-left:8px">—</div>
+        </div>
+        <div id="range-bar-wrap" style="display:none;margin-top:16px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Active Range</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px">
+            <span id="range-bar-low" style="color:var(--green);font-weight:700">—</span>
+            <div style="flex:1;height:6px;background:linear-gradient(90deg,var(--green),var(--gold));border-radius:3px"></div>
+            <span id="range-bar-high" style="color:var(--gold);font-weight:700">—</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px" id="range-set-at">—</div>
+        </div>
+      </div>
+    </section>
+
     <!-- PENDING ORDERS -->
     <section>
       <div class="section-title">Pending Orders</div>
@@ -2134,8 +2175,58 @@ fetchCalendar();
 setInterval(fetchData, 10000);
 setInterval(fetchCalendar, 1800000);
 
+// ─── MANUAL RANGE ────────────────────────────────────────────
+async function loadManualRange() {
+  try {
+    const res  = await fetch('/api/manual-range');
+    const data = await res.json();
+    const wrap = document.getElementById('range-bar-wrap');
+    const statusEl = document.getElementById('range-status');
+    if (data.active && data.high && data.low) {
+      document.getElementById('range-high').value = data.high;
+      document.getElementById('range-low').value  = data.low;
+      document.getElementById('range-bar-high').textContent = data.high.toFixed(2);
+      document.getElementById('range-bar-low').textContent  = data.low.toFixed(2);
+      document.getElementById('range-set-at').textContent   =
+        'Set at: ' + (data.set_at || '').slice(0, 19);
+      wrap.style.display = 'block';
+      statusEl.innerHTML = '<span style="color:var(--green);font-weight:700">● ACTIVE</span> — bot ใช้ manual range';
+    } else {
+      wrap.style.display = 'none';
+      statusEl.innerHTML = '<span style="color:var(--muted)">○ ไม่ได้ตั้งค่า</span> — ใช้ Auto-detect';
+    }
+  } catch(e) { console.error('loadManualRange:', e); }
+}
+
+async function setManualRange() {
+  const high = parseFloat(document.getElementById('range-high').value);
+  const low  = parseFloat(document.getElementById('range-low').value);
+  if (!high || !low) { alert('กรุณากรอก High และ Low ก่อน'); return; }
+  if (high <= low)   { alert('High ต้องมากกว่า Low'); return; }
+  try {
+    const res  = await fetch('/api/manual-range', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({high, low}),
+    });
+    const data = await res.json();
+    if (data.ok) { await loadManualRange(); }
+    else { alert('Error: ' + data.error); }
+  } catch(e) { alert('Network error: ' + e); }
+}
+
+async function clearManualRange() {
+  try {
+    await fetch('/api/manual-range', {method: 'DELETE'});
+    document.getElementById('range-high').value = '';
+    document.getElementById('range-low').value  = '';
+    await loadManualRange();
+  } catch(e) { alert('Network error: ' + e); }
+}
+
 // ─── MONITOR ─────────────────────────────────────────────────
 async function loadMonitor() {
+  await loadManualRange();
   try {
     const res  = await fetch('/api/monitor');
     const data = await res.json();
