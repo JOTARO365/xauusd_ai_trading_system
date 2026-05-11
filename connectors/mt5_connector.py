@@ -31,10 +31,16 @@ def calculate_lot_size(account_balance: float, sl_pips: float) -> float:
         risk_amount = account_balance * MONEY_MANAGEMENT["risk_per_trade"]
         pip_value = 0.1  # XAU/USD: $0.1 per pip per 0.01 lot
         lot = round(risk_amount / (sl_pips * pip_value * 100), 2)
-        logger.info(f"Lot mode: auto → risk ${risk_amount:.2f} / SL {sl_pips} pips = {lot} lots")
 
-    lot = max(_cfg.MIN_LOT, min(lot, _cfg.MAX_LOT))
-    return lot
+    clamped = max(_cfg.MIN_LOT, min(lot, _cfg.MAX_LOT))
+    actual_risk = clamped * sl_pips * pip_value * 100 if _cfg.LOT_MODE != "fixed" else 0
+    if _cfg.LOT_MODE != "fixed":
+        clamp_note = f" → clamped={clamped}" if clamped != lot else ""
+        logger.info(
+            f"Lot mode: auto → risk ${risk_amount:.2f} / SL {sl_pips} pips = {lot} lots"
+            f"{clamp_note} | actual risk ${actual_risk:.2f} ({actual_risk/account_balance*100:.1f}%)"
+        )
+    return clamped
 
 
 def _close_position(pos) -> bool:

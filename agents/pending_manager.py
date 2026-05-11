@@ -31,6 +31,7 @@ def _get_manual_range() -> tuple[float, float] | tuple[None, None]:
 
 DUPLICATE_ZONE_PCT = 0.003   # 0.3% — ถือว่า level เดียวกัน, ไม่วางซ้ำ
 MIN_DIST_FROM_PRICE = 0.003  # 0.3% — ห่างจากราคาปัจจุบันขั้นต่ำ (ไม่วาง pending ติดราคาเกินไป)
+COUNTER_TREND_DIST  = 0.015  # 1.5% — ระยะขั้นต่ำสำหรับ counter-trend pending (extreme S/R เท่านั้น)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -169,14 +170,21 @@ def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = No
         f"{'— strong, no hedge' if strong_sentiment else '— weak/neutral, will hedge'}"
     )
 
-    # ── Trend alignment: ห้ามวาง pending สวนเทรนด์หลัก ──────
-    _trend = chart_data.get("trend", "SIDEWAYS")
+    # ── Trend alignment ───────────────────────────────────────
+    # BULLISH: SELL_LIMIT ได้สูงสุด 1 slot แต่ต้องอยู่ที่ extreme resistance (≥1.5%)
+    # BEARISH: BUY_LIMIT ได้สูงสุด 1 slot แต่ต้องอยู่ที่ extreme support (≥1.5%)
+    _trend           = chart_data.get("trend", "SIDEWAYS")
+    _counter_buy     = False   # BUY วางสวนเทรนด์ BEARISH
+    _counter_sell    = False   # SELL วางสวนเทรนด์ BULLISH
+
     if _trend == "BEARISH" and buy_slots > 0:
-        logger.info("Auto-pending: BEARISH trend — ข้าม BUY_LIMIT ทั้งหมด")
-        buy_slots = 0
+        buy_slots    = min(buy_slots, 1)
+        _counter_buy = True
+        logger.info("Auto-pending: BEARISH trend — BUY_LIMIT จำกัด 1 slot ที่ extreme support (≥1.5%) เท่านั้น")
     elif _trend == "BULLISH" and sell_slots > 0:
-        logger.info("Auto-pending: BULLISH trend — ข้าม SELL_LIMIT ทั้งหมด")
-        sell_slots = 0
+        sell_slots    = min(sell_slots, 1)
+        _counter_sell = True
+        logger.info("Auto-pending: BULLISH trend — SELL_LIMIT จำกัด 1 slot ที่ extreme resistance (≥1.5%) เท่านั้น")
 
     if buy_slots <= 0 and sell_slots <= 0:
         logger.info("Auto-pending: ไม่มี slots ที่เปิดได้ (หลัง trend filter) — ข้าม")
@@ -210,9 +218,14 @@ def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = No
         current, "support", max_out=3,
     )
 
-    min_dist   = current * MIN_DIST_FROM_PRICE
-    res_levels = [r for r in res_levels if r > current + min_dist]
-    sup_levels = [s for s in sup_levels if s < current - min_dist]
+    min_dist      = current * MIN_DIST_FROM_PRICE
+    counter_dist  = current * COUNTER_TREND_DIST
+
+    res_min = counter_dist if _counter_sell else min_dist
+    sup_min = counter_dist if _counter_buy  else min_dist
+
+    res_levels = [r for r in res_levels if r > current + res_min]
+    sup_levels = [s for s in sup_levels if s < current - sup_min]
 
     if not res_levels and not sup_levels:
         logger.info("ไม่พบ key S/R level ที่เหมาะสำหรับ pending")
