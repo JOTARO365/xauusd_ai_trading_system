@@ -395,8 +395,9 @@ def log_trade(decision_result: dict):
     sent_obj = decision_result.get("sentiment") or {}
     trade_entry = {
         # ── Source ────────────────────────────────────
-        "source":      "SYSTEM",
-        "symbol":      _cfg.SYMBOL,
+        "source":           "SYSTEM",
+        "symbol":           _cfg.SYMBOL,
+        "strategy_version": 2,
         # ── Order info ────────────────────────────────
         "timestamp":   datetime.now().isoformat(),
         "ticket":      ticket,
@@ -492,6 +493,7 @@ def log_pending_order(decision_result: dict):
         "sr_zone":              tech.get("sr_zone"),
         "sr_strength":          tech.get("sr_strength"),
         "sentiment":            decision_result.get("sentiment", {}).get("sentiment"),
+        "strategy_version":     2,
         "manual_analysis": None,
         "manual_reason":   None,
         "status": "PENDING",
@@ -555,10 +557,19 @@ def get_trade_history_summary() -> dict:
             f"→ {pnl:+.2f} ({result})\n"
         )
 
-    # ── Entry type performance (จาก closed trades ทั้งหมด) ────────
+    # ── Entry type performance — v2 trades only ─────────────────
+    # v1 = old code (EMA_CROSS era), v2 = current strategy (Issues #1-5)
+    _REMOVED_SIGNALS = {"EMA_CROSS", "MACD_CROSS"}   # signals no longer in system
+    _V2_MIN_TRADES   = 5                              # ต้องมีอย่างน้อย N trades จึงแสดง WR
+
+    closed_v2 = [t for t in closed if t.get("strategy_version", 1) == 2]
+    closed_v1_count = len(closed) - len(closed_v2)
+
     entry_perf: dict[str, dict] = {}
-    for t in closed:
+    for t in closed_v2:
         et = t.get("entry_type") or "UNKNOWN"
+        if et in _REMOVED_SIGNALS:
+            continue
         if et not in entry_perf:
             entry_perf[et] = {"count": 0, "wins": 0, "pnl": 0.0}
         entry_perf[et]["count"] += 1
@@ -566,10 +577,19 @@ def get_trade_history_summary() -> dict:
             entry_perf[et]["wins"] += 1
         entry_perf[et]["pnl"] = round(entry_perf[et]["pnl"] + (t.get("pnl") or 0), 2)
 
-    entry_perf_text = ""
-    for et, s in sorted(entry_perf.items(), key=lambda x: -x[1]["pnl"]):
-        wr = round(s["wins"] / s["count"] * 100, 1) if s["count"] else 0
-        entry_perf_text += f"  {et:<20} {s['count']} trades | WR={wr}% | P&L={s['pnl']:+.2f}\n"
+    if not closed_v2:
+        entry_perf_text = f"  [v2 system: 0 trades — building history | v1 legacy: {closed_v1_count} trades (excluded)]\n"
+    else:
+        header = f"  [v2: {len(closed_v2)} trades"
+        if closed_v1_count:
+            header += f" | v1 legacy excluded: {closed_v1_count}]"
+        else:
+            header += "]"
+        entry_perf_text = header + "\n"
+        for et, s in sorted(entry_perf.items(), key=lambda x: -x[1]["pnl"]):
+            wr = round(s["wins"] / s["count"] * 100, 1) if s["count"] else 0
+            wr_note = "" if s["count"] >= _V2_MIN_TRADES else " (low sample)"
+            entry_perf_text += f"  {et:<22} {s['count']} trades | WR={wr}%{wr_note} | P&L={s['pnl']:+.2f}\n"
 
     return {
         "today_trades":       len(today_trades),
