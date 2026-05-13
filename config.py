@@ -62,6 +62,8 @@ MONEY_MANAGEMENT = {
     "max_losing_streak":     int(os.getenv("MAX_LOSING_STREAK")       or 5),
     "streak_min_confidence": int(os.getenv("STREAK_MIN_CONFIDENCE")   or 62),
     "hedge_buffer_pips":     int(os.getenv("HEDGE_BUFFER_PIPS")       or 2500),
+    "conf_full_size_at":     int(os.getenv("CONF_FULL_SIZE_AT")       or 80),
+    "conf_min_scale":        float(os.getenv("CONF_MIN_SCALE")        or 0.5),
 }
 
 def reload_config():
@@ -95,6 +97,8 @@ def reload_config():
         "max_losing_streak":     int(os.getenv("MAX_LOSING_STREAK")       or 5),
         "streak_min_confidence": int(os.getenv("STREAK_MIN_CONFIDENCE")   or 62),
         "hedge_buffer_pips":     int(os.getenv("HEDGE_BUFFER_PIPS")       or 2500),
+        "conf_full_size_at":     int(os.getenv("CONF_FULL_SIZE_AT")       or 80),
+        "conf_min_scale":        float(os.getenv("CONF_MIN_SCALE")        or 0.5),
     })
 
 

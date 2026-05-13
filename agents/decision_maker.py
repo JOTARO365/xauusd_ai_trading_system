@@ -342,6 +342,17 @@ Threshold ที่ใช้: Technical ≥ {min_tech_conf}%
             if tech_confidence < streak_conf:
                 return {"action": "SKIP", "reason": f"Losing streak {history['losing_streak']} — confidence ต้องสูงกว่า {streak_conf}%"}
 
+        # ── Confidence-based position sizing ─────────────────────────
+        # scale = max(conf_min_scale, min(1.0, confidence / conf_full_size_at))
+        # ตัวอย่าง: conf=50 → scale=0.63, conf=65 → scale=0.81, conf=80+ → scale=1.0
+        _conf_full  = MONEY_MANAGEMENT["conf_full_size_at"]   # 80
+        _conf_min_s = MONEY_MANAGEMENT["conf_min_scale"]       # 0.5
+        conf_scale  = max(_conf_min_s, min(1.0, tech_confidence / _conf_full))
+        logger.info(
+            f"Position sizing: confidence={tech_confidence}% → "
+            f"scale={conf_scale:.2f} (full at {_conf_full}%, min={_conf_min_s:.1f})"
+        )
+
         # ── Dynamic R:R ───────────────────────────────────────────────
         eff_rr = _effective_min_rr(chart_data, sentiment_data)
         if eff_rr != MONEY_MANAGEMENT["min_rr_ratio"]:
@@ -384,6 +395,7 @@ Threshold ที่ใช้: Technical ≥ {min_tech_conf}%
             tp_pips=effective_tp,
             comment=comment_tag,
             min_rr=eff_rr,
+            confidence_scale=conf_scale,
         )
 
         if not order_result.get("success"):
