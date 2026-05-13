@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS trades (
     pa_action            TEXT,
     sentiment            TEXT,
     analysis             TEXT,
+    -- strategy versioning (1=legacy, 2=current v2 strategy)
+    strategy_version     SMALLINT DEFAULT 1,
     -- meta
     created_at           TIMESTAMPTZ DEFAULT NOW(),
     updated_at           TIMESTAMPTZ DEFAULT NOW()

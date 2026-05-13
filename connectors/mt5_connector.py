@@ -23,21 +23,27 @@ PENDING_TYPE_MAP = {
 }
 
 
-def calculate_lot_size(account_balance: float, sl_pips: float) -> float:
+def calculate_lot_size(account_balance: float, sl_pips: float,
+                       confidence_scale: float = 1.0) -> float:
+    """คำนวณ lot size โดยปรับตาม confidence_scale (0.5–1.0)
+    confidence_scale < 1.0 → risk น้อยลงตามสัดส่วน confidence
+    """
+    pip_value = 0.1  # XAU/USD: $0.1 per pip per 0.01 lot
     if _cfg.LOT_MODE == "fixed":
         lot = _cfg.FIXED_LOT
         logger.info(f"Lot mode: fixed → {lot}")
     else:
-        risk_amount = account_balance * MONEY_MANAGEMENT["risk_per_trade"]
-        pip_value = 0.1  # XAU/USD: $0.1 per pip per 0.01 lot
+        scale = max(0.0, min(1.0, confidence_scale))
+        risk_amount = account_balance * MONEY_MANAGEMENT["risk_per_trade"] * scale
         lot = round(risk_amount / (sl_pips * pip_value * 100), 2)
 
     clamped = max(_cfg.MIN_LOT, min(lot, _cfg.MAX_LOT))
     actual_risk = clamped * sl_pips * pip_value * 100 if _cfg.LOT_MODE != "fixed" else 0
     if _cfg.LOT_MODE != "fixed":
-        clamp_note = f" → clamped={clamped}" if clamped != lot else ""
+        scale_note  = f" scale={confidence_scale:.2f}" if confidence_scale < 1.0 else ""
+        clamp_note  = f" → clamped={clamped}" if clamped != lot else ""
         logger.info(
-            f"Lot mode: auto → risk ${risk_amount:.2f} / SL {sl_pips} pips = {lot} lots"
+            f"Lot mode: auto{scale_note} → risk ${risk_amount:.2f} / SL {sl_pips} pips = {lot} lots"
             f"{clamp_note} | actual risk ${actual_risk:.2f} ({actual_risk/account_balance*100:.1f}%)"
         )
     return clamped
@@ -163,7 +169,8 @@ def check_open_slot(direction: str) -> tuple[bool, str]:
 
 
 def open_order(direction: str, sl_pips: float, tp_pips: float,
-               comment: str = "", min_rr: float | None = None) -> dict:
+               comment: str = "", min_rr: float | None = None,
+               confidence_scale: float = 1.0) -> dict:
     account = mt5.account_info()
     if account is None:
         logger.error("Cannot get account info")
@@ -177,7 +184,7 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
     sym_info = mt5.symbol_info(SYMBOL)
     point      = sym_info.point
     stops_min  = sym_info.trade_stops_level * point   # ระยะ SL/TP ขั้นต่ำจากราคาปัจจุบัน
-    lot = calculate_lot_size(account.balance, sl_pips)
+    lot = calculate_lot_size(account.balance, sl_pips, confidence_scale)
 
     no_tp = (tp_pips == 0)   # mode พิเศษ: ไม่ตั้ง TP รอ momentum
 

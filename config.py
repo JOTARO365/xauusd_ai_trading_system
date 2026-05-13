@@ -54,14 +54,16 @@ MONEY_MANAGEMENT = {
     "max_daily_loss":        float(os.getenv("MAX_DAILY_LOSS")        or 1.00),
     "max_open_trades":       int(os.getenv("MAX_OPEN_TRADES")         or 4),
     "default_sl_pips":       int(os.getenv("DEFAULT_SL_PIPS")         or 2000),
-    "default_tp_pips":       int(os.getenv("DEFAULT_TP_PIPS")         or 3000),
-    "min_rr_ratio":          float(os.getenv("MIN_RR_RATIO")          or 1.5),
+    "default_tp_pips":       int(os.getenv("DEFAULT_TP_PIPS")         or 5000),
+    "min_rr_ratio":          float(os.getenv("MIN_RR_RATIO")          or 2.0),
     "max_pending_buy":        int(os.getenv("MAX_PENDING_BUY")         or 4),
     "max_pending_sell":       int(os.getenv("MAX_PENDING_SELL")        or 4),
     "pending_expiry_hours":  int(os.getenv("PENDING_EXPIRY_HOURS")    or 48),
     "max_losing_streak":     int(os.getenv("MAX_LOSING_STREAK")       or 5),
     "streak_min_confidence": int(os.getenv("STREAK_MIN_CONFIDENCE")   or 62),
     "hedge_buffer_pips":     int(os.getenv("HEDGE_BUFFER_PIPS")       or 2500),
+    "conf_full_size_at":     int(os.getenv("CONF_FULL_SIZE_AT")       or 80),
+    "conf_min_scale":        float(os.getenv("CONF_MIN_SCALE")        or 0.5),
 }
 
 def reload_config():
@@ -87,14 +89,16 @@ def reload_config():
         "max_daily_loss":        float(os.getenv("MAX_DAILY_LOSS")        or 1.00),
         "max_open_trades":       int(os.getenv("MAX_OPEN_TRADES")         or 4),
         "default_sl_pips":       int(os.getenv("DEFAULT_SL_PIPS")         or 2000),
-        "default_tp_pips":       int(os.getenv("DEFAULT_TP_PIPS")         or 3000),
-        "min_rr_ratio":          float(os.getenv("MIN_RR_RATIO")          or 1.5),
+        "default_tp_pips":       int(os.getenv("DEFAULT_TP_PIPS")         or 5000),
+        "min_rr_ratio":          float(os.getenv("MIN_RR_RATIO")          or 2.0),
         "max_pending_buy":        int(os.getenv("MAX_PENDING_BUY")         or 4),
         "max_pending_sell":       int(os.getenv("MAX_PENDING_SELL")        or 4),
         "pending_expiry_hours":  int(os.getenv("PENDING_EXPIRY_HOURS")    or 48),
         "max_losing_streak":     int(os.getenv("MAX_LOSING_STREAK")       or 5),
         "streak_min_confidence": int(os.getenv("STREAK_MIN_CONFIDENCE")   or 62),
         "hedge_buffer_pips":     int(os.getenv("HEDGE_BUFFER_PIPS")       or 2500),
+        "conf_full_size_at":     int(os.getenv("CONF_FULL_SIZE_AT")       or 80),
+        "conf_min_scale":        float(os.getenv("CONF_MIN_SCALE")        or 0.5),
     })
 
 

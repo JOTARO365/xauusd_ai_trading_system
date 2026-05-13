@@ -58,6 +58,7 @@ def write_trade(trade: dict) -> bool:
             "pa_action":            trade.get("pa_action"),
             "sentiment":            trade.get("sentiment"),
             "analysis":             trade.get("analysis"),
+            "strategy_version":     trade.get("strategy_version", 1),
         }
         # ลบ None values เพื่อไม่ให้ทับค่าที่มีอยู่เมื่อ upsert
         row = {k: v for k, v in row.items() if v is not None or k in ("pnl", "sl", "tp", "closed_at")}
