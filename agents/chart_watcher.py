@@ -426,6 +426,53 @@ def detect_sr_action(df: pd.DataFrame, sr_levels: list, zone_pct: float = SR_ZON
 #  ENTRY SETUP SCANNER  ← ใหม่
 # ─────────────────────────────────────────────────────────────
 
+def _check_h1_structure(df: pd.DataFrame, direction: str, lookback: int = 40) -> bool:
+    """
+    ตรวจ price structure บน H1 — BUY ต้องการ higher lows, SELL ต้องการ lower highs
+    คืน True ถ้า structure สนับสนุน direction
+    ใช้ swing lows/highs 3 จุดล่าสุดใน lookback bars
+    """
+    recent = df.tail(lookback)
+    window = 3
+
+    if direction == "BUY":
+        lows = []
+        for i in range(window, len(recent) - window):
+            row_low = float(recent["low"].iloc[i])
+            if all(row_low <= float(recent["low"].iloc[i - j]) for j in range(1, window + 1)) and \
+               all(row_low <= float(recent["low"].iloc[i + j]) for j in range(1, window + 1)):
+                lows.append(row_low)
+        if len(lows) < 2:
+            return True   # ข้อมูลน้อยเกินไป → ไม่บล็อก
+        return lows[-1] >= lows[-2]   # higher low = structure ดี
+
+    else:  # SELL
+        highs = []
+        for i in range(window, len(recent) - window):
+            row_high = float(recent["high"].iloc[i])
+            if all(row_high >= float(recent["high"].iloc[i - j]) for j in range(1, window + 1)) and \
+               all(row_high >= float(recent["high"].iloc[i + j]) for j in range(1, window + 1)):
+                highs.append(row_high)
+        if len(highs) < 2:
+            return True
+        return highs[-1] <= highs[-2]   # lower high = structure ดี
+
+
+def _check_bb_squeeze(df: pd.DataFrame, lookback: int = 10) -> bool:
+    """
+    คืน True ถ้า BB กำลัง squeeze (width ปัจจุบัน < 85% ของ width เฉลี่ย lookback bars)
+    BB touch ระหว่าง squeeze มีความหมายกว่า touch ระหว่าง expansion
+    """
+    if "bb_upper" not in df.columns or "bb_mid" not in df.columns:
+        return False
+    bb_width = (df["bb_upper"] - df["bb_lower"]) / df["bb_mid"].replace(0, float("nan"))
+    if len(bb_width.dropna()) < lookback + 1:
+        return False
+    current_w = float(bb_width.iloc[-1])
+    avg_w     = float(bb_width.iloc[-lookback - 1:-1].mean())
+    return avg_w > 0 and current_w < avg_w * 0.85
+
+
 def scan_entry_setups(h4: dict, h1: dict, m15: dict,
                       h4_sr: dict, h1_sr: dict, key_lvl: dict) -> dict:
     """
@@ -435,16 +482,53 @@ def scan_entry_setups(h4: dict, h1: dict, m15: dict,
     price = h4["close"]
     setups: list[dict] = []
 
-    # ── H4 Bias ───────────────────────────────────────────────
+    # ── H4 Bias — multi-component (ไม่ใช้ EMA200 อย่างเดียว) ──
+    # Component 1: EMA200 position (lagging แต่ยังต้องการ — long-term anchor)
     ema200_dist_pct = abs(price - h4["ema200"]) / h4["ema200"] if h4["ema200"] else 0
-    if ema200_dist_pct < 0.005:
+    ema200_bull = price > h4["ema200"]
+
+    # Component 2: H4 EMA50 direction — EMA50 slope = ทิศทางกลางเร็วกว่า EMA200
+    h4_df = h4.get("df")
+    ema50_slope_bull = False
+    if h4_df is not None and "ema50" in h4_df.columns and len(h4_df) >= 5:
+        ema50_now  = float(h4_df["ema50"].iloc[-1])
+        ema50_prev = float(h4_df["ema50"].iloc[-5])
+        ema50_slope_bull = ema50_now > ema50_prev
+
+    # Component 3: H1 structure — H1 EMA stack (more responsive)
+    h1_df = h1.get("df")
+    h1_ema_bull = h1["close"] > h1["ema20"] > h1["ema50"]
+    h1_ema_bear = h1["close"] < h1["ema20"] < h1["ema50"]
+
+    # Component 4: recent swing structure on H4 — higher highs / lower lows
+    h4_struct_bull = False
+    h4_struct_bear = False
+    if h4_df is not None and len(h4_df) >= 20:
+        recent_h4 = h4_df.tail(20)
+        h4_high_now  = float(recent_h4["high"].iloc[-1])
+        h4_high_prev = float(recent_h4["high"].iloc[-10])
+        h4_low_now   = float(recent_h4["low"].iloc[-1])
+        h4_low_prev  = float(recent_h4["low"].iloc[-10])
+        h4_struct_bull = h4_high_now > h4_high_prev and h4_low_now > h4_low_prev
+        h4_struct_bear = h4_high_now < h4_high_prev and h4_low_now < h4_low_prev
+
+    # ── รวม score: BULLISH ≥ 3 component, BEARISH ≥ 3 component
+    bull_score = sum([ema200_bull, ema50_slope_bull, h1_ema_bull, h4_struct_bull])
+    bear_score = sum([not ema200_bull, not ema50_slope_bull, h1_ema_bear, h4_struct_bear])
+
+    if bull_score >= 3:
+        h4_bias = "BULLISH"
+    elif bear_score >= 3:
+        h4_bias = "BEARISH"
+    elif ema200_dist_pct < 0.005 or (bull_score == bear_score):
         h4_bias = "SIDEWAYS"
-    elif price > h4["ema200"]:
+    elif bull_score > bear_score:
         h4_bias = "BULLISH"
     else:
         h4_bias = "BEARISH"
 
-    # ── 1. S/R Zone (H4 + H1) — scalping: ไม่ filter H4 bias ────
+    # ── 1. S/R Zone (H4 + H1) ────────────────────────────────
+    # เพิ่ม H1 structure filter: bonus +10 ถ้า H1 แสดง higher lows / lower highs
     zone = price * SR_ZONE_PCT
     m15_bias = "BULLISH" if m15["close"] > m15["ema20"] else "BEARISH"
 
@@ -457,12 +541,17 @@ def scan_entry_setups(h4: dict, h1: dict, m15: dict,
     for lv in h4_levels:
         if abs(price - lv) <= zone:
             direction = "SELL" if lv >= price else "BUY"
-            m15_align = (direction == "BUY" and m15_bias == "BULLISH") or \
-                        (direction == "SELL" and m15_bias == "BEARISH")
+            m15_align  = (direction == "BUY" and m15_bias == "BULLISH") or \
+                         (direction == "SELL" and m15_bias == "BEARISH")
+            h1_struct  = _check_h1_structure(h1["df"], direction)
+            base_score = 80 if m15_align else 65
+            if h1_struct:
+                base_score = min(100, base_score + 10)   # H1 structure bonus
             setups.append({
                 "type": "SR_ZONE", "tf": "H4", "direction": direction,
-                "score": 80 if m15_align else 65, "level": lv,
-                "note": f"H4 S/R {lv:.2f} ({direction}) M15={'align' if m15_align else 'counter'}"
+                "score": base_score, "level": lv,
+                "note": (f"H4 S/R {lv:.2f} ({direction}) M15={'align' if m15_align else 'counter'}"
+                         + (" H1_struct=OK" if h1_struct else " H1_struct=WARN"))
             })
 
     # ── 1b. H1 S/R Zone ──────────────────────────────────────
@@ -472,10 +561,15 @@ def scan_entry_setups(h4: dict, h1: dict, m15: dict,
             direction = "SELL" if lv >= price else "BUY"
             m15_align = (direction == "BUY" and m15_bias == "BULLISH") or \
                         (direction == "SELL" and m15_bias == "BEARISH")
+            h1_struct = _check_h1_structure(h1["df"], direction)
+            base_score = 72 if m15_align else 58
+            if h1_struct:
+                base_score = min(100, base_score + 8)
             setups.append({
                 "type": "SR_ZONE", "tf": "H1", "direction": direction,
-                "score": 72 if m15_align else 58, "level": lv,
-                "note": f"H1 S/R {lv:.2f} ({direction}) M15={'align' if m15_align else 'counter'}"
+                "score": base_score, "level": lv,
+                "note": (f"H1 S/R {lv:.2f} ({direction}) M15={'align' if m15_align else 'counter'}"
+                         + (" H1_struct=OK" if h1_struct else ""))
             })
 
     # ── 2. EMA200 H4 Dynamic S/R ─────────────────────────────
@@ -488,81 +582,96 @@ def scan_entry_setups(h4: dict, h1: dict, m15: dict,
             "note": f"ราคาแตะ EMA200 H4 ({h4['ema200']:.2f}) — dynamic S/R แข็งแกร่ง"
         })
 
-    # ── 3. Bollinger Band H4 ─────────────────────────────────
+    # ── 3. Bollinger Band H4 — ต้องมี BB squeeze ก่อน ───────
+    # BB touch ระหว่าง expansion = momentum trade ไม่ใช่ reversal
+    # BB touch หลัง squeeze = reversal setup มี edge จริง
+    _h4_df    = h4.get("df")
+    _bb_sqz   = _check_bb_squeeze(_h4_df) if _h4_df is not None else False
+    _bb_score = 68 if _bb_sqz else 52   # squeeze → higher score
+
     if price <= h4["bb_lower"] * 1.001 and h4_bias != "BEARISH":
         setups.append({
             "type": "BB_LOWER", "tf": "H4", "direction": "BUY",
-            "score": 65, "level": h4["bb_lower"],
-            "note": f"ราคาแตะ BB Lower H4 ({h4['bb_lower']:.2f}) — oversold zone"
+            "score": _bb_score, "level": h4["bb_lower"],
+            "note": (f"BB Lower H4 ({h4['bb_lower']:.2f})"
+                     + (" [SQUEEZE→reversal]" if _bb_sqz else " [expansion—weak]"))
         })
     if price >= h4["bb_upper"] * 0.999 and h4_bias != "BULLISH":
         setups.append({
             "type": "BB_UPPER", "tf": "H4", "direction": "SELL",
-            "score": 65, "level": h4["bb_upper"],
-            "note": f"ราคาแตะ BB Upper H4 ({h4['bb_upper']:.2f}) — overbought zone"
+            "score": _bb_score, "level": h4["bb_upper"],
+            "note": (f"BB Upper H4 ({h4['bb_upper']:.2f})"
+                     + (" [SQUEEZE→reversal]" if _bb_sqz else " [expansion—weak]"))
         })
 
     # ── 4. EMA Pullback H1 ───────────────────────────────────
-    # ราคา H1 กลับมาแตะ EMA20 แล้ว bounce ในทิศทาง trend
+    # ราคา H1 กลับมาแตะ EMA20 + ต้องการ candle body ≥ 40% เพื่อยืนยัน bounce
     h1_ema20_dist = abs(h1["close"] - h1["ema20"]) / h1["ema20"] if h1["ema20"] else 1
     if h1_ema20_dist < EMA_TOUCH_PCT:
-        if h4_bias == "BULLISH" and h1["close"] >= h1["ema20"]:
+        _h1_df = h1.get("df")
+        _h1_body_ok = False
+        if _h1_df is not None and len(_h1_df) >= 1:
+            _c = _h1_df.iloc[-1]
+            _rng = float(_c["high"]) - float(_c["low"])
+            _body = abs(float(_c["close"]) - float(_c["open"]))
+            _h1_body_ok = _rng > 0 and (_body / _rng) >= 0.40
+
+        if h4_bias == "BULLISH" and h1["close"] >= h1["ema20"] and _h1_body_ok:
             setups.append({
                 "type": "EMA_PULLBACK", "tf": "H1", "direction": "BUY",
-                "score": 55, "level": h1["ema20"],
-                "note": f"ราคา H1 pullback แตะ EMA20 ({h1['ema20']:.2f}) ใน Bullish trend"
+                "score": 60, "level": h1["ema20"],
+                "note": f"H1 pullback EMA20 ({h1['ema20']:.2f}) Bullish + candle body OK"
             })
-        elif h4_bias == "BEARISH" and h1["close"] <= h1["ema20"]:
+        elif h4_bias == "BEARISH" and h1["close"] <= h1["ema20"] and _h1_body_ok:
             setups.append({
                 "type": "EMA_PULLBACK", "tf": "H1", "direction": "SELL",
-                "score": 55, "level": h1["ema20"],
-                "note": f"ราคา H1 pullback แตะ EMA20 ({h1['ema20']:.2f}) ใน Bearish trend"
+                "score": 60, "level": h1["ema20"],
+                "note": f"H1 pullback EMA20 ({h1['ema20']:.2f}) Bearish + candle body OK"
             })
 
-    # ── 5. EMA Cross H1 ─────────────────────────────────────
-    # EMA20 เพิ่งข้าม EMA50 (prev_close ใช้เป็น proxy)
-    ema_gap = h1["ema20"] - h1["ema50"]
-    if abs(ema_gap) / h1["ema50"] < 0.001:   # ใกล้จะข้าม หรือเพิ่งข้าม
-        if ema_gap > 0 and h4_bias == "BULLISH":
-            setups.append({
-                "type": "EMA_CROSS", "tf": "H1", "direction": "BUY",
-                "score": 65, "level": h1["ema20"],
-                "note": f"EMA20 > EMA50 H1 (gap={ema_gap:.2f}) — bullish cross"
-            })
-        elif ema_gap < 0 and h4_bias == "BEARISH":
-            setups.append({
-                "type": "EMA_CROSS", "tf": "H1", "direction": "SELL",
-                "score": 65, "level": h1["ema20"],
-                "note": f"EMA20 < EMA50 H1 (gap={ema_gap:.2f}) — bearish cross"
-            })
+    # ── 5. Structure Pullback H1 (แทน EMA_CROSS + MACD_CROSS) ──
+    # EMA stack aligned (close > EMA20 > EMA50 = bull stack) ยืนยัน trend
+    # + ราคา pullback มาแตะ EMA50 H1 (deeper pullback = more room)
+    # + H1 structure ดี (higher lows / lower highs)
+    # ดีกว่า EMA_CROSS/MACD_CROSS ตรงที่ไม่ใช่ lagging signal
+    h1_ema50_dist = abs(h1["close"] - h1["ema50"]) / h1["ema50"] if h1["ema50"] else 1
+    h1_bull_stack = h1["close"] > h1["ema20"] > h1["ema50"]
+    h1_bear_stack = h1["close"] < h1["ema20"] < h1["ema50"]
 
-    # ── 6. MACD Cross H1 ────────────────────────────────────
-    # histogram เพิ่งเปลี่ยนทิศทาง (prev histogram ต่างเครื่องหมายกับปัจจุบัน)
-    if h1["macd_hist"] > 0 and h1["prev_macd_hist"] <= 0 and h4_bias == "BULLISH":
-        setups.append({
-            "type": "MACD_CROSS", "tf": "H1", "direction": "BUY",
-            "score": 60, "level": h1["close"],
-            "note": f"MACD cross up H1 (hist={h1['macd_hist']:.3f})"
-        })
-    elif h1["macd_hist"] < 0 and h1["prev_macd_hist"] >= 0 and h4_bias == "BEARISH":
-        setups.append({
-            "type": "MACD_CROSS", "tf": "H1", "direction": "SELL",
-            "score": 60, "level": h1["close"],
-            "note": f"MACD cross down H1 (hist={h1['macd_hist']:.3f})"
-        })
+    if h1_ema50_dist < EMA_TOUCH_PCT * 1.5:   # pullback ถึง EMA50 H1
+        if h4_bias == "BULLISH" and h1_bull_stack:
+            h1_struct = _check_h1_structure(h1["df"], "BUY")
+            if h1_struct:
+                setups.append({
+                    "type": "STRUCTURE_PULLBACK", "tf": "H1", "direction": "BUY",
+                    "score": 70, "level": h1["ema50"],
+                    "note": (f"H1 bull stack pullback EMA50 ({h1['ema50']:.2f})"
+                             " | higher lows confirmed")
+                })
+        elif h4_bias == "BEARISH" and h1_bear_stack:
+            h1_struct = _check_h1_structure(h1["df"], "SELL")
+            if h1_struct:
+                setups.append({
+                    "type": "STRUCTURE_PULLBACK", "tf": "H1", "direction": "SELL",
+                    "score": 70, "level": h1["ema50"],
+                    "note": (f"H1 bear stack pullback EMA50 ({h1['ema50']:.2f})"
+                             " | lower highs confirmed")
+                })
 
-    # ── 7. RSI Extreme M15 ───────────────────────────────────
-    if m15["rsi"] < 32 and h4_bias == "BULLISH":
+    # ── 7. RSI Extreme M15 — ต้องมี H1 structure สนับสนุน ────
+    # RSI ที่ extreme เดียวๆ บน M15 fire บ่อยมาก และมักเป็น noise
+    # เพิ่มเงื่อนไข: H1 ต้องสนับสนุนทิศทาง (EMA stack) ด้วย
+    if m15["rsi"] < 30 and h4_bias == "BULLISH" and h1["close"] > h1["ema50"]:
         setups.append({
             "type": "RSI_OVERSOLD", "tf": "M15", "direction": "BUY",
-            "score": 58, "level": m15["close"],
-            "note": f"RSI M15 = {m15['rsi']:.1f} — oversold ใน Bullish trend"
+            "score": 60, "level": m15["close"],
+            "note": f"RSI M15={m15['rsi']:.1f} oversold | H4 BULL | H1 above EMA50"
         })
-    elif m15["rsi"] > 68 and h4_bias == "BEARISH":
+    elif m15["rsi"] > 70 and h4_bias == "BEARISH" and h1["close"] < h1["ema50"]:
         setups.append({
             "type": "RSI_OVERBOUGHT", "tf": "M15", "direction": "SELL",
-            "score": 58, "level": m15["close"],
-            "note": f"RSI M15 = {m15['rsi']:.1f} — overbought ใน Bearish trend"
+            "score": 60, "level": m15["close"],
+            "note": f"RSI M15={m15['rsi']:.1f} overbought | H4 BEAR | H1 below EMA50"
         })
 
     # ── 8. EMA50 Pullback M15 (entry timing) ─────────────────

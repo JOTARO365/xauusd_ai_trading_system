@@ -25,15 +25,17 @@ Even a weak reaction at a very strong zone is enough to generate a signal — th
 Ranked from strongest to weakest. At least ONE must be present:
 
 1. **Strong rejection** — long wick (≥ 3× body) + small body at zone → +35 pts
-2. **Engulfing / Pin bar** — strong directional candle at zone → +30 pts
-3. **EMA20 pullback** — price tests EMA20 then bounces, body shows direction → +25 pts
-4. **DOJI or small candle at zone** — indecision at strong zone is a valid scalp signal → +15 pts
-5. **Breakout retest** — price breaks swing, pulls back, holds → +25 pts
-6. **Momentum Breakout** *(zone NOT required)* — 3+ consecutive M15 candles same direction, body ≥ 40% of range + H4 trend aligned → +30 pts. Set SR_ZONE = NONE and LOCATION_QUALITY = MEDIUM.
+2. **Engulfing / Pin bar** — strong directional candle (body ≥ 50%) at zone → +30 pts
+3. **Structure pullback** — H1 EMA stack aligned (close > EMA20 > EMA50) + price pulls back to EMA50 H1 + H1 higher lows/lower highs confirmed → +28 pts
+4. **EMA pullback** — price tests EMA20 H1 then bounces, candle body ≥ 40% → +25 pts
+5. **DOJI at strong zone** — indecision at H4 STRONG zone only → +15 pts
+6. **Breakout retest** — price breaks swing, pulls back, holds → +25 pts
+7. **Momentum Breakout** *(zone NOT required)* — 3+ consecutive M15 candles same direction, body ≥ 40% + H4 trend aligned → +30 pts
 
-**At a H4 STRONG zone: any of the above is enough to generate a signal.**
-**At a H1 NORMAL zone: prefer signals 1–3; use signal 4 only if confidence ≥ 55.**
-**Momentum Breakout: valid entry WITHOUT zone — momentum IS the edge during high-volatility sessions (US/London overlap, news releases).**
+**Note:** EMA cross and MACD cross signals are NOT valid entries — they fire after the move is done (lagging). Use Structure Pullback instead.
+
+**At a H4 STRONG zone + H1 structure confirmed: highest confidence — execute on any reaction.**
+**Momentum Breakout: valid WITHOUT zone — momentum IS the edge during US/London overlap.**
 
 ---
 
@@ -79,6 +81,22 @@ If price is inside a **H4 STRONG zone** and ANY candle reaction is visible (even
 - Decision maker will decide whether to execute based on full context
 
 Do NOT return NO_TRADE just because the M15 candle is weak, if the zone is strong.
+
+---
+
+## TREND BIAS (H4)
+
+H4 Bias is determined by **4 components** (not EMA200 alone):
+1. Price vs EMA200 (long-term anchor)
+2. H4 EMA50 slope — rising or falling over last 5 bars
+3. H1 EMA stack — close > EMA20 > EMA50 (bull) or reverse (bear)
+4. H4 recent swing structure — higher highs+lows (bull) or lower highs+lows (bear)
+
+**BULLISH** = 3 or more components agree bullish  
+**BEARISH** = 3 or more components agree bearish  
+**SIDEWAYS** = components split (2 vs 2) or price within 0.5% of EMA200
+
+This is faster than EMA200 alone: catches trend changes 2–5 candles earlier.
 
 ---
 
