@@ -84,20 +84,22 @@ Do NOT return NO_TRADE just because the M15 candle is weak, if the zone is stron
 
 ## STOP LOSS RULE
 
-SL placed at wick tip of **previous M15 candle**:
-- BUY → SL = previous candle's low
-- SELL → SL = previous candle's high
+SL = **max(prev M15 wick distance, H4 ATR × 1.0)**:
+- BUY → SL = previous candle's low (or ATR floor, whichever is farther)
+- SELL → SL = previous candle's high (or ATR floor, whichever is farther)
 
-SL distance clamped: **1000–2000 pips** (XAU: 1 pip = 0.01)
+SL distance clamped: **500–3500 pips** (XAU: 1 pip = 0.01)
 
-If wick-based SL falls outside range → clamp to nearest boundary.
+Rationale: SL below 1× H4 ATR will be hit by normal H4 noise — not a valid level.
 
 ---
 
 ## TAKE PROFIT RULE
 
-TP = next meaningful S/R zone in trade direction, minimum 1.5 × SL distance.
-If no clear zone → TP = 1.5 × SL (minimum acceptable R:R).
+TP = next meaningful S/R zone in trade direction, **minimum 2.0 × SL distance**.
+If no clear zone → TP = 2.0 × SL.
+
+Breakeven WR at 2.0:1 R:R = 33% — provides margin for lower win rates.
 
 ---
 

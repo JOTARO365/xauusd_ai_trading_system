@@ -16,8 +16,9 @@ _last_usage = None   # set after each API call — read by accountant
 
 SR_ZONE_PCT   = 0.004   # 0.4% = "อยู่ในโซน S/R" (ขยายสำหรับ scalping)
 EMA_TOUCH_PCT = 0.002   # 0.2% = "แตะ EMA"
-SL_MIN_PIPS   = 1000
-SL_MAX_PIPS   = 2000
+SL_MIN_PIPS   = 500     # ลดจาก 1000 — ไม่บังคับ SL กว้างเกินในตลาดเงียบ
+SL_MAX_PIPS   = 3500    # เพิ่มจาก 2000 — อนุญาต SL กว้างพอในตลาดผันผวน
+ATR_SL_MULT   = 1.0     # SL ต้องไม่ต่ำกว่า 1.0× H4 ATR — ป้องกันโดน noise ปกติ
 
 FIB_RATIOS = [0.0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0]
 FIB_NAMES  = ["0%", "23.6%", "38.2%", "50%", "61.8%", "78.6%", "100%"]
@@ -130,14 +131,31 @@ def find_key_levels(df: pd.DataFrame) -> dict:
     return {"pdh": pdh, "pdl": pdl, "round_numbers": round_lvl}
 
 
-def calc_sl_from_wick(m15: dict, direction: str) -> int:
-    """SL = ปลาย wick แท่งก่อนหน้า M15, clamp 1000–2000 pips"""
+def calc_sl_atr_floor(h4_atr: float) -> int:
+    """คำนวณ SL ขั้นต่ำจาก H4 ATR — ป้องกัน SL แคบกว่า noise ปกติของ H4"""
+    if h4_atr <= 0:
+        return SL_MIN_PIPS
+    point = 0.01
+    atr_pips = round(h4_atr / point * ATR_SL_MULT)
+    return max(SL_MIN_PIPS, min(SL_MAX_PIPS, atr_pips))
+
+
+def calc_sl_from_wick(m15: dict, direction: str, h4_atr: float = 0.0) -> int:
+    """SL = max(prev M15 wick distance, ATR-based floor)
+    - wick SL: ปลาย wick แท่งก่อนหน้า M15
+    - ATR floor: SL ต้องไม่น้อยกว่า ATR_SL_MULT × H4 ATR
+    - clamp: SL_MIN_PIPS – SL_MAX_PIPS
+    """
     point = 0.01
     if direction == "BUY":
-        sl_pips = round((m15["close"] - m15["prev_low"]) / point)
+        wick_pips = round((m15["close"] - m15["prev_low"]) / point)
     else:
-        sl_pips = round((m15["prev_high"] - m15["close"]) / point)
-    return max(SL_MIN_PIPS, min(SL_MAX_PIPS, max(sl_pips, 0)))
+        wick_pips = round((m15["prev_high"] - m15["close"]) / point)
+    wick_pips = max(wick_pips, 0)
+    atr_floor = calc_sl_atr_floor(h4_atr)
+    # ใช้ค่าที่กว้างกว่า: wick vs ATR floor — ป้องกันโดนทั้งสองทาง
+    sl = max(wick_pips, atr_floor)
+    return max(SL_MIN_PIPS, min(SL_MAX_PIPS, sl))
 
 
 def format_sr_text(h4_sr: dict, h1_sr: dict, key: dict, current_price: float) -> str:
@@ -687,9 +705,10 @@ def analyze_chart() -> dict:
     sr_actions = detect_sr_action(m15["df"], h4_sr["resistance"] + h4_sr["support"] + h1_sr["resistance"] + h1_sr["support"])
     candle_pat = detect_candle_pattern(m15["df"])
 
-    # SL จาก wick แท่งก่อนหน้า M15 (ทั้งสองทิศทาง)
-    buy_sl_pips  = calc_sl_from_wick(m15, "BUY")
-    sell_sl_pips = calc_sl_from_wick(m15, "SELL")
+    # SL = max(prev M15 wick, ATR floor จาก H4) — ทั้งสองทิศทาง
+    h4_atr = h4.get("atr", 0.0)
+    buy_sl_pips  = calc_sl_from_wick(m15, "BUY",  h4_atr)
+    sell_sl_pips = calc_sl_from_wick(m15, "SELL", h4_atr)
 
     # Fibonacci retracement (H4 = major swing, H1 = minor swing)
     fib_h4  = calc_fibonacci(h4["df"],  lookback=80)
