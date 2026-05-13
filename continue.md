@@ -5,7 +5,6 @@
 
 ## วัตถุประสงค์
 แก้ไขสาเหตุหลักที่ทำให้ระบบยังไม่ทำกำไร จากการวิเคราะห์พบ 10 ปัญหา
-Session นี้แก้ไป 5 ข้อแล้ว (Issue #1–#5)
 
 ---
 
@@ -60,7 +59,7 @@ Momentum: H4:UP_STRONG H1:UP_MODERATE M15:UP_STRONG
 SL: 1800p | TP: 3600p | R:R: 2.0 (min 1.8)
 Sentiment: NEUTRAL (no news)
 Regime: BULLISH_TREND (85%) ...
-History — SR_ZONE 12 trades | WR=58.3% | P&L=+123.45
+History — SR_ZONE 12 trades | WR=58.3% | P&L=+123.45  ← v2 trades only
 Account — Today: +$45.00 (2 trades) | WR10: 60% | Streak: 0L
 ```
 
@@ -95,59 +94,102 @@ Account — Today: +$45.00 (2 trades) | WR10: 60% | Streak: 0L
 
 ---
 
-## 🔲 ยังไม่ได้แก้ (Issues #6–#10)
+### Issue B — Strategy Versioning (data contamination fix)
+**Files:** `agents/reporter.py`, `db/schema.sql`, `db/writer.py`
+
+**ปัญหา:** ข้อมูล trade เก่า (v1) ถูกเทรดภายใต้ parameter เก่า (R:R 1.5, SL 1000–2000, EMA_CROSS signal)
+ทำให้ `entry_perf_text` ที่ส่งให้ Claude แสดง WR ที่ไม่ตรงกับ strategy ใหม่
+
+**การเปลี่ยนแปลง:**
+- `log_trade()` และ `log_pending_order()` เพิ่ม `"strategy_version": 2` ใน trade entry ทุกตัวที่เปิดใหม่
+- `get_trade_history_summary()` กรอง `entry_perf_text` เฉพาะ v2 trades
+- ตัด `EMA_CROSS` / `MACD_CROSS` ออกจาก stats (signal ถูกลบไปแล้ว)
+- Warning `(low sample)` เมื่อ v2 มี trades < 5 ตัว
+- `db/schema.sql`: เพิ่ม `strategy_version SMALLINT DEFAULT 1`
+- `db/writer.py`: ส่ง `strategy_version` ไป Supabase ด้วย
+
+**ผล:** Claude เห็น WR เฉพาะ trades ที่เทรดด้วย logic ใหม่ — ไม่ถูก v1 data ปนเปื้อน
+
+---
+
+### Issue C — Monte Carlo Backtest
+**Files:** `backtest/__init__.py`, `backtest/monte_carlo.py`
+
+**ปัญหา:** ไม่สามารถใช้ trade history จริงทำ backtest ได้ เพราะข้อมูลมาจาก v1 strategy ที่ parameter ต่างออกไป
+
+**การเปลี่ยนแปลง:**
+- สร้าง `backtest/monte_carlo.py` — pure simulation ไม่ใช้ historical data
+- Parameter: WR, R:R, risk%, confidence scale, n_trades, n_simulations
+- Output: final return (p5/median/p95), max drawdown, P(ruin), P(profitable)
+- `--sweep` mode: เปรียบเทียบ WR 35–50% ในตารางเดียว
+
+**ผลลัพธ์ sweep (R:R=2.0, risk=0.5%, scale=0.80, 200 trades):**
+
+| WR | EV/trade | Return (med) | DD p95 | P(ruin >10%) |
+|---|---|---|---|---|
+| 35% | +0.020% | +3.7% | 13.9% | **21%** ❌ |
+| 38% | +0.056% | +11.5% | 10.5% | **6%** ⚠️ |
+| 40% | +0.080% | +16.9% | 8.9% | **2.3%** ✅ |
+| 42% | +0.104% | +22.7% | 7.8% | **1.0%** ✅ |
+
+**ต้องการ WR ≥ 40%** เพื่อให้ P(ruin) < 5% (breakeven = 33.3%)
+
+**ใช้งาน:**
+```bash
+python -m backtest.monte_carlo --sweep             # เปรียบเทียบทุก WR
+python -m backtest.monte_carlo --wr 0.42           # single config
+python -m backtest.monte_carlo --wr 0.40 --rr 2.2 --trades 300
+```
+
+---
+
+## 🔲 ยังไม่ได้แก้ (Issues #6–#9)
 
 ### Issue #6 — ไม่มีระบบ Profit-Taking
 **ปัญหา:** ไม่มี scale-out ที่ 1R, 2R, 3R — กำไรถูกเปิดค้างจน TP ไกลมาก โอกาสกลับตัวสูง
 **แนวทางแก้:**
-- เพิ่ม partial close logic ใน `manage_breakeven()` หรือ `manage_dynamic_tp()`
-- Scale out 50% ที่ 1R, move SL to BE
-- Scale out อีก 30% ที่ 2R, trail SL 50% of move
+- เพิ่ม `manage_partial_close()` ใน `connectors/mt5_connector.py`
+- Scale out 50% ที่ 1R → move SL to BE
+- Scale out อีก 30% ที่ 2R → trail SL 50% of move
 - Let 20% run to full TP
-**Files ที่ต้องแก้:** `connectors/mt5_connector.py` (เพิ่ม `manage_partial_close()`), `main.py`
+- เรียกจาก `main.py` loop ทุก cycle
+
+**Files ที่ต้องแก้:** `connectors/mt5_connector.py`, `main.py`
 
 ---
 
 ### Issue #7 — Portfolio Protection ทำงานหลังเกิดความเสียหาย
-**ปัญหา:** Losing streak ≥ 5 เพิ่ม threshold หลังแพ้ไปแล้ว 5 ครั้ง; ไม่ลด position size ค่อยๆ
+**ปัญหา:** Losing streak ≥ 5 block การเทรดทั้งหมด แทนที่จะค่อยๆ ลด size
 **แนวทางแก้:**
-- แทนที่ hard stop ด้วย **gradual position reduction**:
-  - Streak 2: conf_min_scale × 0.8
-  - Streak 3: conf_min_scale × 0.6
-  - Streak 4: conf_min_scale × 0.4
-  - Streak ≥ 5: conf_min_scale × 0.25 (ยังเทรดได้แต่ size เล็กมาก)
-- ใน `_run_gates()` ปรับ conf_scale แทนที่จะ block ทั้งหมด
+- แทนที่ hard stop ด้วย **gradual position reduction** ใน `_run_gates()`:
+  - Streak 2: `conf_scale × 0.8`
+  - Streak 3: `conf_scale × 0.6`
+  - Streak 4: `conf_scale × 0.4`
+  - Streak ≥ 5: `conf_scale × 0.25` (ยังเทรดได้แต่ size เล็กมาก)
+- ส่ง reduced `conf_scale` ไปยัง `open_order()` แทนการ block
+
 **Files ที่ต้องแก้:** `agents/decision_maker.py` (`_run_gates()`)
 
 ---
 
 ### Issue #8 — Momentum เป็นตัวสำรอง ไม่ใช่ตัวหลัก
-**ปัญหา:** MOMENTUM_BREAKOUT ถูกกรองทิ้งโดย gate ก่อน Claude เยอะ เช่น SR_ZONE gate (ต้องการ conf ≥ 62 ถ้าไม่มี zone)
+**ปัญหา:** `MOMENTUM_BREAKOUT` ถูกกรองทิ้งโดย gate SR_ZONE (ต้องการ conf ≥ 62 ถ้าไม่มี zone)
 **แนวทางแก้:**
-- ใน `_run_gates()` เพิ่ม fast path สำหรับ MOMENTUM_BREAKOUT:
+- เพิ่ม fast path ใน `_run_gates()` สำหรับ `MOMENTUM_BREAKOUT`:
   - ถ้า `entry_type == "MOMENTUM_BREAKOUT"` และ score ≥ 70 → ข้าม gate 7 (SR_ZONE) และ gate 8 (ATR)
-  - Session London/NY overlap + MOMENTUM_BREAKOUT ≥ 68 → conf threshold ลด 5%
+  - Session London/NY overlap + score ≥ 68 → conf threshold ลด 5%
+
 **Files ที่ต้องแก้:** `agents/decision_maker.py` (`_run_gates()`)
 
 ---
 
 ### Issue #9 — Pending Orders ไม่ได้ใช้งานเต็มที่
-**ปัญหา:** Pending orders expire หลัง 48 ชั่วโมง, ไม่มีข้อมูลว่า pending WR ดีกว่า market order หรือไม่
+**ปัญหา:** ไม่มีข้อมูลว่า pending WR ดีกว่า market order หรือไม่; expiry 48h นานเกินไป
 **แนวทางแก้:**
-- บันทึก source (PENDING vs MARKET) ใน trade log แยกชัดเจน
-- วิเคราะห์ WR ของ pending vs market entries
-- ลด expiry จาก 48h → 24h (stale order หลัง 1 วันควรยกเลิก)
-**Files ที่ต้องแก้:** `config.py`, `agents/reporter.py`
+- `entry_perf_text` แยก `PENDING` vs `MARKET` WR stats ชัดเจน
+- ลด `PENDING_EXPIRY_HOURS`: 48 → 24 ใน `config.py` default
 
----
-
-### Issue #10 — ไม่มี Backtesting / Monte Carlo
-**ปัญหา:** ไม่รู้ว่าระบบจะรอดไหมถ้าเจอ drawdown รุนแรง 10× จากปัจจุบัน
-**แนวทางแก้:**
-- สร้าง `backtest/` module: อ่าน trades.json → simulate N consecutive losses
-- Monte Carlo: random permutation ของ trade sequence → วัด max drawdown distribution
-- Walk-forward: แบ่ง trades เป็น in-sample (train) + out-of-sample (validate)
-**Files ที่ต้องสร้าง:** `backtest/monte_carlo.py`, `backtest/walk_forward.py`
+**Files ที่ต้องแก้:** `config.py` (default), `agents/reporter.py`
 
 ---
 
@@ -157,20 +199,26 @@ Account — Today: +$45.00 (2 trades) | WR10: 60% | Streak: 0L
 main.py (loop ทุก 300s)
   ├── chart_watcher.analyze_chart()
   │     ├── calculate_indicators() [H4/H1/M15]
-  │     ├── scan_entry_setups()    ← h4_bias ใหม่ (4-component)
-  │     │     ├── _check_h1_structure()  ← ใหม่ #4
-  │     │     ├── _check_bb_squeeze()    ← ใหม่ #4
+  │     ├── scan_entry_setups()    ← h4_bias 4-component (#5)
+  │     │     ├── _check_h1_structure()  ← #4
+  │     │     ├── _check_bb_squeeze()    ← #4
   │     │     └── setups: SR_ZONE, STRUCTURE_PULLBACK, EMA_PULLBACK,
   │     │                 RSI_*, BB_*, EMA200_TOUCH, MOMENTUM_BREAKOUT
-  │     └── calc_sl_from_wick() [ATR floor] ← แก้ #1
+  │     └── calc_sl_from_wick() [ATR floor] ← #1
   │
   ├── analyst.analyze_sentiment()
+  │     └── news_cache.get_news_context()
+  │           └── vector_search() [Gemini embeddings — news only]
   ├── market_advisor.advise()
   │
   └── decision_maker.make_decision()
-        ├── _run_gates()   ← ใหม่ #3 (Python-only, 12 gate)
+        ├── _run_gates()   ← #3 (Python-only, 12 gate)
         └── Claude (8-line clean summary) → EXECUTE/SKIP
               └── open_order(confidence_scale=conf_scale)  ← #2
+                    └── reporter.log_trade(strategy_version=2)  ← B
+
+backtest/
+  └── monte_carlo.py  ← C (simulate WR assumptions, ไม่ใช้ v1 data)
 ```
 
 ## Key Config Values (current defaults)
@@ -183,12 +231,20 @@ SL_MAX_PIPS       = 3500   (was 2000)
 ATR_SL_MULT       = 1.0    (new)
 CONF_FULL_SIZE_AT = 80     (new)
 CONF_MIN_SCALE    = 0.5    (new)
+strategy_version  = 2      (new — ใน trades ใหม่ทุกตัว)
+```
+
+## DB Migration สำหรับผู้ที่มี Supabase อยู่แล้ว
+
+รัน SQL นี้ใน **SQL Editor** ครั้งเดียว:
+
+```sql
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS strategy_version SMALLINT DEFAULT 1;
 ```
 
 ## Next Session — Priority Order
 
-1. **Issue #6** (Profit-Taking) — สร้าง `manage_partial_close()` ใน mt5_connector.py
-2. **Issue #7** (Gradual position reduction on streak) — แก้ `_run_gates()` ใน decision_maker.py
-3. **Issue #8** (Momentum fast path) — แก้ `_run_gates()` skip gate 7+8 สำหรับ MOMENTUM_BREAKOUT
-4. **Issue #9** (Pending order analytics) — เพิ่ม source tracking ใน reporter.py
-5. **Issue #10** (Backtesting) — สร้าง backtest/ module ใหม่
+1. **Issue #6** (Profit-Taking) — `manage_partial_close()` ใน `mt5_connector.py` + เรียกจาก `main.py`
+2. **Issue #7** (Gradual streak reduction) — แก้ `_run_gates()` ส่ง reduced `conf_scale` แทน block
+3. **Issue #8** (Momentum fast path) — เพิ่ม bypass gate 7+8 สำหรับ MOMENTUM_BREAKOUT ≥ 70
+4. **Issue #9** (Pending analytics) — แยก WR stats PENDING vs MARKET + ลด expiry 48→24h

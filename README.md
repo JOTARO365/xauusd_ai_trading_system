@@ -360,6 +360,9 @@ docker compose -f docker-compose.windows.yml down
 │   ├── market_advisor.md      # Prompt: regime analysis
 │   └── analyst.md             # Prompt: sentiment analysis
 │
+├── backtest/
+│   └── monte_carlo.py         # Monte Carlo simulation (ไม่ใช้ historical data)
+│
 ├── .env.example               # Template config
 ├── requirements.txt
 ├── SUPABASE.md                # คู่มือ Supabase setup
@@ -407,8 +410,37 @@ docker compose -f docker-compose.windows.yml down
 - **Market sleep** — หยุดอัตโนมัติ เสาร์-อาทิตย์ และช่วงตลาดปิด
 - **Portfolio protection** — daily loss limit, losing streak protection
 - **PostgreSQL / Supabase** — เก็บ trades, agent usage, cost tracking
+- **Strategy versioning** — trades ใหม่ทุกตัวมี `strategy_version=2` แยกจาก data เก่า
 - **Dashboard** — Flask web UI port 5050 พร้อม economic calendar
 - **PM2 process manager** — auto-restart, เปลี่ยน config ได้ live ผ่าน dashboard
+
+---
+
+## Monte Carlo Simulation
+
+ทดสอบ robustness ของ strategy โดยไม่ใช้ historical trade data (ใช้ assumed parameters แทน):
+
+```bash
+# ดูผลทุก WR ในตารางเดียว (แนะนำ)
+python -m backtest.monte_carlo --sweep
+
+# ทดสอบ config เฉพาะ
+python -m backtest.monte_carlo --wr 0.42 --rr 2.0 --trades 200
+
+# ดู options ทั้งหมด
+python -m backtest.monte_carlo --help
+```
+
+ผลตัวอย่าง (R:R=2.0, risk=0.5%):
+
+| WR | P(ruin >10%) | สรุป |
+|---|---|---|
+| 35% | 21% | อันตราย |
+| 38% | 6% | borderline |
+| 40% | 2.3% | ยอมรับได้ |
+| 42%+ | <1% | ปลอดภัย |
+
+ระบบต้องการ **WR ≥ 40%** (breakeven = 33.3% แต่ต้องการ margin เพิ่ม)
 
 ---
 
@@ -423,6 +455,16 @@ python db/sync.py
 # sync ไป Supabase
 python db/migrate.py
 ```
+
+### อัปเกรด DB ที่มีอยู่แล้ว (เพิ่ม strategy_version)
+
+ถ้ามี Supabase / PostgreSQL ที่สร้าง schema ไว้ก่อนหน้า รัน SQL นี้ครั้งเดียว:
+
+```sql
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS strategy_version SMALLINT DEFAULT 1;
+```
+
+trades เก่าจะได้ `strategy_version=1` (legacy), trades ใหม่จะเป็น `2` โดยอัตโนมัติ
 
 ---
 
