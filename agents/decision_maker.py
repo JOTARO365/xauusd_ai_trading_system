@@ -154,26 +154,22 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     if entry_type == "ENGULFING" and conf < 75:
         return _fail(f"ENGULFING requires conf ≥75% (got {conf}%)")
 
-    # MOMENTUM_BREAKOUT fast path — bypass gate 7+8 ถ้า conf สูงพอ
-    import datetime as _dt
-    _hour_utc    = _dt.datetime.utcnow().hour
+    # MOMENTUM_BREAKOUT: require higher conf threshold at gate 7+8
+    # Other entries: conf ≥ 62 is enough
+    _hour_utc      = datetime.utcnow().hour
     _ln_ny_overlap = 12 <= _hour_utc < 16   # London/NY overlap (12-16 UTC)
     _mo_threshold  = 65 if _ln_ny_overlap else 70
-    _mo_bypass     = (entry_type == "MOMENTUM_BREAKOUT" and conf >= _mo_threshold)
-    if _mo_bypass:
-        logger.debug(
-            f"MO fast path: bypass gate 7+8 conf={conf}% ≥ {_mo_threshold}%"
-            + (" [LN/NY]" if _ln_ny_overlap else "")
-        )
+    _gate_min_conf = _mo_threshold if entry_type == "MOMENTUM_BREAKOUT" else 62
 
-    # 7. No SR zone — ต้อง conf สูงกว่า
-    if sr_zone == "NONE" and conf < 62 and not _mo_bypass:
-        return _fail(f"No SR zone requires conf ≥62% (got {conf}%)")
+    # 7. No SR zone
+    if sr_zone == "NONE" and conf < _gate_min_conf:
+        _tag = " [LN/NY overlap]" if _ln_ny_overlap else ""
+        return _fail(f"No SR zone requires conf ≥{_gate_min_conf}%{_tag} (got {conf}%)")
 
     # 8. ATR gate — ตลาดผันผวน
     h4_atr = chart_data.get("indicators", {}).get("h4", {}).get("atr", 0)
-    if h4_atr > 20 and conf < 62 and not _mo_bypass:
-        return _fail(f"High ATR ({h4_atr:.1f}) requires conf ≥62% (got {conf}%)")
+    if h4_atr > 20 and conf < _gate_min_conf:
+        return _fail(f"High ATR ({h4_atr:.1f}) requires conf ≥{_gate_min_conf}% (got {conf}%)")
 
     # 9. Regime alignment
     adv         = advisor_data or {}
