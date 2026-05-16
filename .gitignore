@@ -11,3 +11,4 @@ node_modules/
 accounts.txt
 accounts.db
 .claude/
+tests/
