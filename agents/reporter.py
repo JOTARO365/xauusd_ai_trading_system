@@ -591,6 +591,23 @@ def get_trade_history_summary() -> dict:
             wr_note = "" if s["count"] >= _V2_MIN_TRADES else " (low sample)"
             entry_perf_text += f"  {et:<22} {s['count']} trades | WR={wr}%{wr_note} | P&L={s['pnl']:+.2f}\n"
 
+        # PENDING vs MARKET breakdown
+        def _stats(tlist):
+            if not tlist:
+                return None
+            wins = sum(1 for t in tlist if (t.get("pnl") or 0) > 0)
+            pnl  = sum(t.get("pnl") or 0 for t in tlist)
+            return {"n": len(tlist), "wr": round(wins / len(tlist) * 100, 1), "pnl": round(pnl, 2)}
+
+        pnd = _stats([t for t in closed_v2 if str(t.get("order_type", "")).startswith("PENDING_")])
+        mkt = _stats([t for t in closed_v2 if not str(t.get("order_type", "")).startswith("PENDING_")])
+        entry_perf_text += "  ─────────────────────────────────────────\n"
+        for label, st in [("PENDING orders", pnd), ("MARKET  orders", mkt)]:
+            if st:
+                entry_perf_text += f"  {label}: {st['n']} trades | WR={st['wr']}% | P&L={st['pnl']:+.2f}\n"
+            else:
+                entry_perf_text += f"  {label}: 0 trades\n"
+
     return {
         "today_trades":       len(today_trades),
         "today_pnl":          round(today_pnl, 2),
