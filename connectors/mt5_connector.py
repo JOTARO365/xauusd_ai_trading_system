@@ -571,6 +571,149 @@ def manage_breakeven() -> int:
     return modified
 
 
+# ── Partial Close ────────────────────────────────────────────────────────────
+_partial_state: dict[int, dict] = {}   # ticket → {"done": set[str], "r_pips": float}
+_MIN_R_PIPS    = 300                   # ต่ำกว่านี้ = SL ถูกขยับมา BE แล้ว ข้าม
+
+
+def _partial_close_pos(pos, lot: float, tick) -> bool:
+    """ปิดบางส่วนของ position ที่ราคาตลาด"""
+    is_buy      = pos.type == 0
+    close_type  = mt5.ORDER_TYPE_SELL if is_buy else mt5.ORDER_TYPE_BUY
+    close_price = tick.bid if is_buy else tick.ask
+    req = {
+        "action":       mt5.TRADE_ACTION_DEAL,
+        "symbol":       SYMBOL,
+        "volume":       lot,
+        "type":         close_type,
+        "position":     pos.ticket,
+        "price":        close_price,
+        "deviation":    20,
+        "magic":        SYSTEM_MAGIC,
+        "comment":      _safe_comment("PARTIAL"),
+        "type_time":    mt5.ORDER_TIME_GTC,
+        "type_filling": mt5.ORDER_FILLING_IOC,
+    }
+    result = mt5.order_send(req)
+    if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+        err = result.retcode if result else mt5.last_error()
+        logger.error(f"Partial close failed ticket={pos.ticket}: {err}")
+        return False
+    return True
+
+
+def _set_sl_tp(ticket: int, new_sl: float, tp: float) -> bool:
+    """ขยับ SL โดยไม่เปลี่ยน TP"""
+    req = {
+        "action":   mt5.TRADE_ACTION_SLTP,
+        "symbol":   SYMBOL,
+        "position": ticket,
+        "sl":       round(new_sl, 2),
+        "tp":       tp,
+    }
+    result = mt5.order_send(req)
+    if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+        err = result.retcode if result else mt5.last_error()
+        logger.error(f"Set SL failed ticket={ticket}: {err}")
+        return False
+    return True
+
+
+def manage_partial_close() -> int:
+    """
+    Scale out SYSTEM positions ที่ profit milestone:
+    - 1R (profit ≥ original SL): ปิด 50%, ขยับ SL → Breakeven
+    - 2R (profit ≥ 2× original SL): ปิด 60% ของที่เหลือ (=30% ของ original), trail SL 50% of move
+
+    State เก็บ in-memory — reset เมื่อ bot restart (ปลอดภัยเพราะ guard r_pips < 300)
+    Returns: จำนวน partial closes ที่ทำสำเร็จ
+    """
+    global _partial_state
+
+    info = mt5.symbol_info(SYMBOL)
+    if not info:
+        return 0
+    point = info.point
+
+    positions = mt5.positions_get(symbol=SYMBOL)
+    if not positions:
+        _partial_state = {}
+        return 0
+
+    tick = mt5.symbol_info_tick(SYMBOL)
+    if not tick:
+        return 0
+
+    closed = 0
+    active: set[int] = set()
+
+    for pos in positions:
+        if pos.magic != SYSTEM_MAGIC:
+            continue
+
+        ticket  = pos.ticket
+        active.add(ticket)
+        entry   = pos.price_open
+        is_buy  = pos.type == 0
+        current = tick.bid if is_buy else tick.ask
+
+        # บันทึก original R ครั้งแรกที่เห็น ticket นี้
+        if ticket not in _partial_state:
+            if pos.sl == 0:
+                continue
+            r_pips = abs(entry - pos.sl) / point
+            if r_pips < _MIN_R_PIPS:
+                continue   # SL ถูกขยับมา BE แล้ว หรือ SL แคบเกิน — ข้าม
+            _partial_state[ticket] = {"done": set(), "r_pips": r_pips}
+
+        state       = _partial_state[ticket]
+        r_pips      = state["r_pips"]
+        done        = state["done"]
+        profit_pips = ((current - entry) if is_buy else (entry - current)) / point
+
+        # ── 1R: ปิด 50% ──────────────────────────────────────────────
+        if "1R" not in done and profit_pips >= r_pips:
+            lot = round(pos.volume * 0.50, 2)
+            if lot >= info.volume_min:
+                if _partial_close_pos(pos, lot, tick):
+                    done.add("1R")
+                    closed += 1
+                    be_sl = round(
+                        entry + BREAKEVEN_BUFFER_PIPS * point if is_buy
+                        else entry - BREAKEVEN_BUFFER_PIPS * point, 2
+                    )
+                    _set_sl_tp(ticket, be_sl, pos.tp)
+                    logger.info(
+                        f"Partial 1R: ticket={ticket} {'BUY' if is_buy else 'SELL'} "
+                        f"ปิด {lot}lot profit={profit_pips:.0f}p → BE SL={be_sl:.2f}"
+                    )
+            else:
+                logger.debug(f"Partial 1R skip ticket={ticket}: lot={pos.volume} < min×2")
+
+        # ── 2R: ปิด 60% ของที่เหลือ (=30% original) ─────────────────
+        elif "1R" in done and "2R" not in done and profit_pips >= r_pips * 2:
+            lot = round(pos.volume * 0.60, 2)
+            if lot >= info.volume_min:
+                if _partial_close_pos(pos, lot, tick):
+                    done.add("2R")
+                    closed += 1
+                    trail_sl = round(
+                        entry + profit_pips * point * 0.50 if is_buy
+                        else entry - profit_pips * point * 0.50, 2
+                    )
+                    _set_sl_tp(ticket, trail_sl, pos.tp)
+                    logger.info(
+                        f"Partial 2R: ticket={ticket} {'BUY' if is_buy else 'SELL'} "
+                        f"ปิด {lot}lot profit={profit_pips:.0f}p → trail SL={trail_sl:.2f}"
+                    )
+            else:
+                logger.debug(f"Partial 2R skip ticket={ticket}: lot={pos.volume} < min×2")
+
+    # ลบ tickets ที่ปิดแล้ว
+    _partial_state = {t: v for t, v in _partial_state.items() if t in active}
+    return closed
+
+
 def _force_breakeven_opposing(new_direction: str) -> int:
     """เมื่อเปิด order ใหม่ ขยับ SL ของทุก position ฝั่งตรงข้ามมาหน้าทุนทันที
     ไม่รอ BREAKEVEN_TRIGGER_PIPS — trigger เพราะมี order ฝั่งตรงข้ามเปิดใหม่"""
