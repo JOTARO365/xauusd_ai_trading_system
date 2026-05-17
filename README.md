@@ -475,12 +475,54 @@ http://localhost:5050  →  API: /api/data?account=all
 
 ### Migration สำหรับ DB เก่า
 
-ถ้ามี Supabase / PostgreSQL ที่ setup ไว้แล้ว รัน 1 ครั้ง:
+รัน SQL ทั้ง 2 ไฟล์ใน Supabase SQL Editor (หรือ psql):
 
 ```bash
-# Supabase: ไปที่ SQL Editor → วาง SQL นี้แล้ว Run
-# PostgreSQL local:
 psql $DATABASE_URL < db/migration_add_account_login.sql
+psql $DATABASE_URL < db/migration_add_api_keys.sql
+```
+
+---
+
+## API Proxy (ส่ง key ให้ user อย่างปลอดภัย)
+
+แทนที่จะแชร์ Supabase key ตรงๆ — owner deploy proxy บน Render.com (ฟรี) แล้วออก key แยกให้แต่ละ user
+
+### Architecture
+
+```
+User Bot → HTTPS + API_KEY → Render Proxy → Supabase (service key)
+Owner Bot ──────────────────────────────→ Supabase (direct)
+```
+
+### Deploy Proxy (Owner ทำครั้งเดียว)
+
+1. **Fork / push โค้ดนี้ไป GitHub**
+2. ไปที่ [render.com](https://render.com) → New → Web Service → เลือก repo
+3. ตั้งค่า:
+   - **Root Directory**: `api_proxy`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+4. เพิ่ม Environment Variables บน Render:
+   - `SUPABASE_URL` = Supabase project URL
+   - `SUPABASE_SERVICE_KEY` = service_role key (Supabase → Settings → API)
+5. Deploy → ได้ URL เช่น `https://xauusd-proxy.onrender.com`
+
+### ออก API Key ให้ User
+
+```bash
+# รันบนเครื่อง owner — ต้องมี .env พร้อม SUPABASE credentials
+python scripts/manage_api_keys.py
+```
+
+เลือก "2) สร้าง key ใหม่" → ใส่ MT5 login + ชื่อ user → ได้ key → ส่งให้ user
+
+### User ตั้งค่า .env
+
+```env
+# User ใส่แค่นี้ — ไม่เห็น Supabase key เลย
+TRADING_API_URL=https://xauusd-proxy.onrender.com
+TRADING_API_KEY=key_ที่ได้รับจาก_owner
 ```
 
 ---

@@ -1,12 +1,39 @@
 """
 Write-through layer: JSON เป็น primary, Supabase เป็น secondary.
 ถ้า Supabase ไม่พร้อม functions จะ log และ return False โดยไม่ crash.
+
+โหมด:
+  A) TRADING_API_URL ตั้งค่า → ส่งผ่าน API proxy (user mode — ไม่เห็น Supabase key)
+  B) SUPABASE_URL ตั้งค่า     → เขียน Supabase ตรง (owner mode)
 """
+import json
+import os
+import urllib.request
 from datetime import datetime
 from loguru import logger
 
 import config
 from db.connection import get_client
+
+_PROXY_URL = os.getenv("TRADING_API_URL", "").rstrip("/")
+_PROXY_KEY = os.getenv("TRADING_API_KEY", "")
+
+
+def _proxy_post(endpoint: str, data: dict) -> bool:
+    """ส่ง JSON ไปยัง API proxy — ใช้ urllib (ไม่ต้องติดตั้ง dependency เพิ่ม)"""
+    try:
+        body = json.dumps(data).encode()
+        req  = urllib.request.Request(
+            f"{_PROXY_URL}/{endpoint}",
+            data=body,
+            headers={"Content-Type": "application/json", "X-Api-Key": _PROXY_KEY},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return r.status == 200
+    except Exception as e:
+        logger.debug(f"Proxy write /{endpoint} failed: {e}")
+        return False
 
 
 def _dt(s) -> str | None:
@@ -32,6 +59,8 @@ def write_trade(trade: dict) -> bool:
     ticket = trade.get("ticket")
     if not ticket:
         return False
+    if _PROXY_URL and _PROXY_KEY:
+        return _proxy_post("trades", trade)
     try:
         # account_login — ใช้ค่าใน trade dict ถ้ามี ไม่งั้นดึงจาก MT5 ตอนนี้
         account_login = int(trade["account_login"]) if trade.get("account_login") else _get_account_login()
@@ -71,6 +100,8 @@ def write_trade(trade: dict) -> bool:
 
 
 def write_cycle(cycle: dict) -> bool:
+    if _PROXY_URL and _PROXY_KEY:
+        return _proxy_post("cycles", cycle)
     try:
         client = get_client()
         account_login = int(cycle.get("account_login") or config.MT5_LOGIN or 0)
