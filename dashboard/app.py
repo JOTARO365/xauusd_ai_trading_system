@@ -481,7 +481,11 @@ def index():
 @app.route("/api/data")
 def api_data():
     system  = request.args.get("system", "xauusd").lower()
-    login   = _get_actual_mt5_login() if system == "xauusd" else None
+    account = request.args.get("account", "own").lower()
+    if account == "all":
+        login = None   # ไม่กรอง → เห็นทุก account
+    else:
+        login = _get_actual_mt5_login() if system == "xauusd" else None
     data    = load_trades(system, account_login=login)
     usd_thb = get_usd_thb()
     account = get_mt5_account(data_to_sync=data) if system == "xauusd" else {}
@@ -513,11 +517,13 @@ def api_data():
 
 @app.route("/api/accounting")
 def api_accounting():
-    """ค่าใช้จ่าย AI — รองรับ ?system=xauusd|btcusd|all (default=all)"""
-    system = request.args.get("system", "all").lower()
+    """ค่าใช้จ่าย AI — รองรับ ?system=xauusd|btcusd|all (default=all) และ ?account=all|own"""
+    system  = request.args.get("system", "all").lower()
+    account = request.args.get("account", "all").lower()
+    login   = None if account == "all" else _get_actual_mt5_login()
     try:
         from db.reader import get_accounting
-        data = get_accounting(None if system == "all" else system)
+        data = get_accounting(None if system == "all" else system, account_login=login)
         if data is not None:
             for info in data.get("agents", {}).values():
                 total_in = (info.get("total_input_tokens", 0)

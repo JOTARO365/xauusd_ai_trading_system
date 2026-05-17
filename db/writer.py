@@ -5,6 +5,7 @@ Write-through layer: JSON เป็น primary, Supabase เป็น secondary.
 from datetime import datetime
 from loguru import logger
 
+import config
 from db.connection import get_client
 
 
@@ -72,10 +73,13 @@ def write_trade(trade: dict) -> bool:
 def write_cycle(cycle: dict) -> bool:
     try:
         client = get_client()
+        account_login = int(cycle.get("account_login") or config.MT5_LOGIN or 0)
+        cycle_at      = _dt(cycle.get("at")) or datetime.utcnow().isoformat()
 
         cycle_row = {
+            "account_login":  account_login,
             "symbol":         cycle.get("symbol", "XAUUSD"),
-            "cycle_at":       _dt(cycle.get("at")) or datetime.utcnow().isoformat(),
+            "cycle_at":       cycle_at,
             "ticket":         cycle.get("ticket"),
             "total_cost_usd": cycle.get("total_cost_usd", 0),
         }
@@ -83,10 +87,11 @@ def write_cycle(cycle: dict) -> bool:
 
         for agent_name, info in cycle.get("agents", {}).items():
             usage_row = {
+                "account_login":      account_login,
                 "symbol":             cycle.get("symbol", "XAUUSD"),
                 "agent_name":         agent_name,
                 "model":              info.get("model", ""),
-                "cycle_at":           _dt(cycle.get("at")) or datetime.utcnow().isoformat(),
+                "cycle_at":           cycle_at,
                 "ticket":             cycle.get("ticket"),
                 "input_tokens":       info.get("input_tokens", 0),
                 "output_tokens":      info.get("output_tokens", 0),

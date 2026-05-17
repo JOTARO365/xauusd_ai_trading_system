@@ -40,7 +40,8 @@ def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list
                 "lot,entry_price,sl,tp,pnl,"
                 "opened_at,closed_at,"
                 "technical_signal,technical_confidence,"
-                "trend,sr_zone,sr_strength,pa_action,sentiment,analysis"
+                "trend,sr_zone,sr_strength,pa_action,sentiment,analysis,"
+                "strategy_version"
             )
             .in_("symbol", symbols)
         )
@@ -72,6 +73,7 @@ def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list
                 "pa_action":             r.get("pa_action"),
                 "sentiment":             r.get("sentiment"),
                 "analysis":              r.get("analysis"),
+                "strategy_version":      r.get("strategy_version", 1),
             })
         return result
     except Exception as e:
@@ -79,10 +81,11 @@ def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list
         return None
 
 
-def get_accounting(symbol: str | None = None) -> dict | None:
-    use_filter = symbol is not None and symbol.lower() != "all"
-    today_str = date.today().isoformat()
-    cutoff = (datetime.utcnow() - timedelta(days=30)).isoformat()
+def get_accounting(symbol: str | None = None, account_login: int | None = None) -> dict | None:
+    use_filter   = symbol is not None and symbol.lower() != "all"
+    use_acct     = account_login is not None and account_login != 0
+    today_str    = date.today().isoformat()
+    cutoff       = (datetime.utcnow() - timedelta(days=30)).isoformat()
 
     try:
         client = get_client()
@@ -98,12 +101,16 @@ def get_accounting(symbol: str | None = None) -> dict | None:
         )
         if use_filter:
             q = q.in_("symbol", symbols)
+        if use_acct:
+            q = q.eq("account_login", account_login)
         agent_rows = q.execute().data
 
         # ── cycles rows (last 30 days) ────────────────────────
         q = client.table("cycles").select("cycle_at,total_cost_usd,ticket").gte("cycle_at", cutoff)
         if use_filter:
             q = q.in_("symbol", symbols)
+        if use_acct:
+            q = q.eq("account_login", account_login)
         cycle_rows = q.execute().data
 
         # ── aggregate agent stats in Python ──────────────────
@@ -152,6 +159,8 @@ def get_accounting(symbol: str | None = None) -> dict | None:
         q2 = client.table("cycles").select("total_cost_usd,ticket")
         if use_filter:
             q2 = q2.in_("symbol", symbols)
+        if use_acct:
+            q2 = q2.eq("account_login", account_login)
         all_cycles = q2.execute().data
         all_cost   = round(sum(float(r.get("total_cost_usd") or 0) for r in all_cycles), 6)
         all_trades = sum(1 for r in all_cycles if r.get("ticket"))

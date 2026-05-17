@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS trades (
 -- ── Agent usage — one row per API call ───────────────────────────────────────
 CREATE TABLE IF NOT EXISTS agent_usage (
     id                  BIGSERIAL PRIMARY KEY,
+    account_login       BIGINT NOT NULL DEFAULT 0,    -- MT5 account number (0 = unknown)
     symbol              TEXT NOT NULL DEFAULT 'XAUUSD',
     agent_name          TEXT NOT NULL,
     model               TEXT NOT NULL,
@@ -57,6 +58,7 @@ CREATE TABLE IF NOT EXISTS agent_usage (
 -- ── Cycles — one row per trading cycle ───────────────────────────────────────
 CREATE TABLE IF NOT EXISTS cycles (
     id              BIGSERIAL PRIMARY KEY,
+    account_login   BIGINT NOT NULL DEFAULT 0,        -- MT5 account number (0 = unknown)
     symbol          TEXT NOT NULL DEFAULT 'XAUUSD',
     cycle_at        TIMESTAMPTZ NOT NULL,
     ticket          BIGINT,
@@ -68,9 +70,11 @@ CREATE TABLE IF NOT EXISTS cycles (
 CREATE INDEX IF NOT EXISTS idx_trades_ticket     ON trades(ticket);
 CREATE INDEX IF NOT EXISTS idx_trades_status     ON trades(status);
 CREATE INDEX IF NOT EXISTS idx_trades_opened_at  ON trades(opened_at DESC);
-CREATE INDEX IF NOT EXISTS idx_agent_usage_at    ON agent_usage(cycle_at DESC);
-CREATE INDEX IF NOT EXISTS idx_agent_usage_agent ON agent_usage(agent_name);
-CREATE INDEX IF NOT EXISTS idx_cycles_at         ON cycles(cycle_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_usage_at      ON agent_usage(cycle_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_usage_agent   ON agent_usage(agent_name);
+CREATE INDEX IF NOT EXISTS idx_agent_usage_account ON agent_usage(account_login);
+CREATE INDEX IF NOT EXISTS idx_cycles_at           ON cycles(cycle_at DESC);
+CREATE INDEX IF NOT EXISTS idx_cycles_account      ON cycles(account_login);
 
 -- ── Auto-update updated_at on trades ─────────────────────────────────────────
 CREATE OR REPLACE FUNCTION _set_updated_at()
