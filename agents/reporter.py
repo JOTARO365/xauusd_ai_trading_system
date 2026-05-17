@@ -527,13 +527,18 @@ def get_trade_history_summary() -> dict:
     today_trades = [t for t in trades if t.get("timestamp", "").startswith(today_str)]
     today_pnl    = sum(t.get("pnl") or 0 for t in today_trades if t.get("pnl") is not None)
 
-    last_10      = closed[-10:]
+    # ── แยก v2 ก่อน ใช้กับทุก metric ────────────────────────────
+    # v1 = โค้ดเก่า (EMA_CROSS era) — ไม่นำมาวิเคราะห์ร่วมกับ v2
+    closed_v2 = [t for t in closed if t.get("strategy_version", 1) == 2]
+    closed_v1_count = len(closed) - len(closed_v2)
+
+    last_10      = closed_v2[-10:]
     last_10_win  = sum(1 for t in last_10 if (t.get("pnl") or 0) > 0)
     last_10_loss = len(last_10) - last_10_win
     last_10_winrate = round(last_10_win / len(last_10) * 100, 1) if last_10 else 0
 
-    # นับ losing streak เฉพาะ order ของวันนี้เท่านั้น — reset ทุกวัน
-    today_closed  = [t for t in closed if t.get("timestamp", "").startswith(today_str)]
+    # นับ losing streak เฉพาะ v2 ของวันนี้เท่านั้น — reset ทุกวัน
+    today_closed  = [t for t in closed_v2 if t.get("timestamp", "").startswith(today_str)]
     losing_streak = 0
     for t in reversed(today_closed):
         if (t.get("pnl") or 0) < 0:
@@ -542,7 +547,7 @@ def get_trade_history_summary() -> dict:
             break
 
     recent_trades_text = ""
-    for t in closed[-5:]:
+    for t in closed_v2[-5:]:
         pnl    = t.get("pnl") or 0
         result = "WIN" if pnl > 0 else "LOSS"
         src    = t.get("source", "SYS")[:3].upper()
@@ -558,12 +563,8 @@ def get_trade_history_summary() -> dict:
         )
 
     # ── Entry type performance — v2 trades only ─────────────────
-    # v1 = old code (EMA_CROSS era), v2 = current strategy (Issues #1-5)
     _REMOVED_SIGNALS = {"EMA_CROSS", "MACD_CROSS"}   # signals no longer in system
     _V2_MIN_TRADES   = 5                              # ต้องมีอย่างน้อย N trades จึงแสดง WR
-
-    closed_v2 = [t for t in closed if t.get("strategy_version", 1) == 2]
-    closed_v1_count = len(closed) - len(closed_v2)
 
     entry_perf: dict[str, dict] = {}
     for t in closed_v2:
@@ -611,12 +612,12 @@ def get_trade_history_summary() -> dict:
     return {
         "today_trades":       len(today_trades),
         "today_pnl":          round(today_pnl, 2),
-        "total_closed":       len(closed),
+        "total_closed":       len(closed_v2),
         "last_10_winrate":    last_10_winrate,
         "last_10_win":        last_10_win,
         "last_10_loss":       last_10_loss,
         "losing_streak":      losing_streak,
-        "recent_trades":      closed[-5:],       # trade objects สำหรับ display โดยตรง
+        "recent_trades":      closed_v2[-5:],
         "recent_trades_text": recent_trades_text or "  ยังไม่มีประวัติการเทรด",
         "entry_perf_text":    entry_perf_text    or "  ยังไม่มีข้อมูล",
     }
@@ -636,9 +637,10 @@ def analyze_performance() -> str:
         return ""
 
     log    = _load_log()
-    closed = [t for t in log.get("trades", []) if t.get("status") == "CLOSED"]
+    all_closed = [t for t in log.get("trades", []) if t.get("status") == "CLOSED"]
+    closed     = [t for t in all_closed if t.get("strategy_version", 1) == 2]
     if len(closed) < 3:
-        return ""  # ข้อมูลน้อยเกินไป
+        return ""  # v2 trades น้อยเกินไป
 
     from config import START_BALANCE
     account       = get_account_info()
@@ -649,7 +651,7 @@ def analyze_performance() -> str:
     balance       = account.get("balance", 0)
     equity        = account.get("equity", 0)
 
-    # คำนวณ expectancy
+    # คำนวณ expectancy จาก v2 trades เท่านั้น
     wins   = [t for t in closed if (t.get("pnl") or 0) > 0]
     losses = [t for t in closed if (t.get("pnl") or 0) < 0]
     avg_win  = sum(t["pnl"] for t in wins)   / len(wins)   if wins   else 0
@@ -657,6 +659,7 @@ def analyze_performance() -> str:
     wr       = len(wins) / len(closed) if closed else 0
     expectancy = round((wr * avg_win) + ((1 - wr) * avg_loss), 2)
     drawdown_pct = round((1 - balance / START_BALANCE) * 100, 1) if START_BALANCE > 0 else 0
+    v1_count = len(all_closed) - len(closed)
 
     user_msg = f"""วิเคราะห์ performance จากข้อมูลต่อไปนี้:
 
@@ -667,7 +670,7 @@ Open P&L      : {open_pnl:+.2f} {currency}
 Start Balance : {START_BALANCE:,.2f} {currency}  ← ทุนเริ่มต้นจริง (ใช้ค่านี้คำนวณ drawdown)
 Drawdown      : {drawdown_pct:.1f}% (คำนวณจาก Start Balance แล้ว)
 
-=== สถิติรวม ===
+=== สถิติรวม (v2 strategy เท่านั้น{f" | v1 legacy excluded: {v1_count}" if v1_count else ""}) ===
 Total Closed  : {len(closed)} trades
 Win Rate      : {round(wr*100, 1)}%  ({len(wins)} W / {len(losses)} L)
 Expectancy    : {expectancy:+.2f} {currency}
@@ -676,9 +679,9 @@ Losing Streak : {history['losing_streak']}
 
 === Strategy Performance (entry type) ===
 {history['entry_perf_text']}
-=== 5 Trade ล่าสุด ===
+=== 5 Trade ล่าสุด (v2) ===
 {history['recent_trades_text']}
-=== ประวัติการเทรดทั้งหมด (trades.json, {len(closed)} trades ล่าสุด) ===
+=== ประวัติการเทรด v2 (30 trades ล่าสุด) ===
 {json.dumps(closed[-30:], ensure_ascii=False, indent=2)}
 """
 
