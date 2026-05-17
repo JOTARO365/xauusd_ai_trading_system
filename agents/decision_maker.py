@@ -67,6 +67,19 @@ def _get_entry_wr(entry_type: str, entry_perf_text: str) -> str:
     return f"{entry_type}: no history"
 
 
+def _last_trade_in_dir_lost(direction: str, recent_trades: list) -> bool:
+    """True ถ้า trade v2 ล่าสุดในทิศทางนี้ขาดทุน
+    ใช้ตัดสินใจว่าจะให้ bonus slot หรือไม่"""
+    same_dir = [
+        t for t in recent_trades
+        if t.get("direction", "").upper() == direction.upper()
+        and t.get("pnl") is not None
+    ]
+    if not same_dir:
+        return False
+    return (same_dir[-1].get("pnl") or 0) < 0
+
+
 # ─────────────────────────────────────────────────────────────
 #  GATE LAYER — Python-only quantitative filters
 # ─────────────────────────────────────────────────────────────
@@ -183,7 +196,9 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         return _fail(f"Counter-trend vs {regime_bias} regime requires conf ≥55% (got {conf}%)")
 
     # 10. Max open trades + hedge slot
-    can_open, slot_reason = check_open_slot(direction)
+    # ถ้า trade ล่าสุดทิศนี้แพ้ → ตัด bonus slot (ป้องกัน pyramid ทิศเดียวหลัง trend เปลี่ยน)
+    _last_lost = _last_trade_in_dir_lost(direction, history.get("recent_trades", []))
+    can_open, slot_reason = check_open_slot(direction, last_dir_lost=_last_lost)
     if not can_open:
         return _fail(slot_reason)
 

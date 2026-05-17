@@ -88,7 +88,7 @@ def is_hedge_active() -> bool:
     return 0 in types and 1 in types  # 0=BUY, 1=SELL
 
 
-def check_open_slot(direction: str) -> tuple[bool, str]:
+def check_open_slot(direction: str, last_dir_lost: bool = False) -> tuple[bool, str]:
     """
     ตรวจสอบว่าสามารถเปิด order ทิศทางนี้ได้หรือไม่
 
@@ -98,7 +98,7 @@ def check_open_slot(direction: str) -> tuple[bool, str]:
     3. ถ้ามี position ฝั่งตรงข้ามที่ขาดทุนอยู่ → ตรวจ 2 เงื่อนไข:
        a) ถ้า losing positions ทุกตัว SL อยู่หน้าทุนแล้ว (protected) → เปิดได้เลย
        b) ถ้า opposing position สวนทางยังไม่เกิน hedge_buffer_pips → เปิดได้
-          hedge_buffer = จำนวนจุดที่ราคาวิ่งสวนทาง opposing position (default 1000 จุด)
+    4. last_dir_lost=True → ตัด bonus slot ออก (trade ล่าสุดทิศนี้แพ้ = trend เสี่ยงเปลี่ยน)
 
     Returns: (can_open: bool, reason: str)
     """
@@ -114,7 +114,12 @@ def check_open_slot(direction: str) -> tuple[bool, str]:
 
     # ── 1. Slot limit ต่อทิศทาง ────────────────────────────────
     protected = count_protected_slots()
-    effective_max = max_per_dir + protected
+    if last_dir_lost and protected > 0:
+        # trade ล่าสุดทิศนี้แพ้ → ตัด bonus slot ออก ป้องกัน pyramid ทิศเดียว
+        effective_max = max_per_dir
+        logger.info(f"Bonus slot disabled [{direction}]: last trade in this direction was a loss")
+    else:
+        effective_max = max_per_dir + protected
     if len(same_pos) >= effective_max:
         return False, (
             f"{direction} slot เต็ม ({len(same_pos)}/{effective_max}"
@@ -229,7 +234,6 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
             return {"success": False, "error": f"RR ratio too low: {rr:.2f} (min={effective_min_rr:.1f})"}
 
     # ตรวจจำนวน order ต่อฝั่ง (สอดคล้องกับ check_open_slot)
-    # นับเฉพาะ same-direction positions — positions ที่ SL หน้าทุนแล้วให้ bonus slot
     dir_type = 0 if direction.upper() == "BUY" else 1
     open_positions = mt5.positions_get(symbol=SYMBOL) or []
     same_dir_count = sum(1 for p in open_positions if p.type == dir_type)
