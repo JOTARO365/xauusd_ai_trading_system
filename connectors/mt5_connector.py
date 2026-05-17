@@ -486,6 +486,154 @@ def get_pending_orders() -> list:
 BREAKEVEN_TRIGGER_PIPS = 1000   # ขยับ SL มาหน้าทุนเมื่อกำไรถึงระดับนี้
 BREAKEVEN_BUFFER_PIPS  = 100    # เผื่อ spread — SL = entry + 100 pips (ไม่ขาดทุน)
 
+# ─────────────────────────────────────────────────────────────
+# PARTIAL CLOSE (Profit-Taking)
+# ─────────────────────────────────────────────────────────────
+
+_PARTIAL_1R_CLOSE_PCT = 0.50   # ปิด 50% ที่ 1R → SL to BE
+_PARTIAL_2R_CLOSE_PCT = 0.60   # ปิด 60% ของที่เหลือที่ 2R (= 30% ต้นฉบับ) → trail SL
+_PARTIAL_2R_TRAIL_PCT = 0.50   # trail SL ที่ 50% ของระยะทางจาก entry ถึง current
+
+_partial_stage: dict[int, int] = {}   # ticket → stage (0=none, 1=1R done, 2=2R done)
+
+
+def manage_partial_close() -> int:
+    """
+    Scale-out profit ที่ 1R และ 2R:
+      Stage 1 (1R): ปิด 50% → ขยับ SL มาที่ BE+buffer
+      Stage 2 (2R): ปิด 60% ของที่เหลือ → trail SL ที่ 50% ของ move
+    คืนจำนวน partial close ที่ execute สำเร็จ
+    """
+    info = mt5.symbol_info(SYMBOL)
+    if info is None:
+        return 0
+    point    = info.point
+    vol_step = info.volume_step
+    vol_min  = info.volume_min
+
+    positions = mt5.positions_get(symbol=SYMBOL)
+    if not positions:
+        return 0
+    tick = mt5.symbol_info_tick(SYMBOL)
+    if tick is None:
+        return 0
+
+    executed = 0
+    for pos in positions:
+        if pos.sl == 0:
+            continue   # ไม่มี SL → คำนวณ R ไม่ได้
+        if pos.magic != SYSTEM_MAGIC:
+            continue   # ข้าม manual orders
+
+        ticket  = pos.ticket
+        is_buy  = pos.type == 0
+        entry   = pos.price_open
+        current = tick.bid if is_buy else tick.ask
+        sl_dist = abs(entry - pos.sl) / point
+
+        if sl_dist < 100:
+            continue   # SL ชิดเกิน (น่าจะ BE แล้ว) → ข้าม
+
+        profit_pips = ((current - entry) if is_buy else (entry - current)) / point
+        stage = _partial_stage.get(ticket, 0)
+
+        # Stage 2: 2R hit (ตรวจก่อน Stage 1 ถ้า stage=1 แล้ว)
+        if stage == 1 and profit_pips >= 2 * sl_dist:
+            close_vol = round(
+                round(pos.volume * _PARTIAL_2R_CLOSE_PCT / vol_step) * vol_step, 2
+            )
+            if close_vol < vol_min:
+                continue
+
+            close_type  = mt5.ORDER_TYPE_SELL if is_buy else mt5.ORDER_TYPE_BUY
+            close_price = tick.bid if is_buy else tick.ask
+            req = {
+                "action":       mt5.TRADE_ACTION_DEAL,
+                "symbol":       SYMBOL,
+                "volume":       close_vol,
+                "type":         close_type,
+                "position":     ticket,
+                "price":        close_price,
+                "deviation":    20,
+                "magic":        SYSTEM_MAGIC,
+                "comment":      _safe_comment("PARTIAL_2R"),
+                "type_time":    mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            }
+            result = mt5.order_send(req)
+            if result and result.retcode == mt5.TRADE_RETCODE_DONE:
+                # Trail SL ที่ 50% ของ move จาก entry
+                move = abs(current - entry)
+                trail_sl = round(entry + move * _PARTIAL_2R_TRAIL_PCT, 2) if is_buy \
+                    else round(entry - move * _PARTIAL_2R_TRAIL_PCT, 2)
+                new_sl = max(pos.sl, trail_sl) if is_buy else min(pos.sl or float("inf"), trail_sl)
+                mt5.order_send({
+                    "action":   mt5.TRADE_ACTION_SLTP,
+                    "symbol":   SYMBOL,
+                    "position": ticket,
+                    "sl":       round(new_sl, 2),
+                    "tp":       pos.tp,
+                })
+                _partial_stage[ticket] = 2
+                executed += 1
+                logger.info(
+                    f"Partial close 2R: ticket={ticket} {'BUY' if is_buy else 'SELL'} "
+                    f"closed {close_vol}L @ {close_price:.2f} profit={profit_pips:.0f}p "
+                    f"→ trail SL {pos.sl:.2f}→{new_sl:.2f}"
+                )
+            else:
+                err = result.retcode if result else mt5.last_error()
+                logger.error(f"Partial 2R failed ticket={ticket}: {err}")
+
+        # Stage 1: 1R hit
+        elif stage == 0 and profit_pips >= sl_dist:
+            close_vol = round(
+                round(pos.volume * _PARTIAL_1R_CLOSE_PCT / vol_step) * vol_step, 2
+            )
+            if close_vol < vol_min:
+                continue
+
+            close_type  = mt5.ORDER_TYPE_SELL if is_buy else mt5.ORDER_TYPE_BUY
+            close_price = tick.bid if is_buy else tick.ask
+            req = {
+                "action":       mt5.TRADE_ACTION_DEAL,
+                "symbol":       SYMBOL,
+                "volume":       close_vol,
+                "type":         close_type,
+                "position":     ticket,
+                "price":        close_price,
+                "deviation":    20,
+                "magic":        SYSTEM_MAGIC,
+                "comment":      _safe_comment("PARTIAL_1R"),
+                "type_time":    mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            }
+            result = mt5.order_send(req)
+            if result and result.retcode == mt5.TRADE_RETCODE_DONE:
+                # SL to BE+buffer
+                be_sl = round(entry + BREAKEVEN_BUFFER_PIPS * point, 2) if is_buy \
+                    else round(entry - BREAKEVEN_BUFFER_PIPS * point, 2)
+                if (is_buy and pos.sl < be_sl) or (not is_buy and (pos.sl > be_sl or pos.sl == 0)):
+                    mt5.order_send({
+                        "action":   mt5.TRADE_ACTION_SLTP,
+                        "symbol":   SYMBOL,
+                        "position": ticket,
+                        "sl":       be_sl,
+                        "tp":       pos.tp,
+                    })
+                _partial_stage[ticket] = 1
+                executed += 1
+                logger.info(
+                    f"Partial close 1R: ticket={ticket} {'BUY' if is_buy else 'SELL'} "
+                    f"closed {close_vol}L @ {close_price:.2f} profit={profit_pips:.0f}p "
+                    f"→ SL→BE {be_sl:.2f}"
+                )
+            else:
+                err = result.retcode if result else mt5.last_error()
+                logger.error(f"Partial 1R failed ticket={ticket}: {err}")
+
+    return executed
+
 
 def count_protected_slots() -> int:
     """คืนจำนวน open positions ที่ SL อยู่หน้าทุนแล้ว (ไม่มีความเสี่ยงขาดทุน)

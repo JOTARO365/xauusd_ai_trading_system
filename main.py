@@ -7,7 +7,7 @@ import time
 from datetime import date as _date, datetime as _dt
 from loguru import logger
 from connectors.price_feed import connect_mt5, disconnect_mt5, is_mt5_connected
-from connectors.mt5_connector import get_open_positions, manage_breakeven, manage_dynamic_tp, manage_post_event_tp, count_protected_slots, is_hedge_active, check_open_slot
+from connectors.mt5_connector import get_open_positions, manage_breakeven, manage_dynamic_tp, manage_post_event_tp, manage_partial_close, count_protected_slots, is_hedge_active, check_open_slot
 from agents.chart_watcher import analyze_chart
 from agents.market_advisor import analyze_market_regime
 from agents.news_gatherer import gather_news
@@ -205,6 +205,9 @@ async def run_status_cycle() -> None:
 
     print_step(5, "running", "กำลังตรวจสอบ positions...")
     try:
+        pc = manage_partial_close()
+        if pc:
+            print_warning(f"Partial close: lock กำไร {pc} position (1R/2R milestone)")
         be = manage_breakeven()
         if be:
             print_warning(f"Breakeven: ขยับ SL หน้าทุน {be} position")
@@ -339,6 +342,9 @@ async def run_cycle() -> tuple[dict, dict]:
     # ── Step 6: Reporter ───────────────────────────────────────────
     print_step(5, "running", "กำลังบันทึกผล...")
     try:
+        pc = manage_partial_close()
+        if pc:
+            print_warning(f"Partial close: lock กำไร {pc} position (1R/2R milestone)")
         be = manage_breakeven()
         if be:
             print_warning(f"Breakeven: ขยับ SL หน้าทุน {be} position")

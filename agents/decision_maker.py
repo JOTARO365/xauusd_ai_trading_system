@@ -154,13 +154,25 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     if entry_type == "ENGULFING" and conf < 75:
         return _fail(f"ENGULFING requires conf ≥75% (got {conf}%)")
 
-    # 7. No SR zone — ต้อง conf สูงกว่า
-    if sr_zone == "NONE" and conf < 62:
+    # 7+8. MOMENTUM_BREAKOUT fast path — ข้าม SR zone gate และ ATR gate
+    hour_now    = datetime.now(_tz.utc).hour
+    is_london_ny = 13 <= hour_now < 17
+    is_mom_fast  = entry_type == "MOMENTUM_BREAKOUT" and (
+        conf >= 70 or (is_london_ny and conf >= 68)
+    )
+    if is_mom_fast:
+        logger.info(
+            f"MOMENTUM_BREAKOUT fast path: skip SR+ATR gates "
+            f"(conf={conf}%, {'London/NY' if is_london_ny else 'other session'})"
+        )
+
+    # 7. No SR zone — ต้อง conf สูงกว่า (ข้ามถ้า momentum fast path)
+    if not is_mom_fast and sr_zone == "NONE" and conf < 62:
         return _fail(f"No SR zone requires conf ≥62% (got {conf}%)")
 
-    # 8. ATR gate — ตลาดผันผวน
+    # 8. ATR gate — ตลาดผันผวน (ข้ามถ้า momentum fast path)
     h4_atr = chart_data.get("indicators", {}).get("h4", {}).get("atr", 0)
-    if h4_atr > 20 and conf < 62:
+    if not is_mom_fast and h4_atr > 20 and conf < 62:
         return _fail(f"High ATR ({h4_atr:.1f}) requires conf ≥62% (got {conf}%)")
 
     # 9. Regime alignment
@@ -179,12 +191,20 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     if not can_open:
         return _fail(slot_reason)
 
-    # 11. Losing streak
+    # 11. Losing streak — gradual position reduction (ไม่ block แต่ลด size)
+    streak_scale = 1.0
     if _cfg.STREAK_PROTECTION:
-        max_streak  = MONEY_MANAGEMENT["max_losing_streak"]
-        streak_conf = MONEY_MANAGEMENT["streak_min_confidence"]
-        if history["losing_streak"] >= max_streak and conf < streak_conf:
-            return _fail(f"Losing streak {history['losing_streak']} — conf ต้องสูงกว่า {streak_conf}%")
+        streak = history["losing_streak"]
+        if streak >= 5:
+            streak_scale = 0.25
+        elif streak == 4:
+            streak_scale = 0.40
+        elif streak == 3:
+            streak_scale = 0.60
+        elif streak == 2:
+            streak_scale = 0.80
+        if streak_scale < 1.0:
+            logger.info(f"Streak {streak}: position size ×{streak_scale} (gradual reduction)")
 
     # 12. SL validation
     sl_key  = "buy_sl_pips" if direction == "BUY" else "sell_sl_pips"
@@ -193,13 +213,14 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         return _fail(f"SL {wick_sl} out of valid range 500–3500 pips")
 
     return {
-        "pass":       True,
-        "reason":     "",
-        "direction":  direction,
-        "tech_signal": tech_signal,
-        "sl_pips":    float(wick_sl),
-        "tp_pips":    float(chart_data.get("tp_pips", MONEY_MANAGEMENT["default_tp_pips"])),
-        "confidence": conf,
+        "pass":         True,
+        "reason":       "",
+        "direction":    direction,
+        "tech_signal":  tech_signal,
+        "sl_pips":      float(wick_sl),
+        "tp_pips":      float(chart_data.get("tp_pips", MONEY_MANAGEMENT["default_tp_pips"])),
+        "confidence":   conf,
+        "streak_scale": streak_scale,
     }
 
 
@@ -311,11 +332,19 @@ Account — Today: {history['today_pnl']:+.2f} USD ({history['today_trades']} tr
         sl_key = "buy_sl_pips" if out_direction == "BUY" else "sell_sl_pips"
         sl_pips = chart_data.get(sl_key, sl_pips)
 
-        # ── Confidence-based position sizing ─────────────────────
-        _conf_full  = MONEY_MANAGEMENT["conf_full_size_at"]
-        _conf_min_s = MONEY_MANAGEMENT["conf_min_scale"]
-        conf_scale  = max(_conf_min_s, min(1.0, conf / _conf_full))
-        logger.info(f"Position sizing: confidence={conf}% → scale={conf_scale:.2f}")
+        # ── Confidence-based position sizing + streak reduction ──
+        _conf_full    = MONEY_MANAGEMENT["conf_full_size_at"]
+        _conf_min_s   = MONEY_MANAGEMENT["conf_min_scale"]
+        conf_scale    = max(_conf_min_s, min(1.0, conf / _conf_full))
+        streak_scale  = gate.get("streak_scale", 1.0)
+        if streak_scale < 1.0:
+            conf_scale = max(_conf_min_s * streak_scale, conf_scale * streak_scale)
+            logger.info(
+                f"Position sizing: conf={conf}% scale={conf_scale / streak_scale:.2f} "
+                f"× streak_scale={streak_scale} → final={conf_scale:.2f}"
+            )
+        else:
+            logger.info(f"Position sizing: confidence={conf}% → scale={conf_scale:.2f}")
 
         # ── Dynamic R:R ───────────────────────────────────────────
         eff_rr = _effective_min_rr(chart_data, sentiment_data)

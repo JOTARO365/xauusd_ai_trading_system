@@ -586,6 +586,21 @@ def get_trade_history_summary() -> dict:
         else:
             header += "]"
         entry_perf_text = header + "\n"
+
+        # ── Pending vs Market source comparison ──────────────────
+        pending_trades = [t for t in closed_v2 if t.get("entry_type") == "PENDING"]
+        market_trades  = [t for t in closed_v2 if t.get("entry_type") != "PENDING"]
+        if pending_trades and market_trades:
+            p_wr  = round(sum(1 for t in pending_trades if (t.get("pnl") or 0) > 0) / len(pending_trades) * 100, 1)
+            p_pnl = round(sum(t.get("pnl") or 0 for t in pending_trades), 2)
+            m_wr  = round(sum(1 for t in market_trades  if (t.get("pnl") or 0) > 0) / len(market_trades)  * 100, 1)
+            m_pnl = round(sum(t.get("pnl") or 0 for t in market_trades), 2)
+            entry_perf_text += (
+                f"  PENDING entries: {len(pending_trades):>3} trades | WR={p_wr}% | P&L={p_pnl:+.2f}\n"
+                f"  MARKET  entries: {len(market_trades):>3} trades | WR={m_wr}% | P&L={m_pnl:+.2f}\n"
+                f"  {'─'*50}\n"
+            )
+
         for et, s in sorted(entry_perf.items(), key=lambda x: -x[1]["pnl"]):
             wr = round(s["wins"] / s["count"] * 100, 1) if s["count"] else 0
             wr_note = "" if s["count"] >= _V2_MIN_TRADES else " (low sample)"
