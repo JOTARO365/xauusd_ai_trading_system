@@ -10,6 +10,10 @@ from loguru import logger
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
+# ── Order fail streak tracker ─────────────────────────────────────────────────
+_order_fail_streak: dict[str, int] = {"BUY": 0, "SELL": 0}
+_FAIL_STREAK_WARN = 3   # warning เมื่อ fail ≥ N ครั้งติดกัน
+
 SYSTEM_PROMPT = Path("agents/prompts/decision_maker.md").read_text(encoding="utf-8")
 
 MIN_TECHNICAL_CONFIDENCE = 50
@@ -400,9 +404,25 @@ Account — Today: {history['today_pnl']:+.2f} USD ({history['today_trades']} tr
 
         if not order_result.get("success"):
             err = order_result.get("error", "unknown")
+            _order_fail_streak[out_direction] = _order_fail_streak.get(out_direction, 0) + 1
+            streak = _order_fail_streak[out_direction]
+            if streak >= _FAIL_STREAK_WARN:
+                retcode = order_result.get("retcode", 0)
+                hint = ""
+                if retcode in (10026, 10027):
+                    hint = " → เปิดปุ่ม Algo Trading ใน MT5 toolbar"
+                elif retcode == 10019:
+                    hint = " → margin ไม่พอ ตรวจสอบ equity"
+                elif retcode in (10004, 10021):
+                    hint = " → requote ถี่ ตรวจสอบ connection หรือ spread"
+                logger.warning(
+                    f"Order fail streak [{out_direction}]: {streak} ครั้งติดกัน "
+                    f"(retcode={retcode}){hint}"
+                )
             logger.error(f"Order rejected by MT5: {err}")
             return {"action": "SKIP", "reason": f"Order failed: {err}"}
 
+        _order_fail_streak[out_direction] = 0   # reset streak เมื่อ order สำเร็จ
         return {
             "action":           "EXECUTE",
             "direction":        out_direction,

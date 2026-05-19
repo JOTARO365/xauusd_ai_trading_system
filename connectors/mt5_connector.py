@@ -15,6 +15,25 @@ def _safe_comment(text: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9 _.!\-/]", "", text)
     return cleaned[:31]
 
+# ── Order retry config ───────────────────────────────────────────────────────
+_RETRYABLE_RETCODES = frozenset({
+    10004,   # REQUOTE
+    10021,   # PRICE_CHANGED
+    10024,   # TOO_MANY_REQUESTS
+})
+_MAX_ORDER_RETRIES = 2
+_RETRY_DELAY_SEC   = 0.5
+
+
+def is_algo_trading_enabled() -> bool:
+    """ตรวจว่าปุ่ม Algo Trading ใน MT5 terminal เปิดอยู่หรือไม่"""
+    try:
+        info = mt5.terminal_info()
+        return bool(info and info.trade_allowed)
+    except Exception:
+        return True   # ถ้าตรวจไม่ได้ สมมติว่าเปิดอยู่
+
+
 PENDING_TYPE_MAP = {
     "BUY_LIMIT":  mt5.ORDER_TYPE_BUY_LIMIT,
     "SELL_LIMIT": mt5.ORDER_TYPE_SELL_LIMIT,
@@ -267,13 +286,43 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         "type_filling": mt5.ORDER_FILLING_IOC,
     }
 
-    result = mt5.order_send(request)
+    # ── Send order — retry สำหรับ requote / price_changed ───────────────
+    result    = None
+    last_err  = ""
+    is_buy    = direction.upper() == "BUY"
+
+    for attempt in range(_MAX_ORDER_RETRIES + 1):
+        if attempt > 0:
+            _time.sleep(_RETRY_DELAY_SEC)
+            tick = mt5.symbol_info_tick(SYMBOL)
+            if tick is None:
+                break
+            price = tick.ask if is_buy else tick.bid
+            sl    = (price - sl_pips * point) if is_buy else (price + sl_pips * point)
+            tp    = (0.0 if no_tp else price + tp_pips * point) if is_buy \
+                    else (0.0 if no_tp else price - tp_pips * point)
+            request["price"] = price
+            request["sl"]    = round(sl, 2)
+            request["tp"]    = round(tp, 2)
+            logger.info(f"Order retry {attempt}/{_MAX_ORDER_RETRIES} @ {price:.2f}")
+
+        result = mt5.order_send(request)
+        if result is None:
+            last_err = f"order_send None: {mt5.last_error()}"
+            logger.warning(f"order_send returned None (attempt {attempt+1}): {last_err}")
+            continue
+        if result.retcode == mt5.TRADE_RETCODE_DONE:
+            break
+        last_err = f"{result.retcode} — {result.comment}"
+        if result.retcode not in _RETRYABLE_RETCODES:
+            break   # error ถาวร ไม่ต้อง retry
+        logger.warning(f"Order retryable error (attempt {attempt+1}): {last_err}")
+
     if result is None:
-        err = mt5.last_error()
-        logger.error(f"Order failed: order_send returned None — {err}")
-        return {"success": False, "error": f"order_send None: {err}"}
+        logger.error(f"Order failed (all attempts): {last_err}")
+        return {"success": False, "error": last_err}
     if result.retcode != mt5.TRADE_RETCODE_DONE:
-        logger.error(f"Order failed: {result.retcode} — {result.comment}")
+        logger.error(f"Order failed: {last_err}")
         return {"success": False, "error": result.comment, "retcode": result.retcode}
 
     logger.info(f"Order opened: {direction} {lot} lots @ {price} SL={sl:.2f} TP={tp:.2f}")

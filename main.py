@@ -7,7 +7,7 @@ import time
 from datetime import date as _date, datetime as _dt
 from loguru import logger
 from connectors.price_feed import connect_mt5, disconnect_mt5, is_mt5_connected
-from connectors.mt5_connector import get_open_positions, manage_breakeven, manage_partial_close, manage_dynamic_tp, manage_post_event_tp, count_protected_slots, is_hedge_active, check_open_slot
+from connectors.mt5_connector import get_open_positions, manage_breakeven, manage_partial_close, manage_dynamic_tp, manage_post_event_tp, count_protected_slots, is_hedge_active, check_open_slot, is_algo_trading_enabled
 from agents.chart_watcher import analyze_chart
 from agents.market_advisor import analyze_market_regime
 from agents.news_gatherer import gather_news
@@ -248,6 +248,11 @@ async def run_cycle() -> tuple[dict, dict]:
     global _cycle, _last_chart_data, _last_sentiment_data, _net_degraded
     _cycle += 1
     print_cycle_start(_cycle)
+
+    # ── Algo Trading check ─────────────────────────────────────────
+    if not is_algo_trading_enabled():
+        logger.warning("MT5 Algo Trading ปิดอยู่ — orders จะ fail ทั้งหมด กดปุ่ม 'Algo Trading' ใน MT5 toolbar")
+        print_warning("⚠  MT5 Algo Trading ปิดอยู่ — กดปุ่ม Algo Trading ใน toolbar ก่อน")
 
     _lat_cw = _lat_ma = _lat_an = _lat_dm = 0   # latencies (ms)
     _cw_ok = _ma_ok = False
