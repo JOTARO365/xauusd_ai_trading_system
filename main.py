@@ -249,6 +249,16 @@ async def run_cycle() -> tuple[dict, dict]:
     _cycle += 1
     print_cycle_start(_cycle)
 
+    # ── DRY_RUN warning ────────────────────────────────────────────
+    if config.DRY_RUN:
+        logger.warning("[DRY_RUN] โหมดทดสอบ — orders จะไม่ถูกส่งไป MT5 จริง")
+        print_warning("⚠  DRY_RUN MODE — ไม่มีการส่ง order จริง (ทดสอบเท่านั้น)")
+
+    # ── NNLB warning ───────────────────────────────────────────────
+    if config.NNLB_MODE:
+        logger.warning("[NNLB] No-Risk-No-Lamborghini — ข้าม money management / gates ทั้งหมด ใช้ MIN_LOT")
+        print_warning("⚠  NNLB MODE — ข้าม gates / MM ทั้งหมด | lot=MIN_LOT เสมอ")
+
     # ── Algo Trading check ─────────────────────────────────────────
     if not is_algo_trading_enabled():
         logger.warning("MT5 Algo Trading ปิดอยู่ — orders จะ fail ทั้งหมด กดปุ่ม 'Algo Trading' ใน MT5 toolbar")

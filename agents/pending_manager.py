@@ -59,7 +59,7 @@ def _find_swing_levels_from_rates(rates, window: int = 3, max_levels: int = 6,
         levels = sorted(set(levels), reverse=True)
         result = []
         for lv in levels:
-            if not result or abs(lv - result[-1]) / result[-1] > dedup_pct:
+            if not result or result[-1] == 0 or abs(lv - result[-1]) / result[-1] > dedup_pct:
                 result.append(lv)
         return result
 
@@ -266,7 +266,7 @@ def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = No
 
             tp_pips = _calc_tp_pips(level, opposing, point,
                                     MONEY_MANAGEMENT["default_tp_pips"], is_sell=is_sell)
-            rr = tp_pips / sl_pips if sl_pips > 0 else 0
+            rr = (tp_pips / sl_pips if sl_pips > 0 else 0) if sl_pips > 0 else 0
             if rr < MONEY_MANAGEMENT["min_rr_ratio"]:
                 logger.info(f"{pending_type} @ {level:.2f}: RR {rr:.2f} ต่ำ — ข้าม")
                 continue
@@ -394,7 +394,7 @@ def place_weekly_calendar_pending(chart_data: dict) -> int:
         if not _is_covered(buy_lv, existing_prices):
             tp_pips = _calc_tp_pips(buy_lv, res_levels[1:], point,
                                     MONEY_MANAGEMENT["default_tp_pips"], is_sell=False)
-            if tp_pips / sl_pips >= min_rr:
+            if (tp_pips / sl_pips if sl_pips > 0 else 0) >= min_rr:
                 res = place_pending_order(
                     pending_type="BUY_STOP",
                     price=buy_lv,
@@ -416,7 +416,7 @@ def place_weekly_calendar_pending(chart_data: dict) -> int:
         if not _is_covered(sell_lv, existing_prices):
             tp_pips = _calc_tp_pips(sell_lv, sup_levels[1:], point,
                                     MONEY_MANAGEMENT["default_tp_pips"], is_sell=True)
-            if tp_pips / sl_pips >= min_rr:
+            if (tp_pips / sl_pips if sl_pips > 0 else 0) >= min_rr:
                 res = place_pending_order(
                     pending_type="SELL_STOP",
                     price=sell_lv,
@@ -435,6 +435,8 @@ def place_weekly_calendar_pending(chart_data: dict) -> int:
 
 
 def _is_covered(level: float, existing_prices: list) -> bool:
+    if level == 0:
+        return False
     return any(abs(p - level) / level < DUPLICATE_ZONE_PCT for p in existing_prices)
 
 
@@ -597,7 +599,7 @@ def manage_range_pending(chart_data: dict) -> int:
     tp_pips = round(range_width_pips * 0.85)
     min_rr  = MONEY_MANAGEMENT["min_rr_ratio"]
 
-    if tp_pips / sl_pips < min_rr:
+    if (tp_pips / sl_pips if sl_pips > 0 else 0) < min_rr:
         logger.info(
             f"Range pending: RR={tp_pips/sl_pips:.2f} < {min_rr} — ข้าม"
         )
@@ -770,7 +772,7 @@ def manage_sl_reentry(chart_data: dict) -> int:
                 continue
             tp_pips = _calc_tp_pips(safe_lv, res_levels, point,
                                     MONEY_MANAGEMENT["default_tp_pips"], is_sell=False)
-            if tp_pips / sl_pips < min_rr:
+            if (tp_pips / sl_pips if sl_pips > 0 else 0) < min_rr:
                 logger.info(f"Post-SL BUY_LIMIT @ {safe_lv:.2f}: RR {tp_pips/sl_pips:.2f} ต่ำ — ข้าม")
                 continue
             res = place_pending_order(
@@ -811,7 +813,7 @@ def manage_sl_reentry(chart_data: dict) -> int:
                 continue
             tp_pips = _calc_tp_pips(safe_lv, sup_levels, point,
                                     MONEY_MANAGEMENT["default_tp_pips"], is_sell=True)
-            if tp_pips / sl_pips < min_rr:
+            if (tp_pips / sl_pips if sl_pips > 0 else 0) < min_rr:
                 logger.info(f"Post-SL SELL_LIMIT @ {safe_lv:.2f}: RR {tp_pips/sl_pips:.2f} ต่ำ — ข้าม")
                 continue
             res = place_pending_order(

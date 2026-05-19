@@ -68,6 +68,66 @@ def calculate_lot_size(account_balance: float, sl_pips: float,
     return clamped
 
 
+def _nnlb_lot_and_check(equity: float, sl_pips: float) -> tuple[float, str]:
+    """
+    NNLB lot calculation + equity gate
+    คืน (lot, error_msg)  — error_msg ว่าง = ผ่าน
+
+    Tier logic:
+      tier = floor(equity / NNLB_EQUITY_PER_LOT)   ← เพิ่ม 1 MIN_LOT ทุก equity tier
+      lot  = MIN_LOT × tier  (clamped ระหว่าง MIN_LOT–MAX_LOT)
+
+    ตัวอย่าง NNLB_EQUITY_PER_LOT=100, MIN_LOT=0.01:
+      equity $80  → ต่ำกว่า base → skip
+      equity $100 → tier=1 → lot 0.01
+      equity $200 → tier=2 → lot 0.02
+      equity $500 → tier=5 → lot 0.05
+    """
+    # ── Gate: equity ต่ำกว่า base → ไม่คุ้มกับ SL ────────────────
+    if equity < _cfg.NNLB_BASE_EQUITY:
+        msg = f"[NNLB] equity {equity:.2f} < base {_cfg.NNLB_BASE_EQUITY:.0f} — skip (ทุนไม่พอ)"
+        logger.warning(msg)
+        return 0.0, msg
+
+    # ── Tier-based lot ────────────────────────────────────────────
+    per_lot   = max(1.0, _cfg.NNLB_EQUITY_PER_LOT)   # guard against div/0
+    tier      = max(1, int(equity / per_lot))
+    lot       = round(min(_cfg.MIN_LOT * tier, _cfg.MAX_LOT), 2)
+    lot       = max(_cfg.MIN_LOT, lot)
+
+    # ── NNLB_MAX_LOSS_PCT: cap lot ให้ max_loss ไม่เกิน X% ของ equity ──
+    pip_value        = 0.1   # XAU/USD: $0.1 per pip per 0.01 lot
+    max_loss         = round(lot * sl_pips * pip_value * 100, 2)
+    max_loss_allowed = round(equity * (_cfg.NNLB_MAX_LOSS_PCT / 100), 2)
+
+    if sl_pips > 0 and max_loss > max_loss_allowed:
+        budget_lot = round(max_loss_allowed / (sl_pips * pip_value * 100), 2)
+        if budget_lot >= _cfg.MIN_LOT:
+            # ลด lot ให้อยู่ใน budget
+            lot      = budget_lot
+            max_loss = round(lot * sl_pips * pip_value * 100, 2)
+            logger.warning(
+                f"[NNLB] lot ลดจาก tier={tier} → {budget_lot} "
+                f"เพื่อให้ max_loss ${max_loss:.2f} ≤ {_cfg.NNLB_MAX_LOSS_PCT:.0f}% ของ equity"
+            )
+        else:
+            # แม้แต่ MIN_LOT ก็เกิน budget — ใช้ MIN_LOT ต่อไป (user รับความเสี่ยงใน NNLB)
+            lot      = _cfg.MIN_LOT
+            max_loss = round(lot * sl_pips * pip_value * 100, 2)
+            logger.warning(
+                f"[NNLB] ⚠ MIN_LOT={lot} ยังให้ max_loss ${max_loss:.2f} "
+                f">{_cfg.NNLB_MAX_LOSS_PCT:.0f}% equity (${max_loss_allowed:.2f}) "
+                f"— ทุนน้อยเกิน SL แต่ NNLB ยังเข้า"
+            )
+
+    loss_pct = round(max_loss / equity * 100, 1) if equity > 0 else 0
+    logger.warning(
+        f"[NNLB] equity={equity:.2f} tier={tier} → lot={lot} | "
+        f"max loss ${max_loss:.2f} ({loss_pct}% of equity)"
+    )
+    return lot, ""
+
+
 def _close_position(pos) -> bool:
     """ปิด market position ด้วยราคาตลาดขณะนั้น"""
     tick = mt5.symbol_info_tick(SYMBOL)
@@ -195,6 +255,13 @@ def check_open_slot(direction: str, last_dir_lost: bool = False) -> tuple[bool, 
 def open_order(direction: str, sl_pips: float, tp_pips: float,
                comment: str = "", min_rr: float | None = None,
                confidence_scale: float = 1.0) -> dict:
+    if _cfg.DRY_RUN:
+        tick = mt5.symbol_info_tick(SYMBOL)
+        price = (tick.ask if direction.upper() == "BUY" else tick.bid) if tick else 0.0
+        logger.warning(f"[DRY_RUN] would have opened {direction} @ {price:.2f} SL={sl_pips}p TP={tp_pips}p")
+        return {"success": True, "ticket": 0, "direction": direction,
+                "lot": 0.0, "price": price, "sl": 0.0, "tp": 0.0, "dry_run": True}
+
     account = mt5.account_info()
     if account is None:
         logger.error("Cannot get account info")
@@ -208,7 +275,13 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
     sym_info = mt5.symbol_info(SYMBOL)
     point      = sym_info.point
     stops_min  = sym_info.trade_stops_level * point   # ระยะ SL/TP ขั้นต่ำจากราคาปัจจุบัน
-    lot = calculate_lot_size(account.balance, sl_pips, confidence_scale)
+
+    if _cfg.NNLB_MODE:
+        lot, err = _nnlb_lot_and_check(account.equity, sl_pips)
+        if err:
+            return {"success": False, "error": err}
+    else:
+        lot = calculate_lot_size(account.balance, sl_pips, confidence_scale)
 
     no_tp = (tp_pips == 0)   # mode พิเศษ: ไม่ตั้ง TP รอ momentum
 
@@ -242,34 +315,35 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
     if no_tp:
         logger.info("No-TP mode: เปิด order โดยไม่ตั้ง TP — รอตั้งหลัง momentum สงบ")
 
-    # ตรวจ Risk/Reward ratio — ข้ามถ้า no_tp (ไม่มี TP ให้คำนวณ)
-    effective_min_rr = min_rr if min_rr is not None else MONEY_MANAGEMENT["min_rr_ratio"]
-    if not no_tp:
-        actual_sl_pips = abs(price - sl) / point
-        actual_tp_pips = abs(tp - price) / point
-        rr = actual_tp_pips / actual_sl_pips if actual_sl_pips > 0 else 0
-        if rr < effective_min_rr:
-            logger.warning(f"RR ratio {rr:.2f} ต่ำกว่าขั้นต่ำ {effective_min_rr:.1f} (dynamic)")
-            return {"success": False, "error": f"RR ratio too low: {rr:.2f} (min={effective_min_rr:.1f})"}
+    if not _cfg.NNLB_MODE:
+        # ตรวจ Risk/Reward ratio — ข้ามถ้า no_tp (ไม่มี TP ให้คำนวณ)
+        effective_min_rr = min_rr if min_rr is not None else MONEY_MANAGEMENT["min_rr_ratio"]
+        if not no_tp:
+            actual_sl_pips = abs(price - sl) / point
+            actual_tp_pips = abs(tp - price) / point
+            rr = actual_tp_pips / actual_sl_pips if actual_sl_pips > 0 else 0
+            if rr < effective_min_rr:
+                logger.warning(f"RR ratio {rr:.2f} ต่ำกว่าขั้นต่ำ {effective_min_rr:.1f} (dynamic)")
+                return {"success": False, "error": f"RR ratio too low: {rr:.2f} (min={effective_min_rr:.1f})"}
 
-    # ตรวจจำนวน order ต่อฝั่ง (สอดคล้องกับ check_open_slot)
-    dir_type = 0 if direction.upper() == "BUY" else 1
-    open_positions = mt5.positions_get(symbol=SYMBOL) or []
-    same_dir_count = sum(1 for p in open_positions if p.type == dir_type)
-    effective_limit = MONEY_MANAGEMENT["max_open_trades"] + count_protected_slots()
-    if same_dir_count >= effective_limit:
-        return {"success": False, "error": "Max open trades reached"}
+        # ตรวจจำนวน order ต่อฝั่ง (สอดคล้องกับ check_open_slot)
+        dir_type = 0 if direction.upper() == "BUY" else 1
+        open_positions = mt5.positions_get(symbol=SYMBOL) or []
+        same_dir_count = sum(1 for p in open_positions if p.type == dir_type)
+        effective_limit = MONEY_MANAGEMENT["max_open_trades"] + count_protected_slots()
+        if same_dir_count >= effective_limit:
+            return {"success": False, "error": "Max open trades reached"}
 
-    # ตรวจ margin ก่อนส่ง — คำนวณ margin ที่ต้องการสำหรับ lot นี้
-    margin_needed = mt5.order_calc_margin(order_type, SYMBOL, lot, price)
-    if margin_needed is not None and account.equity < margin_needed:
-        logger.warning(f"Margin ไม่พอ: ต้องการ {margin_needed:.2f}, equity {account.equity:.2f}")
-        safe_lot = round((account.equity * 0.9) / (margin_needed / lot), 2) if lot > 0 else 0
-        safe_lot = max(_cfg.MIN_LOT, min(safe_lot, lot))
-        if safe_lot < _cfg.MIN_LOT:
-            return {"success": False, "error": f"Margin ไม่พอแม้จะใช้ lot ขั้นต่ำ (equity={account.equity:.2f})"}
-        logger.info(f"ลด lot จาก {lot} → {safe_lot} เพราะ margin จำกัด")
-        lot = safe_lot
+        # ตรวจ margin ก่อนส่ง — คำนวณ margin ที่ต้องการสำหรับ lot นี้
+        margin_needed = mt5.order_calc_margin(order_type, SYMBOL, lot, price)
+        if margin_needed is not None and account.equity < margin_needed:
+            logger.warning(f"Margin ไม่พอ: ต้องการ {margin_needed:.2f}, equity {account.equity:.2f}")
+            safe_lot = round((account.equity * 0.9) / (margin_needed / lot), 2) if lot > 0 else 0
+            safe_lot = max(_cfg.MIN_LOT, min(safe_lot, lot))
+            if safe_lot < _cfg.MIN_LOT:
+                return {"success": False, "error": f"Margin ไม่พอแม้จะใช้ lot ขั้นต่ำ (equity={account.equity:.2f})"}
+            logger.info(f"ลด lot จาก {lot} → {safe_lot} เพราะ margin จำกัด")
+            lot = safe_lot
 
     request = {
         "action": mt5.TRADE_ACTION_DEAL,
@@ -418,6 +492,11 @@ def get_mt5_history(days: int = 60) -> list:
 def place_pending_order(pending_type: str, price: float, sl_pips: float, tp_pips: float,
                         comment: str = "", expiry_hours: int = 48) -> dict:
     """วาง pending order ที่ level ที่กำหนด ใช้ TRADE_ACTION_PENDING"""
+    if _cfg.DRY_RUN:
+        logger.warning(f"[DRY_RUN] would have placed {pending_type} @ {price:.2f} SL={sl_pips}p TP={tp_pips}p")
+        return {"success": True, "ticket": 0, "pending_type": pending_type,
+                "price": price, "sl": 0.0, "tp": 0.0, "dry_run": True}
+
     if pending_type not in PENDING_TYPE_MAP:
         return {"success": False, "error": f"Invalid pending_type: {pending_type}"}
 
@@ -431,7 +510,14 @@ def place_pending_order(pending_type: str, price: float, sl_pips: float, tp_pips
 
     point     = info.point
     stops_min = info.trade_stops_level * point
-    lot       = calculate_lot_size(account.balance, sl_pips)
+
+    if _cfg.NNLB_MODE:
+        lot, err = _nnlb_lot_and_check(account.equity, sl_pips)
+        if err:
+            return {"success": False, "error": err}
+    else:
+        lot = calculate_lot_size(account.balance, sl_pips)
+
     is_buy    = pending_type.startswith("BUY")
     sl = (price - sl_pips * point) if is_buy else (price + sl_pips * point)
     tp = (price + tp_pips * point) if is_buy else (price - tp_pips * point)
@@ -925,8 +1011,8 @@ def _is_momentum_strong(direction: str) -> bool:
     if hist_now > 0: up += 2 if hist_expand else 1
     elif hist_now < 0: dn += 2 if hist_expand else 1
 
-    if roc5 >  0.02: up += 1
-    elif roc5 < -0.02: dn += 1
+    if roc5 >  0.15: up += 1    # 0.15% ≈ $5 move on gold — threshold ที่มีความหมาย
+    elif roc5 < -0.15: dn += 1
 
     if ema_bull: up += 1
     elif ema_bear: dn += 1
@@ -1149,6 +1235,10 @@ def manage_post_event_tp(chart_data: dict | None = None) -> int:
 
 def cancel_pending_order(ticket: int) -> bool:
     """ยกเลิก pending order ด้วย TRADE_ACTION_REMOVE"""
+    if _cfg.DRY_RUN:
+        logger.warning(f"[DRY_RUN] would have cancelled pending ticket={ticket}")
+        return True
+
     result = mt5.order_send({"action": mt5.TRADE_ACTION_REMOVE, "order": ticket})
     if result is None:
         logger.error(f"Cancel pending failed: order_send returned None — {mt5.last_error()}")

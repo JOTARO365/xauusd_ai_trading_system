@@ -199,7 +199,7 @@ def _store_cache(content_hash: str, summary: str, news_data: dict) -> int | None
         # embed แต่ละ item และ insert
         embedded = 0
         for source, content in items:
-            emb = _embed(content, task_type="retrieval_document")
+            emb = _embed(content, task_type="RETRIEVAL_DOCUMENT")
             row = {"cache_id": cache_id, "source": source, "content": content}
             if emb:
                 row["embedding"] = emb

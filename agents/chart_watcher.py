@@ -32,6 +32,8 @@ FIB_ZONE_PCT = 0.0025                      # 0.25% = ถือว่าอยู
 
 def calculate_indicators(rates) -> dict:
     df = pd.DataFrame(rates)
+    if len(df) < 2:
+        return {}
     df["time"] = pd.to_datetime(df["time"], unit="s")
     df.set_index("time", inplace=True)
 
@@ -110,7 +112,7 @@ def find_swing_levels(df: pd.DataFrame, window: int = 5, max_levels: int = 5) ->
         levels = sorted(set(levels), reverse=True)
         result = []
         for lv in levels:
-            if not result or abs(lv - result[-1]) / result[-1] > 0.002:
+            if not result or result[-1] == 0 or abs(lv - result[-1]) / result[-1] > 0.002:
                 result.append(lv)
         return result
 

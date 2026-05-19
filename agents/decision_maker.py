@@ -106,6 +106,31 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     def _fail(reason: str) -> dict:
         return {"pass": False, "reason": reason}
 
+    # ── NNLB mode: ข้าม gates ทั้งหมดยกเว้นทิศทาง ────────────────
+    if _cfg.NNLB_MODE:
+        if tech_signal == "NO_TRADE":
+            return _fail("NNLB: NO_TRADE signal (ไม่มีทิศทาง)")
+        if "BUY" in tech_signal:
+            direction = "BUY"
+        elif "SELL" in tech_signal:
+            direction = "SELL"
+        else:
+            return _fail(f"NNLB: ทิศทางไม่ชัดเจน: {tech_signal}")
+        sl_pips = float(chart_data.get("buy_sl_pips" if direction == "BUY" else "sell_sl_pips")
+                        or MONEY_MANAGEMENT["default_sl_pips"])
+        tp_pips = float(chart_data.get("tp_pips") or MONEY_MANAGEMENT["default_tp_pips"])
+        logger.warning(f"[NNLB] ข้าม gates ทั้งหมด — {direction} SL={sl_pips:.0f}p TP={tp_pips:.0f}p conf={conf}%")
+        return {
+            "pass":         True,
+            "reason":       "NNLB_MODE",
+            "direction":    direction,
+            "tech_signal":  tech_signal,
+            "sl_pips":      sl_pips,
+            "tp_pips":      tp_pips,
+            "confidence":   conf,
+            "streak_scale": 1.0,
+        }
+
     # 1. Daily loss limit
     if _cfg.PORTFOLIO_PROTECTION and account.get("balance", 0) > 0:
         daily_loss_pct = abs(min(history["today_pnl"], 0)) / account["balance"]
@@ -299,6 +324,17 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
     entry_wr    = _get_entry_wr(entry_type, history["entry_perf_text"])
     eff_rr_preview = _effective_min_rr(chart_data, sentiment_data)
 
+    # ── RAG Lesson Retrieval — hybrid search (pre-filter + vector + weighted score) ──
+    lesson_block = ""
+    if getattr(_cfg, "LESSON_LEARNING", True):
+        try:
+            from db.lesson_store import search_lessons, format_lessons_for_prompt
+            lesson_ctx = f"{direction} {entry_type} H4:{trend} SR:{sr_zone} conf:{conf}"
+            lessons = search_lessons(lesson_ctx, direction=direction, trend=trend, top_k=3)
+            lesson_block = format_lessons_for_prompt(lessons)
+        except Exception as _le:
+            logger.debug(f"Lesson search skipped: {_le}")
+
     user_message = f"""Signal: {direction} | Conf: {conf}% | Entry: {entry_type}
 Zone: {sr_zone} {sr_str} | PA: {pa_str} | Candle: {candle_str}
 Trend H4: {trend} | Session: {session} ({hour_utc:02d}:xx UTC)
@@ -307,7 +343,7 @@ SL: {sl_pips:.0f}p | TP: {tp_pips:.0f}p | R:R: {tp_pips/sl_pips:.1f} (min {eff_r
 {sent_line}
 {regime_line}
 History — {entry_wr}
-Account — Today: {history['today_pnl']:+.2f} USD ({history['today_trades']} trades) | WR10: {history['last_10_winrate']}% | Streak: {history['losing_streak']}L"""
+Account — Today: {history['today_pnl']:+.2f} USD ({history['today_trades']} trades) | WR10: {history['last_10_winrate']}% | Streak: {history['losing_streak']}L{chr(10) + lesson_block if lesson_block else ""}"""
 
     global _last_usage
     response = client.messages.create(

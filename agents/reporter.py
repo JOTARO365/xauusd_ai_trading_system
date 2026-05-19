@@ -181,6 +181,8 @@ def _sync_closed_trades(log: dict):
         changed = True
         logger.info(f"Trade closed — Ticket:{t['ticket']} PnL:{pnl:+.2f}")
         _db_write_trade(t)
+        if pnl < 0:
+            _trigger_lesson_learning(t)
 
     if changed:
         closed = [t for t in log["trades"] if t.get("status") == "CLOSED"]
@@ -360,6 +362,8 @@ def log_trade(decision_result: dict):
     order = decision_result.get("order", {})
     if not order.get("success"):
         return
+    if order.get("dry_run"):
+        return  # DRY_RUN order — ไม่บันทึกลง log จริง
 
     tech = decision_result.get("technical", {})
 
@@ -455,6 +459,17 @@ def _db_write_trade(trade: dict) -> None:
         logger.debug(f"DB trade write skipped: {e}")
 
 
+def _trigger_lesson_learning(trade: dict) -> None:
+    try:
+        import config
+        if not getattr(config, "LESSON_LEARNING", True):
+            return
+        from agents.lesson_learner import learn_from_loss
+        learn_from_loss(trade)
+    except Exception as e:
+        logger.debug(f"Lesson learning skipped: {e}")
+
+
 # ─────────────────────────────────────────────────────────────
 #  LOG PENDING ORDER
 # ─────────────────────────────────────────────────────────────
@@ -467,6 +482,8 @@ def log_pending_order(decision_result: dict):
     order = decision_result.get("order", {})
     if not order.get("success"):
         return
+    if order.get("dry_run"):
+        return  # DRY_RUN order — ไม่บันทึกลง log จริง
 
     log  = _load_log()
     tech = decision_result.get("technical", {})
