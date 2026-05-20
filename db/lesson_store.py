@@ -9,8 +9,8 @@ from loguru import logger
 
 _LESSON_TTL_DAYS  = 90
 _DEDUP_WINDOW_DAYS = 30   # รวม lesson ที่เกิดซ้ำภายใน 30 วัน
-_EMBED_MODEL = "models/text-embedding-004"   # 768 dims — ใช้กับ pgvector HNSW ได้
-_EMBED_DIM   = 768
+_EMBED_MODEL = "models/gemini-embedding-001"  # stable model ที่ v1beta รองรับ
+_EMBED_DIM   = 768                            # ลด dim จาก 3072 → 768 ด้วย output_dimensionality
 
 # คำแนะนำต่อ mistake_type — inject เข้า prompt เพื่อให้ Claude รู้ว่าต้องทำอะไร
 _MISTAKE_ADVICE = {
@@ -59,7 +59,7 @@ def _embed(text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> list[float] | No
         result = client.models.embed_content(
             model=_EMBED_MODEL,
             contents=text[:2000],
-            config=types.EmbedContentConfig(task_type=task_type),
+            config=types.EmbedContentConfig(task_type=task_type, output_dimensionality=_EMBED_DIM),
         )
         return result.embeddings[0].values
     except Exception as e:

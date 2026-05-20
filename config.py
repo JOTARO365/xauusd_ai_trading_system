@@ -84,6 +84,10 @@ def reload_config():
     NO_TP_WAIT_MINUTES = int(os.getenv("NO_TP_WAIT_MINUTES", "30"))
     DYNAMIC_TP        = os.getenv("DYNAMIC_TP", "true").lower() != "false"
     STREAK_PROTECTION = os.getenv("STREAK_PROTECTION", "true").lower() != "false"
+    global TRAILING_STOP, TRAILING_ATR_TF, TRAILING_ATR_MULT
+    TRAILING_STOP     = os.getenv("TRAILING_STOP",     "false").lower() == "true"
+    TRAILING_ATR_TF   = os.getenv("TRAILING_ATR_TF",   "D1")
+    TRAILING_ATR_MULT = float(os.getenv("TRAILING_ATR_MULT", "1.5"))
     global LESSON_LEARNING, DRY_RUN, NNLB_MODE, NNLB_BASE_EQUITY, NNLB_EQUITY_PER_LOT, NNLB_MAX_LOSS_PCT
     LESSON_LEARNING      = os.getenv("LESSON_LEARNING", "true").lower() != "false"
     DRY_RUN              = os.getenv("DRY_RUN", "false").lower() == "true"
@@ -108,6 +112,11 @@ def reload_config():
         "conf_min_scale":        float(os.getenv("CONF_MIN_SCALE")        or 0.5),
     })
 
+
+# ── Trailing Stop (ATR-based Higher TF) ──────────────────────
+TRAILING_STOP     = os.getenv("TRAILING_STOP",     "false").lower() == "true"
+TRAILING_ATR_TF   = os.getenv("TRAILING_ATR_TF",   "D1")    # H4 | D1 | W1
+TRAILING_ATR_MULT = float(os.getenv("TRAILING_ATR_MULT", "1.5"))
 
 # ── Lesson Learning (RAG-based) ───────────────────────────────
 LESSON_LEARNING = os.getenv("LESSON_LEARNING", "true").lower() != "false"

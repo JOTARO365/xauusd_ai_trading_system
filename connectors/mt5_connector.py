@@ -128,6 +128,111 @@ def _nnlb_lot_and_check(equity: float, sl_pips: float) -> tuple[float, str]:
     return lot, ""
 
 
+def _atr_from_rates(rates, period: int = 14) -> float:
+    """คำนวณ ATR จาก rates array โดยใช้ numpy (ไม่ต้องพึ่ง pandas/ta)"""
+    if rates is None or len(rates) < period + 1:
+        return 0.0
+    high  = np.array([r["high"]  for r in rates], dtype=float)
+    low   = np.array([r["low"]   for r in rates], dtype=float)
+    close = np.array([r["close"] for r in rates], dtype=float)
+    tr = np.maximum(high[1:] - low[1:],
+         np.maximum(np.abs(high[1:] - close[:-1]),
+                    np.abs(low[1:]  - close[:-1])))
+    return float(np.mean(tr[-period:]))
+
+
+def _get_htf_atr(tf_name: str = "D1") -> float:
+    """ดึง ATR จาก Higher Timeframe — ใช้สำหรับ trailing stop"""
+    from connectors.price_feed import get_ohlcv
+    tf_map = {
+        "H4": mt5.TIMEFRAME_H4,
+        "D1": mt5.TIMEFRAME_D1,
+        "W1": mt5.TIMEFRAME_W1,
+    }
+    tf = tf_map.get(tf_name.upper(), mt5.TIMEFRAME_D1)
+    count = 30 if tf == mt5.TIMEFRAME_W1 else 50
+    rates = get_ohlcv(SYMBOL, tf, count)
+    atr = _atr_from_rates(rates)
+    if atr > 0:
+        logger.debug(f"[TRAILING] ATR_{tf_name} = {atr:.2f}")
+    return atr
+
+
+def manage_trailing_stop() -> int:
+    """
+    ATR-based trailing stop ใช้ Higher TF ATR (H4 / D1 / W1)
+
+    Logic:
+      BUY : trail_sl = bid − ATR × mult  — ขยับ SL ขึ้นเมื่อ trail_sl > current_sl
+      SELL: trail_sl = ask + ATR × mult  — ขยับ SL ลงเมื่อ trail_sl < current_sl
+
+    Config (.env):
+      TRAILING_STOP=true
+      TRAILING_ATR_TF=D1          # H4 | D1 | W1
+      TRAILING_ATR_MULT=1.5       # กี่เท่าของ ATR ให้อยู่หลังราคา
+    """
+    if not getattr(_cfg, "TRAILING_STOP", False):
+        return 0
+
+    tf_name = getattr(_cfg, "TRAILING_ATR_TF",   "D1")
+    mult    = getattr(_cfg, "TRAILING_ATR_MULT",  1.5)
+
+    atr = _get_htf_atr(tf_name)
+    if atr <= 0:
+        logger.warning("[TRAILING] ดึง ATR ไม่ได้ — ข้าม trailing stop")
+        return 0
+
+    tick = mt5.symbol_info_tick(SYMBOL)
+    if tick is None:
+        return 0
+    info = mt5.symbol_info(SYMBOL)
+    if info is None:
+        return 0
+
+    positions = mt5.positions_get(symbol=SYMBOL)
+    if not positions:
+        return 0
+
+    moved = 0
+    trail_dist = round(atr * mult, 2)
+
+    for pos in positions:
+        is_buy    = pos.type == 0
+        cur_price = tick.bid if is_buy else tick.ask
+        cur_sl    = pos.sl
+
+        if is_buy:
+            trail_sl = round(cur_price - trail_dist, 2)
+            if cur_sl > 0 and trail_sl <= cur_sl:
+                continue   # SL ที่คำนวณได้ไม่ดีกว่า → ข้าม
+        else:
+            trail_sl = round(cur_price + trail_dist, 2)
+            if cur_sl > 0 and trail_sl >= cur_sl:
+                continue
+
+        req = {
+            "action":   mt5.TRADE_ACTION_SLTP,
+            "symbol":   SYMBOL,
+            "position": pos.ticket,
+            "sl":       trail_sl,
+            "tp":       pos.tp,
+        }
+        result = mt5.order_send(req)
+        if result and result.retcode == mt5.TRADE_RETCODE_DONE:
+            direction = "BUY" if is_buy else "SELL"
+            logger.warning(
+                f"[TRAILING] ticket={pos.ticket} {direction} "
+                f"SL {cur_sl:.2f} → {trail_sl:.2f} "
+                f"(ATR_{tf_name}={atr:.2f} ×{mult} = {trail_dist:.2f})"
+            )
+            moved += 1
+        else:
+            err = result.retcode if result else mt5.last_error()
+            logger.error(f"[TRAILING] ขยับ SL ticket={pos.ticket} fail: {err}")
+
+    return moved
+
+
 def _close_position(pos) -> bool:
     """ปิด market position ด้วยราคาตลาดขณะนั้น"""
     tick = mt5.symbol_info_tick(SYMBOL)
