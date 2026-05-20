@@ -2452,6 +2452,73 @@ async function loadBacktest() {
     console.error('loadBacktest error:', e);
   }
 }
+
+// ─── NNLB RISK MODAL ─────────────────────────────────────────
+(function () {
+  const nnlbToggle = document.getElementById('cfg-NNLB_MODE');
+  if (!nnlbToggle) return;
+
+  nnlbToggle.addEventListener('change', function (e) {
+    if (!this.checked) return; // turning OFF is fine, no warning needed
+    e.preventDefault();
+    this.checked = false; // revert until user confirms
+    document.getElementById('nnlb-modal').style.display = 'flex';
+  });
+
+  document.getElementById('nnlb-modal-confirm').addEventListener('click', function () {
+    document.getElementById('cfg-NNLB_MODE').checked = true;
+    document.getElementById('nnlb-modal').style.display = 'none';
+  });
+
+  document.getElementById('nnlb-modal-cancel').addEventListener('click', function () {
+    document.getElementById('cfg-NNLB_MODE').checked = false;
+    document.getElementById('nnlb-modal').style.display = 'none';
+  });
+
+  document.getElementById('nnlb-modal').addEventListener('click', function (e) {
+    if (e.target === this) {
+      document.getElementById('cfg-NNLB_MODE').checked = false;
+      this.style.display = 'none';
+    }
+  });
+})();
 </script>
+
+<!-- NNLB Risk Warning Modal -->
+<div id="nnlb-modal" style="
+  display:none; position:fixed; inset:0; z-index:9999;
+  background:rgba(0,0,0,0.7); align-items:center; justify-content:center;">
+  <div style="
+    background:var(--surface1,#1e1e2e); border:1px solid #f38ba8;
+    border-radius:12px; padding:28px 32px; max-width:440px; width:90%; box-shadow:0 8px 40px rgba(0,0,0,0.6);">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <span style="font-size:24px">⚠️</span>
+      <h3 style="margin:0;color:#f38ba8;font-size:16px">เปิด NNLB Mode — รับทราบความเสี่ยง</h3>
+    </div>
+    <ul style="margin:0 0 20px 0;padding-left:18px;line-height:1.8;font-size:13px;color:var(--text,#cdd6f4)">
+      <li>ข้าม Money Management gates <strong>ทั้งหมด</strong> — ไม่มีการกรอง confidence, RR, daily loss</li>
+      <li>Lot size scale ตาม equity tier โดยตรง — อาจขาดทุน <strong>เกิน % ที่ยอมรับได้ในโหมดปกติ</strong></li>
+      <li>หาก MIN_LOT เกิน Max Loss Budget ระบบ <strong>ยังคงเข้า order</strong> ที่ MIN_LOT ต่อไป</li>
+      <li>เหมาะสำหรับทุนน้อยที่ยอมรับความเสี่ยงสูง <strong>เท่านั้น</strong></li>
+    </ul>
+    <p style="margin:0 0 20px 0;font-size:12px;color:#f38ba8;background:rgba(243,139,168,0.1);
+      padding:10px 14px;border-radius:6px;border-left:3px solid #f38ba8">
+      โหมดนี้ออกแบบสำหรับผู้ที่เข้าใจความเสี่ยงอย่างครบถ้วนแล้ว<br>
+      <strong>ระบบจะไม่รับผิดชอบต่อการขาดทุนที่เกิดขึ้น</strong>
+    </p>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button id="nnlb-modal-cancel" style="
+        padding:9px 20px;border-radius:6px;border:1px solid var(--border2,#45475a);
+        background:transparent;color:var(--text,#cdd6f4);font-size:13px;cursor:pointer">
+        ยกเลิก
+      </button>
+      <button id="nnlb-modal-confirm" style="
+        padding:9px 20px;border-radius:6px;border:none;
+        background:#f38ba8;color:#1e1e2e;font-size:13px;font-weight:700;cursor:pointer">
+        รับทราบ — เปิด NNLB Mode
+      </button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
