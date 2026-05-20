@@ -85,6 +85,9 @@ def reload_config():
     DYNAMIC_TP        = os.getenv("DYNAMIC_TP", "true").lower() != "false"
     STREAK_PROTECTION = os.getenv("STREAK_PROTECTION", "true").lower() != "false"
     global TRAILING_STOP, TRAILING_ATR_TF, TRAILING_ATR_MULT
+    global BE_TRIGGER_R, BE_BUFFER_PIPS
+    BE_TRIGGER_R   = float(os.getenv("BE_TRIGGER_R",   "0.8"))
+    BE_BUFFER_PIPS = int(os.getenv("BE_BUFFER_PIPS", "200"))
     TRAILING_STOP     = os.getenv("TRAILING_STOP",     "false").lower() == "true"
     TRAILING_ATR_TF   = os.getenv("TRAILING_ATR_TF",   "D1")
     TRAILING_ATR_MULT = float(os.getenv("TRAILING_ATR_MULT", "1.5"))
@@ -113,7 +116,14 @@ def reload_config():
     })
 
 
-# ── Trailing Stop (ATR-based Higher TF) ──────────────────────
+# ── Breakeven ────────────────────────────────────────────────
+# BE_TRIGGER_R  : trigger BE เมื่อ profit ≥ X × SL distance จริงของ position
+#                 0.8 = 80% ของ SL (เกือบถึง 1R) — ป้องกันโดนหน้าทุนตอนกำไรน้อย
+BE_TRIGGER_R   = float(os.getenv("BE_TRIGGER_R",   "0.8"))
+# BE_BUFFER_PIPS: SL วางที่ entry + buffer (BUY) เพื่อรับ spread เล็กน้อย
+BE_BUFFER_PIPS = int(os.getenv("BE_BUFFER_PIPS", "200"))
+
+# ── Trailing Stop (Swing Low/High Higher TF) ──────────────────
 TRAILING_STOP     = os.getenv("TRAILING_STOP",     "false").lower() == "true"
 TRAILING_ATR_TF   = os.getenv("TRAILING_ATR_TF",   "D1")    # H4 | D1 | W1
 TRAILING_ATR_MULT = float(os.getenv("TRAILING_ATR_MULT", "1.5"))

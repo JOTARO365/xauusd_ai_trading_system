@@ -721,8 +721,7 @@ def get_pending_orders() -> list:
     ]
 
 
-BREAKEVEN_TRIGGER_PIPS = 1000   # ขยับ SL มาหน้าทุนเมื่อกำไรถึงระดับนี้
-BREAKEVEN_BUFFER_PIPS  = 100    # เผื่อ spread — SL = entry + 100 pips (ไม่ขาดทุน)
+BREAKEVEN_BUFFER_PIPS  = 200    # fallback เมื่อ _cfg ยังไม่โหลด
 
 
 def count_protected_slots() -> int:
@@ -733,23 +732,28 @@ def count_protected_slots() -> int:
         return 0
     info = mt5.symbol_info(SYMBOL)
     point = info.point if info else 0.01
+    buf = getattr(_cfg, "BE_BUFFER_PIPS", BREAKEVEN_BUFFER_PIPS)
     count = 0
     for pos in positions:
         if pos.sl == 0:
             continue
         is_buy = pos.type == 0
-        # BUY: SL หน้าทุน = sl >= entry + buffer, SELL: sl <= entry - buffer
-        if is_buy  and pos.sl >= pos.price_open + BREAKEVEN_BUFFER_PIPS * point:
+        if is_buy  and pos.sl >= pos.price_open + buf * point:
             count += 1
-        elif not is_buy and pos.sl <= pos.price_open - BREAKEVEN_BUFFER_PIPS * point:
+        elif not is_buy and pos.sl <= pos.price_open - buf * point:
             count += 1
     return count
 
 
 def manage_breakeven() -> int:
-    """ตรวจ open positions ทุกตัว — ถ้ากำไรเกิน BREAKEVEN_TRIGGER_PIPS แล้ว SL ยังอยู่ฝั่งขาดทุน
-    ให้ขยับ SL มาที่ entry + buffer (หน้าทุนเล็กน้อย)
-    คืนจำนวน positions ที่แก้ SL"""
+    """
+    R-based breakeven: trigger เมื่อ profit ≥ BE_TRIGGER_R × SL distance จริงของ position
+    (ป้องกันโดนหน้าทุนตอนกำไรยังน้อย — default trigger ที่ 80% ของ SL)
+
+    Config (.env):
+      BE_TRIGGER_R   = 0.8   # trigger ที่ 80% ของ SL distance
+      BE_BUFFER_PIPS = 200   # SL วางที่ entry + 200 pips
+    """
     info = mt5.symbol_info(SYMBOL)
     if info is None:
         return 0
@@ -763,26 +767,35 @@ def manage_breakeven() -> int:
     if tick is None:
         return 0
 
+    trigger_r  = getattr(_cfg, "BE_TRIGGER_R",   0.8)
+    buf_pips   = getattr(_cfg, "BE_BUFFER_PIPS", BREAKEVEN_BUFFER_PIPS)
+
     modified = 0
     for pos in positions:
         entry  = pos.price_open
-        is_buy = pos.type == 0   # ORDER_TYPE_BUY = 0
+        is_buy = pos.type == 0
 
-        # คำนวณ pip ที่กำไรอยู่ตอนนี้
-        current = tick.bid if is_buy else tick.ask
+        # ต้องมี SL ถึงจะคำนวณ R ได้
+        if pos.sl == 0:
+            continue
+        sl_dist_pips = abs(entry - pos.sl) / point
+        if sl_dist_pips < 10:
+            continue   # SL แคบเกินไป (อาจถูกขยับมา BE แล้ว)
+
+        current     = tick.bid if is_buy else tick.ask
         profit_pips = ((current - entry) if is_buy else (entry - current)) / point
+        trigger_pips = sl_dist_pips * trigger_r
 
-        if profit_pips < BREAKEVEN_TRIGGER_PIPS:
-            continue   # ยังไม่ถึง trigger
+        if profit_pips < trigger_pips:
+            continue   # ยังไม่ถึง X% ของ SL
 
-        # คำนวณ SL ใหม่ที่หน้าทุน
-        new_sl = round(entry + BREAKEVEN_BUFFER_PIPS * point, 2) if is_buy \
-            else round(entry - BREAKEVEN_BUFFER_PIPS * point, 2)
+        new_sl = round(entry + buf_pips * point, 2) if is_buy \
+            else round(entry - buf_pips * point, 2)
 
-        # ข้ามถ้า SL ปัจจุบันอยู่หน้าทุนแล้ว
+        # ข้ามถ้า SL ปัจจุบันดีกว่าแล้ว
         if is_buy  and pos.sl >= new_sl:
             continue
-        if not is_buy and pos.sl != 0 and pos.sl <= new_sl:
+        if not is_buy and pos.sl <= new_sl:
             continue
 
         req = {
@@ -801,7 +814,8 @@ def manage_breakeven() -> int:
             direction = "BUY" if is_buy else "SELL"
             logger.info(
                 f"Breakeven set: ticket={pos.ticket} {direction} "
-                f"entry={entry:.2f} profit={profit_pips:.0f}pips "
+                f"entry={entry:.2f} SL_dist={sl_dist_pips:.0f}p "
+                f"trigger={trigger_pips:.0f}p profit={profit_pips:.0f}p "
                 f"SL {pos.sl:.2f}→{new_sl:.2f}"
             )
             modified += 1
@@ -916,9 +930,10 @@ def manage_partial_close() -> int:
                 if _partial_close_pos(pos, lot, tick):
                     done.add("1R")
                     closed += 1
+                    _buf = getattr(_cfg, "BE_BUFFER_PIPS", BREAKEVEN_BUFFER_PIPS)
                     be_sl = round(
-                        entry + BREAKEVEN_BUFFER_PIPS * point if is_buy
-                        else entry - BREAKEVEN_BUFFER_PIPS * point, 2
+                        entry + _buf * point if is_buy
+                        else entry - _buf * point, 2
                     )
                     _set_sl_tp(ticket, be_sl, pos.tp)
                     logger.info(
@@ -994,9 +1009,9 @@ def _force_breakeven_opposing(new_direction: str) -> int:
             logger.debug(f"Force-BE skip {tag}: in loss ({profit_pips:.0f}pips)")
             continue
 
-        # ลด buffer ถ้ากำไรน้อยกว่า BREAKEVEN_BUFFER_PIPS
-        # เผื่อ spread 10 pips ก่อนถึง current price
-        safe_buffer = min(BREAKEVEN_BUFFER_PIPS, profit_pips - 10)
+        # ลด buffer ถ้ากำไรน้อยกว่า BE_BUFFER_PIPS
+        _buf = getattr(_cfg, "BE_BUFFER_PIPS", BREAKEVEN_BUFFER_PIPS)
+        safe_buffer = min(_buf, profit_pips - 10)
         if safe_buffer < 0:
             logger.debug(
                 f"Force-BE skip {tag}: profit {profit_pips:.0f}pips too small (need >10 pips)"

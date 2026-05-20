@@ -1478,6 +1478,27 @@
         </div>
       </div>
 
+      <!-- Breakeven -->
+      <div class="settings-card">
+        <h3>Breakeven <span style="font-size:11px;color:var(--muted);font-weight:400">ขยับ SL มาหน้าทุน</span></h3>
+        <div class="field-group">
+          <div class="field">
+            <label>BE Trigger (R) <span style="color:var(--muted);font-size:11px">trigger เมื่อกำไร ≥ X × SL distance</span></label>
+            <input type="number" id="cfg-BE_TRIGGER_R" step="0.05" min="0.5" max="1.5">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">
+              0.8 = trigger ที่ 80% ของ SL (แนะนำ) &nbsp;|&nbsp; 1.0 = รอถึง 1R
+            </div>
+          </div>
+          <div class="field">
+            <label>BE Buffer (pips) <span style="color:var(--muted);font-size:11px">SL วางที่ entry + X pips</span></label>
+            <input type="number" id="cfg-BE_BUFFER_PIPS" step="50" min="0" max="1000">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">
+              200 = entry + $2 (เผื่อ spread) &nbsp;|&nbsp; 0 = หน้าทุนพอดี
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- NNLB Mode -->
       <div class="settings-card">
         <h3>NNLB Mode <span style="font-size:11px;color:var(--muted);font-weight:400">(No-Risk-No-Lamborghini)</span></h3>
@@ -2099,6 +2120,7 @@ const _NUM_KEYS  = ['START_BALANCE','RISK_PER_TRADE','MAX_DAILY_LOSS','MAX_OPEN_
   'DEFAULT_SL_PIPS','DEFAULT_TP_PIPS','MIN_RR_RATIO','FIXED_LOT','MIN_LOT','MAX_LOT',
   'MAX_LOSING_STREAK','STREAK_MIN_CONFIDENCE','MAX_PENDING_BUY','MAX_PENDING_SELL',
   'PENDING_EXPIRY_HOURS','HEDGE_BUFFER_PIPS',
+  'BE_TRIGGER_R','BE_BUFFER_PIPS',
   'NNLB_BASE_EQUITY','NNLB_EQUITY_PER_LOT','NNLB_MAX_LOSS_PCT','TRAILING_ATR_MULT'];
 const _TXT_KEYS  = ['SYMBOL','LOT_MODE','X_ACCOUNTS_TO_FOLLOW','X_KEYWORDS','TRAILING_ATR_TF'];
 const _BOOL_KEYS = ['PORTFOLIO_PROTECTION','STREAK_PROTECTION','DYNAMIC_TP',
