@@ -128,21 +128,12 @@ def _nnlb_lot_and_check(equity: float, sl_pips: float) -> tuple[float, str]:
     return lot, ""
 
 
-def _atr_from_rates(rates, period: int = 14) -> float:
-    """คำนวณ ATR จาก rates array โดยใช้ numpy (ไม่ต้องพึ่ง pandas/ta)"""
-    if rates is None or len(rates) < period + 1:
-        return 0.0
-    high  = np.array([r["high"]  for r in rates], dtype=float)
-    low   = np.array([r["low"]   for r in rates], dtype=float)
-    close = np.array([r["close"] for r in rates], dtype=float)
-    tr = np.maximum(high[1:] - low[1:],
-         np.maximum(np.abs(high[1:] - close[:-1]),
-                    np.abs(low[1:]  - close[:-1])))
-    return float(np.mean(tr[-period:]))
-
-
-def _get_htf_atr(tf_name: str = "D1") -> float:
-    """ดึง ATR จาก Higher Timeframe — ใช้สำหรับ trailing stop"""
+def _get_htf_swing(tf_name: str = "D1", lookback: int = 3) -> tuple:
+    """
+    ดึง swing low / swing high จาก Higher Timeframe
+    lookback: จำนวนแท่งที่ปิดแล้ว (ไม่นับแท่งที่กำลังก่อตัว)
+    Returns: (swing_low, swing_high)  — (0.0, 0.0) ถ้า error
+    """
     from connectors.price_feed import get_ohlcv
     tf_map = {
         "H4": mt5.TIMEFRAME_H4,
@@ -150,43 +141,48 @@ def _get_htf_atr(tf_name: str = "D1") -> float:
         "W1": mt5.TIMEFRAME_W1,
     }
     tf = tf_map.get(tf_name.upper(), mt5.TIMEFRAME_D1)
-    count = 30 if tf == mt5.TIMEFRAME_W1 else 50
-    rates = get_ohlcv(SYMBOL, tf, count)
-    atr = _atr_from_rates(rates)
-    if atr > 0:
-        logger.debug(f"[TRAILING] ATR_{tf_name} = {atr:.2f}")
-    return atr
+    # ดึงเผื่อ +1 เพราะแท่งสุดท้ายอาจยังไม่ปิด
+    rates = get_ohlcv(SYMBOL, tf, lookback + 2)
+    if rates is None or len(rates) < lookback + 1:
+        return 0.0, 0.0
+    # ตัดแท่งสุดท้าย (กำลังก่อตัว) ออก แล้วเอา lookback แท่งที่เหลือ
+    closed = rates[:-1][-lookback:]
+    swing_low  = float(min(r["low"]  for r in closed))
+    swing_high = float(max(r["high"] for r in closed))
+    logger.debug(
+        f"[TRAILING] swing_{tf_name}(n={lookback}): "
+        f"low={swing_low:.2f}  high={swing_high:.2f}"
+    )
+    return swing_low, swing_high
 
 
 def manage_trailing_stop() -> int:
     """
-    ATR-based trailing stop ใช้ Higher TF ATR (H4 / D1 / W1)
+    Swing Low/High trailing stop ใช้ Higher TF (H4 / D1 / W1)
 
     Logic:
-      BUY : trail_sl = bid − ATR × mult  — ขยับ SL ขึ้นเมื่อ trail_sl > current_sl
-      SELL: trail_sl = ask + ATR × mult  — ขยับ SL ลงเมื่อ trail_sl < current_sl
+      BUY : trail_sl = swing_low (lowest low ของ 3 แท่งที่ปิดแล้ว) − buffer
+      SELL: trail_sl = swing_high (highest high ของ 3 แท่ง)         + buffer
+      ขยับ SL เฉพาะเมื่อ trail_sl ดีกว่า SL ปัจจุบัน
 
     Config (.env):
       TRAILING_STOP=true
       TRAILING_ATR_TF=D1          # H4 | D1 | W1
-      TRAILING_ATR_MULT=1.5       # กี่เท่าของ ATR ให้อยู่หลังราคา
+      TRAILING_ATR_MULT=1.5       # buffer เป็น $ ใต้/เหนือ swing point
     """
     if not getattr(_cfg, "TRAILING_STOP", False):
         return 0
 
-    tf_name = getattr(_cfg, "TRAILING_ATR_TF",   "D1")
-    mult    = getattr(_cfg, "TRAILING_ATR_MULT",  1.5)
+    tf_name = getattr(_cfg, "TRAILING_ATR_TF",  "D1")
+    buffer  = getattr(_cfg, "TRAILING_ATR_MULT", 1.5)   # $ buffer
 
-    atr = _get_htf_atr(tf_name)
-    if atr <= 0:
-        logger.warning("[TRAILING] ดึง ATR ไม่ได้ — ข้าม trailing stop")
+    swing_low, swing_high = _get_htf_swing(tf_name, lookback=3)
+    if swing_low <= 0 or swing_high <= 0:
+        logger.warning("[TRAILING] ดึง swing levels ไม่ได้ — ข้าม")
         return 0
 
     tick = mt5.symbol_info_tick(SYMBOL)
     if tick is None:
-        return 0
-    info = mt5.symbol_info(SYMBOL)
-    if info is None:
         return 0
 
     positions = mt5.positions_get(symbol=SYMBOL)
@@ -194,19 +190,17 @@ def manage_trailing_stop() -> int:
         return 0
 
     moved = 0
-    trail_dist = round(atr * mult, 2)
 
     for pos in positions:
-        is_buy    = pos.type == 0
-        cur_price = tick.bid if is_buy else tick.ask
-        cur_sl    = pos.sl
+        is_buy = pos.type == 0
+        cur_sl = pos.sl
 
         if is_buy:
-            trail_sl = round(cur_price - trail_dist, 2)
+            trail_sl = round(swing_low - buffer, 2)
             if cur_sl > 0 and trail_sl <= cur_sl:
-                continue   # SL ที่คำนวณได้ไม่ดีกว่า → ข้าม
+                continue   # swing low ไม่ขยับขึ้น → ไม่ต้องทำอะไร
         else:
-            trail_sl = round(cur_price + trail_dist, 2)
+            trail_sl = round(swing_high + buffer, 2)
             if cur_sl > 0 and trail_sl >= cur_sl:
                 continue
 
@@ -220,10 +214,10 @@ def manage_trailing_stop() -> int:
         result = mt5.order_send(req)
         if result and result.retcode == mt5.TRADE_RETCODE_DONE:
             direction = "BUY" if is_buy else "SELL"
+            ref = f"swing_low={swing_low:.2f}" if is_buy else f"swing_high={swing_high:.2f}"
             logger.warning(
                 f"[TRAILING] ticket={pos.ticket} {direction} "
-                f"SL {cur_sl:.2f} → {trail_sl:.2f} "
-                f"(ATR_{tf_name}={atr:.2f} ×{mult} = {trail_dist:.2f})"
+                f"SL {cur_sl:.2f} → {trail_sl:.2f}  ({ref} buf=${buffer})"
             )
             moved += 1
         else:
