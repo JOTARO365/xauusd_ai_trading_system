@@ -821,6 +821,28 @@ def _format_setups_text(scan: dict) -> str:
 #  MAIN ANALYSIS
 # ─────────────────────────────────────────────────────────────
 
+def analyze_m5_pa() -> dict:
+    """
+    ดึง M5 data ตรวจ candle pattern / rejection (ใช้ใน Ready Mode เท่านั้น)
+    คืน dict: available, close, rsi, direction, candle, prev_high, prev_low
+    """
+    from connectors.price_feed import get_ohlcv as _get
+    m5_rates = _get(timeframe=mt5.TIMEFRAME_M5, count=30)
+    if m5_rates is None:
+        return {"available": False}
+    m5 = calculate_indicators(m5_rates)
+    candle = detect_candle_pattern(m5["df"])
+    return {
+        "available":  True,
+        "close":      m5["close"],
+        "prev_high":  m5["prev_high"],
+        "prev_low":   m5["prev_low"],
+        "rsi":        m5["rsi"],
+        "direction":  "UP" if m5["close"] > m5["ema20"] else "DOWN",
+        "candle":     candle,
+    }
+
+
 def analyze_chart() -> dict:
     logger.info("Agent 1: กำลังวิเคราะห์กราฟ...")
 

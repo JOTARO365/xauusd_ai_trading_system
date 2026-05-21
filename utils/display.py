@@ -363,6 +363,56 @@ def print_performance_report(report: str):
                         border_style="yellow", padding=(1, 2)))
 
 
+def print_ready_mode_banner(zone: dict | None, status: str = "WATCHING",
+                            m5_pa: dict | None = None,
+                            counter_pressure: bool = False) -> None:
+    """
+    status: ENTER | WATCHING | EXIT
+    zone  : htf_zone dict {"tf","level","zone_type","dist_pct"}
+    """
+    if status == "EXIT":
+        console.print(Panel(
+            "[dim]ราคาออกจาก HTF zone — ออกจาก Ready Mode[/dim]",
+            title="[bold dim]⚡ READY MODE — EXIT[/bold dim]",
+            border_style="dim", padding=(0, 1),
+        ))
+        return
+
+    tf   = zone["tf"] if zone else "?"
+    lv   = zone["level"] if zone else 0
+    zt   = zone["zone_type"] if zone else "?"
+    dist = zone["dist_pct"] if zone else 0
+
+    action    = "BUY" if zt == "SUPPORT" else "SELL"
+    direction = "↑ BUY bounce" if action == "BUY" else "↓ SELL rejection"
+
+    lines = [
+        f"[bold yellow]{tf} {zt}[/bold yellow] @ [bold white]{lv}[/bold white]  "
+        f"(ห่าง [cyan]{dist}%[/cyan])",
+        f"คาด: [bold {'green' if action == 'BUY' else 'red'}]{direction}[/bold {'green' if action == 'BUY' else 'red'}]",
+    ]
+
+    if counter_pressure:
+        lines.append("[yellow]⚠ ไม่มีข่าวสนับสนุนทิศทางราคา → โอกาส reversal สูง[/yellow]")
+
+    if m5_pa and m5_pa.get("available"):
+        pat = m5_pa.get("candle", {}).get("patterns", ["—"])
+        bias = m5_pa.get("candle", {}).get("bias", "NEUTRAL")
+        rsi  = m5_pa.get("rsi", 0)
+        color = "green" if bias == "BULLISH" else "red" if bias == "BEARISH" else "dim"
+        lines.append(
+            f"M5 PA: [{color}]{', '.join(pat[:2])}[/{color}]  "
+            f"Bias:{bias}  RSI:{rsi:.0f}"
+        )
+
+    title_color = "yellow" if status == "ENTER" else "gold1"
+    console.print(Panel(
+        "\n".join(lines),
+        title=f"[bold {title_color}]⚡ READY MODE — {status}[/bold {title_color}]",
+        border_style="yellow", padding=(0, 1),
+    ))
+
+
 def print_error(msg: str):
     console.print(f"  [bold red]✗[/]  {msg}", style=RED)
 

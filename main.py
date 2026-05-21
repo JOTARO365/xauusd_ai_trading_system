@@ -8,7 +8,7 @@ from datetime import date as _date, datetime as _dt
 from loguru import logger
 from connectors.price_feed import connect_mt5, disconnect_mt5, is_mt5_connected
 from connectors.mt5_connector import get_open_positions, manage_breakeven, manage_partial_close, manage_dynamic_tp, manage_post_event_tp, count_protected_slots, is_hedge_active, check_open_slot, is_algo_trading_enabled, manage_trailing_stop
-from agents.chart_watcher import analyze_chart
+from agents.chart_watcher import analyze_chart, analyze_m5_pa
 from agents.market_advisor import analyze_market_regime
 from agents.news_gatherer import gather_news
 from agents.analyst import analyze_sentiment
@@ -25,6 +25,7 @@ from utils.display import (
     console, print_header, print_cycle_start, print_cycle_end,
     print_step, print_signal_box, print_advisor_box,
     print_sentiment_box, print_decision_box, print_warning, print_error,
+    print_ready_mode_banner,
 )
 from utils.market_clock import next_interval, market_sleep_status
 import config
@@ -33,7 +34,19 @@ from config import MONEY_MANAGEMENT
 DEFAULT_INTERVAL   = 300
 STATUS_INTERVAL    = 60
 NET_ERROR_INTERVAL = 600   # รอ 10 นาทีเมื่อ network degraded
+READY_INTERVAL     = 120   # 2 min — fast-poll เมื่ออยู่ที่ HTF zone
+READY_MAX_MISS     = 2     # ออก Ready Mode ถ้า zone หายไป N รอบติดกัน
+READY_MAX_CYCLES   = 15    # ออก Ready Mode หลัง N รอบ (~30 min ที่ 120s)
 _cycle            = 0
+
+# ── Ready Mode state ──────────────────────────────────────────
+_ready_state: dict = {
+    "active":    False,
+    "zone":      None,    # htf_zone dict ที่ trigger
+    "since":     None,    # datetime เข้า ready mode
+    "pa_watch":  0,       # จำนวน cycle ที่ดู PA แล้ว
+    "miss_count": 0,      # cycle ที่ zone หายไปต่อเนื่อง
+}
 _last_chart_data:     dict = {}
 _last_sentiment_data: dict = {}
 _last_weekly_pending_date: "_date | None" = None
@@ -534,7 +547,63 @@ async def main():
                     reason   = "Network degraded (CW+MA fail) — รอ 10 นาที"
                     logger.warning(f"Next interval: {interval}s — {reason}")
                 else:
-                    interval, reason = next_interval(chart_data, sentiment_data)
+                    htf_zone = chart_data.get("htf_zone")
+                    interval, reason = next_interval(chart_data, sentiment_data, htf_zone=htf_zone)
+
+                    # ── Ready Mode: ราคาอยู่ที่ D1/W1 major zone ────────────
+                    if htf_zone:
+                        m5_pa = analyze_m5_pa()
+                        # counter-pressure: ไม่มีข่าวสนับสนุนทิศทางที่ราคาวิ่งมา
+                        sent_bias    = sentiment_data.get("bias", "NEUTRAL")
+                        sent_conf    = sentiment_data.get("confidence", 0)
+                        zone_type    = htf_zone["zone_type"]   # SUPPORT / RESISTANCE
+                        # counter-pressure = ราคาลงแรงมา SUPPORT แต่ sentiment ไม่ bearish
+                        counter_pres = (
+                            (zone_type == "SUPPORT"    and sent_bias != "BEARISH") or
+                            (zone_type == "RESISTANCE" and sent_bias != "BULLISH") or
+                            sent_conf < 40
+                        )
+                        if not _ready_state["active"]:
+                            _ready_state.update({
+                                "active":    True,
+                                "zone":      htf_zone,
+                                "since":     _dt.now(),
+                                "pa_watch":  0,
+                                "miss_count": 0,
+                            })
+                            print_ready_mode_banner(htf_zone, "ENTER", m5_pa, counter_pres)
+                            logger.warning(
+                                f"[READY] เข้า Ready Mode: {htf_zone['tf']} "
+                                f"{htf_zone['zone_type']} @ {htf_zone['level']}"
+                            )
+                        else:
+                            _ready_state["pa_watch"]  += 1
+                            _ready_state["miss_count"]  = 0
+                            _ready_state["zone"]        = htf_zone
+                            print_ready_mode_banner(htf_zone, "WATCHING", m5_pa, counter_pres)
+
+                        # force fast interval
+                        if interval > READY_INTERVAL:
+                            interval = READY_INTERVAL
+                            reason   = (f"⚡ READY MODE {htf_zone['tf']} {htf_zone['zone_type']} "
+                                        f"@ {htf_zone['level']} — {reason}")
+
+                        # auto-exit ถ้าดูนานเกินไป
+                        if _ready_state["pa_watch"] >= READY_MAX_CYCLES:
+                            _ready_state["active"] = False
+                            _ready_state["zone"]   = None
+                            print_ready_mode_banner(None, "EXIT")
+                            logger.info("[READY] ออก Ready Mode — ครบ max cycles")
+
+                    elif _ready_state["active"]:
+                        # zone หายไป
+                        _ready_state["miss_count"] += 1
+                        if _ready_state["miss_count"] >= READY_MAX_MISS:
+                            _ready_state["active"] = False
+                            _ready_state["zone"]   = None
+                            print_ready_mode_banner(None, "EXIT")
+                            logger.info("[READY] ออก Ready Mode — zone ออกจากระยะ")
+
                     logger.info(f"Next interval: {interval}s — {reason}")
 
             # ── Weekly calendar pending (จันทร์เช้า) — รันเสมอไม่ขึ้นกับ slots ──

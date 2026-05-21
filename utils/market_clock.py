@@ -93,7 +93,8 @@ def _session_score(hour_utc: int) -> tuple[int, str]:
     return -1, "Asian (quiet)"
 
 
-def next_interval(chart_data: dict, sentiment_data: dict) -> tuple[int, str]:
+def next_interval(chart_data: dict, sentiment_data: dict,
+                  htf_zone: dict | None = None) -> tuple[int, str]:
     """
     คำนวณ interval รอบถัดไปเป็นวินาที
 
@@ -165,6 +166,11 @@ def next_interval(chart_data: dict, sentiment_data: dict) -> tuple[int, str]:
         else:
             score += 2
             reasons.append(f"momentum แรง M15 ({mom_m15.get('direction', '')})")
+
+    # ── HTF zone: ลด interval ทันที (อยู่ที่ D1/W1 = ต้องดูใกล้ชิด) ─
+    if htf_zone:
+        score += 5
+        reasons.append(f"⚡ HTF {htf_zone['tf']} zone ({htf_zone['dist_pct']}%)")
 
     # ── Map score → interval ──────────────────────────────
     #   score ≥ 9  → 60s   (ร้อนแรงมาก)
