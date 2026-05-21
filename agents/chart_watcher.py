@@ -868,8 +868,8 @@ def analyze_chart() -> dict:
     current = price.get("bid", h4["close"])
 
     # D1 / W1 major zones
-    d1_df   = calculate_indicators(d1_rates)["df"] if d1_rates else None
-    w1_df   = calculate_indicators(w1_rates)["df"] if w1_rates else None
+    d1_df   = calculate_indicators(d1_rates).get("df") if d1_rates is not None else None
+    w1_df   = calculate_indicators(w1_rates).get("df") if w1_rates is not None else None
     d1_sr   = find_swing_levels(d1_df, window=3, max_levels=5) if d1_df is not None \
               else {"resistance": [], "support": []}
     w1_sr   = find_swing_levels(w1_df, window=2, max_levels=4) if w1_df is not None \
