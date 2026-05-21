@@ -263,6 +263,7 @@ async def run_cycle() -> tuple[dict, dict]:
     config.reload_config()
     global _cycle, _last_chart_data, _last_sentiment_data, _net_degraded
     _cycle += 1
+    _cycle_start_t = time.monotonic()
     print_cycle_start(_cycle)
 
     # ── DRY_RUN warning ────────────────────────────────────────────
@@ -452,6 +453,12 @@ async def run_cycle() -> tuple[dict, dict]:
     except Exception as e:
         logger.warning(f"bot_status write error: {e}")
 
+    # ── Cycle time monitoring ──────────────────────────────────────
+    _cycle_secs = time.monotonic() - _cycle_start_t
+    _level = "WARNING" if _cycle_secs > 30 else "INFO"
+    logger.log(_level, f"[CYCLE_TIME] รอบ #{_cycle} ใช้เวลา {_cycle_secs:.1f}s"
+               + (" ⚠ เกิน 30s" if _cycle_secs > 30 else ""))
+
     return chart_data, sentiment_data
 
 
@@ -481,6 +488,24 @@ async def main():
             console.print(f"  [green]✓[/green]  Synced {n} trade(s) from MT5 → Database\n")
     else:
         console.print(f"  [yellow]⚠[/yellow]  Database ต่อไม่ได้ ({get_url()}) — บันทึกลง JSON อย่างเดียว\n")
+
+    # ── Startup: verify D1/W1 HTF data availability ───────────────
+    try:
+        from connectors.price_feed import get_ohlcv as _chk_ohlcv
+        import MetaTrader5 as _chk_mt5
+        _d1 = _chk_ohlcv(timeframe=_chk_mt5.TIMEFRAME_D1, count=5)
+        _w1 = _chk_ohlcv(timeframe=_chk_mt5.TIMEFRAME_W1, count=5)
+        _d1_ok = _d1 is not None and len(_d1) >= 3
+        _w1_ok = _w1 is not None and len(_w1) >= 3
+        if _d1_ok and _w1_ok:
+            console.print(f"  [green]✓[/green]  HTF zones: D1({len(_d1)} bars) + W1({len(_w1)} bars) พร้อมใช้งาน\n")
+            logger.info(f"[HTF] Startup check: D1={len(_d1)} bars, W1={len(_w1)} bars — OK")
+        else:
+            console.print(f"  [yellow]⚠[/yellow]  HTF zones: D1={'OK' if _d1_ok else 'ไม่มีข้อมูล'} | W1={'OK' if _w1_ok else 'ไม่มีข้อมูล'}\n")
+            logger.warning(f"[HTF] Startup check: D1={'OK' if _d1_ok else 'MISSING'}, W1={'OK' if _w1_ok else 'MISSING'}")
+    except Exception as _htf_e:
+        console.print(f"  [yellow]⚠[/yellow]  HTF startup check error: {_htf_e}\n")
+        logger.warning(f"[HTF] Startup check error: {_htf_e}")
 
     # รอบแรกใช้ DEFAULT เพราะยังไม่มีข้อมูล
     interval = DEFAULT_INTERVAL
