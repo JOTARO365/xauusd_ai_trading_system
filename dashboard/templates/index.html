@@ -1496,6 +1496,13 @@
               200 = entry + $2 (เผื่อ spread) &nbsp;|&nbsp; 0 = หน้าทุนพอดี
             </div>
           </div>
+          <div class="field">
+            <label>BE Confirm Cycles <span style="color:var(--muted);font-size:11px">ค้างเหนือ trigger กี่รอบก่อน SL ย้าย</span></label>
+            <input type="number" id="cfg-BE_CONFIRM_CYCLES" step="1" min="1" max="10">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">
+              2 ≈ 4–10 นาที (แนะนำ) &nbsp;|&nbsp; 3–4 ถ้าตลาด consolidate ที่ HTF zone
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2120,7 +2127,7 @@ const _NUM_KEYS  = ['START_BALANCE','RISK_PER_TRADE','MAX_DAILY_LOSS','MAX_OPEN_
   'DEFAULT_SL_PIPS','DEFAULT_TP_PIPS','MIN_RR_RATIO','FIXED_LOT','MIN_LOT','MAX_LOT',
   'MAX_LOSING_STREAK','STREAK_MIN_CONFIDENCE','MAX_PENDING_BUY','MAX_PENDING_SELL',
   'PENDING_EXPIRY_HOURS','HEDGE_BUFFER_PIPS',
-  'BE_TRIGGER_R','BE_BUFFER_PIPS',
+  'BE_TRIGGER_R','BE_BUFFER_PIPS','BE_CONFIRM_CYCLES',
   'NNLB_BASE_EQUITY','NNLB_EQUITY_PER_LOT','NNLB_MAX_LOSS_PCT','TRAILING_ATR_MULT'];
 const _TXT_KEYS  = ['SYMBOL','LOT_MODE','X_ACCOUNTS_TO_FOLLOW','X_KEYWORDS','TRAILING_ATR_TF'];
 const _BOOL_KEYS = ['PORTFOLIO_PROTECTION','STREAK_PROTECTION','DYNAMIC_TP',

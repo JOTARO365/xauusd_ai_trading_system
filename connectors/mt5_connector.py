@@ -747,13 +747,18 @@ def count_protected_slots() -> int:
 
 def manage_breakeven() -> int:
     """
-    R-based breakeven: trigger เมื่อ profit ≥ BE_TRIGGER_R × SL distance จริงของ position
-    (ป้องกันโดนหน้าทุนตอนกำไรยังน้อย — default trigger ที่ 80% ของ SL)
+    R-based breakeven พร้อม confirmation cycles:
+    - trigger เมื่อ profit ≥ BE_TRIGGER_R × SL distance จริงของ position
+    - ราคาต้องค้างอยู่เหนือ trigger BE_CONFIRM_CYCLES รอบติดกันก่อน SL จะย้าย
+      (ป้องกัน "แตะแล้วดีดกลับ" ที่ HTF consolidation zone)
 
     Config (.env):
-      BE_TRIGGER_R   = 0.8   # trigger ที่ 80% ของ SL distance
-      BE_BUFFER_PIPS = 200   # SL วางที่ entry + 200 pips
+      BE_TRIGGER_R      = 0.8   # trigger ที่ 80% ของ SL distance
+      BE_BUFFER_PIPS    = 200   # SL วางที่ entry + 200 pips
+      BE_CONFIRM_CYCLES = 2     # ต้องค้างเหนือ trigger กี่ cycle ก่อน BE ย้าย
     """
+    global _be_pending
+
     info = mt5.symbol_info(SYMBOL)
     if info is None:
         return 0
@@ -761,41 +766,65 @@ def manage_breakeven() -> int:
 
     positions = mt5.positions_get(symbol=SYMBOL)
     if not positions:
+        _be_pending.clear()
         return 0
 
     tick = mt5.symbol_info_tick(SYMBOL)
     if tick is None:
         return 0
 
-    trigger_r  = getattr(_cfg, "BE_TRIGGER_R",   0.8)
-    buf_pips   = getattr(_cfg, "BE_BUFFER_PIPS", BREAKEVEN_BUFFER_PIPS)
+    trigger_r     = getattr(_cfg, "BE_TRIGGER_R",      0.8)
+    buf_pips      = getattr(_cfg, "BE_BUFFER_PIPS",    BREAKEVEN_BUFFER_PIPS)
+    confirm_need  = max(1, int(getattr(_cfg, "BE_CONFIRM_CYCLES", 2)))
+
+    # ลบ tickets ที่ปิดแล้วออกจาก pending
+    active_tickets = {p.ticket for p in positions}
+    _be_pending = {t: c for t, c in _be_pending.items() if t in active_tickets}
 
     modified = 0
     for pos in positions:
         entry  = pos.price_open
         is_buy = pos.type == 0
 
-        # ต้องมี SL ถึงจะคำนวณ R ได้
         if pos.sl == 0:
             continue
         sl_dist_pips = abs(entry - pos.sl) / point
         if sl_dist_pips < 10:
             continue   # SL แคบเกินไป (อาจถูกขยับมา BE แล้ว)
 
-        current     = tick.bid if is_buy else tick.ask
-        profit_pips = ((current - entry) if is_buy else (entry - current)) / point
+        current      = tick.bid if is_buy else tick.ask
+        profit_pips  = ((current - entry) if is_buy else (entry - current)) / point
         trigger_pips = sl_dist_pips * trigger_r
 
         if profit_pips < trigger_pips:
-            continue   # ยังไม่ถึง X% ของ SL
+            # ราคาลงมาต่ำกว่า trigger — reset counter
+            if pos.ticket in _be_pending:
+                logger.debug(
+                    f"BE reset ticket={pos.ticket}: profit {profit_pips:.0f}p < trigger {trigger_pips:.0f}p"
+                )
+                _be_pending.pop(pos.ticket)
+            continue
+
+        # นับ consecutive cycles ที่อยู่เหนือ trigger
+        _be_pending[pos.ticket] = _be_pending.get(pos.ticket, 0) + 1
+        cycles_ok = _be_pending[pos.ticket]
+
+        if cycles_ok < confirm_need:
+            logger.info(
+                f"BE pending ticket={pos.ticket}: "
+                f"profit={profit_pips:.0f}p ≥ trigger={trigger_pips:.0f}p "
+                f"— รอ confirm {cycles_ok}/{confirm_need} cycles"
+            )
+            continue   # ยังไม่ถึง confirm threshold
 
         new_sl = round(entry + buf_pips * point, 2) if is_buy \
             else round(entry - buf_pips * point, 2)
 
-        # ข้ามถ้า SL ปัจจุบันดีกว่าแล้ว
         if is_buy  and pos.sl >= new_sl:
+            _be_pending.pop(pos.ticket, None)
             continue
         if not is_buy and pos.sl <= new_sl:
+            _be_pending.pop(pos.ticket, None)
             continue
 
         req = {
@@ -816,8 +845,9 @@ def manage_breakeven() -> int:
                 f"Breakeven set: ticket={pos.ticket} {direction} "
                 f"entry={entry:.2f} SL_dist={sl_dist_pips:.0f}p "
                 f"trigger={trigger_pips:.0f}p profit={profit_pips:.0f}p "
-                f"SL {pos.sl:.2f}→{new_sl:.2f}"
+                f"confirmed={cycles_ok}cycles  SL {pos.sl:.2f}→{new_sl:.2f}"
             )
+            _be_pending.pop(pos.ticket, None)
             modified += 1
 
     return modified
@@ -825,6 +855,7 @@ def manage_breakeven() -> int:
 
 # ── Partial Close ────────────────────────────────────────────────────────────
 _partial_state: dict[int, dict] = {}   # ticket → {"done": set[str], "r_pips": float}
+_be_pending:    dict[int, int]  = {}   # ticket → consecutive cycles above BE trigger
 _MIN_R_PIPS    = 300                   # ต่ำกว่านี้ = SL ถูกขยับมา BE แล้ว ข้าม
 
 
