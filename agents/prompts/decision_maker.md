@@ -5,6 +5,18 @@ All quantitative gates have already passed. Your job is one thing: **confirm thi
 
 ---
 
+## HTF MAJOR ZONE RULE (highest priority)
+
+When the input includes `⚡ HTF Zone: D1` or `⚡ HTF Zone: W1`:
+- **This is an institutional-level zone** — rare, high-value setup
+- EXECUTE if ANY candle reaction exists (even DOJI) — the zone IS the edge
+- Sentiment without news is expected and acceptable at structural zones
+- Require only: zone_type matches direction (SUPPORT→BUY, RESISTANCE→SELL) + price reacting (not continuing straight through)
+- W1 zone = A+ quality automatically if direction is correct
+- D1 zone = A+ if momentum aligned, B otherwise
+
+---
+
 ## EXECUTE when
 - Price action at zone is clear: rejection wick, engulfing, or strong candle body ≥ 50%
 - Momentum aligns with signal direction (M15 + H1 same direction)
@@ -16,13 +28,14 @@ All quantitative gates have already passed. Your job is one thing: **confirm thi
 - Momentum clearly contradicts signal (e.g., BUY signal but M15+H1 DOWN_STRONG)
 - Sentiment strongly opposes with confidence ≥ 70% AND no zone present
 - Losing streak ≥ 5 AND this is a B-quality setup (not A+)
+- **Exception:** HTF Zone rule above overrides SKIP conditions except direct momentum contradiction
 
 ---
 
 ## TRADE QUALITY
 
-**A+** — Strong zone + clear rejection/engulfing + momentum aligned → full confidence  
-**B**  — Zone present + some PA reaction OR strong momentum — standard scalp  
+**A+** — W1 zone + any reaction | OR Strong zone + clear rejection/engulfing + momentum aligned  
+**B**  — D1 zone + any reaction | OR H4 zone + some PA reaction OR strong momentum  
 **C**  — No zone, no PA, contradicting signals → SKIP
 
 ---

@@ -186,9 +186,20 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         if entry_type != "MOMENTUM_BREAKOUT" and scan_best < 65 and conf < 65:
             return _fail("SIDEWAYS — only MOMENTUM_BREAKOUT ≥65 allowed")
 
-    # 5. Min confidence
-    if conf < MIN_TECHNICAL_CONFIDENCE:
-        return _fail(f"Confidence {conf}% < {MIN_TECHNICAL_CONFIDENCE}%")
+    # 5. Min confidence — ลด threshold ถ้าอยู่ที่ D1/W1 major zone
+    htf_zone = chart_data.get("htf_zone")
+    _min_conf = MIN_TECHNICAL_CONFIDENCE
+    if htf_zone:
+        if htf_zone["tf"] == "W1":
+            _min_conf = 42   # W1 zone: โอกาสพลิกกลับสูง — ยอมรับ conf ต่ำกว่า
+        elif htf_zone["tf"] == "D1":
+            _min_conf = 45   # D1 zone: structural level
+        logger.info(
+            f"[HTF] {htf_zone['tf']} zone detected — gate 5 threshold: {_min_conf}% "
+            f"(ปกติ {MIN_TECHNICAL_CONFIDENCE}%)"
+        )
+    if conf < _min_conf:
+        return _fail(f"Confidence {conf}% < {_min_conf}% (HTF={htf_zone['tf'] if htf_zone else 'none'})")
 
     # 6. Entry-type gates
     if entry_type == "EMA_PULLBACK" and conf < 60:
@@ -335,8 +346,14 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
         except Exception as _le:
             logger.debug(f"Lesson search skipped: {_le}")
 
+    htf_zone    = chart_data.get("htf_zone")
+    htf_line    = (f"⚡ HTF Zone: {htf_zone['tf']} {htf_zone['zone_type']} @ {htf_zone['level']} "
+                   f"(ห่าง {htf_zone['dist_pct']}%)"
+                   if htf_zone else "HTF Zone: none")
+
     user_message = f"""Signal: {direction} | Conf: {conf}% | Entry: {entry_type}
 Zone: {sr_zone} {sr_str} | PA: {pa_str} | Candle: {candle_str}
+{htf_line}
 Trend H4: {trend} | Session: {session} ({hour_utc:02d}:xx UTC)
 Momentum: {mom_str}
 SL: {sl_pips:.0f}p | TP: {tp_pips:.0f}p | R:R: {tp_pips/sl_pips:.1f} (min {eff_rr_preview:.1f})

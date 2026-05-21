@@ -122,6 +122,38 @@ def find_swing_levels(df: pd.DataFrame, window: int = 5, max_levels: int = 5) ->
     return {"resistance": resistances, "support": supports}
 
 
+def detect_htf_zone(current: float, d1_sr: dict, w1_sr: dict,
+                    threshold_pct: float = 0.5) -> dict | None:
+    """
+    ตรวจว่าราคาปัจจุบันอยู่ใกล้ D1 หรือ W1 S/R zone มั้ย
+    threshold_pct: ห่างได้ไม่เกิน X% ของราคา (default 0.5%)
+    คืน: {"tf": "W1"|"D1", "level": float, "zone_type": "SUPPORT"|"RESISTANCE", "dist_pct": float}
+    หรือ None ถ้าไม่อยู่ใกล้
+    """
+    best = None
+    for tf_name, sr in [("W1", w1_sr), ("D1", d1_sr)]:
+        for zone_type, levels in [("RESISTANCE", sr["resistance"]), ("SUPPORT", sr["support"])]:
+            for lv in levels:
+                dist_pct = abs(current - lv) / current * 100
+                if dist_pct <= threshold_pct:
+                    if best is None or dist_pct < best["dist_pct"] or tf_name == "W1":
+                        best = {"tf": tf_name, "level": lv,
+                                "zone_type": zone_type, "dist_pct": round(dist_pct, 3)}
+    return best
+
+
+def format_htf_sr_text(d1_sr: dict, w1_sr: dict, current: float) -> str:
+    lines = ["=== Major S/R Zones (D1 + W1) ==="]
+    for tf_name, sr in [("W1", w1_sr), ("D1", d1_sr)]:
+        res = sr["resistance"][:3]
+        sup = sr["support"][:3]
+        dists_r = [f"{lv} ({abs(current-lv)/current*100:.2f}%↑)" for lv in res]
+        dists_s = [f"{lv} ({abs(current-lv)/current*100:.2f}%↓)" for lv in sup]
+        lines.append(f"{tf_name} Resistance: {', '.join(dists_r) or 'none'}")
+        lines.append(f"{tf_name} Support   : {', '.join(dists_s) or 'none'}")
+    return "\n".join(lines)
+
+
 def find_key_levels(df: pd.DataFrame) -> dict:
     close = float(df["close"].iloc[-1])
     prev_day = df.iloc[-48:-24] if len(df) >= 48 else df.iloc[:len(df)//2]
@@ -795,6 +827,8 @@ def analyze_chart() -> dict:
     h4_rates  = get_ohlcv(timeframe=mt5.TIMEFRAME_H4,  count=200)
     h1_rates  = get_ohlcv(timeframe=mt5.TIMEFRAME_H1,  count=100)
     m15_rates = get_ohlcv(timeframe=mt5.TIMEFRAME_M15, count=100)
+    d1_rates  = get_ohlcv(timeframe=mt5.TIMEFRAME_D1,  count=60)
+    w1_rates  = get_ohlcv(timeframe=mt5.TIMEFRAME_W1,  count=30)
 
     if h4_rates is None or h1_rates is None or m15_rates is None:
         logger.error("ดึง OHLCV ไม่ได้")
@@ -810,6 +844,21 @@ def analyze_chart() -> dict:
     key_lvl = find_key_levels(h4["df"])
     price   = get_current_price()
     current = price.get("bid", h4["close"])
+
+    # D1 / W1 major zones
+    d1_df   = calculate_indicators(d1_rates)["df"] if d1_rates else None
+    w1_df   = calculate_indicators(w1_rates)["df"] if w1_rates else None
+    d1_sr   = find_swing_levels(d1_df, window=3, max_levels=5) if d1_df is not None \
+              else {"resistance": [], "support": []}
+    w1_sr   = find_swing_levels(w1_df, window=2, max_levels=4) if w1_df is not None \
+              else {"resistance": [], "support": []}
+    htf_zone = detect_htf_zone(current, d1_sr, w1_sr)
+    htf_sr_text = format_htf_sr_text(d1_sr, w1_sr, current)
+    if htf_zone:
+        logger.info(
+            f"[HTF] ราคาอยู่ที่ {htf_zone['tf']} {htf_zone['zone_type']} "
+            f"@ {htf_zone['level']} (ห่าง {htf_zone['dist_pct']}%)"
+        )
 
     sr_text    = format_sr_text(h4_sr, h1_sr, key_lvl, current)
     all_levels = h4_sr["resistance"] + h4_sr["support"] + h1_sr["resistance"] + h1_sr["support"]
@@ -847,7 +896,15 @@ def analyze_chart() -> dict:
     else:
         sr_action_text = "  ไม่มีสัญญาณ Rejection/Breakout"
 
+    htf_alert = ""
+    if htf_zone:
+        htf_alert = (f"\n⚡ HTF MAJOR ZONE: ราคาอยู่ที่ {htf_zone['tf']} {htf_zone['zone_type']} "
+                     f"@ {htf_zone['level']} (ห่าง {htf_zone['dist_pct']}%) — "
+                     f"ระดับนี้มีนัยสำคัญสูงมาก ให้ bonus confidence ตามกฎ HTF Zone\n")
+
     user_message = f"""ราคาปัจจุบัน: Bid={price.get('bid')} / Ask={price.get('ask')}
+{htf_alert}
+{htf_sr_text}
 
 === Fibonacci Retracement ===
 {fib_text}
@@ -922,6 +979,7 @@ RSI:{m15['rsi']} MACD Hist:{m15['macd_hist']}
         "sr_zones":      {"resistance": h4_sr["resistance"] + h1_sr["resistance"],
                           "support":    h4_sr["support"]    + h1_sr["support"]},
         "key_levels":    key_lvl,
+        "htf_zone":      htf_zone,   # None หรือ {"tf","level","zone_type","dist_pct"}
         "indicators":    {"h4":  {k: v for k, v in h4.items()  if k != "df"},
                           "h1":  {k: v for k, v in h1.items()  if k != "df"},
                           "m15": {k: v for k, v in m15.items() if k != "df"}},

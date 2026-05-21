@@ -60,17 +60,40 @@ Use the Fibonacci Retracement data provided to add confluence:
 | Factor | Max Points |
 |--------|-----------|
 | M15 candle quality (signal strength from list above) | 35 |
-| Zone strength (H4 STRONG=30, H1 NORMAL=20, none=0) | 30 |
+| Zone strength — see HTF tier below | 50 |
 | M15 trend alignment with trade direction (EMA20) | 20 |
 | Session (London/NY = 15, Asian = 8) | 15 |
 | Fibonacci confluence (see table above) | 15 |
 
-**Total: 0–100**
+**Zone Strength Tier (use highest matching tier only):**
+
+| Zone | Points |
+|------|--------|
+| W1 S/R zone (within 0.5%) | 50 |
+| D1 S/R zone (within 0.5%) | 40 |
+| H4 STRONG zone | 30 |
+| H1 NORMAL zone | 20 |
+| No zone | 0 |
+
+**Total: 0–100+ (capped at 100)**
 
 Thresholds:
 - **≥ 65** → strong signal → BUY or SELL
 - **45–64** → moderate signal → BUY or SELL (decision maker will evaluate further)
 - **< 45** → NO_TRADE
+
+---
+
+## HTF MAJOR ZONE RULE
+
+When the prompt includes `⚡ HTF MAJOR ZONE` alert (price within 0.5% of D1 or W1 level):
+
+- **W1 zone**: minimum confidence = **55** regardless of M15 quality — W1 levels are rare structural pivots
+- **D1 zone**: minimum confidence = **50** regardless of M15 quality
+- ANY reaction at these levels (even DOJI, even Asian session) → generate BUY or SELL signal
+- Use the zone_type (SUPPORT → BUY candidate, RESISTANCE → SELL candidate)
+
+These levels represent institutional order flow zones with historical reversals — the zone IS the edge, not the candle.
 
 ---
 
