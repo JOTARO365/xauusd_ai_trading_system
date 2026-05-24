@@ -73,15 +73,15 @@ def _nnlb_lot_and_check(equity: float, sl_pips: float) -> tuple[float, str]:
     NNLB lot calculation + equity gate
     คืน (lot, error_msg)  — error_msg ว่าง = ผ่าน
 
-    Tier logic:
-      tier = floor(equity / NNLB_EQUITY_PER_LOT)   ← เพิ่ม 1 MIN_LOT ทุก equity tier
-      lot  = MIN_LOT × tier  (clamped ระหว่าง MIN_LOT–MAX_LOT)
+    Profit-tier logic:
+      profit = equity - NNLB_BASE_EQUITY            ← กำไรที่ได้จากทุนเริ่มต้น
+      steps  = floor(profit / NNLB_EQUITY_PER_LOT)  ← เพิ่ม 0.01 lot ต่อทุก profit step
+      lot    = MIN_LOT + steps × 0.01  (clamped MIN_LOT–MAX_LOT)
 
-    ตัวอย่าง NNLB_EQUITY_PER_LOT=100, MIN_LOT=0.01:
-      equity $80  → ต่ำกว่า base → skip
-      equity $100 → tier=1 → lot 0.01
-      equity $200 → tier=2 → lot 0.02
-      equity $500 → tier=5 → lot 0.05
+    ตัวอย่าง NNLB_BASE_EQUITY=10000, NNLB_EQUITY_PER_LOT=5000, MIN_LOT=0.02:
+      equity 10,000 (กำไร    0) → lot 0.02
+      equity 15,000 (กำไร 5,000) → lot 0.03
+      equity 20,000 (กำไร 10,000) → lot 0.04
     """
     # ── Gate: equity ต่ำกว่า base → ไม่คุ้มกับ SL ────────────────
     if equity < _cfg.NNLB_BASE_EQUITY:
@@ -89,29 +89,29 @@ def _nnlb_lot_and_check(equity: float, sl_pips: float) -> tuple[float, str]:
         logger.warning(msg)
         return 0.0, msg
 
-    # ── Tier-based lot ────────────────────────────────────────────
-    per_lot   = max(1.0, _cfg.NNLB_EQUITY_PER_LOT)   # guard against div/0
-    tier      = max(1, int(equity / per_lot))
-    lot       = round(min(_cfg.MIN_LOT * tier, _cfg.MAX_LOT), 2)
-    lot       = max(_cfg.MIN_LOT, lot)
+    # ── Profit-based tier: เพิ่ม 0.01 lot ทุก NNLB_EQUITY_PER_LOT กำไร ──
+    per_step     = max(1.0, _cfg.NNLB_EQUITY_PER_LOT)   # guard against div/0
+    profit       = max(0.0, equity - _cfg.NNLB_BASE_EQUITY)
+    profit_steps = int(profit / per_step)
+    lot          = round(min(_cfg.MIN_LOT + profit_steps * 0.01, _cfg.MAX_LOT), 2)
+    lot          = max(_cfg.MIN_LOT, lot)
 
     # ── NNLB_MAX_LOSS_PCT: cap lot ให้ max_loss ไม่เกิน X% ของ equity ──
-    pip_value        = 0.1   # XAU/USD: $0.1 per pip per 0.01 lot
+    # pip_value = $0.01 per pip per 0.01 lot (100 pips = $1 @ 0.01 lot บน GOLD#)
+    pip_value        = 0.01
     max_loss         = round(lot * sl_pips * pip_value * 100, 2)
     max_loss_allowed = round(equity * (_cfg.NNLB_MAX_LOSS_PCT / 100), 2)
 
     if sl_pips > 0 and max_loss > max_loss_allowed:
         budget_lot = round(max_loss_allowed / (sl_pips * pip_value * 100), 2)
         if budget_lot >= _cfg.MIN_LOT:
-            # ลด lot ให้อยู่ใน budget
             lot      = budget_lot
             max_loss = round(lot * sl_pips * pip_value * 100, 2)
             logger.warning(
-                f"[NNLB] lot ลดจาก tier={tier} → {budget_lot} "
+                f"[NNLB] lot ลดจาก profit-tier → {budget_lot} "
                 f"เพื่อให้ max_loss ${max_loss:.2f} ≤ {_cfg.NNLB_MAX_LOSS_PCT:.0f}% ของ equity"
             )
         else:
-            # แม้แต่ MIN_LOT ก็เกิน budget — ใช้ MIN_LOT ต่อไป (user รับความเสี่ยงใน NNLB)
             lot      = _cfg.MIN_LOT
             max_loss = round(lot * sl_pips * pip_value * 100, 2)
             logger.warning(
@@ -122,7 +122,7 @@ def _nnlb_lot_and_check(equity: float, sl_pips: float) -> tuple[float, str]:
 
     loss_pct = round(max_loss / equity * 100, 1) if equity > 0 else 0
     logger.warning(
-        f"[NNLB] equity={equity:.2f} tier={tier} → lot={lot} | "
+        f"[NNLB] equity={equity:.2f} profit={profit:.0f} steps={profit_steps} → lot={lot} | "
         f"max loss ${max_loss:.2f} ({loss_pct}% of equity)"
     )
     return lot, ""
