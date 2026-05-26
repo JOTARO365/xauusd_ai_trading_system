@@ -172,21 +172,25 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     else:
         return _fail(f"ทิศทางไม่ชัดเจน: {tech_signal}")
 
-    # 3. Counter-trend block
+    # 3. UNKNOWN trend — ไม่เทรดเมื่อ trend ไม่ชัดเจน (WR 32% ใน historical data)
+    if not trend or trend.upper() in ("UNKNOWN", "?", ""):
+        return _fail(f"UNKNOWN trend — ไม่เทรดเมื่อทิศทาง H4 ไม่ชัดเจน")
+
+    # 4. Counter-trend block
     is_counter = (trend == "BULLISH" and direction == "SELL") or \
                  (trend == "BEARISH" and direction == "BUY")
     if is_counter:
         at_strong = sr_str == "STRONG" and sr_zone in ("RESISTANCE", "SUPPORT")
-        if not (at_strong and conf >= 70):
-            return _fail(f"Counter-trend {direction} blocked (trend={trend}, conf={conf})")
+        if not (at_strong and conf >= 80):
+            return _fail(f"Counter-trend {direction} blocked (trend={trend}, conf={conf}, need 80%)")
 
-    # 4. SIDEWAYS — เฉพาะ Momentum Breakout
+    # 5. SIDEWAYS — เฉพาะ Momentum Breakout
     if trend == "SIDEWAYS":
         scan_best = chart_data.get("scan", {}).get("best_score", 0)
         if entry_type != "MOMENTUM_BREAKOUT" and scan_best < 65 and conf < 65:
             return _fail("SIDEWAYS — only MOMENTUM_BREAKOUT ≥65 allowed")
 
-    # 5. Min confidence — ลด threshold ถ้าอยู่ที่ D1/W1 major zone
+    # 6. Min confidence — ลด threshold ถ้าอยู่ที่ D1/W1 major zone
     htf_zone = chart_data.get("htf_zone")
     _min_conf = MIN_TECHNICAL_CONFIDENCE
     if htf_zone:
@@ -202,8 +206,8 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         return _fail(f"Confidence {conf}% < {_min_conf}% (HTF={htf_zone['tf'] if htf_zone else 'none'})")
 
     # 6. Entry-type gates
-    if entry_type == "EMA_PULLBACK" and conf < 60:
-        return _fail(f"EMA_PULLBACK requires conf ≥60% (got {conf}%)")
+    if entry_type == "EMA_PULLBACK" and conf < 75:
+        return _fail(f"EMA_PULLBACK requires conf ≥75% (got {conf}%)  [WR 26% historical]")
     if entry_type == "ENGULFING" and conf < 75:
         return _fail(f"ENGULFING requires conf ≥75% (got {conf}%)")
 
@@ -242,13 +246,20 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     if not can_open:
         return _fail(slot_reason)
 
-    # 11. Losing streak — gradual position reduction (ไม่ hard block)
+    # 11. Losing streak — hard block + gradual position reduction
     streak_scale = 1.0
     if _cfg.STREAK_PROTECTION:
-        streak = history["losing_streak"]
-        if streak >= 5:
-            streak_scale = 0.25
-        elif streak == 4:
+        streak      = history["losing_streak"]
+        max_streak  = getattr(_cfg, "MAX_LOSING_STREAK", 5)
+        min_conf_st = getattr(_cfg, "STREAK_MIN_CONFIDENCE", 62)
+
+        if streak >= max_streak:
+            return _fail(f"Losing streak {streak}L ≥ MAX_LOSING_STREAK={max_streak} — หยุดเทรดชั่วคราว")
+
+        if streak >= 2 and conf < min_conf_st:
+            return _fail(f"Streak {streak}L requires conf ≥{min_conf_st}% (got {conf}%)")
+
+        if streak >= 4:
             streak_scale = 0.40
         elif streak == 3:
             streak_scale = 0.60
