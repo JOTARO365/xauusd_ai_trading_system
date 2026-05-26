@@ -492,6 +492,28 @@ def _check_h1_structure(df: pd.DataFrame, direction: str, lookback: int = 40) ->
         return highs[-1] <= highs[-2]   # lower high = structure ดี
 
 
+def _count_zone_touches(df: pd.DataFrame, level: float, zone_pct: float = 0.003) -> int:
+    """นับจำนวน 'visit' ที่ราคาเข้ามาในโซน level (ไม่นับแท่งต่อเนื่องเป็นหลาย touch)"""
+    zone = level * zone_pct
+    touches, in_zone = 0, False
+    for h, l in zip(df["high"].values, df["low"].values):
+        hit = l <= level + zone and h >= level - zone
+        if hit and not in_zone:
+            touches += 1
+        in_zone = hit
+    return touches
+
+
+def _touch_score_bonus(touches: int) -> int:
+    """แปลง touch count → score bonus
+    2-4 touches = zone แข็งแกร่ง (ราคากลับมาหลายรอบ)
+    5+ touches  = zone อ่อนแอ ใกล้แตก → penalty"""
+    if touches <= 1:  return 0    # fresh — ยังไม่ proven
+    if touches <= 4:  return 10   # 2-4 touches = sweet spot
+    if touches <= 6:  return 5    # 5-6 = ยังดีแต่เริ่มอ่อน
+    return -10                    # 7+ = worn zone, risk of break
+
+
 def _check_bb_squeeze(df: pd.DataFrame, lookback: int = 10) -> bool:
     """
     คืน True ถ้า BB กำลัง squeeze (width ปัจจุบัน < 85% ของ width เฉลี่ย lookback bars)
@@ -508,7 +530,8 @@ def _check_bb_squeeze(df: pd.DataFrame, lookback: int = 10) -> bool:
 
 
 def scan_entry_setups(h4: dict, h1: dict, m15: dict,
-                      h4_sr: dict, h1_sr: dict, key_lvl: dict) -> dict:
+                      h4_sr: dict, h1_sr: dict, key_lvl: dict,
+                      d1_sr: dict | None = None, w1_sr: dict | None = None) -> dict:
     """
     สแกนหา entry setup จากทุก timeframe และ S/R
     คืน dict: setups (list), best_direction, best_score, confluence_count, h4_bias
@@ -562,9 +585,21 @@ def scan_entry_setups(h4: dict, h1: dict, m15: dict,
         h4_bias = "BEARISH"
 
     # ── 1. S/R Zone (H4 + H1) ────────────────────────────────
-    # เพิ่ม H1 structure filter: bonus +10 ถ้า H1 แสดง higher lows / lower highs
-    zone = price * SR_ZONE_PCT
+    zone     = price * SR_ZONE_PCT
     m15_bias = "BULLISH" if m15["close"] > m15["ema20"] else "BEARISH"
+
+    # [C] Zone-direction context: AT resistance → bias SELL, AT support → bias BUY
+    at_resistance = any(abs(price - r) <= zone for r in h4_sr["resistance"])
+    at_support    = any(abs(price - s) <= zone for s in h4_sr["support"])
+
+    # [B] รวม HTF levels สำหรับ confluence check
+    htf_levels: list[float] = []
+    if d1_sr:
+        htf_levels += d1_sr.get("resistance", []) + d1_sr.get("support", [])
+    if w1_sr:
+        htf_levels += w1_sr.get("resistance", []) + w1_sr.get("support", [])
+
+    h4_df_ref = h4.get("df")   # สำหรับ touch count
 
     h4_levels = (
         h4_sr["resistance"] + h4_sr["support"] +
@@ -574,36 +609,106 @@ def scan_entry_setups(h4: dict, h1: dict, m15: dict,
     )
     for lv in h4_levels:
         if abs(price - lv) <= zone:
-            direction = "SELL" if lv >= price else "BUY"
+            direction  = "SELL" if lv >= price else "BUY"
             m15_align  = (direction == "BUY" and m15_bias == "BULLISH") or \
                          (direction == "SELL" and m15_bias == "BEARISH")
             h1_struct  = _check_h1_structure(h1["df"], direction)
             base_score = 80 if m15_align else 65
+            bonus_notes = []
+
+            # [+] H1 structure bonus
             if h1_struct:
-                base_score = min(100, base_score + 10)   # H1 structure bonus
+                base_score = min(100, base_score + 10)
+                bonus_notes.append("H1_struct")
+
+            # [A] Touch count bonus
+            if h4_df_ref is not None:
+                touches = _count_zone_touches(h4_df_ref, lv)
+                tb = _touch_score_bonus(touches)
+                if tb != 0:
+                    base_score = max(0, min(100, base_score + tb))
+                    bonus_notes.append(f"touch={touches}({'+' if tb>0 else ''}{tb})")
+
+            # [B] HTF confluence bonus
+            htf_match = any(abs(lv - hl) / lv < 0.003 for hl in htf_levels) if htf_levels else False
+            if htf_match:
+                base_score = min(100, base_score + 20)
+                bonus_notes.append("HTF_confluence+20")
+
+            # [C] Zone-direction lock: AT resistance favors SELL, AT support favors BUY
+            if at_resistance and direction == "SELL":
+                base_score = min(100, base_score + 15)
+                bonus_notes.append("at_resistance+15")
+            elif at_resistance and direction == "BUY":
+                base_score = max(0, base_score - 20)
+                bonus_notes.append("at_resistance-20")
+            elif at_support and direction == "BUY":
+                base_score = min(100, base_score + 15)
+                bonus_notes.append("at_support+15")
+            elif at_support and direction == "SELL":
+                base_score = max(0, base_score - 20)
+                bonus_notes.append("at_support-20")
+
+            bonus_str = f" [{', '.join(bonus_notes)}]" if bonus_notes else ""
             setups.append({
                 "type": "SR_ZONE", "tf": "H4", "direction": direction,
                 "score": base_score, "level": lv,
                 "note": (f"H4 S/R {lv:.2f} ({direction}) M15={'align' if m15_align else 'counter'}"
-                         + (" H1_struct=OK" if h1_struct else " H1_struct=WARN"))
+                         + bonus_str)
             })
 
     # ── 1b. H1 S/R Zone ──────────────────────────────────────
+    h1_df_ref = h1.get("df")
     h1_levels = h1_sr["resistance"] + h1_sr["support"]
     for lv in h1_levels:
         if abs(price - lv) <= zone:
-            direction = "SELL" if lv >= price else "BUY"
-            m15_align = (direction == "BUY" and m15_bias == "BULLISH") or \
-                        (direction == "SELL" and m15_bias == "BEARISH")
-            h1_struct = _check_h1_structure(h1["df"], direction)
+            direction  = "SELL" if lv >= price else "BUY"
+            m15_align  = (direction == "BUY" and m15_bias == "BULLISH") or \
+                         (direction == "SELL" and m15_bias == "BEARISH")
+            h1_struct  = _check_h1_structure(h1["df"], direction)
             base_score = 72 if m15_align else 58
+            bonus_notes = []
+
             if h1_struct:
                 base_score = min(100, base_score + 8)
+                bonus_notes.append("H1_struct")
+
+            # [A] Touch count (H1 df)
+            if h1_df_ref is not None:
+                touches = _count_zone_touches(h1_df_ref, lv)
+                tb = _touch_score_bonus(touches)
+                if tb != 0:
+                    base_score = max(0, min(100, base_score + tb))
+                    bonus_notes.append(f"touch={touches}({'+' if tb>0 else ''}{tb})")
+
+            # [B] HTF confluence (H1 ได้ bonus ครึ่งหนึ่ง)
+            htf_match = any(abs(lv - hl) / lv < 0.003 for hl in htf_levels) if htf_levels else False
+            if htf_match:
+                base_score = min(100, base_score + 10)
+                bonus_notes.append("HTF_confluence+10")
+
+            # [C] Zone-direction lock
+            at_res_h1 = any(abs(price - r) <= zone for r in h1_sr["resistance"])
+            at_sup_h1 = any(abs(price - s) <= zone for s in h1_sr["support"])
+            if at_res_h1 and direction == "SELL":
+                base_score = min(100, base_score + 10)
+                bonus_notes.append("at_res+10")
+            elif at_res_h1 and direction == "BUY":
+                base_score = max(0, base_score - 15)
+                bonus_notes.append("at_res-15")
+            elif at_sup_h1 and direction == "BUY":
+                base_score = min(100, base_score + 10)
+                bonus_notes.append("at_sup+10")
+            elif at_sup_h1 and direction == "SELL":
+                base_score = max(0, base_score - 15)
+                bonus_notes.append("at_sup-15")
+
+            bonus_str = f" [{', '.join(bonus_notes)}]" if bonus_notes else ""
             setups.append({
                 "type": "SR_ZONE", "tf": "H1", "direction": direction,
                 "score": base_score, "level": lv,
                 "note": (f"H1 S/R {lv:.2f} ({direction}) M15={'align' if m15_align else 'counter'}"
-                         + (" H1_struct=OK" if h1_struct else ""))
+                         + bonus_str)
             })
 
     # ── 2. EMA200 H4 Dynamic S/R ─────────────────────────────
@@ -906,7 +1011,7 @@ def analyze_chart() -> dict:
         return f"{m['direction']}_{m['strength']}  (RSI_slope={m['rsi_slope']:+.1f}  MACD_hist={m['macd_hist']:+.4f}{'↑exp' if m['hist_expanding'] else '↓con'}  ROC5={m['roc_5bar']:+.3f}%  EMA={m['ema_align']})"
 
     # Entry setup scanner
-    scan         = scan_entry_setups(h4, h1, m15, h4_sr, h1_sr, key_lvl)
+    scan         = scan_entry_setups(h4, h1, m15, h4_sr, h1_sr, key_lvl, d1_sr, w1_sr)
     setups_text  = _format_setups_text(scan)
 
     # SR action text
