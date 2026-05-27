@@ -880,6 +880,13 @@ _partial_state: dict[int, dict] = {}   # ticket → {"done": set[str], "r_pips":
 _be_pending:    dict[int, int]  = {}   # ticket → consecutive cycles above BE trigger
 _MIN_R_PIPS    = 300                   # ต่ำกว่านี้ = SL ถูกขยับมา BE แล้ว ข้าม
 
+# ── Zone-Break Close + False-Break Re-entry ──────────────────────────────────
+_zone_state:                 dict[int, dict] = {}  # ticket → htf_zone dict
+_zone_break_pending_reentry: list[dict]      = []  # [{zone, direction, since}]
+
+ZONE_BREAK_BUFFER_PIPS = 300  # ปิดถ้า zone ทะลุเกิน 300 pips จาก level
+ZONE_REENTRY_WINDOW_H  = 4    # re-entry window หลัง close (ชั่วโมง)
+
 
 def _partial_close_pos(pos, lot: float, tick) -> bool:
     """ปิดบางส่วนของ position ที่ราคาตลาด"""
@@ -1185,6 +1192,156 @@ def _is_momentum_strong(direction: str) -> bool:
     elif ema_bear: dn += 1
 
     return (up >= 4 and up > dn) if is_buy else (dn >= 4 and dn > up)
+
+
+def manage_zone_break_close(chart_data: dict) -> int:
+    """
+    ปิด SYSTEM_MAGIC position เมื่อ HTF zone ที่เข้า trade ถูกทะลุจริง
+    แล้วรอ false break — ถ้า M15 close กลับข้าม zone level ภายใน ZONE_REENTRY_WINDOW_H
+    → re-enter ใหม่ทันที (false breakout recovery)
+
+    Zone break: M15 close ต่ำกว่า SUPPORT − buffer (BUY)
+                          สูงกว่า RESISTANCE + buffer (SELL)
+    """
+    from datetime import datetime, timedelta, timezone as _tz
+
+    global _zone_state, _zone_break_pending_reentry
+
+    positions = mt5.positions_get(symbol=SYMBOL) or []
+    info      = mt5.symbol_info(SYMBOL)
+    tick      = mt5.symbol_info_tick(SYMBOL)
+    if not info or not tick:
+        return 0
+    point = info.point
+
+    # ลบ tickets ที่ปิดแล้ว
+    active      = {p.ticket for p in positions}
+    _zone_state = {t: z for t, z in _zone_state.items() if t in active}
+
+    # M15 แท่งปิดล่าสุด (index=1 = completed candle)
+    m15_rates = mt5.copy_rates_from_pos(SYMBOL, mt5.TIMEFRAME_M15, 1, 1)
+    if m15_rates is None or len(m15_rates) == 0:
+        return 0
+    m15_close = float(m15_rates["close"][0])
+
+    buffer  = ZONE_BREAK_BUFFER_PIPS * point
+    actions = 0
+
+    # ── Phase 1: ตรวจ zone break → force close ───────────────────────────────
+    for pos in positions:
+        if pos.magic != SYSTEM_MAGIC:
+            continue
+        is_buy = pos.type == 0
+
+        # Auto-register: ใช้ htf_zone ใน chart_data ถ้าใกล้ entry price (< 0.8%)
+        if pos.ticket not in _zone_state:
+            htf = chart_data.get("htf_zone")
+            if htf and abs(pos.price_open - htf["level"]) / max(pos.price_open, 1) * 100 < 0.8:
+                _zone_state[pos.ticket] = htf
+                logger.info(
+                    f"[ZONE] registered ticket={pos.ticket} "
+                    f"{htf['tf']} {htf['zone_type']} @ {htf['level']:.2f}"
+                )
+            continue  # รอรอบหน้า (เพิ่ง register หรือ register ไม่ได้)
+
+        zone  = _zone_state[pos.ticket]
+        level = zone["level"]
+        ztype = zone["zone_type"]
+
+        broke = (    is_buy and ztype == "SUPPORT"    and m15_close < level - buffer) or \
+                (not is_buy and ztype == "RESISTANCE" and m15_close > level + buffer)
+        if not broke:
+            continue
+
+        dir_str = "BUY" if is_buy else "SELL"
+        if _cfg.DRY_RUN:
+            logger.warning(
+                f"[DRY_RUN][ZONE BREAK] would close {dir_str} ticket={pos.ticket} "
+                f"— {ztype} @ {level:.2f} ทะลุ (M15={m15_close:.2f})"
+            )
+        else:
+            close_price = tick.bid if is_buy else tick.ask
+            req = mt5.order_send({
+                "action":       mt5.TRADE_ACTION_DEAL,
+                "symbol":       SYMBOL,
+                "volume":       pos.volume,
+                "type":         mt5.ORDER_TYPE_SELL if is_buy else mt5.ORDER_TYPE_BUY,
+                "position":     pos.ticket,
+                "price":        close_price,
+                "deviation":    20,
+                "magic":        SYSTEM_MAGIC,
+                "comment":      _safe_comment("ZONE_BREAK"),
+                "type_time":    mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            })
+            if req is None or req.retcode != mt5.TRADE_RETCODE_DONE:
+                logger.error(
+                    f"[ZONE BREAK] close failed ticket={pos.ticket}: "
+                    f"{req.retcode if req else mt5.last_error()}"
+                )
+                continue
+            logger.warning(
+                f"[ZONE BREAK] closed {dir_str} ticket={pos.ticket} @ {close_price:.2f} "
+                f"| {zone['tf']} {ztype} @ {level:.2f} ทะลุ {abs(m15_close - level) / point:.0f}p"
+            )
+
+        # เก็บไว้รอ false-break re-entry (ทั้ง live + DRY_RUN)
+        _zone_break_pending_reentry.append({
+            "zone":      zone,
+            "direction": "BUY" if is_buy else "SELL",
+            "since":     datetime.now(_tz.utc),
+        })
+        del _zone_state[pos.ticket]
+        actions += 1
+
+    # ── Phase 2: False Break → Re-entry ──────────────────────────────────────
+    now   = datetime.now(_tz.utc)
+    still = []
+
+    for pending in _zone_break_pending_reentry:
+        if now - pending["since"] > timedelta(hours=ZONE_REENTRY_WINDOW_H):
+            logger.info(
+                f"[ZONE BREAK] re-entry window expired: "
+                f"{pending['direction']} zone @ {pending['zone']['level']:.2f}"
+            )
+            continue  # หมดเวลา — ทิ้งไป
+
+        zone  = pending["zone"]
+        level = zone["level"]
+        ztype = zone["zone_type"]
+        dirc  = pending["direction"]
+
+        # ตรวจ recovery: M15 close กลับข้าม zone level
+        recovered = (dirc == "BUY"  and m15_close > level) or \
+                    (dirc == "SELL" and m15_close < level)
+        if not recovered:
+            still.append(pending)
+            continue
+
+        # มี position ทิศนี้อยู่แล้ว → ไม่ re-enter ซ้ำ
+        same_open = [p for p in positions
+                     if p.magic == SYSTEM_MAGIC and p.type == (0 if dirc == "BUY" else 1)]
+        if same_open:
+            logger.info(f"[ZONE BREAK] re-entry skip: มี {dirc} position อยู่แล้ว")
+            continue  # consumed — ไม่ใส่กลับ still
+
+        sl_pips = float(MONEY_MANAGEMENT["default_sl_pips"])
+        tp_pips = float(MONEY_MANAGEMENT["default_tp_pips"])
+        logger.warning(
+            f"[ZONE BREAK] false break confirmed — re-entering {dirc} @ M15={m15_close:.2f} "
+            f"({zone['tf']} {ztype} @ {level:.2f} recovered)"
+        )
+        result = open_order(dirc, sl_pips, tp_pips, comment="ZONE_REENTRY")
+        if result.get("success"):
+            new_ticket = result.get("ticket", 0)
+            if new_ticket and new_ticket > 0:
+                _zone_state[new_ticket] = zone   # re-register zone ให้ position ใหม่
+            actions += 1
+        else:
+            logger.error(f"[ZONE BREAK] re-entry failed: {result.get('error')}")
+
+    _zone_break_pending_reentry = still
+    return actions
 
 
 def manage_dynamic_tp() -> int:
