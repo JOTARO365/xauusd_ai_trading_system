@@ -110,10 +110,20 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     if _cfg.NNLB_MODE:
         if tech_signal == "NO_TRADE":
             # HTF zone override: ถ้าราคาอยู่ที่ D1/W1 zone ให้ใช้ zone_type เป็น direction
-            # (chart_watcher อาจรอ M15 pattern ก่อน แต่ NNLB เข้าทันทีที่ zone)
+            # แต่ต้อง trend-aligned เท่านั้น — ป้องกัน counter-trend entry ที่ zone กำลังถูกทะลุ
             _htf = chart_data.get("htf_zone")
             if _htf:
-                _htf_dir = "BUY" if _htf["zone_type"] == "SUPPORT" else "SELL"
+                _htf_dir  = "BUY" if _htf["zone_type"] == "SUPPORT" else "SELL"
+                _trend    = (trend or "").upper()
+                # SUPPORT + BEARISH → zone likely to break → skip
+                # RESISTANCE + BULLISH → zone likely to break → skip
+                _counter  = (_htf["zone_type"] == "SUPPORT"    and _trend == "BEARISH") or \
+                             (_htf["zone_type"] == "RESISTANCE" and _trend == "BULLISH")
+                if _counter:
+                    return _fail(
+                        f"NNLB HTF override blocked: {_htf['zone_type']} ใน trend {_trend} "
+                        f"— counter-trend zone มักถูกทะลุ ({_htf['tf']} @ {_htf['level']})"
+                    )
                 tech_signal = f"HTF_{_htf_dir}"
                 chart_data["signal"] = _htf_dir
                 logger.warning(
