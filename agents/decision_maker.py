@@ -109,7 +109,19 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     # ── NNLB mode: ข้าม gates ทั้งหมดยกเว้นทิศทาง ────────────────
     if _cfg.NNLB_MODE:
         if tech_signal == "NO_TRADE":
-            return _fail("NNLB: NO_TRADE signal (ไม่มีทิศทาง)")
+            # HTF zone override: ถ้าราคาอยู่ที่ D1/W1 zone ให้ใช้ zone_type เป็น direction
+            # (chart_watcher อาจรอ M15 pattern ก่อน แต่ NNLB เข้าทันทีที่ zone)
+            _htf = chart_data.get("htf_zone")
+            if _htf:
+                _htf_dir = "BUY" if _htf["zone_type"] == "SUPPORT" else "SELL"
+                tech_signal = f"HTF_{_htf_dir}"
+                chart_data["signal"] = _htf_dir
+                logger.warning(
+                    f"[NNLB] HTF zone override: NO_TRADE → {_htf_dir} "
+                    f"({_htf['tf']} {_htf['zone_type']} @ {_htf['level']} dist={_htf['dist_pct']}%)"
+                )
+            else:
+                return _fail("NNLB: NO_TRADE signal (ไม่มีทิศทาง)")
         if "BUY" in tech_signal:
             direction = "BUY"
         elif "SELL" in tech_signal:

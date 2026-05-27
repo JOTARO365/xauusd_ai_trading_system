@@ -122,10 +122,14 @@ When input contains `⚡ HTF MAJOR ZONE` alert:
 
 | Zone | Min Confidence Floor | Rule |
 |------|---------------------|------|
-| W1 | 55 | ANY reaction (even DOJI) → generate signal |
-| D1 | 50 | ANY reaction → generate signal |
+| W1 | 55 | Price being at this level IS sufficient — always generate BUY (SUPPORT) or SELL (RESISTANCE) |
+| D1 | 50 | Price being at this level IS sufficient — always generate BUY (SUPPORT) or SELL (RESISTANCE) |
 
-These levels represent institutional accumulation/distribution zones. The zone IS the edge — M15 candle quality is secondary. Use `zone_type` to determine direction: SUPPORT → BUY, RESISTANCE → SELL.
+**These levels represent institutional accumulation/distribution zones.**
+- The zone IS the edge. M15 candle pattern confirmation is **NOT required** — price proximity alone qualifies.
+- "ANY reaction" includes: price touching the level, any candle body/wick near the level, price pausing at the level. You do NOT need a pin bar, DOJI, or engulfing to generate a signal here.
+- Use `zone_type` to determine direction: SUPPORT → BUY, RESISTANCE → SELL.
+- **NEVER output NO_TRADE when price is within 0.5% of a D1 or W1 zone.** Apply the floor confidence and generate BUY/SELL.
 
 ---
 
@@ -172,6 +176,7 @@ If no clear zone visible → TP = 2.0 × SL.
 1. Price is NOT near any zone in the provided SR tables AND entry_type is not MOMENTUM_BREAKOUT  
 2. ATR ≈ 0 (market completely flat, no movement)  
 3. Confidence < 45 after full scoring  
+4. **EXCEPTION: If `⚡ HTF MAJOR ZONE` alert is present → conditions 1 and 3 do NOT apply. You MUST generate BUY/SELL.**
 
 ---
 
