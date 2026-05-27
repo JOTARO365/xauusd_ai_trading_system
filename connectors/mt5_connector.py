@@ -68,6 +68,26 @@ def calculate_lot_size(account_balance: float, sl_pips: float,
     return clamped
 
 
+def _calc_pip_value(symbol: str) -> float:
+    """
+    คืน value ต่อ 1 pip ต่อ 1 lot ใน account currency
+    ใช้ mt5.order_calc_profit — MT5 จัดการ currency conversion ให้อัตโนมัติ
+    รองรับ USD, THB, EUR, GBP ฯลฯ โดยไม่ต้อง hardcode อัตราแลกเปลี่ยน
+    Fallback = 1.0 (GOLD USD standard: $1/pip/lot)
+    """
+    tick = mt5.symbol_info_tick(symbol)
+    info = mt5.symbol_info(symbol)
+    if tick is None or info is None:
+        return 1.0
+    price = (tick.bid + tick.ask) / 2
+    profit = mt5.order_calc_profit(
+        mt5.ORDER_TYPE_BUY, symbol, 1.0, price, price + info.point * 100
+    )
+    if profit is None or profit <= 0:
+        return 1.0
+    return round(profit / 100, 4)  # value per 1 pip per 1 lot ใน account currency
+
+
 def _nnlb_lot_and_check(equity: float, sl_pips: float) -> tuple[float, str]:
     """
     NNLB lot calculation + equity gate
@@ -78,10 +98,10 @@ def _nnlb_lot_and_check(equity: float, sl_pips: float) -> tuple[float, str]:
       steps  = floor(profit / NNLB_EQUITY_PER_LOT)  ← เพิ่ม 0.01 lot ต่อทุก profit step
       lot    = MIN_LOT + steps × 0.01  (clamped MIN_LOT–MAX_LOT)
 
-    ตัวอย่าง NNLB_BASE_EQUITY=10000, NNLB_EQUITY_PER_LOT=5000, MIN_LOT=0.02:
-      equity 10,000 (กำไร    0) → lot 0.02
-      equity 15,000 (กำไร 5,000) → lot 0.03
-      equity 20,000 (กำไร 10,000) → lot 0.04
+    ตัวอย่าง NNLB_BASE_EQUITY=1, NNLB_EQUITY_PER_LOT=5000 (THB), MIN_LOT=0.01:
+      equity 10,000 (กำไร ~9,999) → lot 0.02
+      equity 15,000 (กำไร 14,999) → lot 0.03
+      equity 20,000 (กำไร 19,999) → lot 0.04
     """
     # ── Gate: equity ต่ำกว่า base → ไม่คุ้มกับ SL ────────────────
     if equity < _cfg.NNLB_BASE_EQUITY:
@@ -97,33 +117,35 @@ def _nnlb_lot_and_check(equity: float, sl_pips: float) -> tuple[float, str]:
     lot          = max(_cfg.MIN_LOT, lot)
 
     # ── NNLB_MAX_LOSS_PCT: cap lot ให้ max_loss ไม่เกิน X% ของ equity ──
-    # pip_value = $0.01 per pip per 0.01 lot (100 pips = $1 @ 0.01 lot บน GOLD#)
-    pip_value        = 0.01
-    max_loss         = round(lot * sl_pips * pip_value * 100, 2)
+    # ใช้ _calc_pip_value เพื่อให้ถูกต้องทั้ง USD, THB, EUR ฯลฯ
+    acct         = mt5.account_info()
+    ccy          = acct.currency if acct else "?"
+    pv_1lot      = _calc_pip_value(_cfg.SYMBOL)           # per pip per 1 lot ใน account ccy
+    max_loss         = round(lot * sl_pips * pv_1lot, 2)
     max_loss_allowed = round(equity * (_cfg.NNLB_MAX_LOSS_PCT / 100), 2)
 
     if sl_pips > 0 and max_loss > max_loss_allowed:
-        budget_lot = round(max_loss_allowed / (sl_pips * pip_value * 100), 2)
+        budget_lot = round(max_loss_allowed / (sl_pips * pv_1lot), 2) if pv_1lot > 0 else _cfg.MIN_LOT
         if budget_lot >= _cfg.MIN_LOT:
             lot      = budget_lot
-            max_loss = round(lot * sl_pips * pip_value * 100, 2)
+            max_loss = round(lot * sl_pips * pv_1lot, 2)
             logger.warning(
                 f"[NNLB] lot ลดจาก profit-tier → {budget_lot} "
-                f"เพื่อให้ max_loss ${max_loss:.2f} ≤ {_cfg.NNLB_MAX_LOSS_PCT:.0f}% ของ equity"
+                f"เพื่อให้ max_loss {max_loss:.0f} {ccy} ≤ {_cfg.NNLB_MAX_LOSS_PCT:.0f}% ของ equity"
             )
         else:
             lot      = _cfg.MIN_LOT
-            max_loss = round(lot * sl_pips * pip_value * 100, 2)
+            max_loss = round(lot * sl_pips * pv_1lot, 2)
             logger.warning(
-                f"[NNLB] ⚠ MIN_LOT={lot} ยังให้ max_loss ${max_loss:.2f} "
-                f">{_cfg.NNLB_MAX_LOSS_PCT:.0f}% equity (${max_loss_allowed:.2f}) "
+                f"[NNLB] ⚠ MIN_LOT={lot} ยังให้ max_loss {max_loss:.0f} {ccy} "
+                f">{_cfg.NNLB_MAX_LOSS_PCT:.0f}% equity ({max_loss_allowed:.0f} {ccy}) "
                 f"— ทุนน้อยเกิน SL แต่ NNLB ยังเข้า"
             )
 
     loss_pct = round(max_loss / equity * 100, 1) if equity > 0 else 0
     logger.warning(
-        f"[NNLB] equity={equity:.2f} profit={profit:.0f} steps={profit_steps} → lot={lot} | "
-        f"max loss ${max_loss:.2f} ({loss_pct}% of equity)"
+        f"[NNLB] equity={equity:.0f} {ccy}  profit={profit:.0f}  steps={profit_steps} → lot={lot} | "
+        f"max loss {max_loss:.0f} {ccy} ({loss_pct}%)"
     )
     return lot, ""
 
