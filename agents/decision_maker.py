@@ -144,16 +144,14 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
 
                 _tc_dir = None
                 if _px and _e20 and _e50 and _h4e20 and _h4e50:
-                    _near = abs(_px - _e20) / _px < 0.003   # ห่าง ≤ 0.3% = ~135 pips ที่ 4500
+                    # H1 + H4 EMA stack ยืนยันแนวโน้ม — ไม่ต้องตรวจ proximity (EMA stack คือ filter)
                     if (_trend_upper == "BEARISH"
                             and _e20 < _e50                  # H1 EMA bearish order
-                            and _h4e20 < _h4e50              # H4 ยืนยัน
-                            and _near):
+                            and _h4e20 < _h4e50):            # H4 ยืนยัน
                         _tc_dir = "SELL"
                     elif (_trend_upper == "BULLISH"
                             and _e20 > _e50                  # H1 EMA bullish order
-                            and _h4e20 > _h4e50
-                            and _near):
+                            and _h4e20 > _h4e50):
                         _tc_dir = "BUY"
 
                 if _tc_dir:
