@@ -1194,6 +1194,83 @@ def _is_momentum_strong(direction: str) -> bool:
     return (up >= 4 and up > dn) if is_buy else (dn >= 4 and dn > up)
 
 
+MOMENTUM_EXIT_MIN_LOSS_PIPS = 100   # ขาดทุนขั้นต่ำ (pips) ก่อน momentum exit จะ trigger
+
+
+def manage_momentum_exit() -> int:
+    """
+    ปิด SYSTEM_MAGIC position ทันทีเมื่อ momentum แรงสวนทาง — ไม่รอ SL hit
+    เงื่อนไข:
+      1. Position ขาดทุน >= MOMENTUM_EXIT_MIN_LOSS_PIPS
+      2. _is_momentum_strong(counter_direction) == True
+    BUY open + strong SELL momentum → ปิด
+    SELL open + strong BUY momentum → ปิด
+    """
+    if not _check_mt5():
+        return 0
+
+    positions = mt5.positions_get(symbol=SYMBOL)
+    if not positions:
+        return 0
+
+    tick = mt5.symbol_info_tick(SYMBOL)
+    if tick is None:
+        return 0
+
+    sym_info = mt5.symbol_info(SYMBOL)
+    if sym_info is None:
+        return 0
+    point   = sym_info.point
+    closed  = 0
+
+    for pos in positions:
+        if pos.magic != SYSTEM_MAGIC:
+            continue
+
+        is_buy       = pos.type == 0
+        current      = tick.bid if is_buy else tick.ask
+        profit_pips  = ((current - pos.price_open) if is_buy else (pos.price_open - current)) / point
+
+        if profit_pips > -MOMENTUM_EXIT_MIN_LOSS_PIPS:
+            continue
+
+        counter_dir = "SELL" if is_buy else "BUY"
+        if not _is_momentum_strong(counter_dir):
+            continue
+
+        tag = (
+            f"ticket={pos.ticket} {'BUY' if is_buy else 'SELL'} "
+            f"entry={pos.price_open:.2f} loss={profit_pips:.0f}pips"
+        )
+
+        if DRY_RUN:
+            logger.info(f"[DRY_RUN] Momentum exit would close: {tag} counter={counter_dir}")
+            continue
+
+        req = {
+            "action":    mt5.TRADE_ACTION_DEAL,
+            "symbol":    SYMBOL,
+            "volume":    pos.volume,
+            "type":      mt5.ORDER_TYPE_SELL if is_buy else mt5.ORDER_TYPE_BUY,
+            "position":  pos.ticket,
+            "price":     tick.bid if is_buy else tick.ask,
+            "deviation": 20,
+            "magic":     SYSTEM_MAGIC,
+            "comment":   "MOMENTUM_EXIT",
+        }
+        result = mt5.order_send(req)
+        if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+            err = mt5.last_error() if result is None else f"retcode={result.retcode} comment={result.comment}"
+            logger.error(f"Momentum exit FAILED {tag}: {err}")
+        else:
+            logger.warning(
+                f"[MOMENTUM_EXIT] Closed early: {tag} — {counter_dir} momentum strong"
+            )
+            closed += 1
+
+    return closed
+
+
 def manage_zone_break_close(chart_data: dict) -> int:
     """
     ปิด SYSTEM_MAGIC position เมื่อ HTF zone ที่เข้า trade ถูกทะลุจริง
