@@ -259,6 +259,20 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     # อนุญาต: SR_ZONE bounce ที่ขอบ range, MOMENTUM_BREAKOUT (breakout จาก range)
     # ไม่อนุญาต: trend-following (EMA_PULLBACK, TREND_CONT) — ไม่มี trend ใน range
     if trend == "SIDEWAYS":
+        # Fix 1 — High ATR means range is expanding (breakout forming), not tradeable
+        _sw_h4_atr = chart_data.get("indicators", {}).get("h4", {}).get("atr", 0)
+        if _sw_h4_atr > 35:
+            return _fail(f"SIDEWAYS + high ATR ({_sw_h4_atr:.1f}) — market too volatile for range trade, likely breaking out")
+        # Fix 3 — Ensure range is wide enough to fit TP inside
+        _sw_sr   = chart_data.get("sr_zones", {})
+        _sw_px   = float(chart_data.get("indicators", {}).get("h1", {}).get("close") or 0)
+        if _sw_px and _sw_sr:
+            _res_above = sorted([r for r in _sw_sr.get("resistance", []) if r > _sw_px])
+            _sup_below = sorted([s for s in _sw_sr.get("support", []) if s < _sw_px], reverse=True)
+            if _res_above and _sup_below:
+                _range_pips = (_res_above[0] - _sup_below[0]) / 0.01
+                if _range_pips < 1500:
+                    return _fail(f"SIDEWAYS range too narrow ({_range_pips:.0f}p < 1500p) — SL would exceed range")
         _is_trend_follow = entry_type == "EMA_PULLBACK" or "TREND_CONT" in tech_signal
         _at_sr_zone      = sr_zone in ("RESISTANCE", "SUPPORT")
         _is_breakout     = entry_type == "MOMENTUM_BREAKOUT"
@@ -284,12 +298,10 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         if sr_zone == "NONE" and conf < 72:
             return _fail(f"{_sess_lbl}: no-zone entries blocked — conf {conf}% < 72%")
 
-    # 5c. SELL at RESISTANCE in BEARISH trend — data shows WR=39% here, zone breaks often
+    # 5c. SELL at RESISTANCE in BEARISH trend — WR=39% historically, require STRONG zone + high conf
     if direction == "SELL" and trend == "BEARISH" and sr_zone == "RESISTANCE":
-        if conf < 70:
-            return _fail(
-                f"SELL+RESISTANCE in BEARISH trend: zone likely to break, requires conf ≥70% (got {conf}%)"
-            )
+        if not (sr_str == "STRONG" and conf >= 80):
+            return _fail(f"SELL+RESISTANCE in BEARISH: WR=39% — requires STRONG zone + conf >=80% (got {sr_str}/{conf}%)")
 
     # 6. Min confidence — ลด threshold ถ้าอยู่ที่ D1/W1 major zone
     htf_zone = chart_data.get("htf_zone")

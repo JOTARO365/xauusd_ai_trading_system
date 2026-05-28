@@ -12,6 +12,27 @@ from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from loguru import logger
 
+
+def _to_native(obj):
+    """Recursively convert numpy scalars to Python native types (for msgpack serialization)."""
+    try:
+        import numpy as np
+        if isinstance(obj, dict):
+            return {k: _to_native(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [_to_native(v) for v in obj]
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+    except ImportError:
+        pass
+    return obj
+
 # ── State ──────────────────────────────────────────────────────────────────────
 class TradingState(TypedDict):
     skip_ai:        bool
@@ -53,7 +74,7 @@ def node_chart(state: TradingState) -> dict:
     print_step(0, "running", "กำลังดึงข้อมูลกราฟ...")
     t = time.monotonic()
     try:
-        data = analyze_chart()
+        data = _to_native(analyze_chart())
         lat  = int((time.monotonic() - t) * 1000)
         sig  = data.get("signal", "NO_TRADE")
         conf = data.get("confidence", 0)
