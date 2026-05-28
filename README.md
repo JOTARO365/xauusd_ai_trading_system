@@ -65,49 +65,49 @@ Every cycle (~15 min normal / ~5 min with open position)
 
 | Node | Agent | Runs every cycle? | Description |
 |---|---|---|---|
-| `_entry` | — | Always | ตรวจว่า skip AI รอบนี้หรือไม่ |
-| `chart_watcher` | Claude | Full cycle only | วิเคราะห์กราฟ H4/H1/M15 — หา S/R zone, entry signal, ให้ confidence score |
-| `market_advisor` | Claude | Full cycle only | ดู market regime (trending/sideways/volatile) และ bias รวม |
-| `news_gatherer` | X/Twitter | Full cycle only | รวบรวม tweets ล่าสุดที่เกี่ยวกับทองและเศรษฐกิจ |
-| `analyst` | Claude | Full cycle only | วิเคราะห์ sentiment จาก news + chart รวมกัน |
-| `decision_maker` | Claude | Full cycle only | ผ่าน 12 Python gates → ตัดสินใจ EXECUTE หรือ SKIP |
-| `position_mgmt` | MT5 | **Always** | จัดการ positions ที่เปิดอยู่ (breakeven, trailing stop, momentum exit) |
-| `reporter` | Claude | Full cycle only | บันทึกผล, วาง pending orders, สรุป P&L |
-| `accounting` | DB | Full cycle only | บันทึก token cost และ latency ลง database |
+| `_entry` | — | Always | Checks whether to skip AI this cycle |
+| `chart_watcher` | Claude | Full cycle only | Analyzes H4/H1/M15 charts — finds S/R zones, entry signal, confidence score |
+| `market_advisor` | Claude | Full cycle only | Determines market regime (trending/sideways/volatile) and overall bias |
+| `news_gatherer` | X/Twitter | Full cycle only | Collects latest tweets related to gold and macro economy |
+| `analyst` | Claude | Full cycle only | Analyzes sentiment from news + chart combined |
+| `decision_maker` | Claude | Full cycle only | Passes 12 Python gates → decides EXECUTE or SKIP |
+| `position_mgmt` | MT5 | **Always** | Manages open positions (breakeven, trailing stop, momentum exit) |
+| `reporter` | Claude | Full cycle only | Logs trade result, places pending orders, summarizes P&L |
+| `accounting` | DB | Full cycle only | Records token cost and latency to database |
 
-### 3 Paths ที่ระบบเลือกอัตโนมัติ
+### 3 Paths — Chosen Automatically
 
-**Path 1 — Full AI Cycle** (ทุก ~15 นาที หรือ ~5 นาทีถ้ามี position เปิด)
-> รันทุก node ครบ — ใช้ AI ตัดสินใจ
+**Path 1 — Full AI Cycle** (every ~15 min, or ~5 min when a position is open)
+> All nodes run — AI makes the trade decision
 
-**Path 2 — Skip AI** (ระหว่าง full cycles)
-> ข้าม AI agents ทั้งหมด → รันแค่ `position_mgmt` เพื่อดูแล positions ที่เปิดอยู่
-> ประหยัด ~97% ของค่า token
+**Path 2 — Skip AI** (between full cycles)
+> Skips all AI agents → runs only `position_mgmt` to manage open positions
+> Saves ~97% of token cost
 
-**Path 3 — Network Degraded** (chart + advisor fail พร้อมกัน)
-> หยุดตัดสินใจ → รัน `accounting` แล้วจบ ไม่เปิด order ใหม่
+**Path 3 — Network Degraded** (chart + advisor both fail)
+> Halts decision-making → runs `accounting` and exits; no new orders placed
 
 ### Smart Skip Gate
 
-ระบบจะ **ไม่ skip** และรัน AI ทันทีเมื่อ:
+The system will **not skip** and runs AI immediately when:
 
-| เงื่อนไข | เหตุผล |
+| Condition | Reason |
 |---|---|
-| Ready Mode active | ราคาอยู่ที่ D1/W1 HTF zone — โอกาสใหญ่ |
-| Cycle แรกหลัง start | ยังไม่มีข้อมูล |
-| Price spike ≥ 500 pips | ข่าวด่วน / flash crash |
-| ราคาใกล้ S/R zone ≤ 0.3% | กราฟอาจกำลัง form setup ใน M15 |
-| อยู่ในช่วงข่าว (8-9, 13-15, 18-19 UTC) | threshold ลดเหลือ 3 นาที |
+| Ready Mode active | Price is at a D1/W1 HTF zone — high-probability opportunity |
+| First cycle after start | No prior data available |
+| Price spike ≥ 500 pips | Breaking news / flash crash |
+| Price within ≤ 0.3% of an S/R zone | M15 setup may be forming |
+| News window (8–9, 13–15, 18–19 UTC) | Interval reduced to 3 minutes |
 
 ### Why LangGraph?
 
-| | เดิม (sequential) | ใหม่ (LangGraph) |
+| | Before (sequential) | After (LangGraph) |
 |---|---|---|
-| State | globals กระจัด 6 ตัว | `TradingState` TypedDict เดียว |
-| Error handling | try/except ×6 ซ้ำกัน | อยู่ใน node แยกชัดเจน |
-| Position mgmt code | ซ้ำ 2 ที่ | node เดียว `position_mgmt` |
-| Crash recovery | เริ่ม cycle ใหม่ตั้งแต่ต้น | **MemorySaver** resume ได้จากจุดที่หยุด |
-| เพิ่ม agent ใหม่ | แก้ main.py | `add_node()` บรรทัดเดียว |
+| State | 6 scattered globals | Single `TradingState` TypedDict |
+| Error handling | 6 duplicated try/except blocks | Isolated per node |
+| Position mgmt code | Duplicated in 2 places | Single `position_mgmt` node |
+| Crash recovery | Restarts cycle from scratch | **MemorySaver** resumes from last checkpoint |
+| Adding a new agent | Edit main.py | One `add_node()` call |
 
 ---
 
