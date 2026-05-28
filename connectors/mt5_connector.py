@@ -1226,9 +1226,6 @@ def manage_momentum_exit() -> int:
     Trigger 1: loss >= MOMENTUM_EXIT_MIN_LOSS_PIPS + _is_momentum_strong(counter)
     Trigger 2: M1 spike >= M1_SPIKE_EXIT_PIPS ทิศสวน (ออกทันที ไม่ต้องรอ loss)
     """
-    if not _check_mt5():
-        return 0
-
     positions = mt5.positions_get(symbol=SYMBOL)
     if not positions:
         return 0
