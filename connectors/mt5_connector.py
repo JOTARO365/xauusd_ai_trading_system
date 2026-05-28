@@ -1195,16 +1195,36 @@ def _is_momentum_strong(direction: str) -> bool:
 
 
 MOMENTUM_EXIT_MIN_LOSS_PIPS = 100   # ขาดทุนขั้นต่ำ (pips) ก่อน momentum exit จะ trigger
+M1_SPIKE_EXIT_PIPS          = 500   # M1 candle range ขั้นต่ำที่ถือว่า spike — ออกทันทีไม่รอ loss
+
+
+def _is_1m_spike(counter_dir: str) -> bool:
+    """
+    คืน True ถ้า M1 candle ล่าสุด (หรือกำลังก่อตัว) วิ่งเกิน M1_SPIKE_EXIT_PIPS
+    ในทิศ counter_dir (spike แรงผิดปกติ — flash crash / news spike)
+    ใช้ 2 candles ล่าสุดเพื่อ detect เร็ว
+    """
+    bars = mt5.copy_rates_from_pos(SYMBOL, mt5.TIMEFRAME_M1, 0, 3)
+    if bars is None or len(bars) < 2:
+        return False
+    sym_info = mt5.symbol_info(SYMBOL)
+    if sym_info is None:
+        return False
+    point = sym_info.point
+    is_sell = counter_dir.upper() == "SELL"
+    for candle in bars[-2:]:   # candle ปิดแล้ว + candle กำลังก่อตัว
+        rng        = (candle["high"] - candle["low"]) / point
+        is_bearish = candle["close"] < candle["open"]
+        if rng >= M1_SPIKE_EXIT_PIPS and (is_sell == is_bearish):
+            return True
+    return False
 
 
 def manage_momentum_exit() -> int:
     """
     ปิด SYSTEM_MAGIC position ทันทีเมื่อ momentum แรงสวนทาง — ไม่รอ SL hit
-    เงื่อนไข:
-      1. Position ขาดทุน >= MOMENTUM_EXIT_MIN_LOSS_PIPS
-      2. _is_momentum_strong(counter_direction) == True
-    BUY open + strong SELL momentum → ปิด
-    SELL open + strong BUY momentum → ปิด
+    Trigger 1: loss >= MOMENTUM_EXIT_MIN_LOSS_PIPS + _is_momentum_strong(counter)
+    Trigger 2: M1 spike >= M1_SPIKE_EXIT_PIPS ทิศสวน (ออกทันที ไม่ต้องรอ loss)
     """
     if not _check_mt5():
         return 0
@@ -1230,21 +1250,22 @@ def manage_momentum_exit() -> int:
         is_buy       = pos.type == 0
         current      = tick.bid if is_buy else tick.ask
         profit_pips  = ((current - pos.price_open) if is_buy else (pos.price_open - current)) / point
+        counter_dir  = "SELL" if is_buy else "BUY"
 
-        if profit_pips > -MOMENTUM_EXIT_MIN_LOSS_PIPS:
+        spike    = _is_1m_spike(counter_dir)
+        momentum = profit_pips <= -MOMENTUM_EXIT_MIN_LOSS_PIPS and _is_momentum_strong(counter_dir)
+
+        if not spike and not momentum:
             continue
 
-        counter_dir = "SELL" if is_buy else "BUY"
-        if not _is_momentum_strong(counter_dir):
-            continue
-
+        reason = "M1_SPIKE" if spike else "MOMENTUM_STRONG"
         tag = (
             f"ticket={pos.ticket} {'BUY' if is_buy else 'SELL'} "
-            f"entry={pos.price_open:.2f} loss={profit_pips:.0f}pips"
+            f"entry={pos.price_open:.2f} pnl={profit_pips:.0f}pips [{reason}]"
         )
 
         if DRY_RUN:
-            logger.info(f"[DRY_RUN] Momentum exit would close: {tag} counter={counter_dir}")
+            logger.info(f"[DRY_RUN] Momentum exit would close: {tag}")
             continue
 
         req = {
@@ -1263,9 +1284,7 @@ def manage_momentum_exit() -> int:
             err = mt5.last_error() if result is None else f"retcode={result.retcode} comment={result.comment}"
             logger.error(f"Momentum exit FAILED {tag}: {err}")
         else:
-            logger.warning(
-                f"[MOMENTUM_EXIT] Closed early: {tag} — {counter_dir} momentum strong"
-            )
+            logger.warning(f"[MOMENTUM_EXIT] Closed early: {tag}")
             closed += 1
 
     return closed
