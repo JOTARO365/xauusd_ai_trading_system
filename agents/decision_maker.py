@@ -387,6 +387,23 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
     conf        = gate["confidence"]
     trend       = chart_data.get("trend", "SIDEWAYS")
 
+    # TREND_CONT ใน NNLB — ข้าม Claude ทั้งหมด เข้า order ทันที (NNLB philosophy = bypass everything)
+    if "TREND_CONT" in tech_signal:
+        logger.warning(
+            f"[TREND_CONT] Fast-path → {direction} SL={sl_pips:.0f}p TP={tp_pips:.0f}p "
+            f"(skipping Claude — NNLB+trend continuation)"
+        )
+        return {
+            "action":      direction,
+            "direction":   direction,
+            "lot":         None,
+            "sl_pips":     sl_pips,
+            "tp_pips":     tp_pips,
+            "reason":      f"TREND_CONT_{direction} — H1+H4 EMA bearish stack",
+            "trade_quality": "B",
+            "confidence_score": conf,
+        }
+
     # SIDEWAYS TP: target ขอบ range ฝั่งตรงข้าม แทน fixed 2×SL
     if trend == "SIDEWAYS":
         _sr_zones = chart_data.get("sr_zones", {})
