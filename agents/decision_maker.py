@@ -394,7 +394,7 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
             f"(skipping Claude — NNLB+trend continuation)"
         )
         return {
-            "action":      direction,
+            "action":      "EXECUTE",
             "direction":   direction,
             "lot":         None,
             "sl_pips":     sl_pips,
