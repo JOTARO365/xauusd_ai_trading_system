@@ -203,9 +203,10 @@ def _should_skip_ai() -> tuple[bool, str]:
       1. Ready Mode (HTF zone)      → ไม่ skip เสมอ
       2. Cycle แรก                   → ไม่ skip เสมอ
       3. Price spike ≥ AI_SPIKE_PIPS → ไม่ skip (ข่าวด่วน/unscheduled)
-      4. Scheduled news hour UTC     → threshold 3 นาที
-      5. มี open position             → threshold 5 นาที
-      6. ไม่มี position (ปกติ)        → threshold 15 นาที
+      4. Near S/R zone (0.3%)        → ไม่ skip (กราฟกำลัง form setup)
+      5. Scheduled news hour UTC     → threshold 3 นาที
+      6. มี open position             → threshold 5 นาที
+      7. ไม่มี position (ปกติ)        → threshold 15 นาที
     """
     from utils.market_clock import HIGH_IMPACT_HOURS_UTC
     from datetime import datetime, timezone as _tz
@@ -221,6 +222,7 @@ def _should_skip_ai() -> tuple[bool, str]:
         return False, "first cycle"
 
     # 3. Price spike — ข่าวด่วนที่ไม่ได้นัดหมาย (flash crash, surprise release)
+    cur = 0.0
     try:
         cur = get_current_price()
         if cur > 0 and _last_ai_price > 0:
@@ -230,12 +232,26 @@ def _should_skip_ai() -> tuple[bool, str]:
     except Exception:
         pass
 
-    # 4. Scheduled news hour
+    # 4. Near S/R zone — ป้องกัน miss setup ขณะ skip (ราคาเข้าใกล้โซน H4/D1/W1)
+    try:
+        if cur > 0 and _last_chart_data:
+            sr = _last_chart_data.get("sr_zones", {})
+            all_levels = sr.get("resistance", []) + sr.get("support", [])
+            htf = _last_chart_data.get("htf_zone")
+            if htf and htf.get("level"):
+                all_levels.append(htf["level"])
+            for lvl in all_levels:
+                if lvl and abs(cur - lvl) / cur * 100 <= 0.3:
+                    return False, f"near S/R {lvl:.2f} ({abs(cur - lvl) / cur * 100:.2f}%)"
+    except Exception:
+        pass
+
+    # 5. Scheduled news hour
     if datetime.now(_tz.utc).hour in HIGH_IMPACT_HOURS_UTC:
         threshold = AI_NEWS_INTERVAL_SECS
         label = "news hour"
     else:
-        # 5/6. ตามจำนวน open positions
+        # 6/7. ตามจำนวน open positions
         try:
             threshold = AI_POS_INTERVAL_SECS if get_open_positions() else AI_MIN_INTERVAL_SECS
             label = "open pos" if threshold == AI_POS_INTERVAL_SECS else "normal"
