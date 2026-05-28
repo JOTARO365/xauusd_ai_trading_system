@@ -393,15 +393,25 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
             f"[TREND_CONT] Fast-path → {direction} SL={sl_pips:.0f}p TP={tp_pips:.0f}p "
             f"(skipping Claude — NNLB+trend continuation)"
         )
+        order_result = open_order(
+            direction=direction,
+            sl_pips=sl_pips,
+            tp_pips=tp_pips,
+            comment=f"TREND_CONT_{direction}|NNLB",
+        )
+        if not order_result.get("success"):
+            err = order_result.get("error", "unknown")
+            logger.error(f"[TREND_CONT] Order rejected by MT5: {err}")
+            return {"action": "SKIP", "reason": f"TREND_CONT order failed: {err}",
+                    "trade_quality": "C", "confidence_score": 0}
         return {
-            "action":      "EXECUTE",
-            "direction":   direction,
-            "lot":         None,
-            "sl_pips":     sl_pips,
-            "tp_pips":     tp_pips,
-            "reason":      f"TREND_CONT_{direction} — H1+H4 EMA bearish stack",
-            "trade_quality": "B",
+            "action":           "EXECUTE",
+            "direction":        direction,
+            "trade_quality":    "B",
             "confidence_score": conf,
+            "order":            order_result,
+            "technical":        chart_data,
+            "sentiment":        sentiment_data,
         }
 
     # SIDEWAYS TP: target ขอบ range ฝั่งตรงข้าม แทน fixed 2×SL
