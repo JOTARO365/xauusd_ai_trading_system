@@ -138,18 +138,26 @@ def _infer_manual_analysis(price: float, direction: str, chart_data: dict | None
     }
 
 
-def _get_close_times(days: int = 7) -> dict[str, str]:
-    """ดึง close_time ของ positions ที่ปิดแล้ว → {position_id: iso_datetime}"""
+def _get_close_times(days: int = 7) -> dict[str, dict]:
+    """ดึง close_time + close_reason + close_price ของ positions ที่ปิดแล้ว
+    → {position_id: {close_time, close_reason, close_price}}
+    MT5 deal.reason: 0=client/manual, 1=sl, 2=tp, 6=expert/EA
+    """
     import MetaTrader5 as mt5
     from datetime import timedelta
+    _REASON = {0: "MANUAL", 1: "SL_HIT", 2: "TP_HIT", 6: "EA_CLOSE"}
     date_from = datetime.now() - timedelta(days=days)
-    close_map: dict[str, str] = {}
+    close_map: dict[str, dict] = {}
     try:
         all_deals = mt5.history_deals_get(date_from, datetime.now())
         if all_deals:
             for d in all_deals:
                 if d.entry == 1:  # DEAL_ENTRY_OUT
-                    close_map[str(d.position_id)] = datetime.fromtimestamp(d.time).isoformat()
+                    close_map[str(d.position_id)] = {
+                        "close_time":   datetime.fromtimestamp(d.time).isoformat(),
+                        "close_reason": _REASON.get(getattr(d, "reason", 0), f"REASON_{getattr(d, 'reason', 0)}"),
+                        "close_price":  getattr(d, "price", None),
+                    }
     except Exception:
         pass
     return close_map
@@ -176,8 +184,12 @@ def _sync_closed_trades(log: dict):
 
         t["status"] = "CLOSED"
         t["pnl"]    = pnl
+        _ci = close_map.get(tk, {})
         if not t.get("close_time"):
-            t["close_time"] = close_map.get(tk, datetime.now().isoformat())
+            t["close_time"] = _ci.get("close_time") or datetime.now().isoformat()
+        if not t.get("close_reason"):
+            t["close_reason"]  = _ci.get("close_reason", "UNKNOWN")
+            t["close_price"]   = _ci.get("close_price")
         changed = True
         logger.info(f"Trade closed — Ticket:{t['ticket']} PnL:{pnl:+.2f}")
         _db_write_trade(t)
@@ -443,6 +455,11 @@ def log_trade(decision_result: dict):
             logger.info(f"System trade updated — Ticket:{ticket} | PA:{pa_action} | Type:{entry_type}")
             _db_write_trade(trade_entry)
             return
+
+    # Validate critical fields — warn if missing so analysis stays accurate
+    for _f in ("trend", "entry_type", "technical_signal", "technical_confidence", "sr_zone"):
+        if trade_entry.get(_f) is None:
+            logger.warning(f"[REPORTER] Missing field '{_f}' in trade ticket={ticket} — will show as UNKNOWN in analysis")
 
     log["trades"].append(trade_entry)
     log["summary"]["total"] += 1

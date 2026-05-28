@@ -108,7 +108,19 @@ If Fib + H4 S/R zone coincide → treat zone as STRONG regardless of original ra
 | London open / NY (7–13, 17–21 UTC) | 12 |
 | Asian (0–7 UTC) | 8 |
 
-**Step 2:** Cap total at 100. Apply thresholds:
+**Step 2:** Cap total at 100.
+
+**Step 2b — Volatility & Session Penalties (apply before cap):**
+
+| Condition | Penalty |
+|-----------|---------|
+| H4 ATR > 60 pips | -20 |
+| H4 ATR 40–60 pips | -10 |
+| Asian session (0–7 UTC) + no S/R zone | -10 |
+
+Rationale: High ATR means stops get hit by noise before TP is reached. Asian session without a zone anchor has historically negative edge.
+
+**Step 3:** Apply thresholds to final score:
 
 - ≥ 65 → strong signal — output BUY or SELL  
 - 45–64 → moderate signal — output BUY or SELL (DecisionMaker evaluates further)  

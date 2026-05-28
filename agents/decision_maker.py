@@ -183,6 +183,13 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         sl_pips = float(chart_data.get("buy_sl_pips" if direction == "BUY" else "sell_sl_pips")
                         or MONEY_MANAGEMENT["default_sl_pips"])
         tp_pips = float(chart_data.get("tp_pips") or MONEY_MANAGEMENT["default_tp_pips"])
+        # NNLB streak protection — ถึงแม้ NNLB จะข้าม gates แต่ยังต้องหยุดเมื่อ streak สูง
+        if _cfg.STREAK_PROTECTION:
+            _nnlb_streak = history.get("losing_streak", 0)
+            _max_s       = getattr(_cfg, "MAX_LOSING_STREAK", 5)
+            if _nnlb_streak >= _max_s:
+                return _fail(f"NNLB: losing streak {_nnlb_streak}L ≥ {_max_s} — หยุดชั่วคราว")
+
         logger.warning(f"[NNLB] ข้าม gates ทั้งหมด — {direction} SL={sl_pips:.0f}p TP={tp_pips:.0f}p conf={conf}%")
         return {
             "pass":         True,
@@ -266,6 +273,23 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
                 return _fail(f"SIDEWAYS SR_ZONE ({sr_str}) requires conf ≥{_sw_min}% (got {conf}%)")
         elif _is_breakout and conf < 65:
             return _fail(f"SIDEWAYS MOMENTUM_BREAKOUT requires conf ≥65% (got {conf}%)")
+
+    # 5b. Session gate — Asian/dead-zone sessions block weak entries (data shows Asian = noise)
+    _sess_hour        = datetime.utcnow().hour
+    _in_quiet_session = not (7 <= _sess_hour < 21)   # Asian 0-7 UTC or dead zone 21-24 UTC
+    if _in_quiet_session:
+        _sess_lbl = "Asian (quiet)" if _sess_hour < 7 else "NY Close (quiet)"
+        if entry_type in ("EMA_PULLBACK", "STRUCTURE_PULLBACK") and conf < 72:
+            return _fail(f"{_sess_lbl}: EMA/structure entries require conf ≥72% (got {conf}%)")
+        if sr_zone == "NONE" and conf < 72:
+            return _fail(f"{_sess_lbl}: no-zone entries blocked — conf {conf}% < 72%")
+
+    # 5c. SELL at RESISTANCE in BEARISH trend — data shows WR=39% here, zone breaks often
+    if direction == "SELL" and trend == "BEARISH" and sr_zone == "RESISTANCE":
+        if conf < 70:
+            return _fail(
+                f"SELL+RESISTANCE in BEARISH trend: zone likely to break, requires conf ≥70% (got {conf}%)"
+            )
 
     # 6. Min confidence — ลด threshold ถ้าอยู่ที่ D1/W1 major zone
     htf_zone = chart_data.get("htf_zone")
