@@ -1,0 +1,320 @@
+"""
+LangGraph pipeline — แทน sequential pipeline ใน run_cycle()
+
+Graph flow:
+  _entry → (skip_ai?) → position_mgmt → END
+         → chart → advisor → (net_degraded?) → accounting → END
+                           → news → analyst → decision → position_mgmt → reporter → accounting → END
+"""
+import time
+from typing import TypedDict
+from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
+from loguru import logger
+
+# ── State ──────────────────────────────────────────────────────────────────────
+class TradingState(TypedDict):
+    skip_ai:        bool
+    skip_reason:    str
+    chart_data:     dict
+    advisor_data:   dict
+    news_data:      dict
+    sentiment_data: dict
+    decision:       dict
+    net_degraded:   bool
+    latencies:      dict
+    error_steps:    list
+
+GRAPH_CONFIG = {"configurable": {"thread_id": "xauusd_main"}}
+
+EMPTY_STATE: TradingState = {
+    "skip_ai":        False,
+    "skip_reason":    "",
+    "chart_data":     {},
+    "advisor_data":   {},
+    "news_data":      {"tweets": [], "count": 0},
+    "sentiment_data": {"sentiment": "NEUTRAL", "confidence": 0, "summary": "", "tweet_count": 0},
+    "decision":       {"action": "SKIP", "reason": ""},
+    "net_degraded":   False,
+    "latencies":      {},
+    "error_steps":    [],
+}
+
+
+# ── Nodes ──────────────────────────────────────────────────────────────────────
+
+def node_entry(state: TradingState) -> dict:
+    return {}
+
+
+def node_chart(state: TradingState) -> dict:
+    from agents.chart_watcher import analyze_chart
+    from utils.display import print_step, print_signal_box
+    print_step(0, "running", "กำลังดึงข้อมูลกราฟ...")
+    t = time.monotonic()
+    try:
+        data = analyze_chart()
+        lat  = int((time.monotonic() - t) * 1000)
+        sig  = data.get("signal", "NO_TRADE")
+        conf = data.get("confidence", 0)
+        print_step(0, "done", f"{sig}  ({conf}%)")
+        print_signal_box(data)
+        return {
+            "chart_data": data,
+            "latencies":  {**state.get("latencies", {}), "chart_watcher": lat},
+        }
+    except Exception as e:
+        print_step(0, "error", str(e)[:60])
+        logger.error(f"[GRAPH:chart] {e}")
+        return {
+            "chart_data":  {"signal": "NO_TRADE", "confidence": 0, "sl_pips": 1000, "tp_pips": 1500},
+            "error_steps": state.get("error_steps", []) + ["chart_watcher"],
+        }
+
+
+def node_advisor(state: TradingState) -> dict:
+    from agents.market_advisor import analyze_market_regime
+    from utils.display import print_step, print_advisor_box
+    print_step(1, "running", "กำลังวิเคราะห์ market regime...")
+    t = time.monotonic()
+    try:
+        data   = analyze_market_regime(state["chart_data"])
+        lat    = int((time.monotonic() - t) * 1000)
+        regime = data.get("regime", "—")
+        conf   = data.get("regime_confidence", 0)
+        bias   = data.get("bias", "—")
+        print_step(1, "done", f"{regime}  ({conf}%)  Bias: {bias}")
+        print_advisor_box(data)
+        return {
+            "advisor_data": data,
+            "net_degraded": False,
+            "latencies":    {**state.get("latencies", {}), "market_advisor": lat},
+        }
+    except Exception as e:
+        print_step(1, "error", str(e)[:60])
+        logger.error(f"[GRAPH:advisor] {e}")
+        cw_failed = "chart_watcher" in state.get("error_steps", [])
+        return {
+            "advisor_data": {},
+            "net_degraded": cw_failed,
+            "error_steps":  state.get("error_steps", []) + ["market_advisor"],
+        }
+
+
+async def node_news(state: TradingState) -> dict:
+    from agents.news_gatherer import gather_news
+    from utils.display import print_step
+    print_step(2, "running", "กำลังดึงข่าว Twitter/X...")
+    try:
+        data  = await gather_news()
+        count = data.get("count", 0)
+        print_step(2, "done", f"{count} tweet")
+        return {"news_data": data}
+    except Exception as e:
+        print_step(2, "error", str(e)[:60])
+        logger.error(f"[GRAPH:news] {e}")
+        return {"news_data": {"tweets": [], "count": 0}}
+
+
+def node_analyst(state: TradingState) -> dict:
+    from agents.analyst import analyze_sentiment
+    from utils.display import print_step, print_sentiment_box
+    print_step(3, "running", "กำลังวิเคราะห์ sentiment...")
+    t = time.monotonic()
+    try:
+        data  = analyze_sentiment(state["news_data"], state["chart_data"])
+        data["news_count"] = state["news_data"].get("count", 0)
+        lat   = int((time.monotonic() - t) * 1000)
+        sent  = data.get("sentiment", "NEUTRAL")
+        sconf = data.get("confidence", 0)
+        print_step(3, "done", f"{sent}  ({sconf}%)")
+        print_sentiment_box(data)
+        return {
+            "sentiment_data": data,
+            "latencies":      {**state.get("latencies", {}), "analyst": lat},
+        }
+    except Exception as e:
+        print_step(3, "error", str(e)[:60])
+        logger.error(f"[GRAPH:analyst] {e}")
+        return {
+            "sentiment_data": {"sentiment": "NEUTRAL", "confidence": 0, "summary": "", "tweet_count": 0}
+        }
+
+
+def node_decision(state: TradingState) -> dict:
+    from agents.decision_maker import make_decision
+    from utils.display import print_step, print_decision_box
+    print_step(4, "running", "กำลังตัดสินใจ...")
+    t = time.monotonic()
+    try:
+        data   = make_decision(state["chart_data"], state["sentiment_data"], state["advisor_data"])
+        lat    = int((time.monotonic() - t) * 1000)
+        action = data.get("action", "SKIP")
+        detail = f"EXECUTE {data.get('direction','')}" if action == "EXECUTE" else "SKIP"
+        status = "done" if action == "EXECUTE" else "skip"
+        print_step(4, status, detail)
+        print_decision_box(data)
+        return {
+            "decision": data,
+            "latencies": {**state.get("latencies", {}), "decision_maker": lat},
+        }
+    except Exception as e:
+        print_step(4, "error", str(e)[:60])
+        logger.error(f"[GRAPH:decision] {e}")
+        return {"decision": {"action": "SKIP", "reason": str(e)}}
+
+
+def node_position_mgmt(state: TradingState) -> dict:
+    """รัน position management ทุก cycle — ทั้ง skip_ai และ full path"""
+    from connectors.mt5_connector import (
+        manage_momentum_exit, manage_zone_break_close, manage_partial_close,
+        manage_breakeven, manage_dynamic_tp, manage_post_event_tp, manage_trailing_stop,
+    )
+    from utils.display import print_warning
+    chart = state.get("chart_data") or {}
+    try:
+        mex = manage_momentum_exit()
+        if mex: print_warning(f"Momentum Exit: ปิดเร็ว {mex} position (momentum สวนทางแรง)")
+        zbc = manage_zone_break_close(chart)
+        if zbc: print_warning(f"Zone Break: ปิด/re-enter {zbc} position (HTF zone ถูกทะลุ)")
+        pc = manage_partial_close()
+        if pc: print_warning(f"Partial close: scale out {pc} position(s)")
+        be = manage_breakeven()
+        if be: print_warning(f"Breakeven: ขยับ SL หน้าทุน {be} position")
+        dtp = manage_dynamic_tp()
+        if dtp: print_warning(f"Dynamic TP: ขยับ TP ออก {dtp} position (momentum แรง)")
+        ptp = manage_post_event_tp(chart)
+        if ptp: print_warning(f"Post-event TP: ตั้ง TP {ptp} position (momentum สงบแล้ว)")
+        tsl = manage_trailing_stop()
+        if tsl: print_warning(f"Trailing Stop: ขยับ SL {tsl} position")
+    except Exception as e:
+        logger.error(f"[GRAPH:position_mgmt] {e}")
+    return {}
+
+
+def node_reporter(state: TradingState) -> dict:
+    from agents.reporter import log_trade, print_summary, scan_manual_orders
+    from agents.pending_manager import auto_place_pending_orders, manage_range_pending, manage_sl_reentry
+    from utils.display import print_step, print_warning
+    print_step(5, "running", "กำลังบันทึกผล...")
+    chart     = state.get("chart_data") or {}
+    decision  = state.get("decision") or {}
+    sentiment = state.get("sentiment_data") or {}
+    try:
+        log_trade(decision)
+        n = scan_manual_orders(chart or None)
+        print_step(5, "done", "done" + (f" (+{n} manual)" if n else ""))
+        if n: print_warning(f"พบ manual order {n} รายการ — บันทึก context แล้ว")
+        try:
+            p = auto_place_pending_orders(chart, sentiment)
+            if p: print_warning(f"Auto-pending: วาง {p} order ที่ key S/R levels (H4+Daily)")
+        except Exception as e:
+            logger.error(f"Auto-pending error: {e}")
+        try:
+            rp = manage_range_pending(chart)
+            if rp: print_warning(f"Range pending: วาง {rp} order ที่กรอบ sideways")
+        except Exception as e:
+            logger.error(f"Range pending error: {e}")
+        try:
+            sr = manage_sl_reentry(chart)
+            if sr: print_warning(f"Post-SL: วาง {sr} re-entry order ที่ safe zone")
+        except Exception as e:
+            logger.error(f"Post-SL re-entry error: {e}")
+        print_summary()
+    except Exception as e:
+        print_step(5, "error", str(e)[:60])
+        logger.error(f"[GRAPH:reporter] {e}")
+    return {}
+
+
+def node_accounting(state: TradingState) -> dict:
+    import agents.chart_watcher  as _cw
+    import agents.market_advisor as _ma
+    import agents.analyst        as _an
+    import agents.decision_maker as _dm
+    import agents.reporter       as _rp
+    import config
+    from agents.accountant import record_cycle
+    try:
+        ticket = (
+            state.get("decision", {}).get("order", {}).get("ticket")
+            if state.get("decision", {}).get("action") == "EXECUTE" else None
+        )
+        record_cycle(
+            symbol=config.SYMBOL,
+            agent_usages={
+                "chart_watcher":  ("claude-sonnet-4-6",          _cw._last_usage),
+                "market_advisor": ("claude-sonnet-4-6",          _ma._last_usage),
+                "analyst":        ("claude-sonnet-4-6",          _an._last_usage),
+                "decision_maker": ("claude-sonnet-4-6",          _dm._last_usage),
+                "reporter":       ("claude-haiku-4-5-20251001",  _rp._last_usage),
+            },
+            ticket=ticket,
+            latencies_ms=state.get("latencies", {}),
+        )
+    except Exception as e:
+        logger.error(f"[GRAPH:accounting] {e}")
+    return {}
+
+
+# ── Routing ────────────────────────────────────────────────────────────────────
+
+def route_entry(state: TradingState) -> str:
+    if state.get("skip_ai"):
+        return "position_mgmt"
+    return "chart"
+
+
+def route_after_advisor(state: TradingState) -> str:
+    if state.get("net_degraded"):
+        logger.warning("[GRAPH] Network degraded (CW+MA fail) — skip to accounting")
+        return "accounting"
+    return "news"
+
+
+def route_after_position_mgmt(state: TradingState) -> str:
+    if state.get("skip_ai"):
+        return "done"   # skip_ai path: position mgmt only → END
+    return "reporter"
+
+
+# ── Build Graph ────────────────────────────────────────────────────────────────
+
+def build_trading_graph():
+    g = StateGraph(TradingState)
+
+    g.add_node("_entry",        node_entry)
+    g.add_node("chart",         node_chart)
+    g.add_node("advisor",       node_advisor)
+    g.add_node("news",          node_news)
+    g.add_node("analyst",       node_analyst)
+    g.add_node("decision",      node_decision)
+    g.add_node("position_mgmt", node_position_mgmt)
+    g.add_node("reporter",      node_reporter)
+    g.add_node("accounting",    node_accounting)
+
+    g.set_entry_point("_entry")
+    g.add_conditional_edges("_entry", route_entry, {
+        "chart":         "chart",
+        "position_mgmt": "position_mgmt",
+    })
+    g.add_edge("chart",    "advisor")
+    g.add_conditional_edges("advisor", route_after_advisor, {
+        "news":       "news",
+        "accounting": "accounting",
+    })
+    g.add_edge("news",     "analyst")
+    g.add_edge("analyst",  "decision")
+    g.add_edge("decision", "position_mgmt")
+    g.add_conditional_edges("position_mgmt", route_after_position_mgmt, {
+        "reporter": "reporter",
+        "done":     END,
+    })
+    g.add_edge("reporter",   "accounting")
+    g.add_edge("accounting", END)
+
+    return g.compile(checkpointer=MemorySaver())
+
+
+# Singleton — compile once at import time
+TRADING_APP = build_trading_graph()

@@ -7,25 +7,13 @@ import time
 from datetime import date as _date, datetime as _dt
 from loguru import logger
 from connectors.price_feed import connect_mt5, disconnect_mt5, is_mt5_connected
-from connectors.mt5_connector import get_open_positions, get_current_price, manage_breakeven, manage_partial_close, manage_dynamic_tp, manage_post_event_tp, count_protected_slots, is_hedge_active, check_open_slot, is_algo_trading_enabled, manage_trailing_stop, manage_zone_break_close, manage_momentum_exit
-from agents.chart_watcher import analyze_chart, analyze_m5_pa
-from agents.market_advisor import analyze_market_regime
-from agents.news_gatherer import gather_news
-from agents.analyst import analyze_sentiment
-from agents.decision_maker import make_decision
-from agents.reporter import log_trade, print_summary, scan_manual_orders
-from agents.pending_manager import auto_place_pending_orders, place_weekly_calendar_pending, manage_range_pending, manage_sl_reentry
-import agents.chart_watcher  as _cw_mod
-import agents.market_advisor as _ma_mod
-import agents.analyst        as _an_mod
-import agents.decision_maker as _dm_mod
-import agents.reporter       as _rp_mod
-from agents.accountant import record_cycle
+from connectors.mt5_connector import get_open_positions, get_current_price, is_hedge_active, check_open_slot, is_algo_trading_enabled
+from agents.chart_watcher import analyze_m5_pa
+from agents.pending_manager import place_weekly_calendar_pending
+from agents.trading_graph import TRADING_APP, GRAPH_CONFIG, EMPTY_STATE, TradingState
 from utils.display import (
     console, print_header, print_cycle_start, print_cycle_end,
-    print_step, print_signal_box, print_advisor_box,
-    print_sentiment_box, print_decision_box, print_warning, print_error,
-    print_ready_mode_banner,
+    print_warning, print_error, print_ready_mode_banner,
 )
 from utils.market_clock import next_interval, market_sleep_status
 import config
@@ -264,320 +252,86 @@ def _should_skip_ai() -> tuple[bool, str]:
 
 
 async def run_status_cycle() -> None:
-    """Lightweight cycle เมื่อ slots เต็ม — ข้าม AI agents"""
+    """Slots เต็ม — ข้าม AI, รัน position management ผ่าน graph"""
     config.reload_config()
     global _cycle
     _cycle += 1
     print_cycle_start(_cycle)
 
-    open_pos  = get_open_positions()
-    hedge     = is_hedge_active()
-    can_buy,  rb = check_open_slot("BUY")
-    can_sell, rs = check_open_slot("SELL")
-
+    open_pos   = get_open_positions()
+    hedge      = is_hedge_active()
+    can_buy,   _  = check_open_slot("BUY")
+    can_sell,  _  = check_open_slot("SELL")
+    max_dir    = MONEY_MANAGEMENT["max_open_trades"]
     buy_count  = sum(1 for p in open_pos if p.get("direction") == "BUY")
     sell_count = sum(1 for p in open_pos if p.get("direction") == "SELL")
-    max_dir    = MONEY_MANAGEMENT["max_open_trades"]
+    buy_pnl    = sum(p.get("profit", 0) for p in open_pos if p.get("direction") == "BUY")
+    sell_pnl   = sum(p.get("profit", 0) for p in open_pos if p.get("direction") == "SELL")
+    buy_tag    = f"[green]BUY {buy_count}/{max_dir}  P&L:{buy_pnl:+.2f}[/green]" if can_buy \
+                 else f"[dim]BUY {buy_count}/{max_dir}  P&L:{buy_pnl:+.2f}  x[/dim]"
+    sell_tag   = f"[green]SELL {sell_count}/{max_dir}  P&L:{sell_pnl:+.2f}[/green]" if can_sell \
+                 else f"[dim]SELL {sell_count}/{max_dir}  P&L:{sell_pnl:+.2f}  x[/dim]"
+    hedge_tag  = "  [bold cyan]Hedge[/bold cyan]" if hedge else ""
+    console.print(f"  [bold yellow]||[/bold yellow]  {buy_tag}   {sell_tag}{hedge_tag}  — skip AI\n")
 
-    buy_pnl  = sum(p.get("profit", 0) for p in open_pos if p.get("direction") == "BUY")
-    sell_pnl = sum(p.get("profit", 0) for p in open_pos if p.get("direction") == "SELL")
-
-    buy_tag  = f"[green]BUY {buy_count}/{max_dir}  P&L:{buy_pnl:+.2f}[/green]" if can_buy  \
-               else f"[dim]BUY {buy_count}/{max_dir}  P&L:{buy_pnl:+.2f}  ✗[/dim]"
-    sell_tag = f"[green]SELL {sell_count}/{max_dir}  P&L:{sell_pnl:+.2f}[/green]" if can_sell \
-               else f"[dim]SELL {sell_count}/{max_dir}  P&L:{sell_pnl:+.2f}  ✗[/dim]"
-
-    hedge_tag = f"  [bold cyan]⇄ Hedge[/bold cyan]" if hedge else ""
-
-    console.print(
-        f"  [bold yellow]⏸[/bold yellow]  "
-        f"{buy_tag}   {sell_tag}{hedge_tag}  — skip AI\n"
-    )
-
-    print_step(5, "running", "กำลังตรวจสอบ positions...")
-    try:
-        mex = manage_momentum_exit()
-        if mex:
-            print_warning(f"Momentum Exit: ปิดเร็ว {mex} position (momentum สวนทางแรง)")
-        zbc = manage_zone_break_close(_last_chart_data or {})
-        if zbc:
-            print_warning(f"Zone Break: ปิด/re-enter {zbc} position (HTF zone ถูกทะลุ)")
-        pc = manage_partial_close()
-        if pc:
-            print_warning(f"Partial close: scale out {pc} position(s)")
-        be = manage_breakeven()
-        if be:
-            print_warning(f"Breakeven: ขยับ SL หน้าทุน {be} position")
-        dtp = manage_dynamic_tp()
-        if dtp:
-            print_warning(f"Dynamic TP: ขยับ TP ออก {dtp} position (momentum แรง)")
-        ptp = manage_post_event_tp(_last_chart_data)
-        if ptp:
-            print_warning(f"Post-event TP: ตั้ง TP {ptp} position (momentum สงบแล้ว)")
-        tsl = manage_trailing_stop()
-        if tsl:
-            print_warning(f"Trailing Stop: ขยับ SL {tsl} position (ATR_{config.TRAILING_ATR_TF})")
-        n = scan_manual_orders(_last_chart_data or None)
-        detail = "done" + (f"  +{n} manual" if n else "")
-        print_step(5, "done", detail)
-        if n:
-            print_warning(f"พบ manual order {n} รายการ — บันทึก context แล้ว")
-        # Range pending — ตรวจและยกเลิก stale orders แม้ในรอบ status
-        try:
-            rp = manage_range_pending(_last_chart_data or {})
-            if rp:
-                print_warning(f"Range pending: วาง {rp} order ที่กรอบ sideways")
-        except Exception as rpe:
-            logger.error(f"Range pending error: {rpe}")
-        # Post-SL re-entry — หาจุดเข้าใหม่ที่ safe zone หลัง SL hit
-        try:
-            sr = manage_sl_reentry(_last_chart_data or {})
-            if sr:
-                print_warning(f"Post-SL: วาง {sr} re-entry order ที่ safe zone")
-        except Exception as sre:
-            logger.error(f"Post-SL re-entry error: {sre}")
-        print_summary()
-    except Exception as e:
-        print_step(5, "error", str(e)[:60])
-        logger.error(f"Status cycle error: {e}")
+    state: TradingState = {**EMPTY_STATE, "skip_ai": True, "skip_reason": "slots_full",
+                           "chart_data": _last_chart_data or {}}
+    await TRADING_APP.ainvoke(state, config=GRAPH_CONFIG)
 
 
 async def run_cycle() -> tuple[dict, dict]:
-    """รัน 1 รอบ คืน (chart_data, sentiment_data) สำหรับคำนวณ interval"""
+    """รัน 1 รอบผ่าน LangGraph — คืน (chart_data, sentiment_data)"""
     config.reload_config()
     global _cycle, _last_chart_data, _last_sentiment_data, _net_degraded
     _cycle += 1
     _cycle_start_t = time.monotonic()
     print_cycle_start(_cycle)
 
-    # ── DRY_RUN warning ────────────────────────────────────────────
     if config.DRY_RUN:
         logger.warning("[DRY_RUN] โหมดทดสอบ — orders จะไม่ถูกส่งไป MT5 จริง")
-        print_warning("⚠  DRY_RUN MODE — ไม่มีการส่ง order จริง (ทดสอบเท่านั้น)")
-
-    # ── NNLB warning ───────────────────────────────────────────────
+        print_warning("DRY_RUN MODE — ไม่มีการส่ง order จริง (ทดสอบเท่านั้น)")
     if config.NNLB_MODE:
-        logger.warning("[NNLB] No-Risk-No-Lamborghini — ข้าม money management / gates ทั้งหมด ใช้ MIN_LOT")
-        print_warning("⚠  NNLB MODE — ข้าม gates / MM ทั้งหมด | lot=MIN_LOT เสมอ")
-
-    # ── Algo Trading check ─────────────────────────────────────────
+        logger.warning("[NNLB] No-Risk-No-Lamborghini — ข้าม money management / gates ทั้งหมด")
+        print_warning("NNLB MODE — ข้าม gates / MM ทั้งหมด | lot=MIN_LOT เสมอ")
     if not is_algo_trading_enabled():
-        logger.warning("MT5 Algo Trading ปิดอยู่ — orders จะ fail ทั้งหมด กดปุ่ม 'Algo Trading' ใน MT5 toolbar")
-        print_warning("⚠  MT5 Algo Trading ปิดอยู่ — กดปุ่ม Algo Trading ใน toolbar ก่อน")
+        logger.warning("MT5 Algo Trading ปิดอยู่")
+        print_warning("MT5 Algo Trading ปิดอยู่ — กดปุ่ม Algo Trading ใน toolbar ก่อน")
 
-    # ── AI Skip Gate ──────────────────────────────────────────────
     _skip_ai, _skip_why = _should_skip_ai()
     if _skip_ai:
         logger.debug(f"[SKIP_AI] {_skip_why}")
-        console.print(f"  [dim]⏭  SKIP AI: {_skip_why}[/dim]\n")
-        # ยัง run position management ทุก cycle (ไม่ขึ้นกับ AI)
-        try:
-            mex = manage_momentum_exit()
-            if mex:
-                print_warning(f"Momentum Exit: ปิดเร็ว {mex} position")
-            zbc = manage_zone_break_close(_last_chart_data or {})
-            if zbc:
-                print_warning(f"Zone Break: ปิด {zbc} position")
-            be = manage_breakeven()
-            if be:
-                print_warning(f"Breakeven: ขยับ SL {be} position")
-            dtp = manage_dynamic_tp()
-            if dtp:
-                print_warning(f"Dynamic TP: ขยับ TP {dtp} position")
-            tsl = manage_trailing_stop()
-            if tsl:
-                print_warning(f"Trailing Stop: ขยับ SL {tsl} position")
-        except Exception as _e:
-            logger.error(f"[SKIP_AI] position mgmt error: {_e}")
-        return _last_chart_data or {}, _last_sentiment_data or {}
+        console.print(f"  [dim]SKIP AI: {_skip_why}[/dim]\n")
 
-    _lat_cw = _lat_ma = _lat_an = _lat_dm = 0   # latencies (ms)
-    _cw_ok = _ma_ok = False
+    # ── Run graph ──────────────────────────────────────────────────
+    initial: TradingState = {
+        **EMPTY_STATE,
+        "skip_ai":        _skip_ai,
+        "skip_reason":    _skip_why,
+        "chart_data":     _last_chart_data or {},
+        "sentiment_data": _last_sentiment_data or EMPTY_STATE["sentiment_data"],
+    }
+    result = await TRADING_APP.ainvoke(initial, config=GRAPH_CONFIG)
 
-    # ── Step 1: Chart Watcher ──────────────────────────────────────
-    print_step(0, "running", "กำลังดึงข้อมูลกราฟ...")
-    try:
-        _t = time.monotonic()
-        chart_data = analyze_chart()
-        _lat_cw = int((time.monotonic() - _t) * 1000)
-        _last_chart_data = chart_data
-        signal = chart_data.get("signal", "NO_TRADE")
-        conf   = chart_data.get("confidence", 0)
-        print_step(0, "done", f"{signal}  ({conf}%)")
-        print_signal_box(chart_data)
-        _cw_ok = True
-    except Exception as e:
-        print_step(0, "error", str(e)[:60])
-        logger.error(f"Chart Watcher error: {e}")
-        chart_data = {"signal": "NO_TRADE", "confidence": 0,
-                      "sl_pips": 1000, "tp_pips": 1500}
+    chart_data     = result.get("chart_data")     or _last_chart_data or {}
+    sentiment_data = result.get("sentiment_data") or _last_sentiment_data or EMPTY_STATE["sentiment_data"]
 
-    # ── Step 2: Market Advisor ─────────────────────────────────────
-    print_step(1, "running", "กำลังวิเคราะห์ market regime...")
-    try:
-        _t = time.monotonic()
-        advisor_data = analyze_market_regime(chart_data)
-        _lat_ma = int((time.monotonic() - _t) * 1000)
-        regime = advisor_data.get("regime", "—")
-        conf   = advisor_data.get("regime_confidence", 0)
-        bias   = advisor_data.get("bias", "—")
-        print_step(1, "done", f"{regime}  ({conf}%)  Bias: {bias}")
-        print_advisor_box(advisor_data)
-        _ma_ok = True
-    except Exception as e:
-        print_step(1, "error", str(e)[:60])
-        logger.error(f"Market Advisor error: {e}")
-        advisor_data = {}
-
-    # ── Network degraded check — ถ้า CW+MA ทั้งคู่ fail ข้ามการเทรด ──
-    _net_degraded = not _cw_ok and not _ma_ok
-    if _net_degraded:
-        logger.warning("Network degraded — CW+MA ทั้งคู่ fail — ข้ามการตัดสินใจรอบนี้")
-        sentiment_data = _last_sentiment_data or {"sentiment": "NEUTRAL", "confidence": 0,
-                                                   "summary": "", "tweet_count": 0}
-        return chart_data, sentiment_data
-
-    # ── Step 3: News Gatherer ──────────────────────────────────────
-    print_step(2, "running", "กำลังดึงข่าว Twitter/X...")
-    try:
-        news_data = await gather_news()
-        print_step(2, "done", f"{news_data.get('count', 0)} tweet")
-    except Exception as e:
-        print_step(2, "error", str(e)[:60])
-        logger.error(f"News Gatherer error: {e}")
-        news_data = {"tweets": [], "count": 0}
-
-    # ── Step 4: Sentiment Analyst ──────────────────────────────────
-    print_step(3, "running", "กำลังวิเคราะห์ sentiment...")
-    try:
-        _t = time.monotonic()
-        sentiment_data = analyze_sentiment(news_data, chart_data)
-        _lat_an = int((time.monotonic() - _t) * 1000)
-        sent  = sentiment_data.get("sentiment", "NEUTRAL")
-        sconf = sentiment_data.get("confidence", 0)
-        sentiment_data["news_count"] = news_data.get("count", 0)
+    if not _skip_ai:
+        _last_chart_data     = chart_data
         _last_sentiment_data = sentiment_data
-        print_step(3, "done", f"{sent}  ({sconf}%)")
-        print_sentiment_box(sentiment_data)
-    except Exception as e:
-        print_step(3, "error", str(e)[:60])
-        logger.error(f"Sentiment error: {e}")
-        sentiment_data = {"sentiment": "NEUTRAL", "confidence": 0,
-                          "summary": "", "tweet_count": 0}
-
-    # ── Step 5: Decision Maker ─────────────────────────────────────
-    print_step(4, "running", "กำลังตัดสินใจ...")
-    try:
-        _t = time.monotonic()
-        decision = make_decision(chart_data, sentiment_data, advisor_data)
-        _lat_dm = int((time.monotonic() - _t) * 1000)
-        action = decision.get("action", "SKIP")
-        step_detail = f"EXECUTE {decision.get('direction','')}" if action == "EXECUTE" else "SKIP"
-        step_status = "done" if action == "EXECUTE" else "skip"
-        print_step(4, step_status, step_detail)
-        print_decision_box(decision)
-    except Exception as e:
-        print_step(4, "error", str(e)[:60])
-        logger.error(f"Decision Maker error: {e}")
-        decision = {"action": "SKIP", "reason": str(e)}
-
-    # ── Step 6: Reporter ───────────────────────────────────────────
-    print_step(5, "running", "กำลังบันทึกผล...")
-    try:
-        mex = manage_momentum_exit()
-        if mex:
-            print_warning(f"Momentum Exit: ปิดเร็ว {mex} position (momentum สวนทางแรง)")
-        zbc = manage_zone_break_close(chart_data)
-        if zbc:
-            print_warning(f"Zone Break: ปิด/re-enter {zbc} position (HTF zone ถูกทะลุ)")
-        pc = manage_partial_close()
-        if pc:
-            print_warning(f"Partial close: scale out {pc} position(s)")
-        be = manage_breakeven()
-        if be:
-            print_warning(f"Breakeven: ขยับ SL หน้าทุน {be} position")
-        dtp = manage_dynamic_tp()
-        if dtp:
-            print_warning(f"Dynamic TP: ขยับ TP ออก {dtp} position (momentum แรง)")
-        ptp = manage_post_event_tp(chart_data)
-        if ptp:
-            print_warning(f"Post-event TP: ตั้ง TP {ptp} position (momentum สงบแล้ว)")
-        tsl = manage_trailing_stop()
-        if tsl:
-            print_warning(f"Trailing Stop: ขยับ SL {tsl} position (ATR_{config.TRAILING_ATR_TF})")
-        log_trade(decision)
-        n = scan_manual_orders(chart_data)
-        detail = "done" + (f" (+{n} manual)" if n else "")
-        print_step(5, "done", detail)
-        if n:
-            print_warning(f"พบ manual order {n} รายการ — บันทึก context ทาง technical แล้ว")
-        # ── Auto-pending: วาง limit orders ที่ key S/R (H4 + Daily) ──
+        _net_degraded        = result.get("net_degraded", False)
+        # อัปเดต skip gate timing หลัง AI cycle จริง
+        global _last_ai_mono, _last_ai_price
+        _last_ai_mono  = time.monotonic()
+        _last_ai_price = get_current_price()
         try:
-            p = auto_place_pending_orders(chart_data, sentiment_data)
-            if p:
-                print_warning(f"Auto-pending: วาง {p} order ที่ key S/R levels (H4+Daily)")
-        except Exception as pe:
-            logger.error(f"Auto-pending error: {pe}")
-        # ── Range pending: sideways กรอบอัตโนมัติ (แยกจาก weekly+auto) ──
-        try:
-            rp = manage_range_pending(chart_data)
-            if rp:
-                print_warning(f"Range pending: วาง {rp} order ที่กรอบ sideways")
-        except Exception as rpe:
-            logger.error(f"Range pending error: {rpe}")
-        # ── Post-SL re-entry: หาจุดเข้าใหม่ที่ safe zone หลัง SL hit ──
-        try:
-            sr = manage_sl_reentry(chart_data)
-            if sr:
-                print_warning(f"Post-SL: วาง {sr} re-entry order ที่ safe zone")
-        except Exception as sre:
-            logger.error(f"Post-SL re-entry error: {sre}")
-        print_summary()
-    except Exception as e:
-        print_step(5, "error", str(e)[:60])
-        logger.error(f"Reporter error: {e}")
+            _write_bot_status(chart_data, sentiment_data, result.get("decision") or {})
+        except Exception as e:
+            logger.warning(f"bot_status write error: {e}")
 
-    # ── Accounting ─────────────────────────────────────────────────
-    global _last_ai_mono, _last_ai_price
-    _last_ai_mono  = time.monotonic()
-    _last_ai_price = get_current_price()   # เก็บราคาไว้ตรวจ spike รอบหน้า
-    try:
-        _ticket = (
-            decision.get("order", {}).get("ticket")
-            if decision.get("action") == "EXECUTE" else None
-        )
-        record_cycle(
-            symbol       = config.SYMBOL,
-            agent_usages = {
-                "chart_watcher":  ("claude-sonnet-4-6", _cw_mod._last_usage),
-                "market_advisor": ("claude-sonnet-4-6", _ma_mod._last_usage),
-                "analyst":        ("claude-sonnet-4-6", _an_mod._last_usage),
-                "decision_maker": ("claude-sonnet-4-6", _dm_mod._last_usage),
-                "reporter":       ("claude-haiku-4-5-20251001", _rp_mod._last_usage),
-            },
-            ticket       = _ticket,
-            latencies_ms = {
-                "chart_watcher":  _lat_cw,
-                "market_advisor": _lat_ma,
-                "analyst":        _lat_an,
-                "decision_maker": _lat_dm,
-            },
-        )
-    except Exception as e:
-        logger.error(f"Accounting error: {e}")
-
-    # ── Write bot status for dashboard monitor ─────────────────────
-    try:
-        _write_bot_status(chart_data, sentiment_data, decision)
-    except Exception as e:
-        logger.warning(f"bot_status write error: {e}")
-
-    # ── Cycle time monitoring ──────────────────────────────────────
     _cycle_secs = time.monotonic() - _cycle_start_t
     _level = "WARNING" if _cycle_secs > 30 else "INFO"
     logger.log(_level, f"[CYCLE_TIME] รอบ #{_cycle} ใช้เวลา {_cycle_secs:.1f}s"
-               + (" ⚠ เกิน 30s" if _cycle_secs > 30 else ""))
-
+               + (" WARN เกิน 30s" if _cycle_secs > 30 else ""))
     return chart_data, sentiment_data
 
 
