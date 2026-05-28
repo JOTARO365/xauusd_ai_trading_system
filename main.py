@@ -39,6 +39,11 @@ READY_MAX_MISS     = 2     # ออก Ready Mode ถ้า zone หายไป
 READY_MAX_CYCLES   = 15    # ออก Ready Mode หลัง N รอบ (~30 min ที่ 120s)
 _cycle            = 0
 
+# ── AI Skip Gate — ประหยัด token เมื่อตลาดไม่ขยับ ──────────────
+AI_MIN_INTERVAL_SECS = 900   # ไม่เรียก AI บ่อยกว่า 15 นาที (= 1 M15 candle)
+AI_POS_INTERVAL_SECS = 300   # มี open position → AI ทุก 5 นาที
+_last_ai_mono: float = 0.0   # monotonic time ของ AI cycle ล่าสุด
+
 # ── Ready Mode state ──────────────────────────────────────────
 _ready_state: dict = {
     "active":    False,
@@ -185,6 +190,36 @@ def _setup_logger():
 
 
 
+def _should_skip_ai() -> tuple[bool, str]:
+    """
+    คืน (skip, reason)
+    True  = ข้าม AI agents รอบนี้ (แค่รัน position management)
+    False = รัน AI ตามปกติ
+
+    Rules:
+      - ไม่ skip ถ้าอยู่ใน Ready Mode (HTF zone = โอกาสสำคัญ)
+      - ไม่ skip cycle แรก
+      - มี open position: รัน AI ทุก AI_POS_INTERVAL_SECS (5 นาที)
+      - ไม่มี position: รัน AI ทุก AI_MIN_INTERVAL_SECS (15 นาที)
+    """
+    since = time.monotonic() - _last_ai_mono
+
+    if _ready_state.get("active"):
+        return False, "Ready Mode active"
+    if _last_ai_mono == 0.0:
+        return False, "first cycle"
+
+    try:
+        open_pos = get_open_positions()
+        threshold = AI_POS_INTERVAL_SECS if open_pos else AI_MIN_INTERVAL_SECS
+    except Exception:
+        threshold = AI_MIN_INTERVAL_SECS
+
+    if since < threshold:
+        return True, f"{since:.0f}s < {threshold}s (next AI in {threshold - since:.0f}s)"
+    return False, f"{since:.0f}s elapsed → run AI"
+
+
 async def run_status_cycle() -> None:
     """Lightweight cycle เมื่อ slots เต็ม — ข้าม AI agents"""
     config.reload_config()
@@ -286,6 +321,32 @@ async def run_cycle() -> tuple[dict, dict]:
     if not is_algo_trading_enabled():
         logger.warning("MT5 Algo Trading ปิดอยู่ — orders จะ fail ทั้งหมด กดปุ่ม 'Algo Trading' ใน MT5 toolbar")
         print_warning("⚠  MT5 Algo Trading ปิดอยู่ — กดปุ่ม Algo Trading ใน toolbar ก่อน")
+
+    # ── AI Skip Gate ──────────────────────────────────────────────
+    _skip_ai, _skip_why = _should_skip_ai()
+    if _skip_ai:
+        logger.debug(f"[SKIP_AI] {_skip_why}")
+        console.print(f"  [dim]⏭  SKIP AI: {_skip_why}[/dim]\n")
+        # ยัง run position management ทุก cycle (ไม่ขึ้นกับ AI)
+        try:
+            mex = manage_momentum_exit()
+            if mex:
+                print_warning(f"Momentum Exit: ปิดเร็ว {mex} position")
+            zbc = manage_zone_break_close(_last_chart_data or {})
+            if zbc:
+                print_warning(f"Zone Break: ปิด {zbc} position")
+            be = manage_breakeven()
+            if be:
+                print_warning(f"Breakeven: ขยับ SL {be} position")
+            dtp = manage_dynamic_tp()
+            if dtp:
+                print_warning(f"Dynamic TP: ขยับ TP {dtp} position")
+            tsl = manage_trailing_stop()
+            if tsl:
+                print_warning(f"Trailing Stop: ขยับ SL {tsl} position")
+        except Exception as _e:
+            logger.error(f"[SKIP_AI] position mgmt error: {_e}")
+        return _last_chart_data or {}, _last_sentiment_data or {}
 
     _lat_cw = _lat_ma = _lat_an = _lat_dm = 0   # latencies (ms)
     _cw_ok = _ma_ok = False
@@ -434,6 +495,8 @@ async def run_cycle() -> tuple[dict, dict]:
         logger.error(f"Reporter error: {e}")
 
     # ── Accounting ─────────────────────────────────────────────────
+    global _last_ai_mono
+    _last_ai_mono = time.monotonic()   # อัปเดตหลัง AI run สำเร็จ
     try:
         _ticket = (
             decision.get("order", {}).get("ticket")
