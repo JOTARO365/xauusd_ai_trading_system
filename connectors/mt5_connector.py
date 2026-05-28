@@ -884,7 +884,7 @@ _MIN_R_PIPS    = 300                   # ต่ำกว่านี้ = SL ถ
 _zone_state:                 dict[int, dict] = {}  # ticket → htf_zone dict
 _zone_break_pending_reentry: list[dict]      = []  # [{zone, direction, since}]
 
-ZONE_BREAK_BUFFER_PIPS = 300  # ปิดถ้า zone ทะลุเกิน 300 pips จาก level
+ZONE_BREAK_BUFFER_PIPS = 800  # ปิดถ้า zone ทะลุเกิน 800 pips ($8) จาก level — gold noise ≈$3-5
 ZONE_REENTRY_WINDOW_H  = 4    # re-entry window หลัง close (ชั่วโมง)
 
 
@@ -1194,8 +1194,9 @@ def _is_momentum_strong(direction: str) -> bool:
     return (up >= 4 and up > dn) if is_buy else (dn >= 4 and dn > up)
 
 
-MOMENTUM_EXIT_MIN_LOSS_PIPS = 100   # ขาดทุนขั้นต่ำ (pips) ก่อน momentum exit จะ trigger
-M1_SPIKE_EXIT_PIPS          = 500   # M1 candle range ขั้นต่ำที่ถือว่า spike — ออกทันทีไม่รอ loss
+MOMENTUM_EXIT_MIN_LOSS_PIPS = 500   # absolute floor (pips) — $5 minimum loss before momentum exit
+MOMENTUM_EXIT_SL_FRACTION   = 0.60  # ต้องขาดทุนอย่างน้อย 60% ของ SL distance ก่อน trigger
+M1_SPIKE_EXIT_PIPS          = 800   # M1 candle range ขั้นต่ำที่ถือว่า spike — ออกทันทีไม่รอ loss
 
 
 def _is_1m_spike(counter_dir: str) -> bool:
@@ -1249,8 +1250,12 @@ def manage_momentum_exit() -> int:
         profit_pips  = ((current - pos.price_open) if is_buy else (pos.price_open - current)) / point
         counter_dir  = "SELL" if is_buy else "BUY"
 
+        # threshold = max(floor, 60% of actual SL distance) — ป้องกัน exit ก่อน SL ถึง
+        sl_dist_pips = abs(pos.price_open - pos.sl) / point if pos.sl > 0 else 0
+        threshold    = max(MOMENTUM_EXIT_MIN_LOSS_PIPS, sl_dist_pips * MOMENTUM_EXIT_SL_FRACTION)
+
         spike    = _is_1m_spike(counter_dir)
-        momentum = profit_pips <= -MOMENTUM_EXIT_MIN_LOSS_PIPS and _is_momentum_strong(counter_dir)
+        momentum = profit_pips <= -threshold and _is_momentum_strong(counter_dir)
 
         if not spike and not momentum:
             continue
@@ -1258,7 +1263,8 @@ def manage_momentum_exit() -> int:
         reason = "M1_SPIKE" if spike else "MOMENTUM_STRONG"
         tag = (
             f"ticket={pos.ticket} {'BUY' if is_buy else 'SELL'} "
-            f"entry={pos.price_open:.2f} pnl={profit_pips:.0f}pips [{reason}]"
+            f"entry={pos.price_open:.2f} pnl={profit_pips:.0f}pips "
+            f"(threshold={threshold:.0f}p) [{reason}]"
         )
 
         if DRY_RUN:
