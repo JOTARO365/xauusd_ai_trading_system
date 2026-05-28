@@ -158,11 +158,19 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
                     tech_signal = f"TREND_CONT_{_tc_dir}"
                     chart_data["signal"]     = _tc_dir
                     chart_data["confidence"] = 55            # moderate — no zone anchor
+                    chart_data["entry_type"] = "EMA_PULLBACK"
                     conf = 55
+                    # SL = H4 ATR (clamped), TP = SL × 2  → R:R = 2.0
+                    _h4_atr = float(chart_data.get("indicators", {}).get("h4", {}).get("atr") or 0)
+                    _tc_sl  = int(min(max(round(_h4_atr / 0.01), 500), 3500)) if _h4_atr else 1500
+                    _tc_tp  = _tc_sl * 2
+                    chart_data["sell_sl_pips"] = _tc_sl
+                    chart_data["buy_sl_pips"]  = _tc_sl
+                    chart_data["tp_pips"]      = _tc_tp
                     logger.warning(
                         f"[TREND_CONT] {_trend_upper} EMA pullback → {_tc_dir} | "
                         f"H1 EMA20={_e20:.2f} price={_px:.2f} "
-                        f"dist={abs(_px - _e20) / _px * 100:.2f}%"
+                        f"SL={_tc_sl}p TP={_tc_tp}p (ATR={_h4_atr:.1f})"
                     )
                 else:
                     return _fail("NNLB: NO_TRADE signal (ไม่มีทิศทาง)")
@@ -451,9 +459,19 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
                    f"(ห่าง {htf_zone['dist_pct']}%)"
                    if htf_zone else "HTF Zone: none")
 
+    # TREND_CONT context — แทนที่ zone/PA signal ด้วย EMA structure
+    tc_line = ""
+    if "TREND_CONT" in tech_signal:
+        _h1_ind = chart_data.get("indicators", {}).get("h1", {})
+        _h4_ind = chart_data.get("indicators", {}).get("h4", {})
+        tc_line = (f"\n⚡ TREND_CONT: H1 EMA20={_h1_ind.get('ema20',0):.0f} "
+                   f"< EMA50={_h1_ind.get('ema50',0):.0f} | "
+                   f"H4 EMA20={_h4_ind.get('ema20',0):.0f} < EMA50={_h4_ind.get('ema50',0):.0f} "
+                   f"— EMA stack is the S/R, no zone required")
+
     user_message = f"""Signal: {direction} | Conf: {conf}% | Entry: {entry_type}
 Zone: {sr_zone} {sr_str} | PA: {pa_str} | Candle: {candle_str}
-{htf_line}
+{htf_line}{tc_line}
 Trend H4: {trend} | Session: {session} ({hour_utc:02d}:xx UTC)
 Momentum: {mom_str}
 SL: {sl_pips:.0f}p | TP: {tp_pips:.0f}p | R:R: {tp_pips/sl_pips:.1f} (min {eff_rr_preview:.1f})
