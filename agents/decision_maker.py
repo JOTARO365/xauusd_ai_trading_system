@@ -242,11 +242,24 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         if not (at_strong and conf >= 80):
             return _fail(f"Counter-trend {direction} blocked (trend={trend}, conf={conf}, need 80%)")
 
-    # 5. SIDEWAYS — เฉพาะ Momentum Breakout
+    # 5. SIDEWAYS — range bounce strategy
+    # อนุญาต: SR_ZONE bounce ที่ขอบ range, MOMENTUM_BREAKOUT (breakout จาก range)
+    # ไม่อนุญาต: trend-following (EMA_PULLBACK, TREND_CONT) — ไม่มี trend ใน range
     if trend == "SIDEWAYS":
-        scan_best = chart_data.get("scan", {}).get("best_score", 0)
-        if entry_type != "MOMENTUM_BREAKOUT" and scan_best < 65 and conf < 65:
-            return _fail("SIDEWAYS — only MOMENTUM_BREAKOUT ≥65 allowed")
+        _is_trend_follow = entry_type == "EMA_PULLBACK" or "TREND_CONT" in tech_signal
+        _at_sr_zone      = sr_zone in ("RESISTANCE", "SUPPORT")
+        _is_breakout     = entry_type == "MOMENTUM_BREAKOUT"
+
+        if _is_trend_follow:
+            return _fail("SIDEWAYS — trend-following blocked, ใช้ range bounce ที่ SR zone เท่านั้น")
+        if not _at_sr_zone and not _is_breakout:
+            return _fail("SIDEWAYS — ต้องอยู่ที่ SR zone หรือ MOMENTUM_BREAKOUT")
+        if _at_sr_zone:
+            _sw_min = 52 if sr_str == "STRONG" else 60
+            if conf < _sw_min:
+                return _fail(f"SIDEWAYS SR_ZONE ({sr_str}) requires conf ≥{_sw_min}% (got {conf}%)")
+        elif _is_breakout and conf < 65:
+            return _fail(f"SIDEWAYS MOMENTUM_BREAKOUT requires conf ≥65% (got {conf}%)")
 
     # 6. Min confidence — ลด threshold ถ้าอยู่ที่ D1/W1 major zone
     htf_zone = chart_data.get("htf_zone")
@@ -366,6 +379,27 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
     tp_pips     = gate["tp_pips"]
     tech_signal = gate["tech_signal"]
     conf        = gate["confidence"]
+    trend       = chart_data.get("trend", "SIDEWAYS")
+
+    # SIDEWAYS TP: target ขอบ range ฝั่งตรงข้าม แทน fixed 2×SL
+    if trend == "SIDEWAYS":
+        _sr_zones = chart_data.get("sr_zones", {})
+        _px = float(chart_data.get("indicators", {}).get("h1", {}).get("close") or 0)
+        if _px:
+            if direction == "BUY" and _sr_zones.get("resistance"):
+                _res = sorted([r for r in _sr_zones["resistance"] if r > _px])
+                if _res:
+                    _rng_tp = round((_res[0] - _px) / 0.01 * 0.85)   # 85% ไปฝั่ง resistance
+                    if _rng_tp >= sl_pips * 1.5:
+                        logger.info(f"[SIDEWAYS] TP {tp_pips:.0f}p → {_rng_tp}p (range boundary {_res[0]:.2f})")
+                        tp_pips = float(_rng_tp)
+            elif direction == "SELL" and _sr_zones.get("support"):
+                _sup = sorted([s for s in _sr_zones["support"] if s < _px], reverse=True)
+                if _sup:
+                    _rng_tp = round((_px - _sup[0]) / 0.01 * 0.85)   # 85% ไปฝั่ง support
+                    if _rng_tp >= sl_pips * 1.5:
+                        logger.info(f"[SIDEWAYS] TP {tp_pips:.0f}p → {_rng_tp}p (range boundary {_sup[0]:.2f})")
+                        tp_pips = float(_rng_tp)
 
     # ── Clean summary สำหรับ Claude (~15 บรรทัด) ─────────────────
     hour_utc    = datetime.now(_tz.utc).hour
@@ -373,7 +407,6 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
     entry_type  = chart_data.get("entry_type", "NONE")
     sr_zone     = chart_data.get("sr_zone", "NONE")
     sr_str      = chart_data.get("sr_strength", "NORMAL")
-    trend       = chart_data.get("trend", "SIDEWAYS")
 
     candle_pat  = chart_data.get("candle_pat", {})
     sr_actions  = chart_data.get("sr_actions", [])
