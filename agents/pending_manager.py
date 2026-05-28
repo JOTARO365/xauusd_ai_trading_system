@@ -504,6 +504,22 @@ def cancel_stale_range_pending(current_trend: str) -> int:
     return cancelled
 
 
+def _cancel_range_pending_side(direction: str) -> int:
+    """Cancel range pending orders on one side after the opposing side has triggered.
+    Returns count cancelled."""
+    tag = f"{_RANGE_TAG}{direction[:4].upper()}"
+    cancelled = 0
+    for o in get_pending_orders():
+        if str(o.get("comment", "")).startswith(tag):
+            if cancel_pending_order(o["ticket"]):
+                cancelled += 1
+                logger.info(
+                    f"Range {direction} pending cancelled (opposing side already triggered): "
+                    f"ticket={o['ticket']} @ {o.get('price')}"
+                )
+    return cancelled
+
+
 def manage_range_pending(chart_data: dict) -> int:
     """
     Sideways Range Pending — วาง BUY_LIMIT/SELL_LIMIT ที่กรอบอัตโนมัติ
@@ -525,6 +541,19 @@ def manage_range_pending(chart_data: dict) -> int:
 
     # ── ยกเลิก stale orders ถ้า trend เปลี่ยน ──────────────────────
     cancel_stale_range_pending(trend)
+
+    # ── Cancel opposing pending เมื่อ 1 ฝั่ง trigger แล้ว ──────────
+    # ถ้า BUY position จาก range เปิดอยู่ → ยกเลิก SELL pending (และในทางกลับกัน)
+    # ป้องกัน: BUY กำลังวิ่งไป TP แล้ว SELL pending trigger สวนทางกลับ
+    _rng_positions = mt5.positions_get(symbol=SYMBOL) or []
+    for _p in _rng_positions:
+        _pc = str(getattr(_p, "comment", "") or "")
+        if _pc.startswith(f"{_RANGE_TAG}BUY"):
+            _cancel_range_pending_side("SELL")
+            break
+        elif _pc.startswith(f"{_RANGE_TAG}SELL"):
+            _cancel_range_pending_side("BUY")
+            break
 
     if trend != "SIDEWAYS":
         return 0
