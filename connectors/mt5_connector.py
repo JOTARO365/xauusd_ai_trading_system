@@ -540,6 +540,12 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
 SYSTEM_MAGIC = 20260429   # magic number ที่ระบบ AI ใช้
 
 
+def get_current_price() -> float:
+    """คืน bid price ปัจจุบันของ SYMBOL — ใช้ใน skip gate ตรวจ price spike"""
+    tick = mt5.symbol_info_tick(SYMBOL)
+    return float(tick.bid) if tick else 0.0
+
+
 def get_open_positions() -> list:
     positions = mt5.positions_get(symbol=SYMBOL)
     if positions is None:

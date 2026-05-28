@@ -7,7 +7,7 @@ import time
 from datetime import date as _date, datetime as _dt
 from loguru import logger
 from connectors.price_feed import connect_mt5, disconnect_mt5, is_mt5_connected
-from connectors.mt5_connector import get_open_positions, manage_breakeven, manage_partial_close, manage_dynamic_tp, manage_post_event_tp, count_protected_slots, is_hedge_active, check_open_slot, is_algo_trading_enabled, manage_trailing_stop, manage_zone_break_close, manage_momentum_exit
+from connectors.mt5_connector import get_open_positions, get_current_price, manage_breakeven, manage_partial_close, manage_dynamic_tp, manage_post_event_tp, count_protected_slots, is_hedge_active, check_open_slot, is_algo_trading_enabled, manage_trailing_stop, manage_zone_break_close, manage_momentum_exit
 from agents.chart_watcher import analyze_chart, analyze_m5_pa
 from agents.market_advisor import analyze_market_regime
 from agents.news_gatherer import gather_news
@@ -40,9 +40,12 @@ READY_MAX_CYCLES   = 15    # ออก Ready Mode หลัง N รอบ (~30 
 _cycle            = 0
 
 # ── AI Skip Gate — ประหยัด token เมื่อตลาดไม่ขยับ ──────────────
-AI_MIN_INTERVAL_SECS = 900   # ไม่เรียก AI บ่อยกว่า 15 นาที (= 1 M15 candle)
-AI_POS_INTERVAL_SECS = 300   # มี open position → AI ทุก 5 นาที
-_last_ai_mono: float = 0.0   # monotonic time ของ AI cycle ล่าสุด
+AI_MIN_INTERVAL_SECS  = 900   # ไม่เรียก AI บ่อยกว่า 15 นาที (= 1 M15 candle)
+AI_POS_INTERVAL_SECS  = 300   # มี open position → AI ทุก 5 นาที
+AI_NEWS_INTERVAL_SECS = 180   # ช่วงข่าว scheduled → AI ทุก 3 นาที
+AI_SPIKE_PIPS         = 500   # ราคาเด้งเกินนี้ → run AI ทันที (ข่าวด่วน/unscheduled)
+_last_ai_mono:  float = 0.0   # monotonic time ของ AI cycle ล่าสุด
+_last_ai_price: float = 0.0   # bid price ตอน AI cycle ล่าสุด
 
 # ── Ready Mode state ──────────────────────────────────────────
 _ready_state: dict = {
@@ -196,28 +199,52 @@ def _should_skip_ai() -> tuple[bool, str]:
     True  = ข้าม AI agents รอบนี้ (แค่รัน position management)
     False = รัน AI ตามปกติ
 
-    Rules:
-      - ไม่ skip ถ้าอยู่ใน Ready Mode (HTF zone = โอกาสสำคัญ)
-      - ไม่ skip cycle แรก
-      - มี open position: รัน AI ทุก AI_POS_INTERVAL_SECS (5 นาที)
-      - ไม่มี position: รัน AI ทุก AI_MIN_INTERVAL_SECS (15 นาที)
+    Priority (เช็คตามลำดับ):
+      1. Ready Mode (HTF zone)      → ไม่ skip เสมอ
+      2. Cycle แรก                   → ไม่ skip เสมอ
+      3. Price spike ≥ AI_SPIKE_PIPS → ไม่ skip (ข่าวด่วน/unscheduled)
+      4. Scheduled news hour UTC     → threshold 3 นาที
+      5. มี open position             → threshold 5 นาที
+      6. ไม่มี position (ปกติ)        → threshold 15 นาที
     """
+    from utils.market_clock import HIGH_IMPACT_HOURS_UTC
+    from datetime import datetime, timezone as _tz
+
     since = time.monotonic() - _last_ai_mono
 
+    # 1. Ready Mode
     if _ready_state.get("active"):
         return False, "Ready Mode active"
+
+    # 2. First cycle
     if _last_ai_mono == 0.0:
         return False, "first cycle"
 
+    # 3. Price spike — ข่าวด่วนที่ไม่ได้นัดหมาย (flash crash, surprise release)
     try:
-        open_pos = get_open_positions()
-        threshold = AI_POS_INTERVAL_SECS if open_pos else AI_MIN_INTERVAL_SECS
+        cur = get_current_price()
+        if cur > 0 and _last_ai_price > 0:
+            spike = abs(cur - _last_ai_price) / 0.01   # XAUUSD point = 0.01
+            if spike >= AI_SPIKE_PIPS:
+                return False, f"price spike {spike:.0f}p ≥ {AI_SPIKE_PIPS}p — ข่าวด่วน!"
     except Exception:
-        threshold = AI_MIN_INTERVAL_SECS
+        pass
+
+    # 4. Scheduled news hour
+    if datetime.now(_tz.utc).hour in HIGH_IMPACT_HOURS_UTC:
+        threshold = AI_NEWS_INTERVAL_SECS
+        label = "news hour"
+    else:
+        # 5/6. ตามจำนวน open positions
+        try:
+            threshold = AI_POS_INTERVAL_SECS if get_open_positions() else AI_MIN_INTERVAL_SECS
+            label = "open pos" if threshold == AI_POS_INTERVAL_SECS else "normal"
+        except Exception:
+            threshold, label = AI_MIN_INTERVAL_SECS, "normal"
 
     if since < threshold:
-        return True, f"{since:.0f}s < {threshold}s (next AI in {threshold - since:.0f}s)"
-    return False, f"{since:.0f}s elapsed → run AI"
+        return True, f"{label}: {since:.0f}s < {threshold}s (next AI in {threshold - since:.0f}s)"
+    return False, f"{label}: {since:.0f}s elapsed → run AI"
 
 
 async def run_status_cycle() -> None:
@@ -495,8 +522,9 @@ async def run_cycle() -> tuple[dict, dict]:
         logger.error(f"Reporter error: {e}")
 
     # ── Accounting ─────────────────────────────────────────────────
-    global _last_ai_mono
-    _last_ai_mono = time.monotonic()   # อัปเดตหลัง AI run สำเร็จ
+    global _last_ai_mono, _last_ai_price
+    _last_ai_mono  = time.monotonic()
+    _last_ai_price = get_current_price()   # เก็บราคาไว้ตรวจ spike รอบหน้า
     try:
         _ticket = (
             decision.get("order", {}).get("ticket")
