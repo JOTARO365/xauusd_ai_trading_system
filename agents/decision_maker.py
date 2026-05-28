@@ -131,7 +131,43 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
                     f"({_htf['tf']} {_htf['zone_type']} @ {_htf['level']} dist={_htf['dist_pct']}%)"
                 )
             else:
-                return _fail("NNLB: NO_TRADE signal (ไม่มีทิศทาง)")
+                # Trend Continuation: EMA pullback ใน trending market — ไม่ต้องการ zone
+                # เงื่อนไข: H1+H4 EMA stack aligned + ราคาอยู่ใกล้ H1 EMA20 ≤ 0.3% (pullback zone)
+                _trend_upper = (trend or "").upper()
+                _h1    = chart_data.get("indicators", {}).get("h1", {})
+                _h4    = chart_data.get("indicators", {}).get("h4", {})
+                _px    = float(_h1.get("close") or 0)
+                _e20   = float(_h1.get("ema20") or 0)
+                _e50   = float(_h1.get("ema50") or 0)
+                _h4e20 = float(_h4.get("ema20") or 0)
+                _h4e50 = float(_h4.get("ema50") or 0)
+
+                _tc_dir = None
+                if _px and _e20 and _e50 and _h4e20 and _h4e50:
+                    _near = abs(_px - _e20) / _px < 0.003   # ห่าง ≤ 0.3% = ~135 pips ที่ 4500
+                    if (_trend_upper == "BEARISH"
+                            and _e20 < _e50                  # H1 EMA bearish order
+                            and _h4e20 < _h4e50              # H4 ยืนยัน
+                            and _near):
+                        _tc_dir = "SELL"
+                    elif (_trend_upper == "BULLISH"
+                            and _e20 > _e50                  # H1 EMA bullish order
+                            and _h4e20 > _h4e50
+                            and _near):
+                        _tc_dir = "BUY"
+
+                if _tc_dir:
+                    tech_signal = f"TREND_CONT_{_tc_dir}"
+                    chart_data["signal"]     = _tc_dir
+                    chart_data["confidence"] = 55            # moderate — no zone anchor
+                    conf = 55
+                    logger.warning(
+                        f"[TREND_CONT] {_trend_upper} EMA pullback → {_tc_dir} | "
+                        f"H1 EMA20={_e20:.2f} price={_px:.2f} "
+                        f"dist={abs(_px - _e20) / _px * 100:.2f}%"
+                    )
+                else:
+                    return _fail("NNLB: NO_TRADE signal (ไม่มีทิศทาง)")
         if "BUY" in tech_signal:
             direction = "BUY"
         elif "SELL" in tech_signal:

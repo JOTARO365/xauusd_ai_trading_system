@@ -171,12 +171,36 @@ If no clear zone visible → TP = 2.0 × SL.
 
 ---
 
+## TREND CONTINUATION ENTRY (no zone required)
+
+When **no S/R zone is nearby** but trend is strongly confirmed:
+
+| Condition | Requirement |
+|-----------|-------------|
+| Trend | BEARISH (SELL) or BULLISH (BUY) — from provided H4 bias |
+| H1 EMA stack | BEARISH: price < EMA20 < EMA50 — BULLISH: price > EMA20 > EMA50 |
+| Entry signal | EMA_PULLBACK or ENGULFING or MOMENTUM_BREAKOUT on M15 |
+| Zone | NOT required — use EMA20 H1 as dynamic S/R |
+
+**Scoring without zone:**
+- Start: M15 signal points (from entry signal table)
+- EMA alignment bonus: +20 (M15 trend aligned)
+- Session: normal points
+- Zone: 0 (no zone — this is acceptable here)
+- **Minimum confidence to generate signal: 45**
+
+**Direction rule:** BEARISH trend + EMA_PULLBACK → SELL (treat EMA20 H1 as resistance)  
+BULLISH trend + EMA_PULLBACK → BUY (treat EMA20 H1 as support)
+
+---
+
 ## NO TRADE — only these conditions block signal generation
 
 1. Price is NOT near any zone in the provided SR tables AND entry_type is not MOMENTUM_BREAKOUT  
 2. ATR ≈ 0 (market completely flat, no movement)  
 3. Confidence < 45 after full scoring  
 4. **EXCEPTION: If `⚡ HTF MAJOR ZONE` alert is present → conditions 1 and 3 do NOT apply. You MUST generate BUY/SELL.**
+5. **EXCEPTION: If TREND CONTINUATION conditions are met (H1 EMA stack aligned + EMA_PULLBACK signal) → condition 1 does NOT apply. Generate BUY/SELL with available confidence (min 45).**
 
 ---
 
