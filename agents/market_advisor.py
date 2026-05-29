@@ -1,11 +1,22 @@
-import anthropic
+import json
 from pathlib import Path
+from langchain_anthropic import ChatAnthropic
 from config import ANTHROPIC_API_KEY
 from agents.reporter import get_trade_history_summary
+from agents.schemas import MarketAdvisorOutput
 from loguru import logger
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-SYSTEM_PROMPT = Path("agents/prompts/market_advisor.md").read_text(encoding="utf-8")
+_llm = ChatAnthropic(
+    model="claude-sonnet-4-6",
+    api_key=ANTHROPIC_API_KEY,
+    max_tokens=450,
+    temperature=0,
+).with_structured_output(MarketAdvisorOutput)
+
+SYSTEM_PROMPT = json.dumps(
+    json.loads(Path("agents/prompts/market_advisor.json").read_text(encoding="utf-8")),
+    separators=(",", ":"),
+)
 
 _last_usage = None   # set after each API call — read by accountant
 
@@ -30,118 +41,47 @@ def analyze_market_regime(chart_data: dict) -> dict:
     res_levels = h4_sr.get("resistance", [])
     sup_levels = h4_sr.get("support", [])
 
-    history = get_trade_history_summary()
+    history    = get_trade_history_summary()
     entry_perf = history.get("entry_perf_text", "  No data yet")
 
-    user_message = f"""วิเคราะห์ market regime สำหรับ XAUUSD จากข้อมูลต่อไปนี้:
+    user_message = f"""XAUUSD market regime analysis:
 
-=== Current Price ===
-Price: {price:.2f}
-
-=== EMA Structure (H4) ===
-EMA20:  {ema20_h4:.2f}  | Price vs EMA20: {"ABOVE" if price > ema20_h4 else "BELOW"}
-EMA50:  {ema50_h4:.2f}  | EMA20 vs EMA50: {"ABOVE" if ema20_h4 > ema50_h4 else "BELOW"}
-EMA200: {ema200_h4:.2f} | EMA20 vs EMA200: {"ABOVE" if ema20_h4 > ema200_h4 else "BELOW"}
-ATR:    {atr_h4:.2f}
-
-=== EMA Structure (H1 + M15) ===
-H1  EMA20: {ema20_h1:.2f}  | Price: {"ABOVE" if price > ema20_h1 else "BELOW"}
-M15 EMA20: {ema20_m15:.2f} | Price: {"ABOVE" if price > ema20_m15 else "BELOW"}
-
-=== S/R Zones (H4) ===
-Resistance: {", ".join(f"{r:.2f}" for r in res_levels[:4]) or "—"}
-Support:    {", ".join(f"{s:.2f}" for s in sup_levels[:4]) or "—"}
-
-=== Price Action Signal (Agent 1) ===
-Signal:     {chart_data.get("signal", "NO_TRADE")}
-Confidence: {chart_data.get("confidence", 0)}%
-Trend:      {chart_data.get("trend", "—")}
-SR Zone:    {chart_data.get("sr_zone", "—")} / {chart_data.get("sr_strength", "—")}
-Entry Type: {chart_data.get("entry_type", "—")}
-
-=== Historical Entry Performance (from real trades) ===
-{entry_perf}
-Reply in the exact output format only. No extra text."""
+Price:{price:.2f} EMA20_H4:{ema20_h4:.2f} EMA50_H4:{ema50_h4:.2f} EMA200_H4:{ema200_h4:.2f} ATR_H4:{atr_h4:.2f}
+H1_EMA20:{ema20_h1:.2f} M15_EMA20:{ema20_m15:.2f}
+Resistance:{",".join(f"{r:.2f}" for r in res_levels[:4]) or "none"}
+Support:{",".join(f"{s:.2f}" for s in sup_levels[:4]) or "none"}
+Signal:{chart_data.get("signal","NO_TRADE")} Conf:{chart_data.get("confidence",0)}% Trend:{chart_data.get("trend","—")} SR:{chart_data.get("sr_zone","—")}/{chart_data.get("sr_strength","—")} Entry:{chart_data.get("entry_type","—")}
+Historical performance:
+{entry_perf}"""
 
     global _last_usage
     _last_usage = None
     try:
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=700,
-            system=[{"type": "text", "text": SYSTEM_PROMPT,
-                     "cache_control": {"type": "ephemeral"}}],
-            messages=[{"role": "user", "content": user_message}],
-        )
-        _last_usage = response.usage
-        text = response.content[0].text
-        logger.info(f"Market Advisor:\n{text}")
-        return _parse_response(text)
+        messages = [
+            {"role": "system", "content": [
+                {"type": "text", "text": SYSTEM_PROMPT,
+                 "cache_control": {"type": "ephemeral"}}
+            ]},
+            {"role": "user", "content": user_message},
+        ]
+        result: MarketAdvisorOutput = _llm.invoke(messages)
+        logger.info(f"Market Advisor: {result.regime} ({result.regime_confidence}%) Bias:{result.bias}")
+        return {
+            "regime":            result.regime,
+            "regime_confidence": result.regime_confidence,
+            "bias":              result.bias,
+            "volatility":        result.volatility,
+            "tp_style":          result.tp_style,
+            "top_setup":         result.top_setup,
+            "best_indicators":   result.best_indicators,
+            "intraday_h4":       result.intraday_structure.h4,
+            "intraday_h1":       result.intraday_structure.h1,
+            "intraday_m15":      result.intraday_structure.m15,
+            "advisor_note":      result.advisor_note,
+        }
     except Exception as e:
         logger.error(f"Market Advisor error: {e}")
         return _default()
-
-
-def _parse_response(text: str) -> dict:
-    result = _default()
-    result["raw"] = text
-
-    section = None
-    section_data: dict[str, list] = {
-        "INTRADAY_STRUCTURE": [],
-        "REGIME_NOTE":        [],
-        "ADVISOR_NOTE":       [],
-    }
-    SECTION_KEYS = set(section_data.keys())
-
-    for line in text.splitlines():
-        s = line.strip()
-        if not s:
-            continue
-
-        header = s.rstrip(":")
-        if header in SECTION_KEYS and s.endswith(":"):
-            section = header
-            continue
-
-        if s.startswith("REGIME:") and "CONFIDENCE" not in s and "NOTE" not in s:
-            result["regime"] = s.split(":", 1)[1].strip()
-            section = None
-        elif s.startswith("REGIME_CONFIDENCE:"):
-            try:
-                result["regime_confidence"] = int(s.split(":", 1)[1].strip().replace("%", ""))
-            except Exception:
-                pass
-            section = None
-        elif s.startswith("BIAS:"):
-            result["bias"] = s.split(":", 1)[1].strip()
-            section = None
-        elif s.startswith("VOLATILITY:"):
-            result["volatility"] = s.split(":", 1)[1].strip()
-            section = None
-        elif s.startswith("TP_STYLE:"):
-            result["tp_style"] = s.split(":", 1)[1].strip()
-            section = None
-        elif s.startswith("TOP_SETUP:"):
-            result["top_setup"] = s.split(":", 1)[1].strip()
-            section = None
-        elif s.startswith("BEST_INDICATORS:"):
-            result["best_indicators"] = [x.strip() for x in s.split(":", 1)[1].split(",") if x.strip()]
-            section = None
-        elif section and s.startswith("- "):
-            section_data[section].append(s[2:])
-
-    for item in section_data["INTRADAY_STRUCTURE"]:
-        if item.startswith("H4:"):
-            result["intraday_h4"] = item.split(":", 1)[1].strip()
-        elif item.startswith("H1:"):
-            result["intraday_h1"] = item.split(":", 1)[1].strip()
-        elif item.startswith("M15:"):
-            result["intraday_m15"] = item.split(":", 1)[1].strip()
-
-    result["regime_note"]  = " ".join(section_data["REGIME_NOTE"])
-    result["advisor_note"] = " ".join(section_data["ADVISOR_NOTE"])
-    return result
 
 
 def _default() -> dict:
@@ -156,7 +96,5 @@ def _default() -> dict:
         "intraday_h4":       "—",
         "intraday_h1":       "—",
         "intraday_m15":      "—",
-        "regime_note":       "",
         "advisor_note":      "",
-        "raw":               "",
     }

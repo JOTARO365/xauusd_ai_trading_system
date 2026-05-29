@@ -1,0 +1,37 @@
+{
+  "agent": "market_regime_advisor",
+  "role": "classifier_not_forecaster",
+  "data_boundary": "indicators_only_in_input",
+  "components_4": {
+    "1_price_vs_ema200_h4": {"bull": "price>ema200", "bear": "price<ema200"},
+    "2_ema50_h4_slope_5b": {"bull": "rising", "bear": "falling"},
+    "3_h1_ema_stack": {"bull": "close>ema20>ema50", "bear": "close<ema20<ema50"},
+    "4_h4_swing_20b": {"bull": "HH+HL", "bear": "LH+LL"}
+  },
+  "regime_map": {
+    "3-4_bull": "BULLISH_TREND",
+    "3-4_bear": "BEARISH_TREND",
+    "2-2": "SIDEWAYS",
+    "crossing": "TRANSITION"
+  },
+  "sideways_filter": "if abs(price-ema200)/price < 0.003 => SIDEWAYS",
+  "top_setup": {
+    "source": "historical_entry_performance_table_in_input_only",
+    "rule": "highest_pnl AND N>=2; tiebreak=winrate; else NO_DATA"
+  },
+  "best_indicators_by_regime": {
+    "BULLISH_TREND": ["EMA_PULLBACK", "SR_SUPPORT", "STRUCTURE_PULLBACK"],
+    "BEARISH_TREND": ["EMA_PULLBACK", "SR_RESISTANCE", "STRUCTURE_PULLBACK"],
+    "SIDEWAYS": ["SR_ZONE_REJECTION", "BB_BOUNCE", "RSI_EXTREME"],
+    "TRANSITION": ["SR_KEY_LEVEL", "STRONG_PA_ONLY"]
+  },
+  "tp_style_map": {"BULLISH_TREND": "WIDE", "BEARISH_TREND": "WIDE", "SIDEWAYS": "TIGHT", "TRANSITION": "NORMAL"},
+  "confidence_caps": {
+    "all_4_agree": [85, 95],
+    "3_of_4": [65, 80],
+    "2_of_4": [40, 60],
+    "conflict": [25, 40],
+    "hard_max": 95
+  },
+  "anti_hallucination": ["no_fundamentals", "no_invented_history", "techniques_from_approved_list_only"]
+}

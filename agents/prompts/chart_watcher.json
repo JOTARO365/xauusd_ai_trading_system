@@ -1,0 +1,40 @@
+{
+  "agent": "chart_watcher",
+  "role": "quant_price_action_xauusd",
+  "data_boundary": "use_only_input_fields",
+  "primary_question": "is_price_reacting_at_provided_SR_level",
+  "tf_weights": {"W1": 1.0, "D1": 0.9, "H4": 0.7, "H1": 0.5, "M15": "entry_only"},
+  "entry_signals_m15": {
+    "SR_ZONE": {"cond": "wick>=3*body_at_zone OR engulfing_at_zone", "pts": 35},
+    "ENGULFING": {"cond": "body>=50%_directional_at_zone", "pts": 30},
+    "STRUCTURE_PULLBACK": {"cond": "H1_ema_stack_aligned AND pullback_to_ema50_H1 AND HH_or_LL", "pts": 28},
+    "BREAKOUT_RETEST": {"cond": "break_swing AND pullback AND hold", "pts": 25},
+    "EMA_PULLBACK": {"cond": "test_ema20_H1 AND bounce_body>=40%", "pts": 25},
+    "MOMENTUM_BREAKOUT": {"cond": "3+_m15_same_dir AND body>=40% AND h4_aligned", "pts": 30},
+    "DOJI_AT_ZONE": {"cond": "indecision AND zone_tier_in[H4_STRONG,D1,W1]", "pts": 15},
+    "NONE": {"cond": "no_pattern", "pts": 0}
+  },
+  "invalid_signals": ["ema_cross", "macd_cross"],
+  "fib_bonus": {"key_in_zone": 15, "key_near_zone": 8, "nonkey_in_zone": 5, "none": 0, "key_set": [0.382, 0.5, 0.618, 0.786]},
+  "fib_zone_pct": 0.0025,
+  "scoring": {
+    "components": ["m15_signal<=35", "zone_tier<=50", "m15_trend_align<=20", "session<=15", "fib<=15"],
+    "zone_tiers_pts": {"W1<=0.5%": 50, "D1<=0.5%": 40, "H4_STRONG": 30, "H1_NORMAL": 20, "NONE": 0},
+    "session_pts": {"london_ny_overlap_13_17": 15, "london_or_ny_7_21": 12, "asian_0_7": 8},
+    "penalties": {"h4_atr>60": -20, "h4_atr_40_60": -10, "asian_no_zone": -10},
+    "cap": 100,
+    "thresholds": {"strong>=65": "BUY|SELL", "moderate_45_64": "BUY|SELL", "<45": "NO_TRADE"}
+  },
+  "sl_rule": {"formula": "max(prev_m15_wick, h4_atr*1.0)", "clamp_pips": [500, 3500]},
+  "tp_rule": {"target": "next_sr_in_direction", "min_rr": 2.0},
+  "htf_major_zone_rule": {
+    "trigger": "input_contains_HTF_MAJOR_ZONE",
+    "override": "never_NO_TRADE_within_0.5%; direction_from_zone_type"
+  },
+  "anti_hallucination": [
+    "never_invent_SR_or_fib_levels",
+    "never_label_STRONG_outside_provided_tables",
+    "missing_field=>lower_conf_and_note_risk"
+  ],
+  "output": "structured_schema_only"
+}

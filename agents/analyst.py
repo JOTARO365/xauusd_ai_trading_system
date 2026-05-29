@@ -1,13 +1,23 @@
-import anthropic
+import json
 from datetime import datetime, timezone
 from pathlib import Path
+from langchain_anthropic import ChatAnthropic
 from config import ANTHROPIC_API_KEY
 from agents.news_cache import get_news_context
+from agents.schemas import AnalystOutput
 from loguru import logger
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+_llm = ChatAnthropic(
+    model="claude-sonnet-4-6",
+    api_key=ANTHROPIC_API_KEY,
+    max_tokens=300,
+    temperature=0,
+).with_structured_output(AnalystOutput)
 
-SYSTEM_PROMPT = Path("agents/prompts/analyst.md").read_text(encoding="utf-8")
+SYSTEM_PROMPT = json.dumps(
+    json.loads(Path("agents/prompts/analyst.json").read_text(encoding="utf-8")),
+    separators=(",", ":"),
+)
 
 _last_usage = None   # set after each API call — read by accountant
 
@@ -75,40 +85,27 @@ def analyze_sentiment(news_data: dict, chart_data: dict | None = None) -> dict:
 หมายเหตุ: ให้น้ำหนัก ForexFactory calendar สูงสุด (hard data) → News Summary → Relevant items"""
 
     global _last_usage
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=400,
-        system=[{"type": "text", "text": SYSTEM_PROMPT,
-                 "cache_control": {"type": "ephemeral"}}],
-        messages=[{"role": "user", "content": user_message}],
-    )
-    _last_usage = response.usage
-
-    analysis_text = response.content[0].text
-    logger.info(f"Sentiment Analysis:\n{analysis_text}")
-
-    result = {
-        "raw":        analysis_text,
-        "sentiment":  "NEUTRAL",
-        "confidence": 0,
-        "summary":    "",
-        "bias":       "NEUTRAL",
-        "tweet_count": len(tweets),
-    }
-
-    for line in analysis_text.splitlines():
-        if line.startswith("SENTIMENT:"):
-            result["sentiment"] = line.split(":", 1)[1].strip()
-        elif line.startswith("CONFIDENCE:"):
-            try:
-                raw_conf = line.split(":", 1)[1].strip().replace("%", "").strip()
-                result["confidence"] = int(raw_conf)
-            except Exception:
-                pass
-        elif line.startswith("SUMMARY:"):
-            result["summary"] = line.split(":", 1)[1].strip()
-        elif line.startswith("BIAS:"):
-            result["bias"] = line.split(":", 1)[1].strip()
+    _last_usage = None
+    messages = [
+        {"role": "system", "content": [
+            {"type": "text", "text": SYSTEM_PROMPT,
+             "cache_control": {"type": "ephemeral"}}
+        ]},
+        {"role": "user", "content": user_message},
+    ]
+    try:
+        parsed: AnalystOutput = _llm.invoke(messages)
+        logger.info(f"Sentiment Analysis: {parsed.sentiment} ({parsed.confidence}%)")
+        result = {
+            "sentiment":   parsed.sentiment,
+            "confidence":  parsed.confidence,
+            "summary":     parsed.summary,
+            "bias":        parsed.bias,
+            "tweet_count": len(tweets),
+        }
+    except Exception as e:
+        logger.error(f"Analyst structured output failed: {e} — defaulting NEUTRAL")
+        result = {"sentiment": "NEUTRAL", "confidence": 0, "summary": "", "bias": "NEUTRAL", "tweet_count": len(tweets)}
 
     # ── คำนวณ event ที่ยังไม่เกิด (actual = pending) ────────────
     now = datetime.now(timezone.utc)

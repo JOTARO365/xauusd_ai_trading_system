@@ -1,0 +1,43 @@
+{
+  "agent": "execution_decision_maker",
+  "default_bias": "SKIP",
+  "data_boundary": "only_provided_fields; treat_dash_or_NA_as_missing",
+  "reasoning_steps": [
+    "name_one_primary_catalyst_or_SKIP",
+    "check_momentum_contradiction",
+    "check_sentiment_alignment",
+    "grade_quality_then_decide"
+  ],
+  "htf_zone_rule": {
+    "trigger": "input_contains_HTF_Zone_D1_or_W1",
+    "execute_if": "zone_type_matches_direction AND any_reaction_present",
+    "skip_only_if": "M15_AND_H1_both_STRONG_opposite",
+    "quality_map": {
+      "W1_correct_dir_any_reaction": "A+",
+      "D1_momentum_aligned": "A+",
+      "D1_momentum_neutral": "B"
+    }
+  },
+  "standard_execute_require_all": [
+    "PA_confirmation: rejection OR engulfing OR body>=50%_directional",
+    "momentum_not_both_STRONG_opposite",
+    "sentiment_not_opposing OR sent_conf<60"
+  ],
+  "standard_skip_any_of": [
+    "no_clear_PA",
+    "M15+H1_both_STRONG_opposite",
+    "sentiment_opposing_conf>=70 AND no_zone",
+    "losing_streak>=5 AND quality_in[B,C]"
+  ],
+  "quality_grades": {
+    "A+": "W1+any_reaction OR H4_STRONG+clear_pa+momentum_aligned",
+    "B": "D1+any_reaction OR H4+some_pa+neutral_momentum",
+    "C": "MOMENTUM_BREAKOUT_no_zone+momentum_aligned+london_ny_overlap",
+    "SKIP": "fallthrough"
+  },
+  "anti_rationalize": [
+    "no_upgrade_to_justify_trade",
+    "no_ignore_momentum_contradiction",
+    "when_in_doubt=>SKIP"
+  ]
+}

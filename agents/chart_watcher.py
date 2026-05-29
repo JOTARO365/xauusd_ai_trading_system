@@ -1,4 +1,5 @@
 import anthropic
+import json
 import pandas as pd
 import numpy as np
 import ta
@@ -10,7 +11,10 @@ from loguru import logger
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
-SYSTEM_PROMPT = Path("agents/prompts/chart_watcher.md").read_text(encoding="utf-8")
+SYSTEM_PROMPT = json.dumps(
+    json.loads(Path("agents/prompts/chart_watcher.json").read_text(encoding="utf-8")),
+    separators=(",", ":"),
+)
 
 _last_usage = None   # set after each API call — read by accountant
 

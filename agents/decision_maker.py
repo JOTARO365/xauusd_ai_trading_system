@@ -1,20 +1,30 @@
-import anthropic
+import json
 from datetime import datetime, timezone as _tz
 from pathlib import Path
+from langchain_anthropic import ChatAnthropic
 from connectors.mt5_connector import open_order, get_open_positions, count_protected_slots, check_open_slot, _is_momentum_strong
 from connectors.price_feed import get_account_info
 from agents.reporter import get_trade_history_summary
+from agents.schemas import DecisionMakerOutput
 import config as _cfg
 from config import ANTHROPIC_API_KEY, MONEY_MANAGEMENT
 from loguru import logger
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+_llm = ChatAnthropic(
+    model="claude-sonnet-4-6",
+    api_key=ANTHROPIC_API_KEY,
+    max_tokens=120,
+    temperature=0,
+).with_structured_output(DecisionMakerOutput)
 
 # ── Order fail streak tracker ─────────────────────────────────────────────────
 _order_fail_streak: dict[str, int] = {"BUY": 0, "SELL": 0}
 _FAIL_STREAK_WARN = 3   # warning เมื่อ fail ≥ N ครั้งติดกัน
 
-SYSTEM_PROMPT = Path("agents/prompts/decision_maker.md").read_text(encoding="utf-8")
+SYSTEM_PROMPT = json.dumps(
+    json.loads(Path("agents/prompts/decision_maker.json").read_text(encoding="utf-8")),
+    separators=(",", ":"),  # minified — saves ~15% tokens vs pretty-printed
+)
 
 MIN_TECHNICAL_CONFIDENCE = 50
 
@@ -552,35 +562,24 @@ History — {entry_wr}
 Account — Today: {history['today_pnl']:+.2f} USD ({history['today_trades']} trades) | WR10: {history['last_10_winrate']}% | Streak: {history['losing_streak']}L{chr(10) + lesson_block if lesson_block else ""}"""
 
     global _last_usage
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=150,
-        system=[{"type": "text", "text": SYSTEM_PROMPT,
-                 "cache_control": {"type": "ephemeral"}}],
-        messages=[{"role": "user", "content": user_message}],
-    )
-    _last_usage = response.usage
-
-    decision_text = response.content[0].text
-    logger.info(f"Decision:\n{decision_text}")
-
-    decision         = "SKIP"
-    out_direction    = "NONE"
-    trade_quality    = "C"
-    confidence_score = 0
-
-    for line in decision_text.splitlines():
-        if line.startswith("DECISION:"):
-            decision = line.split(":", 1)[1].strip()
-        elif line.startswith("DIRECTION:"):
-            out_direction = line.split(":", 1)[1].strip()
-        elif line.startswith("TRADE_QUALITY:"):
-            trade_quality = line.split(":", 1)[1].strip()
-        elif line.startswith("CONFIDENCE_SCORE:"):
-            try:
-                confidence_score = int(line.split(":", 1)[1].strip().replace("%", ""))
-            except Exception:
-                pass
+    messages = [
+        {"role": "system", "content": [
+            {"type": "text", "text": SYSTEM_PROMPT,
+             "cache_control": {"type": "ephemeral"}}
+        ]},
+        {"role": "user", "content": user_message},
+    ]
+    try:
+        result: DecisionMakerOutput = _llm.invoke(messages)
+        _last_usage = getattr(_llm.last_response_metadata, "usage", None) if hasattr(_llm, "last_response_metadata") else None
+        decision         = result.decision
+        out_direction    = result.direction
+        trade_quality    = result.trade_quality
+        confidence_score = result.confidence_score
+        logger.info(f"Decision: {decision} {out_direction}")
+    except Exception as e:
+        logger.error(f"[DM] structured output failed: {e} — defaulting SKIP")
+        decision, out_direction, trade_quality, confidence_score = "SKIP", "NONE", "C", 0
 
     logger.info(f"Quality:{trade_quality} ConfScore:{confidence_score}")
 

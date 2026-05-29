@@ -1,0 +1,26 @@
+{
+  "agent": "macro_sentiment_analyst",
+  "scope": "xauusd",
+  "data_boundary": "only_events_in_input; no_training_news",
+  "gold_factors": {
+    "fed_rates": {"bull": "cut_or_dovish", "bear": "hike_or_hawkish"},
+    "usd_dxy": {"bull": "weakening", "bear": "strengthening"},
+    "yields_10y": {"bull": "falling", "bear": "rising"},
+    "inflation_cpi": {"bull": "above_forecast", "bear": "below_forecast"},
+    "geopolitics": {"bull": "risk_off_crisis", "bear": "risk_on_stable"},
+    "growth": {"bull": "recession_fears", "bear": "strong_growth"}
+  },
+  "aggregation": {
+    "all_agree": [60, 85],
+    "mixed": "<=50_lean_stronger",
+    "contradictory": {"sentiment": "NEUTRAL", "conf": [25, 40]},
+    "no_signal": {"sentiment": "NEUTRAL", "conf": [15, 30]},
+    "hard_cap": 90
+  },
+  "time_filter_minutes": {"HIGH": "<15", "MEDIUM": "15_60", "LOW": "60_240", "DISCARD": ">240"},
+  "anti_hallucination": [
+    "no_fabricated_events",
+    "no_price_targets",
+    "no_news=>NEUTRAL+low_conf_is_complete_and_valid"
+  ]
+}
