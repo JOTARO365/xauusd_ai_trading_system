@@ -47,14 +47,12 @@ def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list
         )
         if login:
             q = q.eq("account_login", login)
-        res = q.order("opened_at", desc=False).execute()
+        res = q.order("opened_at", desc=True).limit(500).execute()
         result = []
         for r in res.data:
             result.append({
                 "ticket":                r.get("ticket"),
-                "account_login":         r.get("account_login"),
-                "symbol":                r.get("symbol"),
-                "source":                r.get("source"),
+                "source":                r.get("source", "SYSTEM"),
                 "direction":             r.get("direction"),
                 "entry_type":            r.get("entry_type"),
                 "status":                r.get("status"),
@@ -65,16 +63,21 @@ def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list
                 "pnl":                   r.get("pnl"),
                 "timestamp":             r.get("opened_at"),
                 "close_time":            r.get("closed_at"),
+                "close_reason":          r.get("close_reason"),
                 "technical_signal":      r.get("technical_signal"),
                 "technical_confidence":  r.get("technical_confidence"),
                 "trend":                 r.get("trend"),
                 "sr_zone":               r.get("sr_zone"),
                 "sr_strength":           r.get("sr_strength"),
                 "pa_action":             r.get("pa_action"),
+                "pa_patterns":           r.get("pa_patterns") or [],
                 "sentiment":             r.get("sentiment"),
                 "analysis":              r.get("analysis"),
+                "manual_reason":         r.get("manual_reason", ""),
+                "manual_analysis":       r.get("manual_analysis", ""),
                 "strategy_version":      r.get("strategy_version", 1),
             })
+        # Return newest first (desc order from DB, keep as-is)
         return result
     except Exception as e:
         logger.debug(f"get_trades DB error: {e}")

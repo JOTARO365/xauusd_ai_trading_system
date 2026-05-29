@@ -24,6 +24,22 @@ from config import MT5_LOGIN, MT5_PASSWORD, MT5_SERVER, SYMBOL
 app = Flask(__name__)
 
 _BASE = os.path.dirname(__file__)
+
+# ── Simple in-process cache to avoid hammering Supabase on every 10s poll ──
+import time as _time_mod
+_data_cache: dict = {}   # key -> (timestamp, payload)
+_DATA_CACHE_TTL = 20     # seconds
+
+def _cached(key: str, fn, ttl: int = _DATA_CACHE_TTL):
+    """Return cached value or recompute if stale."""
+    now = _time_mod.time()
+    if key in _data_cache:
+        ts, val = _data_cache[key]
+        if now - ts < ttl:
+            return val
+    val = fn()
+    _data_cache[key] = (now, val)
+    return val
 _SYSTEM_LOGS = {
     "xauusd": os.path.join(_BASE, "../logs/trades.json"),
     "btcusd": os.path.join(_BASE, "../logs/btcusd_trades.json"),
@@ -495,7 +511,8 @@ def api_data():
         login = None   # ไม่กรอง → เห็นทุก account
     else:
         login = _get_actual_mt5_login() if system == "xauusd" else None
-    data    = load_trades(system, account_login=login)
+    cache_key = f"trades:{system}:{login}"
+    data    = _cached(cache_key, lambda: load_trades(system, account_login=login), ttl=15)
     usd_thb = get_usd_thb()
     account = get_mt5_account(data_to_sync=data) if system == "xauusd" else {}
     trades  = data.get("trades", [])
