@@ -190,6 +190,13 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
             if _nnlb_streak >= _max_s:
                 return _fail(f"NNLB: losing streak {_nnlb_streak}L ≥ {_max_s} — หยุดชั่วคราว")
 
+        # NNLB slot/BE check — opposing positions ต้อง protected หรือกำไรก่อนเปิดฝั่งตรงข้าม
+        # ข้าม quality gates ทั้งหมด แต่ยังป้องกันการเปิด order ที่ทำให้ขาดทุนซ้อนกัน
+        _last_lost = _last_trade_in_dir_lost(direction, history.get("recent_trades", []))
+        _can_open, _slot_reason = check_open_slot(direction, last_dir_lost=_last_lost)
+        if not _can_open:
+            return _fail(f"NNLB: {_slot_reason}")
+
         logger.warning(f"[NNLB] ข้าม gates ทั้งหมด — {direction} SL={sl_pips:.0f}p TP={tp_pips:.0f}p conf={conf}%")
         return {
             "pass":         True,
