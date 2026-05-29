@@ -824,20 +824,28 @@ def manage_breakeven() -> int:
             continue   # SL แคบเกินไป (อาจถูกขยับมา BE แล้ว)
 
         # ใช้ HTF settings ถ้า position ถูก register ว่าเปิดที่ D1/W1/MN zone
+        # Fallback heuristic: ถ้า SL_dist > 1000p = likely HTF trade (process restarted)
         zone_info = _zone_state.get(pos.ticket, {})
         zone_tf   = zone_info.get("tf", "") if zone_info else ""
-        is_htf    = zone_tf in ("D1", "W1", "MN1")
+        is_htf    = zone_tf in ("D1", "W1", "MN1") or sl_dist_pips > 1000
         trigger_r = htf_trigger_r if is_htf else default_trigger_r
-        buf_pips  = htf_buf_pips  if is_htf else default_buf_pips
-        if is_htf:
-            logger.debug(
-                f"BE [{zone_tf} zone] ticket={pos.ticket}: "
-                f"using HTF settings trigger={trigger_r}R buf={buf_pips}p"
-            )
 
         current      = tick.bid if is_buy else tick.ask
         profit_pips  = ((current - entry) if is_buy else (entry - current)) / point
         trigger_pips = sl_dist_pips * trigger_r
+
+        # Proportional buffer: lock 30% of current profit, minimum = default_buf_pips
+        # ป้องกัน lock กำไรน้อยเกินไปเมื่อ position วิ่งไกลแล้ว
+        if is_htf:
+            buf_pips = max(htf_buf_pips, int(profit_pips * 0.30))
+        else:
+            buf_pips = max(default_buf_pips, int(profit_pips * 0.30))
+
+        if is_htf and zone_tf:
+            logger.debug(
+                f"BE [{zone_tf} zone] ticket={pos.ticket}: "
+                f"trigger={trigger_r}R buf={buf_pips}p profit={profit_pips:.0f}p"
+            )
 
         if profit_pips < trigger_pips:
             # ราคาลงมาต่ำกว่า trigger — reset counter

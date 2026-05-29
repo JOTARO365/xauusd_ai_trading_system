@@ -86,9 +86,12 @@ def reload_config():
     STREAK_PROTECTION = os.getenv("STREAK_PROTECTION", "true").lower() != "false"
     global TRAILING_STOP, TRAILING_ATR_TF, TRAILING_ATR_MULT
     global BE_TRIGGER_R, BE_BUFFER_PIPS, BE_CONFIRM_CYCLES
-    BE_TRIGGER_R      = float(os.getenv("BE_TRIGGER_R",      "0.8"))
-    BE_BUFFER_PIPS    = int(os.getenv("BE_BUFFER_PIPS",    "200"))
-    BE_CONFIRM_CYCLES = int(os.getenv("BE_CONFIRM_CYCLES", "2"))
+    global HTF_BE_TRIGGER_R, HTF_BE_BUFFER_PIPS
+    BE_TRIGGER_R       = float(os.getenv("BE_TRIGGER_R",       "1.2"))
+    BE_BUFFER_PIPS     = int(os.getenv("BE_BUFFER_PIPS",     "300"))
+    BE_CONFIRM_CYCLES  = int(os.getenv("BE_CONFIRM_CYCLES",  "2"))
+    HTF_BE_TRIGGER_R   = float(os.getenv("HTF_BE_TRIGGER_R",  "2.0"))
+    HTF_BE_BUFFER_PIPS = int(os.getenv("HTF_BE_BUFFER_PIPS", "1000"))
     TRAILING_STOP     = os.getenv("TRAILING_STOP",     "false").lower() == "true"
     TRAILING_ATR_TF   = os.getenv("TRAILING_ATR_TF",   "D1")
     TRAILING_ATR_MULT = float(os.getenv("TRAILING_ATR_MULT", "1.5"))
@@ -118,14 +121,15 @@ def reload_config():
 
 
 # ── Breakeven ────────────────────────────────────────────────
-# BE_TRIGGER_R  : trigger BE เมื่อ profit ≥ X × SL distance จริงของ position
-#                 0.8 = 80% ของ SL (เกือบถึง 1R) — ป้องกันโดนหน้าทุนตอนกำไรน้อย
-BE_TRIGGER_R      = float(os.getenv("BE_TRIGGER_R",      "0.8"))
-# BE_BUFFER_PIPS: SL วางที่ entry + buffer (BUY) เพื่อรับ spread เล็กน้อย
-BE_BUFFER_PIPS    = int(os.getenv("BE_BUFFER_PIPS",    "200"))
+# BE_TRIGGER_R  : trigger BE เมื่อ profit ≥ X × SL distance (1.2 = profit > SL)
+BE_TRIGGER_R       = float(os.getenv("BE_TRIGGER_R",       "1.2"))
+# BE_BUFFER_PIPS: lock กำไรขั้นต่ำ (code ใช้ max(buffer, profit×30%) อัตโนมัติ)
+BE_BUFFER_PIPS     = int(os.getenv("BE_BUFFER_PIPS",     "300"))
 # BE_CONFIRM_CYCLES: ราคาต้องค้างเหนือ trigger กี่ cycle ก่อน SL ย้าย
-# ป้องกัน "แตะแล้วดีดกลับ" ที่ HTF consolidation zone
-BE_CONFIRM_CYCLES = int(os.getenv("BE_CONFIRM_CYCLES", "2"))
+BE_CONFIRM_CYCLES  = int(os.getenv("BE_CONFIRM_CYCLES",  "2"))
+# HTF zone (D1/W1/MN): ให้วิ่งได้ไกลกว่าก่อน BE
+HTF_BE_TRIGGER_R   = float(os.getenv("HTF_BE_TRIGGER_R",  "2.0"))
+HTF_BE_BUFFER_PIPS = int(os.getenv("HTF_BE_BUFFER_PIPS", "1000"))
 
 # ── Trailing Stop (Swing Low/High Higher TF) ──────────────────
 TRAILING_STOP     = os.getenv("TRAILING_STOP",     "false").lower() == "true"
