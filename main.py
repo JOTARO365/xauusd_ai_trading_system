@@ -51,12 +51,36 @@ _net_degraded: bool = False   # True เมื่อ ChartWatcher + MarketAdviso
 _BOT_STATUS_FILE = os.path.join(os.path.dirname(__file__), "logs", "bot_status.json")
 
 
-def _write_bot_status(chart_data: dict, sentiment_data: dict, decision: dict) -> None:
+def _write_bot_status(chart_data: dict, sentiment_data: dict, decision: dict, skip_ai: bool = False) -> None:
     """Write logs/bot_status.json each cycle — read by /api/monitor in dashboard."""
     try:
+        from connectors.price_feed import get_current_price
+        import MetaTrader5 as _mt5
+        tick = _mt5.symbol_info_tick(config.SYMBOL)
+        if tick:
+            prev_close = chart_data.get("indicators", {}).get("h1", {}).get("prev_close") or tick.bid
+            change_pct = round((tick.bid - prev_close) / prev_close * 100, 3) if prev_close else 0
+            price_info = {
+                "bid":        round(float(tick.bid), 2),
+                "ask":        round(float(tick.ask), 2),
+                "spread":     round(float(tick.ask - tick.bid), 2),
+                "change_pct": change_pct,
+            }
+        else:
+            price_info = None
+
+        ready = _ready_state
+        ready_mode = {
+            "active":  ready.get("active", False),
+            "zone":    ready.get("zone"),
+            "set_at":  ready.get("since").isoformat() if ready.get("since") else None,
+        }
+
         status = {
-            "updated_at": _dt.now().isoformat(timespec="seconds"),
-            "cycle":      _cycle,
+            "updated_at":   _dt.now().isoformat(timespec="seconds"),
+            "cycle":        _cycle,
+            "skip_ai":      skip_ai,
+            "decision":     decision.get("action", "SKIP"),
             "last_signal": {
                 "time":       _dt.now().isoformat(timespec="seconds"),
                 "direction":  chart_data.get("signal", ""),
@@ -69,6 +93,8 @@ def _write_bot_status(chart_data: dict, sentiment_data: dict, decision: dict) ->
             },
             "sentiment":    sentiment_data.get("sentiment", "NEUTRAL"),
             "sent_conf":    sentiment_data.get("confidence", 0),
+            "price_info":   price_info,
+            "ready_mode":   ready_mode,
         }
         with open(_BOT_STATUS_FILE, "w", encoding="utf-8") as f:
             json.dump(status, f, ensure_ascii=False, indent=2)
@@ -324,7 +350,7 @@ async def run_cycle() -> tuple[dict, dict]:
         _last_ai_mono  = time.monotonic()
         _last_ai_price = get_current_price()
         try:
-            _write_bot_status(chart_data, sentiment_data, result.get("decision") or {})
+            _write_bot_status(chart_data, sentiment_data, result.get("decision") or {}, skip_ai=_skip_ai)
         except Exception as e:
             logger.warning(f"bot_status write error: {e}")
 
