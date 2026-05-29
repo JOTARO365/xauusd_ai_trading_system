@@ -801,9 +801,12 @@ def manage_breakeven() -> int:
     if tick is None:
         return 0
 
-    trigger_r     = getattr(_cfg, "BE_TRIGGER_R",      0.8)
-    buf_pips      = getattr(_cfg, "BE_BUFFER_PIPS",    BREAKEVEN_BUFFER_PIPS)
-    confirm_need  = max(1, int(getattr(_cfg, "BE_CONFIRM_CYCLES", 2)))
+    default_trigger_r  = getattr(_cfg, "BE_TRIGGER_R",      0.8)
+    default_buf_pips   = getattr(_cfg, "BE_BUFFER_PIPS",    BREAKEVEN_BUFFER_PIPS)
+    confirm_need       = max(1, int(getattr(_cfg, "BE_CONFIRM_CYCLES", 2)))
+    # HTF (D1/W1/MN) zone trades: wait longer before moving BE, lock more profit
+    htf_trigger_r  = getattr(_cfg, "HTF_BE_TRIGGER_R",   1.5)   # trigger only at 1.5R
+    htf_buf_pips   = getattr(_cfg, "HTF_BE_BUFFER_PIPS", 1000)  # lock 1,000 pips
 
     # ลบ tickets ที่ปิดแล้วออกจาก pending
     active_tickets = {p.ticket for p in positions}
@@ -819,6 +822,18 @@ def manage_breakeven() -> int:
         sl_dist_pips = abs(entry - pos.sl) / point
         if sl_dist_pips < 10:
             continue   # SL แคบเกินไป (อาจถูกขยับมา BE แล้ว)
+
+        # ใช้ HTF settings ถ้า position ถูก register ว่าเปิดที่ D1/W1/MN zone
+        zone_info = _zone_state.get(pos.ticket, {})
+        zone_tf   = zone_info.get("tf", "") if zone_info else ""
+        is_htf    = zone_tf in ("D1", "W1", "MN1")
+        trigger_r = htf_trigger_r if is_htf else default_trigger_r
+        buf_pips  = htf_buf_pips  if is_htf else default_buf_pips
+        if is_htf:
+            logger.debug(
+                f"BE [{zone_tf} zone] ticket={pos.ticket}: "
+                f"using HTF settings trigger={trigger_r}R buf={buf_pips}p"
+            )
 
         current      = tick.bid if is_buy else tick.ask
         profit_pips  = ((current - entry) if is_buy else (entry - current)) / point
