@@ -430,17 +430,18 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
     conf        = gate["confidence"]
     trend       = chart_data.get("trend", "SIDEWAYS")
 
-    # TREND_CONT ใน NNLB — ข้าม Claude ทั้งหมด เข้า order ทันที (NNLB philosophy = bypass everything)
-    if "TREND_CONT" in tech_signal:
+    # NNLB fast-path: HTF zone override หรือ TREND_CONT — ข้าม Claude เข้า order ทันที
+    if _cfg.NNLB_MODE and ("TREND_CONT" in tech_signal or tech_signal.startswith("HTF_")):
+        tag = "HTF_ZONE" if tech_signal.startswith("HTF_") else "TREND_CONT"
         logger.warning(
-            f"[TREND_CONT] Fast-path → {direction} SL={sl_pips:.0f}p TP={tp_pips:.0f}p "
-            f"(skipping Claude — NNLB+trend continuation)"
+            f"[{tag}] Fast-path → {direction} SL={sl_pips:.0f}p TP={tp_pips:.0f}p "
+            f"(skipping Claude — NNLB)"
         )
         order_result = open_order(
             direction=direction,
             sl_pips=sl_pips,
             tp_pips=tp_pips,
-            comment=f"TREND_CONT_{direction}|NNLB",
+            comment=f"{tag}_{direction}|NNLB",
         )
         if not order_result.get("success"):
             err = order_result.get("error", "unknown")
