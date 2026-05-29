@@ -31,8 +31,11 @@ def _read_cooldown_ts() -> datetime | None:
 
 
 def _write_cooldown_ts(dt: datetime):
-    os.makedirs("logs", exist_ok=True)
-    Path(_COOLDOWN_FILE).write_text(dt.isoformat())
+    try:
+        os.makedirs("logs", exist_ok=True)
+        Path(_COOLDOWN_FILE).write_text(dt.isoformat())
+    except Exception as e:
+        logger.warning(f"[REPORTER] cooldown write failed: {e} — next cycle will retry LLM call")
 
 
 def _load_log() -> dict:

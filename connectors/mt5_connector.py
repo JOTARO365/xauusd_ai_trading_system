@@ -222,7 +222,9 @@ def manage_trailing_stop() -> int:
         cur_sl       = pos.sl
         current      = tick.bid if is_buy else tick.ask
         profit_pips  = ((current - pos.price_open) if is_buy else (pos.price_open - current)) / point
-        sl_dist_pips = abs(pos.price_open - cur_sl) / point if cur_sl > 0 else 0
+        if cur_sl == 0:
+            continue   # no SL set — skip to avoid trail_sl above current price
+        sl_dist_pips = abs(pos.price_open - cur_sl) / point
 
         # ไม่เริ่ม trail จนกว่าจะมีกำไร ≥ min_profit_r × SL distance
         if sl_dist_pips > 0 and profit_pips < sl_dist_pips * min_profit_r:

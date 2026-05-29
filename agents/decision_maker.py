@@ -296,7 +296,7 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
             return _fail(f"SIDEWAYS MOMENTUM_BREAKOUT requires conf ≥65% (got {conf}%)")
 
     # 5b. Session gate — Asian/dead-zone sessions block weak entries (data shows Asian = noise)
-    _sess_hour        = datetime.utcnow().hour
+    _sess_hour        = datetime.now(_tz.utc).hour
     _in_quiet_session = not (7 <= _sess_hour < 21)   # Asian 0-7 UTC or dead zone 21-24 UTC
     if _in_quiet_session:
         _sess_lbl = "Asian (quiet)" if _sess_hour < 7 else "NY Close (quiet)"
@@ -333,7 +333,7 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
 
     # MOMENTUM_BREAKOUT: require higher conf threshold at gate 7+8
     # Other entries: conf ≥ 62 is enough
-    _hour_utc      = datetime.utcnow().hour
+    _hour_utc      = datetime.now(_tz.utc).hour
     _ln_ny_overlap = 12 <= _hour_utc < 16   # London/NY overlap (12-16 UTC)
     _mo_threshold  = 65 if _ln_ny_overlap else 70
     _gate_min_conf = _mo_threshold if entry_type == "MOMENTUM_BREAKOUT" else 62

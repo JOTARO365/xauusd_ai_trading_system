@@ -9,26 +9,31 @@ Graph flow:
 import time
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.memory import MemorySaver
 from loguru import logger
 
 
 def _to_native(obj):
-    """Recursively convert numpy scalars to Python native types (for msgpack serialization)."""
+    """Recursively convert numpy/special types to msgpack-safe Python natives."""
     try:
+        import math
         import numpy as np
         if isinstance(obj, dict):
             return {k: _to_native(v) for k, v in obj.items()}
-        if isinstance(obj, list):
+        if isinstance(obj, (list, tuple)):
             return [_to_native(v) for v in obj]
         if isinstance(obj, np.floating):
-            return float(obj)
+            v = float(obj)
+            return None if (math.isnan(v) or math.isinf(v)) else v
         if isinstance(obj, np.integer):
             return int(obj)
         if isinstance(obj, np.bool_):
             return bool(obj)
+        if isinstance(obj, (np.str_, np.bytes_)):
+            return str(obj)
         if isinstance(obj, np.ndarray):
-            return obj.tolist()
+            return _to_native(obj.tolist())
+        if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+            return None
     except ImportError:
         pass
     return obj
@@ -99,7 +104,7 @@ def node_advisor(state: TradingState) -> dict:
     print_step(1, "running", "กำลังวิเคราะห์ market regime...")
     t = time.monotonic()
     try:
-        data   = analyze_market_regime(state["chart_data"])
+        data   = _to_native(analyze_market_regime(state["chart_data"]))
         lat    = int((time.monotonic() - t) * 1000)
         regime = data.get("regime", "—")
         conf   = data.get("regime_confidence", 0)
@@ -143,7 +148,7 @@ def node_analyst(state: TradingState) -> dict:
     print_step(3, "running", "กำลังวิเคราะห์ sentiment...")
     t = time.monotonic()
     try:
-        data  = analyze_sentiment(state["news_data"], state["chart_data"])
+        data  = _to_native(analyze_sentiment(state["news_data"], state["chart_data"]))
         data["news_count"] = state["news_data"].get("count", 0)
         lat   = int((time.monotonic() - t) * 1000)
         sent  = data.get("sentiment", "NEUTRAL")
@@ -191,8 +196,14 @@ def node_position_mgmt(state: TradingState) -> dict:
         manage_momentum_exit, manage_zone_break_close, manage_partial_close,
         manage_breakeven, manage_dynamic_tp, manage_post_event_tp, manage_trailing_stop,
     )
+    from agents.reporter import scan_manual_orders
     from utils.display import print_warning
     chart = state.get("chart_data") or {}
+    # scan manual orders every cycle (including skip_ai) so they're never missed
+    try:
+        scan_manual_orders(chart or None)
+    except Exception as e:
+        logger.error(f"[GRAPH:position_mgmt] scan_manual_orders: {e}")
     try:
         mex = manage_momentum_exit()
         if mex: print_warning(f"Momentum Exit: ปิดเร็ว {mex} position (momentum สวนทางแรง)")
@@ -334,7 +345,7 @@ def build_trading_graph():
     g.add_edge("reporter",   "accounting")
     g.add_edge("accounting", END)
 
-    return g.compile(checkpointer=MemorySaver())
+    return g.compile()  # stateless per cycle — no checkpoint bleed between cycles
 
 
 # Singleton — compile once at import time

@@ -543,17 +543,14 @@ def manage_range_pending(chart_data: dict) -> int:
     cancel_stale_range_pending(trend)
 
     # ── Cancel opposing pending เมื่อ 1 ฝั่ง trigger แล้ว ──────────
-    # ถ้า BUY position จาก range เปิดอยู่ → ยกเลิก SELL pending (และในทางกลับกัน)
-    # ป้องกัน: BUY กำลังวิ่งไป TP แล้ว SELL pending trigger สวนทางกลับ
+    # รวบรวม directions ทั้งหมดก่อน แล้ว cancel ฝั่งตรงข้ามครบทุกตัว
     _rng_positions = mt5.positions_get(symbol=SYMBOL) or []
-    for _p in _rng_positions:
-        _pc = str(getattr(_p, "comment", "") or "")
-        if _pc.startswith(f"{_RANGE_TAG}BUY"):
-            _cancel_range_pending_side("SELL")
-            break
-        elif _pc.startswith(f"{_RANGE_TAG}SELL"):
-            _cancel_range_pending_side("BUY")
-            break
+    _has_rng_buy  = any(str(getattr(_p, "comment", "") or "").startswith(f"{_RANGE_TAG}BUY")  for _p in _rng_positions)
+    _has_rng_sell = any(str(getattr(_p, "comment", "") or "").startswith(f"{_RANGE_TAG}SELL") for _p in _rng_positions)
+    if _has_rng_buy:
+        _cancel_range_pending_side("SELL")
+    if _has_rng_sell:
+        _cancel_range_pending_side("BUY")
 
     if trend != "SIDEWAYS":
         return 0

@@ -534,9 +534,15 @@ def _acquire_lock() -> bool:
             existing_pid = int(open(_PID_FILE).read().strip())
             import psutil
             if psutil.pid_exists(existing_pid):
-                print(f"\n  ERROR: bot already running (PID {existing_pid})")
-                print(f"  Stop it first:  taskkill /F /PID {existing_pid}\n")
-                return False
+                try:
+                    proc_name = psutil.Process(existing_pid).name().lower()
+                    is_python = "python" in proc_name
+                except Exception:
+                    is_python = True  # assume it's ours if we can't check
+                if is_python:
+                    print(f"\n  ERROR: bot already running (PID {existing_pid})")
+                    print(f"  Stop it first:  taskkill /F /PID {existing_pid}\n")
+                    return False
         except Exception:
             pass  # stale lock — overwrite
     with open(_PID_FILE, "w") as f:
