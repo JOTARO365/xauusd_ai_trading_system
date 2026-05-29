@@ -105,8 +105,12 @@ def get_accounting(symbol: str | None = None, account_login: int | None = None) 
             q = q.eq("account_login", account_login)
         agent_rows = q.execute().data
 
-        # ── cycles rows (last 30 days) ────────────────────────
-        q = client.table("cycles").select("cycle_at,total_cost_usd,ticket").gte("cycle_at", cutoff)
+        # ── cycles rows: recent 1000 ordered DESC so today's data is included
+        q = (client.table("cycles")
+             .select("cycle_at,total_cost_usd,ticket")
+             .gte("cycle_at", cutoff)
+             .order("cycle_at", desc=True)
+             .limit(1000))
         if use_filter:
             q = q.in_("symbol", symbols)
         if use_acct:
