@@ -523,5 +523,38 @@ async def main():
         disconnect_mt5()
 
 
+_PID_FILE = "logs/bot.pid"
+
+
+def _acquire_lock() -> bool:
+    """Write PID lock file. Returns False if another instance is already running."""
+    os.makedirs("logs", exist_ok=True)
+    if os.path.exists(_PID_FILE):
+        try:
+            existing_pid = int(open(_PID_FILE).read().strip())
+            import psutil
+            if psutil.pid_exists(existing_pid):
+                print(f"\n  ERROR: bot already running (PID {existing_pid})")
+                print(f"  Stop it first:  taskkill /F /PID {existing_pid}\n")
+                return False
+        except Exception:
+            pass  # stale lock — overwrite
+    with open(_PID_FILE, "w") as f:
+        f.write(str(os.getpid()))
+    return True
+
+
+def _release_lock():
+    try:
+        os.remove(_PID_FILE)
+    except FileNotFoundError:
+        pass
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    if not _acquire_lock():
+        sys.exit(1)
+    try:
+        asyncio.run(main())
+    finally:
+        _release_lock()
