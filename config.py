@@ -85,6 +85,7 @@ def reload_config():
     DYNAMIC_TP        = os.getenv("DYNAMIC_TP", "true").lower() != "false"
     STREAK_PROTECTION = os.getenv("STREAK_PROTECTION", "true").lower() != "false"
     global TRAILING_STOP, TRAILING_ATR_TF, TRAILING_ATR_MULT
+    global TRAILING_MIN_PROFIT_R, TRAILING_LOOKBACK
     global BE_TRIGGER_R, BE_BUFFER_PIPS, BE_CONFIRM_CYCLES
     global HTF_BE_TRIGGER_R, HTF_BE_BUFFER_PIPS
     BE_TRIGGER_R       = float(os.getenv("BE_TRIGGER_R",       "1.2"))
@@ -92,9 +93,11 @@ def reload_config():
     BE_CONFIRM_CYCLES  = int(os.getenv("BE_CONFIRM_CYCLES",  "2"))
     HTF_BE_TRIGGER_R   = float(os.getenv("HTF_BE_TRIGGER_R",  "2.0"))
     HTF_BE_BUFFER_PIPS = int(os.getenv("HTF_BE_BUFFER_PIPS", "1000"))
-    TRAILING_STOP     = os.getenv("TRAILING_STOP",     "false").lower() == "true"
-    TRAILING_ATR_TF   = os.getenv("TRAILING_ATR_TF",   "D1")
-    TRAILING_ATR_MULT = float(os.getenv("TRAILING_ATR_MULT", "1.5"))
+    TRAILING_STOP        = os.getenv("TRAILING_STOP",           "false").lower() == "true"
+    TRAILING_ATR_TF      = os.getenv("TRAILING_ATR_TF",         "D1")
+    TRAILING_ATR_MULT    = float(os.getenv("TRAILING_ATR_MULT",  "1.5"))
+    TRAILING_MIN_PROFIT_R= float(os.getenv("TRAILING_MIN_PROFIT_R", "1.5"))
+    TRAILING_LOOKBACK    = int(os.getenv("TRAILING_LOOKBACK",    "6"))
     global LESSON_LEARNING, DRY_RUN, NNLB_MODE, NNLB_BASE_EQUITY, NNLB_EQUITY_PER_LOT, NNLB_MAX_LOSS_PCT
     LESSON_LEARNING      = os.getenv("LESSON_LEARNING", "true").lower() != "false"
     DRY_RUN              = os.getenv("DRY_RUN", "false").lower() == "true"
@@ -132,9 +135,11 @@ HTF_BE_TRIGGER_R   = float(os.getenv("HTF_BE_TRIGGER_R",  "2.0"))
 HTF_BE_BUFFER_PIPS = int(os.getenv("HTF_BE_BUFFER_PIPS", "1000"))
 
 # ── Trailing Stop (Swing Low/High Higher TF) ──────────────────
-TRAILING_STOP     = os.getenv("TRAILING_STOP",     "false").lower() == "true"
-TRAILING_ATR_TF   = os.getenv("TRAILING_ATR_TF",   "D1")    # H4 | D1 | W1
-TRAILING_ATR_MULT = float(os.getenv("TRAILING_ATR_MULT", "1.5"))
+TRAILING_STOP         = os.getenv("TRAILING_STOP",      "false").lower() == "true"
+TRAILING_ATR_TF       = os.getenv("TRAILING_ATR_TF",    "D1")   # H4 | D1 | W1
+TRAILING_ATR_MULT     = float(os.getenv("TRAILING_ATR_MULT",     "1.5"))
+TRAILING_MIN_PROFIT_R = float(os.getenv("TRAILING_MIN_PROFIT_R", "1.5"))  # start only after 1.5R profit
+TRAILING_LOOKBACK     = int(os.getenv("TRAILING_LOOKBACK",       "6"))    # candles for swing calc
 
 # ── Lesson Learning (RAG-based) ───────────────────────────────
 LESSON_LEARNING = os.getenv("LESSON_LEARNING", "true").lower() != "false"

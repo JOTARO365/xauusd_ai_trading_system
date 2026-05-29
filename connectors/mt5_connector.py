@@ -195,10 +195,12 @@ def manage_trailing_stop() -> int:
     if not getattr(_cfg, "TRAILING_STOP", False):
         return 0
 
-    tf_name = getattr(_cfg, "TRAILING_ATR_TF",  "D1")
-    buffer  = getattr(_cfg, "TRAILING_ATR_MULT", 1.5)   # $ buffer
+    tf_name        = getattr(_cfg, "TRAILING_ATR_TF",       "D1")
+    buffer         = getattr(_cfg, "TRAILING_ATR_MULT",      1.5)   # $ buffer above/below swing
+    min_profit_r   = getattr(_cfg, "TRAILING_MIN_PROFIT_R",  1.5)   # start trailing only after 1.5R profit
+    lookback       = int(getattr(_cfg, "TRAILING_LOOKBACK",  6))    # H4 candles to find swing
 
-    swing_low, swing_high = _get_htf_swing(tf_name, lookback=3)
+    swing_low, swing_high = _get_htf_swing(tf_name, lookback=lookback)
     if swing_low <= 0 or swing_high <= 0:
         logger.warning("[TRAILING] ดึง swing levels ไม่ได้ — ข้าม")
         return 0
@@ -211,16 +213,29 @@ def manage_trailing_stop() -> int:
     if not positions:
         return 0
 
+    info  = mt5.symbol_info(SYMBOL)
+    point = info.point if info else 0.01
     moved = 0
 
     for pos in positions:
-        is_buy = pos.type == 0
-        cur_sl = pos.sl
+        is_buy       = pos.type == 0
+        cur_sl       = pos.sl
+        current      = tick.bid if is_buy else tick.ask
+        profit_pips  = ((current - pos.price_open) if is_buy else (pos.price_open - current)) / point
+        sl_dist_pips = abs(pos.price_open - cur_sl) / point if cur_sl > 0 else 0
+
+        # ไม่เริ่ม trail จนกว่าจะมีกำไร ≥ min_profit_r × SL distance
+        if sl_dist_pips > 0 and profit_pips < sl_dist_pips * min_profit_r:
+            logger.debug(
+                f"[TRAILING] ticket={pos.ticket}: profit={profit_pips:.0f}p < "
+                f"min={sl_dist_pips * min_profit_r:.0f}p ({min_profit_r}R) — รอก่อน"
+            )
+            continue
 
         if is_buy:
             trail_sl = round(swing_low - buffer, 2)
             if cur_sl > 0 and trail_sl <= cur_sl:
-                continue   # swing low ไม่ขยับขึ้น → ไม่ต้องทำอะไร
+                continue   # swing low ไม่ขยับขึ้น
         else:
             trail_sl = round(swing_high + buffer, 2)
             if cur_sl > 0 and trail_sl >= cur_sl:
