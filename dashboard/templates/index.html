@@ -1,150 +1,353 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>XAUUSD Trading Dashboard</title>
+  <title>XAUUSD Trading Terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg:       #0a0a0a;
-      --surface:  #141414;
-      --surface2: #1c1c1c;
-      --border:   #252525;
-      --border2:  #2e2e2e;
-      --gold:     #f5c842;
-      --gold-dim: rgba(245,200,66,0.12);
-      --green:    #26a69a;
-      --green-dim:#0d2e2b;
-      --red:      #ef5350;
-      --red-dim:  #2d0e0e;
-      --text:     #d4d4d4;
-      --muted:    #5a5a5a;
-      --muted2:   #3a3a3a;
+      --bg:        #07080a;
+      --bg2:       #0c0e12;
+      --surface:   #11141a;
+      --surface2:  #161a22;
+      --surface3:  #1c2230;
+      --border:    #1f2533;
+      --border2:   #2a3142;
+      --border3:   #353d52;
+
+      --gold:      #D4AC0D;
+      --gold-2:    #E6BC18;
+      --gold-dim:  rgba(212,172,13,0.10);
+      --gold-glow: rgba(212,172,13,0.35);
+
+      --cyan:      #00B4D8;
+      --cyan-dim:  rgba(0,180,216,0.12);
+
+      --green:     #26C281;
+      --green-2:   #1FAE73;
+      --green-dim: rgba(38,194,129,0.10);
+
+      --red:       #E94560;
+      --red-2:     #D63851;
+      --red-dim:   rgba(233,69,96,0.10);
+
+      --amber:     #F5A623;
+      --violet:    #A78BFA;
+
+      --text:      #DDE2EC;
+      --text-dim:  #A0A8B8;
+      --muted:     #6B7488;
+      --muted2:    #3D4456;
+      --muted3:    #2A2F3C;
+
+      --mono:      'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+      --sans:      'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     }
 
-    body {
+    html, body {
       background: var(--bg);
       color: var(--text);
-      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-family: var(--sans);
       min-height: 100vh;
-      font-size: 14px;
+      font-size: 13px;
+      font-feature-settings: "cv11", "ss01", "ss03";
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
+
+    /* subtle grid bg */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+      background-size: 32px 32px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .num, .mono { font-family: var(--mono); font-feature-settings: "tnum", "zero"; }
 
     /* ─── HEADER ─────────────────────────────────────── */
     header {
-      background: var(--surface);
+      background: linear-gradient(180deg, #0c0f15 0%, #0a0d12 100%);
       border-bottom: 1px solid var(--border);
-      padding: 0 32px;
-      height: 56px;
+      padding: 0 24px;
+      height: 54px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       position: sticky;
       top: 0;
       z-index: 100;
+      backdrop-filter: blur(10px);
     }
 
-    .header-left { display: flex; align-items: center; gap: 16px; }
+    .header-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
 
-    header h1 {
-      font-size: 16px;
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .brand-mark {
+      width: 26px; height: 26px;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-2) 100%);
+      border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--mono);
+      font-weight: 800;
+      font-size: 13px;
+      color: #1a1308;
+      letter-spacing: -1px;
+      box-shadow: 0 0 0 1px rgba(212,172,13,0.3), 0 0 18px rgba(212,172,13,0.18);
+    }
+
+    header h1, #dashboard-title {
+      font-size: 13px;
       font-weight: 700;
-      color: var(--gold);
+      color: var(--text);
       letter-spacing: 1.5px;
       text-transform: uppercase;
+      font-family: var(--mono);
     }
 
     .live-dot {
       width: 7px; height: 7px;
       background: var(--green);
       border-radius: 50%;
-      box-shadow: 0 0 6px var(--green);
-      animation: pulse 2s infinite;
+      box-shadow: 0 0 6px var(--green), 0 0 0 2px rgba(38,194,129,0.15);
+      animation: pulse 2.4s infinite;
     }
     @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
     }
+    @keyframes flash-green {
+      0% { background: rgba(38,194,129,0.25); }
+      100% { background: transparent; }
+    }
+    @keyframes flash-red {
+      0% { background: rgba(233,69,96,0.25); }
+      100% { background: transparent; }
+    }
+    .flash-up { animation: flash-green 0.6s ease-out; }
+    .flash-down { animation: flash-red 0.6s ease-out; }
 
-    #last-update { font-size: 12px; color: var(--muted); }
-
-    /* ─── LAYOUT ─────────────────────────────────────── */
-    .container { padding: 24px 32px; max-width: 1600px; margin: 0 auto; }
-
-    section { margin-bottom: 24px; }
-
-    .section-title {
-      font-size: 11px;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-bottom: 12px;
+    /* Live price ticker in header */
+    .ticker {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 14px;
+      padding: 6px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    .ticker-symbol {
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 0.5px;
+    }
+    .ticker-cell {
+      display: flex; flex-direction: column;
+      line-height: 1.1;
+      min-width: 60px;
+    }
+    .ticker-label {
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .ticker-val {
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text);
+      transition: background 0.3s;
+      padding: 0 2px;
+      border-radius: 2px;
+    }
+    .ticker-bid .ticker-val { color: var(--red); }
+    .ticker-ask .ticker-val { color: var(--green); }
+    .ticker-change.up   .ticker-val { color: var(--green); }
+    .ticker-change.down .ticker-val { color: var(--red); }
+
+    #last-update { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+    /* ─── LAYOUT ─────────────────────────────────────── */
+    .container {
+      padding: 18px 24px 60px;
+      max-width: 1680px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    section { margin-bottom: 18px; }
+
+    .section-title {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-family: var(--mono);
+    }
+    .section-title::before {
+      content: '';
+      width: 3px; height: 12px;
+      background: var(--gold);
+      border-radius: 1px;
     }
     .section-title::after {
       content: '';
       flex: 1;
       height: 1px;
-      background: var(--border);
+      background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
+    }
+
+    /* ─── READY MODE BANNER ─────────────────────────── */
+    .ready-banner {
+      display: none;
+      background: linear-gradient(90deg, rgba(212,172,13,0.18) 0%, rgba(212,172,13,0.05) 60%, transparent 100%);
+      border: 1px solid rgba(212,172,13,0.4);
+      border-left: 3px solid var(--gold);
+      border-radius: 6px;
+      padding: 12px 18px;
+      margin-bottom: 14px;
+      align-items: center;
+      gap: 14px;
+      font-size: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+    .ready-banner.active { display: flex; }
+    .ready-banner::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(ellipse at left, rgba(212,172,13,0.12) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .ready-pulse {
+      width: 10px; height: 10px;
+      background: var(--gold);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--gold-glow);
+      animation: pulse 1.6s infinite;
+      flex-shrink: 0;
+    }
+    .ready-title {
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      font-size: 10px;
+      font-family: var(--mono);
+    }
+    .ready-desc {
+      color: var(--text);
+      margin-top: 2px;
+      font-family: var(--mono);
     }
 
     /* ─── ALERT BAR ───────────────────────────────────── */
     .alert-bar {
-      background: rgba(245,200,66,0.08);
-      border: 1px solid rgba(245,200,66,0.3);
-      border-radius: 8px;
-      padding: 10px 16px;
-      margin-bottom: 20px;
-      font-size: 13px;
+      background: rgba(212,172,13,0.06);
+      border: 1px solid rgba(212,172,13,0.25);
+      border-left: 3px solid var(--gold);
+      border-radius: 6px;
+      padding: 9px 16px;
+      margin-bottom: 14px;
+      font-size: 12px;
       color: var(--gold);
       display: none;
       align-items: center;
       gap: 8px;
+      font-family: var(--mono);
     }
 
     /* ─── PORTFOLIO BAR ───────────────────────────────── */
     .portfolio-bar {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 8px;
       padding: 0;
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(4, 1fr) 200px;
       overflow: hidden;
     }
 
     .port-item {
-      padding: 20px 24px;
+      padding: 14px 18px;
       border-right: 1px solid var(--border);
       position: relative;
+      min-width: 0;
     }
     .port-item:last-child { border-right: none; }
 
     .port-label {
-      font-size: 10px;
+      font-size: 9px;
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 1.5px;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-family: var(--mono);
     }
 
     .port-thb {
-      font-size: 30px;
+      font-size: 22px;
       font-weight: 700;
-      color: var(--gold);
-      line-height: 1;
-      letter-spacing: -0.5px;
+      color: var(--text);
+      line-height: 1.1;
+      letter-spacing: -0.3px;
+      font-family: var(--mono);
+      font-feature-settings: "tnum";
+      transition: color 0.3s;
     }
 
     .port-sub {
-      font-size: 12px;
+      font-size: 10px;
       color: var(--muted);
-      margin-top: 6px;
+      margin-top: 4px;
+      font-family: var(--mono);
+      letter-spacing: 0.5px;
+    }
+
+    .sparkline-wrap {
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+    }
+    .sparkline-label {
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      font-family: var(--mono);
+      font-weight: 600;
+    }
+    #equity-sparkline {
+      width: 100%;
+      height: 40px;
+      display: block;
     }
 
     /* ─── AGENT PIPELINE ──────────────────────────────── */
@@ -154,19 +357,31 @@
       gap: 0;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 8px;
       overflow: hidden;
     }
 
     .pipeline-step {
-      padding: 16px 18px;
+      padding: 13px 16px;
       border-right: 1px solid var(--border);
       position: relative;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 5px;
+      transition: background 0.3s;
     }
     .pipeline-step:last-child { border-right: none; }
+    .pipeline-step.active {
+      background: linear-gradient(180deg, rgba(212,172,13,0.10) 0%, rgba(212,172,13,0.02) 100%);
+    }
+    .pipeline-step.active::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      background: var(--gold);
+      box-shadow: 0 0 8px var(--gold-glow);
+      animation: pulse 1.6s infinite;
+    }
 
     .pipeline-step::after {
       content: '›';
@@ -174,29 +389,40 @@
       right: -9px;
       top: 50%;
       transform: translateY(-50%);
-      color: var(--border2);
+      color: var(--border3);
       font-size: 20px;
       z-index: 1;
+      font-family: var(--mono);
     }
     .pipeline-step:last-child::after { display: none; }
 
     .step-num {
-      font-size: 10px;
+      font-size: 9px;
       color: var(--muted2);
-      font-weight: 600;
-      letter-spacing: 1px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      font-family: var(--mono);
     }
 
     .step-name {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       color: var(--text);
+      letter-spacing: 0.2px;
     }
 
     .step-desc {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--muted);
-      line-height: 1.4;
+      line-height: 1.35;
+    }
+
+    .step-meta {
+      font-size: 10px;
+      color: var(--text-dim);
+      font-family: var(--mono);
+      margin-top: 2px;
+      min-height: 12px;
     }
 
     .step-status {
@@ -204,9 +430,10 @@
       align-items: center;
       gap: 5px;
       margin-top: 4px;
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      font-family: var(--mono);
     }
 
     .step-status .dot {
@@ -214,140 +441,160 @@
       border-radius: 50%;
     }
 
-    .status-ready   .dot { background: var(--green); }
+    .status-ready   .dot { background: var(--green); box-shadow: 0 0 5px var(--green); }
     .status-ready        { color: var(--green); }
     .status-waiting .dot { background: var(--muted); }
     .status-waiting      { color: var(--muted); }
     .status-active  .dot { background: var(--gold); box-shadow: 0 0 6px var(--gold); }
-    .status-active       { color: var(--gold); animation: pulse 2s infinite; }
+    .status-active       { color: var(--gold); animation: pulse 1.6s infinite; }
+    .status-done    .dot { background: var(--cyan); box-shadow: 0 0 5px var(--cyan); }
+    .status-done         { color: var(--cyan); }
 
     /* ─── STAT CARDS ──────────────────────────────────── */
     .stat-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
+      gap: 10px;
     }
 
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 16px 20px;
+      border-radius: 7px;
+      padding: 13px 16px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
+      transition: border-color 0.18s;
     }
+    .card:hover { border-color: var(--border2); }
 
     .card .label {
-      font-size: 10px;
+      font-size: 9px;
       color: var(--muted);
       text-transform: uppercase;
-      letter-spacing: 1.2px;
+      letter-spacing: 1.5px;
+      font-weight: 600;
+      font-family: var(--mono);
     }
 
     .card .value {
-      font-size: 24px;
+      font-size: 21px;
       font-weight: 700;
-      color: #fff;
+      color: var(--text);
       line-height: 1.1;
-      letter-spacing: -0.5px;
+      letter-spacing: -0.3px;
+      font-family: var(--mono);
+      font-feature-settings: "tnum";
+      transition: color 0.3s;
     }
 
     .card .sub {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--muted);
       margin-top: 2px;
+      font-family: var(--mono);
+      letter-spacing: 0.4px;
     }
 
     .value.green { color: var(--green); }
     .value.red   { color: var(--red); }
     .value.gold  { color: var(--gold); }
+    .value.cyan  { color: var(--cyan); }
 
     /* ─── CHART ROW ───────────────────────────────────── */
     .chart-row {
       display: grid;
       grid-template-columns: 2fr 1fr;
-      gap: 12px;
+      gap: 10px;
     }
 
     .chart-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 20px 24px;
+      border-radius: 7px;
+      padding: 16px 18px;
     }
 
     .chart-card .chart-title {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--muted);
       text-transform: uppercase;
-      letter-spacing: 1.2px;
-      margin-bottom: 16px;
+      letter-spacing: 1.5px;
+      margin-bottom: 14px;
+      font-weight: 600;
+      font-family: var(--mono);
     }
 
     /* ─── TRADE TABLE ─────────────────────────────────── */
     .table-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 8px;
       overflow: hidden;
     }
 
     .table-toolbar {
-      padding: 16px 20px;
+      padding: 12px 16px;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 12px;
+      gap: 10px;
     }
 
     .table-toolbar h3 {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--muted);
       text-transform: uppercase;
-      letter-spacing: 1.5px;
+      letter-spacing: 1.8px;
+      font-weight: 600;
+      font-family: var(--mono);
     }
 
     .filter-row {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     .filter-row select {
       background: var(--surface2);
       border: 1px solid var(--border2);
       color: var(--text);
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-size: 12px;
+      padding: 5px 9px;
+      border-radius: 5px;
+      font-size: 11px;
       cursor: pointer;
       outline: none;
+      font-family: var(--mono);
+      letter-spacing: 0.5px;
     }
-    .filter-row select:focus { border-color: var(--gold); }
+    .filter-row select:focus, .filter-row select:hover { border-color: var(--gold); }
 
     .table-wrap { overflow-x: auto; }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 13px;
-      min-width: 820px;
+      font-size: 12px;
+      min-width: 920px;
     }
 
     thead th {
-      padding: 10px 16px;
+      padding: 9px 14px;
       text-align: left;
-      font-size: 10px;
-      font-weight: 600;
+      font-size: 9px;
+      font-weight: 700;
       color: var(--muted);
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 1.3px;
       border-bottom: 1px solid var(--border);
       white-space: nowrap;
-      background: var(--surface);
+      background: var(--bg2);
+      font-family: var(--mono);
     }
 
     tbody tr {
@@ -355,16 +602,20 @@
       transition: background 0.12s;
     }
     tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: rgba(255,255,255,0.025); }
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+    tbody tr.row-win  { background: rgba(38,194,129,0.04); }
+    tbody tr.row-loss { background: rgba(233,69,96,0.04); }
+    tbody tr.row-win:hover  { background: rgba(38,194,129,0.07); }
+    tbody tr.row-loss:hover { background: rgba(233,69,96,0.07); }
 
     tbody td {
-      padding: 11px 16px;
+      padding: 9px 14px;
       color: var(--text);
       vertical-align: middle;
     }
 
     /* Column alignment */
-    td.num, th.num { text-align: right; }
+    td.num, th.num { text-align: right; font-family: var(--mono); font-feature-settings: "tnum"; }
     td.center, th.center { text-align: center; }
 
     /* Badges */
@@ -372,41 +623,46 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 2px 10px;
-      border-radius: 20px;
-      font-size: 11px;
+      padding: 2px 9px;
+      border-radius: 3px;
+      font-size: 10px;
       font-weight: 700;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.8px;
       white-space: nowrap;
+      font-family: var(--mono);
     }
 
-    .badge-buy    { background: rgba(38,166,154,0.15); color: var(--green); border: 1px solid rgba(38,166,154,0.25); }
-    .badge-sell   { background: rgba(239,83,80,0.15);  color: var(--red);   border: 1px solid rgba(239,83,80,0.25); }
-    .badge-open   { background: rgba(245,200,66,0.12); color: var(--gold);  border: 1px solid rgba(245,200,66,0.25); }
-    .badge-closed { background: var(--surface2);       color: var(--muted); border: 1px solid var(--border); }
-    .badge-win    { background: rgba(38,166,154,0.12); color: var(--green); }
-    .badge-loss   { background: rgba(239,83,80,0.12);  color: var(--red); }
-    .badge-system { background: rgba(126,200,227,0.12); color: #7ec8e3; border: 1px solid rgba(126,200,227,0.25); }
-    .badge-manual { background: rgba(240,165,0,0.12);   color: #f0a500;  border: 1px solid rgba(240,165,0,0.25); }
+    .badge-buy    { background: rgba(38,194,129,0.14); color: var(--green); border: 1px solid rgba(38,194,129,0.3); }
+    .badge-sell   { background: rgba(233,69,96,0.14);  color: var(--red);   border: 1px solid rgba(233,69,96,0.3); }
+    .badge-open   { background: rgba(212,172,13,0.12); color: var(--gold);  border: 1px solid rgba(212,172,13,0.3); }
+    .badge-closed { background: var(--surface2);        color: var(--muted); border: 1px solid var(--border2); }
+    .badge-win    { background: rgba(38,194,129,0.14); color: var(--green); }
+    .badge-loss   { background: rgba(233,69,96,0.14);  color: var(--red); }
+    .badge-system { background: rgba(0,180,216,0.12); color: var(--cyan); border: 1px solid rgba(0,180,216,0.3); }
+    .badge-manual { background: rgba(245,166,35,0.12); color: var(--amber); border: 1px solid rgba(245,166,35,0.3); }
 
-    .analysis-cell { font-size: 11px; color: var(--muted); line-height: 1.5; max-width: 260px; }
+    .analysis-cell { font-size: 11px; color: var(--text-dim); line-height: 1.45; max-width: 280px; }
     .analysis-cell .tag {
       display: inline-block; background: var(--surface2); border: 1px solid var(--border2);
-      border-radius: 4px; padding: 1px 6px; font-size: 10px; color: var(--muted); margin: 1px 2px 1px 0;
+      border-radius: 3px; padding: 1px 6px; font-size: 9px; color: var(--text-dim);
+      margin: 1px 2px 1px 0;
+      font-family: var(--mono); letter-spacing: 0.3px;
     }
-    .analysis-cell .reason { color: var(--text); font-style: italic; margin-top: 3px; }
+    .analysis-cell .reason { color: var(--text); font-style: italic; margin-top: 4px; font-size: 11px; }
 
-    tr.manual-row { border-left: 2px solid rgba(240,165,0,0.4); }
-    tr.manual-row td:first-child { padding-left: 14px; }
+    tr.manual-row { border-left: 2px solid rgba(245,166,35,0.5); }
+    tr.manual-row td:first-child { padding-left: 12px; }
 
     .pnl-pos { color: var(--green); font-weight: 700; }
     .pnl-neg { color: var(--red);   font-weight: 700; }
 
     .no-data {
       text-align: center;
-      padding: 60px;
+      padding: 50px;
       color: var(--muted2);
-      font-size: 13px;
+      font-size: 12px;
+      font-family: var(--mono);
+      letter-spacing: 1px;
     }
 
     /* Signal pill */
@@ -414,14 +670,15 @@
       display: inline-block;
       background: var(--surface2);
       border: 1px solid var(--border2);
-      border-radius: 6px;
-      padding: 3px 8px;
-      font-size: 11px;
-      color: var(--muted);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 10px;
+      color: var(--text-dim);
       max-width: 160px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      font-family: var(--mono);
     }
 
     /* Confidence bar */
@@ -432,7 +689,7 @@
     }
     .conf-track {
       flex: 1;
-      height: 4px;
+      height: 3px;
       background: var(--border2);
       border-radius: 2px;
       overflow: hidden;
@@ -442,130 +699,205 @@
       height: 100%;
       border-radius: 2px;
       background: var(--gold);
+      transition: width 0.4s;
     }
-    .conf-num { font-size: 11px; color: var(--muted); min-width: 26px; text-align: right; }
+    .conf-num { font-size: 10px; color: var(--muted); min-width: 26px; text-align: right; font-family: var(--mono); }
 
     /* ─── TABS ───────────────────────────────────────────── */
     .tab-nav {
       display: flex;
       border-bottom: 1px solid var(--border);
-      margin-bottom: 24px;
+      margin-bottom: 18px;
+      gap: 2px;
+      overflow-x: auto;
     }
     .tab-btn {
       background: none;
       border: none;
       border-bottom: 2px solid transparent;
       color: var(--muted);
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 600;
-      padding: 10px 22px;
+      padding: 9px 18px;
       cursor: pointer;
-      letter-spacing: 0.5px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
       margin-bottom: -1px;
-      transition: color 0.15s, border-color 0.15s;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      font-family: var(--mono);
+      white-space: nowrap;
     }
-    .tab-btn:hover  { color: var(--text); }
+    .tab-btn:hover  { color: var(--text); background: rgba(255,255,255,0.02); }
     .tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
     .tab-content    { display: none; }
-    .tab-content.active { display: block; }
+    .tab-content.active { display: block; animation: fadeIn 0.18s ease-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(2px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
 
     /* ─── SYSTEM SWITCHER ───────────────────────────── */
     .sys-switcher {
       display: flex;
       align-items: center;
-      gap: 4px;
-      margin-right: 20px;
+      gap: 2px;
+      padding: 2px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
     }
     .sys-btn {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 6px;
+      background: transparent;
+      border: none;
+      border-radius: 4px;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
-      padding: 5px 12px;
+      padding: 4px 12px;
       cursor: pointer;
-      letter-spacing: 0.8px;
+      letter-spacing: 1px;
       transition: all 0.15s;
+      font-family: var(--mono);
     }
-    .sys-btn:hover { color: var(--text); border-color: var(--border2); }
+    .sys-btn:hover { color: var(--text); }
     .sys-btn.active {
       background: var(--gold-dim);
-      border-color: var(--gold);
       color: var(--gold);
+      box-shadow: inset 0 0 0 1px rgba(212,172,13,0.3);
     }
 
-    /* ─── SETTINGS ───────────────────────────────────────── */
+    /* ─── SETTINGS (Accordion) ─────────────────────────── */
     .settings-notice {
-      background: rgba(245,200,66,0.06);
-      border: 1px solid rgba(245,200,66,0.2);
-      border-radius: 8px;
+      background: rgba(212,172,13,0.05);
+      border: 1px solid rgba(212,172,13,0.2);
+      border-left: 3px solid var(--gold);
+      border-radius: 6px;
       padding: 10px 16px;
-      font-size: 12px;
+      font-size: 11px;
       color: var(--gold);
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
+      font-family: var(--mono);
+      letter-spacing: 0.3px;
     }
-    .settings-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
+    .accordion {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
-    .settings-card {
+    .accordion-section {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 20px;
+      border-radius: 7px;
+      overflow: hidden;
     }
-    .settings-card h3 {
+    .accordion-header {
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .accordion-header:hover { background: var(--surface2); }
+    .accordion-header h3 {
+      font-size: 11px;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-weight: 700;
+      font-family: var(--mono);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .accordion-header h3 .hint {
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 400;
+      letter-spacing: 0.5px;
+      text-transform: none;
+    }
+    .accordion-icon {
+      width: 18px; height: 18px;
+      color: var(--muted);
+      transition: transform 0.2s;
+      font-family: var(--mono);
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .accordion-section.open .accordion-icon { transform: rotate(90deg); color: var(--gold); }
+    .accordion-section.open .accordion-header h3 { color: var(--gold); }
+    .accordion-body {
+      display: none;
+      padding: 14px 18px 18px;
+      border-top: 1px solid var(--border);
+    }
+    .accordion-section.open .accordion-body { display: block; }
+    .accordion-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
+    .field-group { display: flex; flex-direction: column; gap: 12px; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label {
       font-size: 10px;
       color: var(--muted);
       text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-bottom: 14px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--border);
-    }
-    .field-group { display: flex; flex-direction: column; gap: 11px; }
-    .field { display: flex; flex-direction: column; gap: 5px; }
-    .field label {
-      font-size: 11px;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
+      letter-spacing: 1.2px;
+      font-weight: 600;
+      font-family: var(--mono);
     }
     .field input[type=text],
     .field input[type=number],
-    .field select {
+    .field select,
+    .field textarea {
       background: var(--surface2);
       border: 1px solid var(--border2);
       color: var(--text);
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 13px;
+      padding: 7px 10px;
+      border-radius: 5px;
+      font-size: 12px;
       outline: none;
       width: 100%;
+      font-family: var(--mono);
+      transition: border-color 0.15s, background 0.15s;
     }
-    .field input:focus, .field select:focus { border-color: var(--gold); }
+    .field textarea { resize: vertical; font-family: var(--mono); }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--gold); background: var(--surface); }
     .field select option { background: var(--surface2); }
+    .field-help {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 3px;
+      font-family: var(--mono);
+      letter-spacing: 0.2px;
+      line-height: 1.4;
+    }
 
     /* Toggle switch */
     .toggle-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 5px 0;
+      padding: 6px 0;
+      gap: 12px;
     }
-    .toggle-label-text { font-size: 13px; color: var(--text); }
-    .toggle-label-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .toggle-label-text { font-size: 12px; color: var(--text); font-weight: 500; }
+    .toggle-label-sub  { font-size: 10px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
 
     .toggle {
       position: relative;
       display: inline-block;
-      width: 40px;
-      height: 22px;
+      width: 36px;
+      height: 20px;
       flex-shrink: 0;
       cursor: pointer;
     }
@@ -581,43 +913,79 @@
     .toggle-thumb {
       position: absolute;
       top: 3px; left: 3px;
-      width: 16px; height: 16px;
+      width: 14px; height: 14px;
       background: #fff;
       border-radius: 50%;
       transition: transform 0.2s;
       pointer-events: none;
     }
-    .toggle input:checked ~ .toggle-thumb { transform: translateX(18px); }
+    .toggle input:checked ~ .toggle-thumb { transform: translateX(16px); }
 
     /* Save button */
     .save-btn {
-      background: var(--gold);
-      color: #000;
+      background: linear-gradient(180deg, var(--gold-2) 0%, var(--gold) 100%);
+      color: #1a1308;
       border: none;
-      border-radius: 8px;
-      padding: 10px 28px;
-      font-size: 13px;
-      font-weight: 700;
+      border-radius: 6px;
+      padding: 9px 24px;
+      font-size: 11px;
+      font-weight: 800;
       cursor: pointer;
-      letter-spacing: 0.5px;
-      transition: opacity 0.15s;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      font-family: var(--mono);
+      transition: all 0.15s;
+      box-shadow: 0 0 0 1px rgba(212,172,13,0.3), 0 4px 12px rgba(212,172,13,0.2);
     }
-    .save-btn:hover    { opacity: 0.85; }
-    .save-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .save-btn:hover    { transform: translateY(-1px); box-shadow: 0 0 0 1px rgba(212,172,13,0.4), 0 6px 16px rgba(212,172,13,0.3); }
+    .save-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .secondary-btn {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border2);
+      border-radius: 5px;
+      padding: 6px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-family: var(--mono);
+      transition: all 0.15s;
+    }
+    .secondary-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+    .primary-btn {
+      background: var(--gold);
+      color: #1a1308;
+      border: none;
+      border-radius: 5px;
+      padding: 6px 16px;
+      font-weight: 800;
+      cursor: pointer;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-family: var(--mono);
+    }
+    .primary-btn:hover { background: var(--gold-2); }
 
     /* ─── ECONOMIC CALENDAR ──────────────────────────── */
-    .cal-container { display: flex; flex-direction: column; gap: 18px; }
+    .cal-container { display: flex; flex-direction: column; gap: 14px; }
 
-    .cal-day-group { display: flex; flex-direction: column; gap: 8px; }
+    .cal-day-group { display: flex; flex-direction: column; gap: 6px; }
 
     .cal-day-label {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 1.5px;
       display: flex;
       align-items: center;
       gap: 6px;
+      font-family: var(--mono);
+      font-weight: 600;
     }
     .cal-day-label.is-today { color: var(--gold); }
 
@@ -628,107 +996,97 @@
       box-shadow: 0 0 5px var(--gold);
     }
 
-    .cal-cards { display: flex; flex-wrap: wrap; gap: 10px; }
+    .cal-cards { display: flex; flex-wrap: wrap; gap: 8px; }
 
     .cal-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-left: 3px solid var(--border2);
-      border-radius: 10px;
-      padding: 12px 14px;
+      border-left: 3px solid var(--border3);
+      border-radius: 6px;
+      padding: 10px 12px;
       min-width: 160px;
       max-width: 230px;
       flex: 1 1 160px;
       position: relative;
     }
     .cal-card.impact-high   { border-left-color: var(--red); }
-    .cal-card.impact-medium { border-left-color: #f09642; }
+    .cal-card.impact-medium { border-left-color: var(--amber); }
     .cal-card.is-today-card { background: var(--surface2); }
 
     .cal-curr {
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 700;
       color: var(--muted);
-      letter-spacing: 1px;
+      letter-spacing: 1.5px;
       margin-bottom: 4px;
+      font-family: var(--mono);
     }
     .cal-name {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       color: var(--text);
       line-height: 1.35;
-      margin-bottom: 7px;
+      margin-bottom: 6px;
       padding-right: 36px;
     }
-    .cal-time { font-size: 11px; color: var(--muted); }
+    .cal-time { font-size: 10px; color: var(--muted); font-family: var(--mono); }
 
     .cal-badge {
       position: absolute;
-      top: 9px;
-      right: 9px;
-      font-size: 9px;
+      top: 8px;
+      right: 8px;
+      font-size: 8px;
       font-weight: 700;
-      letter-spacing: 0.5px;
+      letter-spacing: 1px;
       padding: 2px 5px;
       border-radius: 3px;
+      font-family: var(--mono);
     }
-    .impact-high   .cal-badge { background: rgba(239,83,80,0.18); color: var(--red); }
-    .impact-medium .cal-badge { background: rgba(240,150,66,0.18); color: #f09642; }
-
-    /* Responsive */
-    @media (max-width: 1200px) {
-      .stat-grid { grid-template-columns: repeat(4, 1fr); }
-    }
-    @media (max-width: 900px) {
-      .portfolio-bar { grid-template-columns: repeat(2, 1fr); }
-      .pipeline { grid-template-columns: repeat(3, 1fr); }
-      .stat-grid { grid-template-columns: repeat(2, 1fr); }
-      .chart-row { grid-template-columns: 1fr; }
-      .settings-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-    @media (max-width: 600px) {
-      .settings-grid { grid-template-columns: 1fr; }
-    }
+    .impact-high   .cal-badge { background: rgba(233,69,96,0.18); color: var(--red); }
+    .impact-medium .cal-badge { background: rgba(245,166,35,0.18); color: var(--amber); }
 
     /* ─── ACCOUNTING TAB ──────────────────────────────── */
     .agent-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 13px;
+      font-size: 12px;
     }
     .agent-table th {
-      padding: 10px 14px;
+      padding: 9px 14px;
       text-align: left;
-      font-size: 10px;
+      font-size: 9px;
       color: var(--muted);
       text-transform: uppercase;
-      letter-spacing: 1.2px;
+      letter-spacing: 1.3px;
       border-bottom: 1px solid var(--border);
-      font-weight: 600;
+      font-weight: 700;
+      font-family: var(--mono);
+      background: var(--bg2);
     }
-    .agent-table th.num, .agent-table td.num { text-align: right; }
+    .agent-table th.num, .agent-table td.num { text-align: right; font-family: var(--mono); }
     .agent-table td {
-      padding: 12px 14px;
+      padding: 11px 14px;
       border-bottom: 1px solid var(--border);
       color: var(--text);
     }
     .agent-table tr:last-child td { border-bottom: none; }
-    .agent-table tr:hover td { background: var(--surface2); }
+    .agent-table tr:hover td { background: rgba(255,255,255,0.02); }
     .model-badge {
       display: inline-block;
       padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
+      border-radius: 3px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      font-family: var(--mono);
     }
-    .model-haiku  { background: rgba(38,166,154,0.15); color: var(--green); }
-    .model-sonnet { background: rgba(245,200,66,0.15);  color: var(--gold); }
+    .model-haiku  { background: rgba(38,194,129,0.15); color: var(--green); }
+    .model-sonnet { background: rgba(212,172,13,0.15); color: var(--gold); }
     .hit-bar {
       display: flex; align-items: center; gap: 8px;
     }
     .hit-bar-track {
-      width: 60px; height: 4px;
+      width: 60px; height: 3px;
       background: var(--border2);
       border-radius: 2px;
       overflow: hidden;
@@ -741,26 +1099,134 @@
     }
     .acc-db-badge {
       display: inline-flex; align-items: center; gap: 5px;
-      font-size: 11px; padding: 3px 8px;
+      font-size: 10px; padding: 3px 8px;
       border-radius: 4px;
+      font-family: var(--mono);
     }
     .acc-db-ok  { background: var(--green-dim); color: var(--green); }
     .acc-db-off { background: var(--red-dim);   color: var(--red); }
+
+    /* Last Decision Detail box */
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+    .detail-cell {
+      padding: 4px 0;
+    }
+    .detail-label {
+      color: var(--muted);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-family: var(--mono);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .detail-value {
+      font-weight: 600;
+      color: var(--text);
+      font-size: 13px;
+      font-family: var(--mono);
+    }
+
+    /* Range bar */
+    .range-input {
+      width: 110px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      border-radius: 5px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-family: var(--mono);
+      outline: none;
+    }
+    .range-input:focus { border-color: var(--gold); }
+
+    /* Responsive */
+    @media (max-width: 1280px) {
+      .portfolio-bar { grid-template-columns: repeat(4, 1fr); }
+      .sparkline-wrap { display: none; }
+    }
+    @media (max-width: 1024px) {
+      .stat-grid { grid-template-columns: repeat(4, 1fr); }
+      .accordion-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 900px) {
+      .ticker .ticker-cell:nth-child(n+4) { display: none; }
+      .portfolio-bar { grid-template-columns: repeat(2, 1fr); }
+      .pipeline { grid-template-columns: repeat(2, 1fr); }
+      .pipeline-step { border-bottom: 1px solid var(--border); }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .chart-row { grid-template-columns: 1fr; }
+      .accordion-grid { grid-template-columns: 1fr; }
+      .detail-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 768px) {
+      .container { padding: 12px 14px 40px; }
+      header { padding: 0 14px; height: auto; flex-wrap: wrap; gap: 8px; padding-top: 8px; padding-bottom: 8px; }
+      .header-left, .header-right { width: 100%; justify-content: space-between; }
+      .ticker { padding: 5px 10px; gap: 8px; font-size: 11px; }
+      .ticker .ticker-cell { min-width: 50px; }
+      .ticker-symbol { display: none; }
+      .port-thb { font-size: 18px; }
+      .pipeline { grid-template-columns: 1fr; }
+      .pipeline-step::after { display: none; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      table { min-width: 720px; }
+      .tab-btn { padding: 8px 12px; font-size: 10px; }
+      .detail-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      .stat-grid { grid-template-columns: 1fr; }
+      .portfolio-bar { grid-template-columns: 1fr; }
+      .ticker .ticker-cell:nth-child(n+3) { display: none; }
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border3); }
   </style>
 </head>
 <body>
 
 <header>
   <div class="header-left">
+    <div class="brand">
+      <div class="brand-mark">AU</div>
+      <h1 id="dashboard-title">XAUUSD &middot; Trading Terminal</h1>
+    </div>
     <div class="live-dot"></div>
-    <h1 id="dashboard-title">XAUUSD &middot; Trading Dashboard</h1>
   </div>
-  <div style="display:flex;align-items:center;gap:16px;">
+  <div class="header-right">
+    <div class="ticker" id="live-ticker">
+      <div class="ticker-symbol">XAUUSD</div>
+      <div class="ticker-cell ticker-bid">
+        <span class="ticker-label">Bid</span>
+        <span class="ticker-val" id="px-bid">—</span>
+      </div>
+      <div class="ticker-cell ticker-ask">
+        <span class="ticker-label">Ask</span>
+        <span class="ticker-val" id="px-ask">—</span>
+      </div>
+      <div class="ticker-cell">
+        <span class="ticker-label">Spread</span>
+        <span class="ticker-val" id="px-spread">—</span>
+      </div>
+      <div class="ticker-cell ticker-change" id="px-change-wrap">
+        <span class="ticker-label">Chg %</span>
+        <span class="ticker-val" id="px-change">—</span>
+      </div>
+    </div>
     <div class="sys-switcher">
       <button class="sys-btn active" data-system="xauusd" onclick="switchSystem('xauusd')">XAUUSD</button>
       <button class="sys-btn"        data-system="btcusd"  onclick="switchSystem('btcusd')">BTC</button>
     </div>
-    <span id="last-update">กำลังโหลด...</span>
+    <span id="last-update">Loading…</span>
   </div>
 </header>
 
@@ -768,15 +1234,25 @@
 
   <!-- TABS -->
   <div class="tab-nav">
-    <button class="tab-btn active" data-tab="overview"    onclick="switchTab('overview')">Overview</button>
-    <button class="tab-btn"        data-tab="monitor"     onclick="switchTab('monitor')">Monitor</button>
-    <button class="tab-btn"        data-tab="backtest"    onclick="switchTab('backtest')">Backtest</button>
-    <button class="tab-btn"        data-tab="accounting"  onclick="switchTab('accounting')">$ Accounting</button>
-    <button class="tab-btn"        data-tab="settings"    onclick="switchTab('settings')">&#9881; Settings</button>
+    <button class="tab-btn active" data-tab="overview"    onclick="switchTab('overview')">Dashboard</button>
+    <button class="tab-btn"        data-tab="monitor"     onclick="switchTab('monitor')">Live</button>
+    <button class="tab-btn"        data-tab="backtest"    onclick="switchTab('backtest')">Analytics</button>
+    <button class="tab-btn"        data-tab="accounting"  onclick="switchTab('accounting')">Costs</button>
+    <button class="tab-btn"        data-tab="settings"    onclick="switchTab('settings')">Settings</button>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div class="tab-content active" id="tab-overview">
+
+  <!-- READY MODE BANNER (top) -->
+  <div class="ready-banner" id="ready-banner">
+    <div class="ready-pulse"></div>
+    <div style="flex:1">
+      <div class="ready-title">READY MODE ACTIVE</div>
+      <div class="ready-desc" id="ready-desc">Awaiting price entry into HTF zone…</div>
+    </div>
+    <div id="ready-timer" style="font-family:var(--mono);font-size:11px;color:var(--gold);letter-spacing:1px"></div>
+  </div>
 
   <!-- ALERT -->
   <div class="alert-bar" id="alert-bar"></div>
@@ -785,18 +1261,18 @@
   <section>
     <div class="portfolio-bar">
       <div class="port-item">
-        <div class="port-label">Balance (เงินคงเหลือ)</div>
+        <div class="port-label">Balance</div>
         <div class="port-thb" id="port-balance-thb">—</div>
         <div class="port-sub" id="port-rate">—</div>
       </div>
       <div class="port-item">
-        <div class="port-label">Equity (มูลค่าจริง)</div>
+        <div class="port-label">Equity</div>
         <div class="port-thb" id="port-equity-thb">—</div>
         <div class="port-sub" id="port-equity-usd">—</div>
       </div>
       <div class="port-item">
-        <div class="port-label">กำไร / ขาดทุน (Open)</div>
-        <div class="port-thb" id="port-profit-thb" style="font-size:28px">—</div>
+        <div class="port-label">Floating P&amp;L</div>
+        <div class="port-thb" id="port-profit-thb" style="font-size:20px">—</div>
         <div class="port-sub" id="port-profit-usd">—</div>
       </div>
       <div class="port-item">
@@ -804,65 +1280,77 @@
         <div class="port-thb" id="port-margin-thb">—</div>
         <div class="port-sub" id="port-margin-usd">—</div>
       </div>
+      <div class="port-item sparkline-wrap">
+        <div class="sparkline-label">Equity Trend</div>
+        <svg id="equity-sparkline" viewBox="0 0 160 40" preserveAspectRatio="none">
+          <polyline id="spark-line" fill="none" stroke="var(--gold)" stroke-width="1.5" points="" />
+          <polyline id="spark-area" fill="rgba(212,172,13,0.10)" stroke="none" points="" />
+        </svg>
+      </div>
     </div>
   </section>
 
   <!-- AGENT PIPELINE -->
   <section>
-    <div class="section-title">ขั้นตอนการทำงาน (Agent Pipeline)</div>
-    <div class="pipeline">
-      <div class="pipeline-step">
-        <div class="step-num">STEP 01</div>
+    <div class="section-title">Agent Pipeline</div>
+    <div class="pipeline" id="pipeline-container">
+      <div class="pipeline-step" data-step="chart_watcher">
+        <div class="step-num">01 / CHART</div>
         <div class="step-name">Chart Watcher</div>
-        <div class="step-desc">วิเคราะห์กราฟ H4/H1/M15<br>S/R zone + Candle pattern</div>
-        <div class="step-status status-ready"><span class="dot"></span>READY</div>
+        <div class="step-desc">H4 / H1 / M15 structure<br>S/R zone &middot; candle pattern</div>
+        <div class="step-meta" id="step-1-meta">—</div>
+        <div class="step-status status-ready" id="step-1-status"><span class="dot"></span>READY</div>
       </div>
-      <div class="pipeline-step">
-        <div class="step-num">STEP 02</div>
-        <div class="step-name">Sentiment Analyst</div>
-        <div class="step-desc">วิเคราะห์ข่าว Twitter/X<br>ความเชื่อมั่นตลาด</div>
-        <div class="step-status status-ready"><span class="dot"></span>READY</div>
+      <div class="pipeline-step" data-step="market_advisor">
+        <div class="step-num">02 / SENT</div>
+        <div class="step-name">Market Advisor</div>
+        <div class="step-desc">News &middot; X / Twitter<br>Market sentiment scoring</div>
+        <div class="step-meta" id="step-2-meta">—</div>
+        <div class="step-status status-ready" id="step-2-status"><span class="dot"></span>READY</div>
       </div>
-      <div class="pipeline-step">
-        <div class="step-num">STEP 03</div>
+      <div class="pipeline-step" data-step="analyst">
+        <div class="step-num">03 / RISK</div>
         <div class="step-name">Risk Guard</div>
-        <div class="step-desc">คำนวณ lot size<br>ตรวจ daily loss limit</div>
-        <div class="step-status status-ready"><span class="dot"></span>READY</div>
+        <div class="step-desc">Lot sizing &middot; RR check<br>Daily loss limit</div>
+        <div class="step-meta" id="step-3-meta">—</div>
+        <div class="step-status status-ready" id="step-3-status"><span class="dot"></span>READY</div>
       </div>
-      <div class="pipeline-step">
-        <div class="step-num">STEP 04</div>
+      <div class="pipeline-step" data-step="decision_maker">
+        <div class="step-num">04 / DECIDE</div>
         <div class="step-name">Decision Maker</div>
-        <div class="step-desc">ตัดสินใจ BUY/SELL/NO_TRADE<br>จากทุก agent รวมกัน</div>
-        <div class="step-status status-ready"><span class="dot"></span>READY</div>
+        <div class="step-desc">BUY / SELL / NO_TRADE<br>Multi-agent consensus</div>
+        <div class="step-meta" id="step-4-meta">—</div>
+        <div class="step-status status-ready" id="step-4-status"><span class="dot"></span>READY</div>
       </div>
-      <div class="pipeline-step">
-        <div class="step-num">STEP 05</div>
+      <div class="pipeline-step" data-step="reporter">
+        <div class="step-num">05 / EXEC</div>
         <div class="step-name">Reporter</div>
-        <div class="step-desc">ส่ง order ไปยัง MT5<br>บันทึกผลลัพธ์</div>
-        <div class="step-status status-ready"><span class="dot"></span>READY</div>
+        <div class="step-desc">Order routing to MT5<br>Outcome logging</div>
+        <div class="step-meta" id="step-5-meta">—</div>
+        <div class="step-status status-ready" id="step-5-status"><span class="dot"></span>READY</div>
       </div>
     </div>
   </section>
 
   <!-- ECONOMIC CALENDAR -->
   <section>
-    <div class="section-title">ปฏิทินเศรษฐกิจสัปดาห์นี้</div>
+    <div class="section-title">Economic Calendar &mdash; This Week</div>
     <div class="cal-container" id="cal-container">
-      <div style="color:var(--muted);font-size:13px">กำลังโหลด...</div>
+      <div style="color:var(--muted);font-size:12px;font-family:var(--mono)">Loading…</div>
     </div>
   </section>
 
   <!-- STAT CARDS -->
   <section>
-    <div class="section-title">สถิติภาพรวม</div>
+    <div class="section-title">Performance Statistics</div>
     <div class="stat-grid">
       <div class="card">
-        <div class="label">P&L รวม</div>
+        <div class="label">Total P&amp;L</div>
         <div class="value" id="total-pnl">—</div>
-        <div class="sub">ปิดแล้วทั้งหมด</div>
+        <div class="sub">All closed trades</div>
       </div>
       <div class="card">
-        <div class="label">P&L วันนี้</div>
+        <div class="label">Today P&amp;L</div>
         <div class="value" id="today-pnl">—</div>
         <div class="sub" id="today-trades-sub">— trades</div>
       </div>
@@ -879,36 +1367,36 @@
       <div class="card">
         <div class="label">Avg Win</div>
         <div class="value green" id="avg-win">—</div>
-        <div class="sub">per trade</div>
+        <div class="sub">Per trade</div>
       </div>
       <div class="card">
         <div class="label">Avg Loss</div>
         <div class="value red" id="avg-loss">—</div>
-        <div class="sub">per trade</div>
+        <div class="sub">Per trade</div>
       </div>
       <div class="card">
         <div class="label">Losing Streak</div>
         <div class="value" id="losing-streak">—</div>
-        <div class="sub">ปัจจุบัน</div>
+        <div class="sub">Current</div>
       </div>
       <div class="card">
         <div class="label">Total Trades</div>
         <div class="value" id="total-trades">—</div>
-        <div class="sub">ปิดแล้ว</div>
+        <div class="sub">Closed</div>
       </div>
     </div>
   </section>
 
   <!-- CHARTS -->
   <section>
-    <div class="section-title">กราฟ</div>
+    <div class="section-title">Performance Charts</div>
     <div class="chart-row">
       <div class="chart-card">
         <div class="chart-title">Equity Curve</div>
         <canvas id="equityChart" height="110"></canvas>
       </div>
       <div class="chart-card">
-        <div class="chart-title">Win / Loss Ratio</div>
+        <div class="chart-title">Win / Loss Distribution</div>
         <canvas id="winlossChart" height="110"></canvas>
       </div>
     </div>
@@ -920,17 +1408,17 @@
     <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
       <div class="card">
         <div class="label">System Trades</div>
-        <div class="value" id="sys-count" style="color:#7ec8e3">—</div>
+        <div class="value cyan" id="sys-count">—</div>
         <div class="sub" id="sys-winrate">Win rate —</div>
       </div>
       <div class="card">
         <div class="label">Manual Trades</div>
-        <div class="value" id="man-count" style="color:#f0a500">—</div>
+        <div class="value" id="man-count" style="color:var(--amber)">—</div>
         <div class="sub" id="man-winrate">Win rate —</div>
       </div>
       <div class="card" style="grid-column:span 2">
         <div class="label">Strategy Breakdown (System)</div>
-        <div id="entry-type-stats" style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.8">—</div>
+        <div id="entry-type-stats" style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.8;font-family:var(--mono)">—</div>
       </div>
     </div>
   </section>
@@ -939,27 +1427,27 @@
   <section>
     <div class="table-card">
       <div class="table-toolbar">
-        <h3>ประวัติการเทรด</h3>
+        <h3>Trade History</h3>
         <div class="filter-row">
           <select id="filter-source">
-            <option value="">ทุก Source</option>
-            <option value="SYSTEM">SYSTEM</option>
-            <option value="MANUAL">MANUAL</option>
+            <option value="">All Sources</option>
+            <option value="SYSTEM">System</option>
+            <option value="MANUAL">Manual</option>
           </select>
           <select id="filter-dir">
-            <option value="">ทุกทิศทาง</option>
-            <option value="BUY">BUY</option>
-            <option value="SELL">SELL</option>
+            <option value="">All Directions</option>
+            <option value="BUY">Buy</option>
+            <option value="SELL">Sell</option>
           </select>
           <select id="filter-status">
-            <option value="">ทุกสถานะ</option>
-            <option value="OPEN">OPEN</option>
-            <option value="CLOSED">CLOSED</option>
+            <option value="">All Statuses</option>
+            <option value="OPEN">Open</option>
+            <option value="CLOSED">Closed</option>
           </select>
           <select id="filter-result">
-            <option value="">ทุกผลลัพธ์</option>
-            <option value="win">WIN</option>
-            <option value="loss">LOSS</option>
+            <option value="">All Results</option>
+            <option value="win">Win</option>
+            <option value="loss">Loss</option>
           </select>
         </div>
       </div>
@@ -967,7 +1455,7 @@
         <table>
           <thead>
             <tr>
-              <th style="width:130px">เวลา</th>
+              <th style="width:130px">Time</th>
               <th class="center" style="width:72px">Source</th>
               <th class="center" style="width:64px">Dir</th>
               <th class="num"    style="width:56px">Lot</th>
@@ -975,20 +1463,21 @@
               <th class="num"    style="width:68px">SL</th>
               <th class="num"    style="width:68px">TP</th>
               <th style="width:130px">Strategy</th>
-              <th style="min-width:180px">Analysis / Rationale</th>
-              <th class="num"    style="width:84px">P&L</th>
+              <th style="min-width:180px">Analysis</th>
+              <th class="num"    style="width:84px">P&amp;L</th>
+              <th style="width:110px">Close Reason</th>
               <th class="center" style="width:100px">Result</th>
             </tr>
           </thead>
           <tbody id="trade-tbody">
-            <tr><td colspan="11" class="no-data">กำลังโหลด...</td></tr>
+            <tr><td colspan="12" class="no-data">Loading…</td></tr>
           </tbody>
         </table>
       </div>
-      <div id="pagination" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 4px 2px;font-size:13px;color:var(--muted)">
-        <button id="pg-prev" onclick="changePage(-1)" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:4px 12px;border-radius:6px;cursor:pointer">&#8592;</button>
+      <div id="pagination" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 14px;font-size:11px;color:var(--muted);font-family:var(--mono)">
+        <button id="pg-prev" onclick="changePage(-1)" class="secondary-btn" style="padding:4px 10px">&larr;</button>
         <span id="pg-info"></span>
-        <button id="pg-next" onclick="changePage(1)"  style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:4px 12px;border-radius:6px;cursor:pointer">&#8594;</button>
+        <button id="pg-next" onclick="changePage(1)"  class="secondary-btn" style="padding:4px 10px">&rarr;</button>
       </div>
     </div>
   </section>
@@ -1027,55 +1516,43 @@
 
     <!-- LAST DECISION DETAIL -->
     <section>
-      <div class="section-title">Last Decision Detail</div>
-      <div class="chart-card" style="font-size:13px;line-height:1.8">
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
-          <div><span style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px">Trend</span><br><span id="mon-trend" style="font-weight:600">—</span></div>
-          <div><span style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px">SR Zone</span><br><span id="mon-srzone" style="font-weight:600">—</span></div>
-          <div><span style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px">Entry Type</span><br><span id="mon-entry-type" style="font-weight:600">—</span></div>
-          <div><span style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px">Confidence</span><br><span id="mon-conf" style="font-weight:600">—</span></div>
-          <div style="grid-column:span 2"><span style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px">Reason</span><br><span id="mon-reason" style="color:var(--muted);font-style:italic">—</span></div>
+      <div class="section-title">Last Decision &mdash; Detail</div>
+      <div class="chart-card">
+        <div class="detail-grid">
+          <div class="detail-cell"><div class="detail-label">Trend</div><span id="mon-trend" class="detail-value">—</span></div>
+          <div class="detail-cell"><div class="detail-label">SR Zone</div><span id="mon-srzone" class="detail-value">—</span></div>
+          <div class="detail-cell"><div class="detail-label">Entry Type</div><span id="mon-entry-type" class="detail-value">—</span></div>
+          <div class="detail-cell"><div class="detail-label">Confidence</div><span id="mon-conf" class="detail-value">—</span></div>
+          <div class="detail-cell" style="grid-column:span 2"><div class="detail-label">Reason</div><span id="mon-reason" style="color:var(--text-dim);font-style:italic;font-size:12px">—</span></div>
         </div>
       </div>
     </section>
 
     <!-- MANUAL RANGE OVERRIDE -->
     <section>
-      <div class="section-title">Manual Range Override (Sideways)</div>
-      <div class="chart-card" style="padding:20px">
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div class="section-title">Manual Range Override &mdash; Sideways</div>
+      <div class="chart-card" style="padding:16px 18px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <div style="display:flex;align-items:center;gap:8px">
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">High</label>
-            <input id="range-high" type="number" step="0.01" placeholder="4750.00"
-              style="width:110px;background:var(--surface2);border:1px solid var(--border2);
-                     color:var(--text);border-radius:6px;padding:6px 10px;font-size:14px">
+            <label style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;font-family:var(--mono);font-weight:600">High</label>
+            <input id="range-high" type="number" step="0.01" placeholder="4750.00" class="range-input">
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Low</label>
-            <input id="range-low" type="number" step="0.01" placeholder="4680.00"
-              style="width:110px;background:var(--surface2);border:1px solid var(--border2);
-                     color:var(--text);border-radius:6px;padding:6px 10px;font-size:14px">
+            <label style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;font-family:var(--mono);font-weight:600">Low</label>
+            <input id="range-low" type="number" step="0.01" placeholder="4680.00" class="range-input">
           </div>
-          <button onclick="setManualRange()"
-            style="background:var(--gold);color:#000;border:none;border-radius:6px;
-                   padding:7px 18px;font-weight:700;cursor:pointer;font-size:13px">
-            Set Range
-          </button>
-          <button onclick="clearManualRange()"
-            style="background:var(--surface2);color:var(--muted);border:1px solid var(--border2);
-                   border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px">
-            Clear
-          </button>
-          <div id="range-status" style="font-size:13px;color:var(--muted);margin-left:8px">—</div>
+          <button onclick="setManualRange()" class="primary-btn">Set Range</button>
+          <button onclick="clearManualRange()" class="secondary-btn">Clear</button>
+          <div id="range-status" style="font-size:11px;color:var(--muted);margin-left:8px;font-family:var(--mono)">—</div>
         </div>
-        <div id="range-bar-wrap" style="display:none;margin-top:16px">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Active Range</div>
-          <div style="display:flex;align-items:center;gap:10px;font-size:13px">
+        <div id="range-bar-wrap" style="display:none;margin-top:14px">
+          <div style="font-size:9px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1.5px;font-family:var(--mono);font-weight:600">Active Range</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;font-family:var(--mono)">
             <span id="range-bar-low" style="color:var(--green);font-weight:700">—</span>
-            <div style="flex:1;height:6px;background:linear-gradient(90deg,var(--green),var(--gold));border-radius:3px"></div>
+            <div style="flex:1;height:5px;background:linear-gradient(90deg,var(--green),var(--gold));border-radius:3px"></div>
             <span id="range-bar-high" style="color:var(--gold);font-weight:700">—</span>
           </div>
-          <div style="font-size:11px;color:var(--muted);margin-top:6px" id="range-set-at">—</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:6px;font-family:var(--mono)" id="range-set-at">—</div>
         </div>
       </div>
     </section>
@@ -1086,7 +1563,7 @@
       <div class="table-card">
         <div class="table-toolbar">
           <h3>Pending Orders by Tag</h3>
-          <div id="mon-pending-summary" style="font-size:12px;color:var(--muted)">—</div>
+          <div id="mon-pending-summary" style="font-size:11px;color:var(--muted);font-family:var(--mono)">—</div>
         </div>
         <div class="table-wrap">
           <table>
@@ -1102,7 +1579,7 @@
               </tr>
             </thead>
             <tbody id="mon-pending-tbody">
-              <tr><td colspan="7" class="no-data">กำลังโหลด...</td></tr>
+              <tr><td colspan="7" class="no-data">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -1116,7 +1593,7 @@
 
     <!-- SUMMARY -->
     <section>
-      <div class="section-title">Backtest Overview</div>
+      <div class="section-title">Analytics Overview</div>
       <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
         <div class="card">
           <div class="label">All Trades</div>
@@ -1143,61 +1620,55 @@
 
     <!-- BREAKDOWN TABLES -->
     <section>
-      <div class="section-title">Breakdown</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="section-title">Performance Breakdown</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
 
-        <!-- Confidence Tier -->
         <div class="table-card">
           <div class="table-toolbar"><h3>Confidence Tier (System)</h3></div>
           <table><thead><tr>
-            <th>Tier</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&L</th>
+            <th>Tier</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&amp;L</th>
           </tr></thead>
-          <tbody id="bt-tier-tbody"><tr><td colspan="4" class="no-data">โหลด...</td></tr></tbody></table>
+          <tbody id="bt-tier-tbody"><tr><td colspan="4" class="no-data">Loading…</td></tr></tbody></table>
         </div>
 
-        <!-- Entry Type -->
         <div class="table-card">
           <div class="table-toolbar"><h3>Entry Type (System)</h3></div>
           <table><thead><tr>
-            <th>Type</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&L</th>
+            <th>Type</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&amp;L</th>
           </tr></thead>
-          <tbody id="bt-entry-tbody"><tr><td colspan="4" class="no-data">โหลด...</td></tr></tbody></table>
+          <tbody id="bt-entry-tbody"><tr><td colspan="4" class="no-data">Loading…</td></tr></tbody></table>
         </div>
 
-        <!-- Trend -->
         <div class="table-card">
           <div class="table-toolbar"><h3>Trend (System)</h3></div>
           <table><thead><tr>
-            <th>Trend</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&L</th>
+            <th>Trend</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&amp;L</th>
           </tr></thead>
-          <tbody id="bt-trend-tbody"><tr><td colspan="4" class="no-data">โหลด...</td></tr></tbody></table>
+          <tbody id="bt-trend-tbody"><tr><td colspan="4" class="no-data">Loading…</td></tr></tbody></table>
         </div>
 
-        <!-- SR Zone -->
         <div class="table-card">
           <div class="table-toolbar"><h3>SR Zone (System)</h3></div>
           <table><thead><tr>
-            <th>Zone</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&L</th>
+            <th>Zone</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&amp;L</th>
           </tr></thead>
-          <tbody id="bt-sr-tbody"><tr><td colspan="4" class="no-data">โหลด...</td></tr></tbody></table>
+          <tbody id="bt-sr-tbody"><tr><td colspan="4" class="no-data">Loading…</td></tr></tbody></table>
         </div>
 
-        <!-- Session -->
         <div class="table-card">
           <div class="table-toolbar"><h3>Trading Session (All)</h3></div>
           <table><thead><tr>
-            <th>Session</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&L</th>
+            <th>Session</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&amp;L</th>
           </tr></thead>
-          <tbody id="bt-session-tbody"><tr><td colspan="4" class="no-data">โหลด...</td></tr></tbody></table>
+          <tbody id="bt-session-tbody"><tr><td colspan="4" class="no-data">Loading…</td></tr></tbody></table>
         </div>
 
-        <!-- Hold Time -->
         <div class="table-card">
           <div class="table-toolbar"><h3>Hold Time (All)</h3></div>
           <table><thead><tr>
-            <th>Duration</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&L</th>
+            <th>Duration</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&amp;L</th>
           </tr></thead>
-          <tbody id="bt-hold-tbody"><tr><td colspan="4" class="no-data">โหลด...</td></tr></tbody></table>
+          <tbody id="bt-hold-tbody"><tr><td colspan="4" class="no-data">Loading…</td></tr></tbody></table>
         </div>
 
       </div>
@@ -1208,48 +1679,45 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-accounting">
 
-    <!-- SUMMARY CARDS -->
     <section>
-      <div class="section-title">ค่าใช้จ่าย AI</div>
+      <div class="section-title">AI Spend</div>
       <div class="stat-grid">
         <div class="card">
-          <div class="label">Cost วันนี้</div>
+          <div class="label">Today Cost</div>
           <div class="value gold" id="acc-today-cost">—</div>
           <div class="sub" id="acc-today-cycles">— cycles</div>
         </div>
         <div class="card">
-          <div class="label">Cost รวม (All-time)</div>
+          <div class="label">Total Cost (All-time)</div>
           <div class="value" id="acc-total-cost">—</div>
           <div class="sub" id="acc-total-cycles">— cycles total</div>
         </div>
         <div class="card">
-          <div class="label">เฉลี่ย / Cycle</div>
+          <div class="label">Avg / Cycle</div>
           <div class="value" id="acc-avg-cycle">—</div>
-          <div class="sub">ต้นทุน AI ต่อรอบ</div>
+          <div class="sub">AI cost per cycle</div>
         </div>
         <div class="card">
-          <div class="label">เฉลี่ย / Trade</div>
+          <div class="label">Avg / Trade</div>
           <div class="value" id="acc-avg-trade">—</div>
-          <div class="sub" id="acc-total-trades-sub">— trades ที่มี AI cost</div>
+          <div class="sub" id="acc-total-trades-sub">— trades with AI cost</div>
         </div>
       </div>
     </section>
 
-    <!-- DAILY COST CHART -->
     <section>
-      <div class="section-title">AI Cost รายวัน (30 วันล่าสุด)</div>
+      <div class="section-title">Daily AI Cost (Last 30 Days)</div>
       <div class="chart-card">
-        <div style="display:flex;gap:20px;margin-bottom:12px;font-size:11px;color:var(--muted)">
-          <span><span style="display:inline-block;width:10px;height:10px;background:rgba(245,200,66,0.6);border-radius:2px;margin-right:5px"></span>Cost (USD)</span>
-          <span><span style="display:inline-block;width:10px;height:3px;background:#7ec8e3;border-radius:2px;margin-right:5px;vertical-align:middle"></span>Cycles</span>
+        <div style="display:flex;gap:18px;margin-bottom:12px;font-size:10px;color:var(--muted);font-family:var(--mono);letter-spacing:0.5px">
+          <span><span style="display:inline-block;width:10px;height:10px;background:rgba(212,172,13,0.6);border-radius:2px;margin-right:5px"></span>Cost (USD)</span>
+          <span><span style="display:inline-block;width:10px;height:3px;background:var(--cyan);border-radius:2px;margin-right:5px;vertical-align:middle"></span>Cycles</span>
         </div>
         <canvas id="dailyCostChart" height="100"></canvas>
       </div>
     </section>
 
-    <!-- AGENT BREAKDOWN TABLE -->
     <section>
-      <div class="section-title">ต้นทุน per Agent</div>
+      <div class="section-title">Cost Per Agent</div>
       <div class="table-card">
         <table class="agent-table">
           <thead>
@@ -1264,7 +1732,7 @@
             </tr>
           </thead>
           <tbody id="agent-cost-tbody">
-            <tr><td colspan="7" class="no-data">กำลังโหลด...</td></tr>
+            <tr><td colspan="7" class="no-data">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -1276,303 +1744,378 @@
   <div class="tab-content" id="tab-settings">
 
     <div class="settings-notice">
-      ✓ &nbsp;กด <strong>บันทึกการตั้งค่า</strong> — ระบบจะ restart ผ่าน PM2 อัตโนมัติ
+      &#10003;&nbsp;Click <strong>Save Configuration</strong> &mdash; PM2 will auto-restart the bot.
     </div>
 
-    <div class="settings-grid">
+    <div class="accordion" id="settings-accordion">
 
       <!-- General -->
-      <div class="settings-card">
-        <h3>ทั่วไป</h3>
-        <div class="field-group">
-          <div class="field">
-            <label>Symbol</label>
-            <input type="text" id="cfg-SYMBOL" placeholder="XAUUSD">
-          </div>
-          <div class="field">
-            <label>Start Balance (ทุนเริ่มต้น)</label>
-            <input type="number" id="cfg-START_BALANCE" step="100" min="100">
+      <div class="accordion-section open" data-section="general">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          <h3>General <span class="hint">Symbol &middot; starting balance</span></h3>
+          <div class="accordion-icon">&rsaquo;</div>
+        </div>
+        <div class="accordion-body">
+          <div class="accordion-grid">
+            <div class="field">
+              <label>Symbol</label>
+              <input type="text" id="cfg-SYMBOL" placeholder="XAUUSD">
+            </div>
+            <div class="field">
+              <label>Start Balance</label>
+              <input type="number" id="cfg-START_BALANCE" step="100" min="100">
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Money Management -->
-      <div class="settings-card">
-        <h3>Money Management</h3>
-        <div class="field-group">
-          <div class="field">
-            <label>Risk per Trade (%)</label>
-            <input type="number" id="cfg-RISK_PER_TRADE" step="0.1" min="0.1" max="10">
-          </div>
-          <div class="field">
-            <label>Max Daily Loss (%)</label>
-            <input type="number" id="cfg-MAX_DAILY_LOSS" step="0.1" min="0.1" max="20">
-          </div>
-          <div class="field">
-            <label>Max Open Trades</label>
-            <input type="number" id="cfg-MAX_OPEN_TRADES" step="1" min="1" max="20">
-          </div>
-          <div class="field">
-            <label>Default SL (pips)</label>
-            <input type="number" id="cfg-DEFAULT_SL_PIPS" step="50" min="100">
-          </div>
-          <div class="field">
-            <label>Default TP (pips)</label>
-            <input type="number" id="cfg-DEFAULT_TP_PIPS" step="50" min="100">
-          </div>
-          <div class="field">
-            <label>Min RR Ratio</label>
-            <input type="number" id="cfg-MIN_RR_RATIO" step="0.1" min="0.5" max="10">
-          </div>
-          <div class="field">
-            <label>Hedge Buffer (จุด)</label>
-            <input type="number" id="cfg-HEDGE_BUFFER_PIPS" step="100" min="0" max="10000"
-                   title="ช่องไฟเปิด order ฝั่งตรงข้าม — ราคาสวนทาง opposing position ได้สูงสุดกี่จุด (default 1000)">
+      <div class="accordion-section" data-section="mm">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          <h3>Money Management <span class="hint">Risk &middot; SL/TP &middot; RR &middot; hedge buffer</span></h3>
+          <div class="accordion-icon">&rsaquo;</div>
+        </div>
+        <div class="accordion-body">
+          <div class="accordion-grid">
+            <div class="field">
+              <label>Risk per Trade (%)</label>
+              <input type="number" id="cfg-RISK_PER_TRADE" step="0.1" min="0.1" max="10">
+            </div>
+            <div class="field">
+              <label>Max Daily Loss (%)</label>
+              <input type="number" id="cfg-MAX_DAILY_LOSS" step="0.1" min="0.1" max="20">
+            </div>
+            <div class="field">
+              <label>Max Open Trades</label>
+              <input type="number" id="cfg-MAX_OPEN_TRADES" step="1" min="1" max="20">
+            </div>
+            <div class="field">
+              <label>Default SL (pips)</label>
+              <input type="number" id="cfg-DEFAULT_SL_PIPS" step="50" min="100">
+            </div>
+            <div class="field">
+              <label>Default TP (pips)</label>
+              <input type="number" id="cfg-DEFAULT_TP_PIPS" step="50" min="100">
+            </div>
+            <div class="field">
+              <label>Min RR Ratio</label>
+              <input type="number" id="cfg-MIN_RR_RATIO" step="0.1" min="0.5" max="10">
+            </div>
+            <div class="field">
+              <label>Hedge Buffer (pips)</label>
+              <input type="number" id="cfg-HEDGE_BUFFER_PIPS" step="100" min="0" max="10000"
+                     title="Max counter-trend distance for opposite-side order (default 1000)">
+              <div class="field-help">How far price may move against an open opposing position</div>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Lot Size -->
-      <div class="settings-card">
-        <h3>Lot Size</h3>
-        <div class="field-group">
-          <div class="field">
-            <label>Lot Mode</label>
-            <select id="cfg-LOT_MODE">
-              <option value="auto">Auto (% Risk)</option>
-              <option value="fixed">Fixed</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Fixed Lot</label>
-            <input type="number" id="cfg-FIXED_LOT" step="0.01" min="0.01">
-          </div>
-          <div class="field">
-            <label>Min Lot</label>
-            <input type="number" id="cfg-MIN_LOT" step="0.01" min="0.01">
-          </div>
-          <div class="field">
-            <label>Max Lot</label>
-            <input type="number" id="cfg-MAX_LOT" step="0.01" min="0.01">
+      <div class="accordion-section" data-section="lot">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          <h3>Lot Sizing <span class="hint">Mode &middot; min / max bounds</span></h3>
+          <div class="accordion-icon">&rsaquo;</div>
+        </div>
+        <div class="accordion-body">
+          <div class="accordion-grid">
+            <div class="field">
+              <label>Lot Mode</label>
+              <select id="cfg-LOT_MODE">
+                <option value="auto">Auto (% Risk)</option>
+                <option value="fixed">Fixed</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Fixed Lot</label>
+              <input type="number" id="cfg-FIXED_LOT" step="0.01" min="0.01">
+            </div>
+            <div class="field">
+              <label>Min Lot</label>
+              <input type="number" id="cfg-MIN_LOT" step="0.01" min="0.01">
+            </div>
+            <div class="field">
+              <label>Max Lot</label>
+              <input type="number" id="cfg-MAX_LOT" step="0.01" min="0.01">
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Streak Protection -->
-      <div class="settings-card">
-        <h3>Streak Protection</h3>
-        <div class="field-group">
-          <div class="field">
-            <label>Max Losing Streak (ครั้ง)</label>
-            <input type="number" id="cfg-MAX_LOSING_STREAK" step="1" min="2" max="20">
-          </div>
-          <div class="field">
-            <label>Min Confidence เมื่อติด Streak (%)</label>
-            <input type="number" id="cfg-STREAK_MIN_CONFIDENCE" step="1" min="50" max="100">
+      <div class="accordion-section" data-section="streak">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          <h3>Streak Protection <span class="hint">Tighten gates after losses</span></h3>
+          <div class="accordion-icon">&rsaquo;</div>
+        </div>
+        <div class="accordion-body">
+          <div class="accordion-grid">
+            <div class="field">
+              <label>Max Losing Streak</label>
+              <input type="number" id="cfg-MAX_LOSING_STREAK" step="1" min="2" max="20">
+            </div>
+            <div class="field">
+              <label>Min Confidence on Streak (%)</label>
+              <input type="number" id="cfg-STREAK_MIN_CONFIDENCE" step="1" min="50" max="100">
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Pending Orders -->
-      <div class="settings-card">
-        <h3>Pending Orders</h3>
-        <div class="field-group">
-          <div class="field">
-            <label>Max Pending BUY</label>
-            <input type="number" id="cfg-MAX_PENDING_BUY" step="1" min="0" max="10">
-          </div>
-          <div class="field">
-            <label>Max Pending SELL</label>
-            <input type="number" id="cfg-MAX_PENDING_SELL" step="1" min="0" max="10">
-          </div>
-          <div class="field">
-            <label>Expiry Hours</label>
-            <input type="number" id="cfg-PENDING_EXPIRY_HOURS" step="1" min="1" max="168">
+      <div class="accordion-section" data-section="pending">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          <h3>Pending Orders <span class="hint">Limits &middot; expiry</span></h3>
+          <div class="accordion-icon">&rsaquo;</div>
+        </div>
+        <div class="accordion-body">
+          <div class="accordion-grid">
+            <div class="field">
+              <label>Max Pending BUY</label>
+              <input type="number" id="cfg-MAX_PENDING_BUY" step="1" min="0" max="10">
+            </div>
+            <div class="field">
+              <label>Max Pending SELL</label>
+              <input type="number" id="cfg-MAX_PENDING_SELL" step="1" min="0" max="10">
+            </div>
+            <div class="field">
+              <label>Expiry (hours)</label>
+              <input type="number" id="cfg-PENDING_EXPIRY_HOURS" step="1" min="1" max="168">
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- News / Twitter -->
-      <div class="settings-card">
-        <h3>News &amp; Twitter</h3>
-        <div class="field-group">
-          <div class="field">
-            <label>Accounts to Follow (คั่นด้วย ,)</label>
-            <textarea id="cfg-X_ACCOUNTS_TO_FOLLOW" rows="3"
-              style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);
-                     padding:8px 12px;border-radius:6px;font-size:13px;outline:none;
-                     width:100%;resize:vertical;font-family:inherit"
-              placeholder="kun_purich,cnnbrk,BBCBreaking"></textarea>
-            <span style="font-size:10px;color:var(--muted)">username เท่านั้น ไม่มี @</span>
+      <!-- Breakeven (Standard) -->
+      <div class="accordion-section" data-section="be">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          <h3>Breakeven (Standard) <span class="hint">Move SL to entry once profit threshold hits</span></h3>
+          <div class="accordion-icon">&rsaquo;</div>
+        </div>
+        <div class="accordion-body">
+          <div class="accordion-grid">
+            <div class="field">
+              <label>BE Trigger (R)</label>
+              <input type="number" id="cfg-BE_TRIGGER_R" step="0.05" min="0.5" max="1.5">
+              <div class="field-help">0.8 = 80% of SL distance (recommended) &middot; 1.0 = wait for 1R</div>
+            </div>
+            <div class="field">
+              <label>BE Buffer (pips)</label>
+              <input type="number" id="cfg-BE_BUFFER_PIPS" step="50" min="0" max="1000">
+              <div class="field-help">200 = entry + $2 (spread buffer) &middot; 0 = exact entry</div>
+            </div>
+            <div class="field">
+              <label>BE Confirm Cycles</label>
+              <input type="number" id="cfg-BE_CONFIRM_CYCLES" step="1" min="1" max="10">
+              <div class="field-help">2 ≈ 4–10 min &middot; 3–4 for HTF consolidation zones</div>
+            </div>
           </div>
-          <div class="field">
-            <label>Keywords (คั่นด้วย ,)</label>
-            <textarea id="cfg-X_KEYWORDS" rows="3"
-              style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);
-                     padding:8px 12px;border-radius:6px;font-size:13px;outline:none;
-                     width:100%;resize:vertical;font-family:inherit"
-              placeholder="XAUUSD,gold,XAU,Fed,inflation"></textarea>
+        </div>
+      </div>
+
+      <!-- Breakeven (HTF) -->
+      <div class="accordion-section" data-section="be-htf">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          <h3>Breakeven (HTF) <span class="hint">Looser trigger for higher-timeframe entries</span></h3>
+          <div class="accordion-icon">&rsaquo;</div>
+        </div>
+        <div class="accordion-body">
+          <div class="accordion-grid">
+            <div class="field">
+              <label>HTF BE Trigger (R)</label>
+              <input type="number" id="cfg-HTF_BE_TRIGGER_R" step="0.05" min="0.5" max="2.0">
+              <div class="field-help">Looser trigger for D1/W1 zones (e.g. 1.0 = wait for full 1R)</div>
+            </div>
+            <div class="field">
+              <label>HTF BE Buffer (pips)</label>
+              <input type="number" id="cfg-HTF_BE_BUFFER_PIPS" step="50" min="0" max="2000">
+              <div class="field-help">Wider buffer for HTF entries (e.g. 500 = entry + $5)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trailing Stop -->
+      <div class="accordion-section" data-section="trailing">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          <h3>Trailing Stop <span class="hint">ATR-based swing-tracking SL</span></h3>
+          <div class="accordion-icon">&rsaquo;</div>
+        </div>
+        <div class="accordion-body">
+          <div class="field-group">
+            <div class="toggle-row" style="margin-bottom:6px">
+              <div>
+                <div class="toggle-label-text">Enable Trailing Stop</div>
+                <div class="toggle-label-sub">SL trails price by N × ATR of selected timeframe</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="cfg-TRAILING_STOP">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
+            </div>
+            <div class="accordion-grid">
+              <div class="field">
+                <label>ATR Timeframe</label>
+                <select id="cfg-TRAILING_ATR_TF">
+                  <option value="H4">H4 (~$40 ATR)</option>
+                  <option value="D1">D1 (~$70 ATR) — recommended</option>
+                  <option value="W1">W1 (~$150 ATR)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Swing Buffer ($)</label>
+                <input type="number" id="cfg-TRAILING_ATR_MULT" step="0.5" min="0.5" max="20.0">
+                <div class="field-help">USD distance below/above swing point</div>
+              </div>
+              <div class="field">
+                <label>Min Profit (R)</label>
+                <input type="number" id="cfg-TRAILING_MIN_PROFIT_R" step="0.05" min="0.0" max="3.0">
+                <div class="field-help">Don't trail until profit ≥ X × SL distance</div>
+              </div>
+              <div class="field">
+                <label>Lookback (bars)</label>
+                <input type="number" id="cfg-TRAILING_LOOKBACK" step="1" min="3" max="100">
+                <div class="field-help">Number of bars to scan for swing high/low</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Feature Toggles -->
-      <div class="settings-card">
-        <h3>Feature Toggles</h3>
-        <div class="field-group">
-          <div class="toggle-row">
-            <div>
-              <div class="toggle-label-text">Portfolio Protection</div>
-              <div class="toggle-label-sub">จำกัด max trades + daily loss</div>
+      <div class="accordion-section" data-section="features">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          <h3>Feature Toggles <span class="hint">High-level engine switches</span></h3>
+          <div class="accordion-icon">&rsaquo;</div>
+        </div>
+        <div class="accordion-body">
+          <div class="field-group">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label-text">Portfolio Protection</div>
+                <div class="toggle-label-sub">Caps max trades &amp; daily loss</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="cfg-PORTFOLIO_PROTECTION">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
             </div>
-            <label class="toggle">
-              <input type="checkbox" id="cfg-PORTFOLIO_PROTECTION">
-              <span class="toggle-track"></span>
-              <span class="toggle-thumb"></span>
-            </label>
-          </div>
-          <div class="toggle-row">
-            <div>
-              <div class="toggle-label-text">Streak Protection</div>
-              <div class="toggle-label-sub">เพิ่ม threshold เมื่อแพ้ติดกัน</div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label-text">Streak Protection</div>
+                <div class="toggle-label-sub">Raises confidence threshold after losses</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="cfg-STREAK_PROTECTION">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
             </div>
-            <label class="toggle">
-              <input type="checkbox" id="cfg-STREAK_PROTECTION">
-              <span class="toggle-track"></span>
-              <span class="toggle-thumb"></span>
-            </label>
-          </div>
-          <div class="toggle-row">
-            <div>
-              <div class="toggle-label-text">Dynamic TP</div>
-              <div class="toggle-label-sub">ขยาย TP เมื่อ momentum แรง</div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label-text">Dynamic TP</div>
+                <div class="toggle-label-sub">Extends TP on strong momentum</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="cfg-DYNAMIC_TP">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
             </div>
-            <label class="toggle">
-              <input type="checkbox" id="cfg-DYNAMIC_TP">
-              <span class="toggle-track"></span>
-              <span class="toggle-thumb"></span>
-            </label>
-          </div>
-          <div class="toggle-row">
-            <div>
-              <div class="toggle-label-text">Lesson Learning</div>
-              <div class="toggle-label-sub">RAG — จำ mistake เตือน DecisionMaker</div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label-text">Lesson Learning</div>
+                <div class="toggle-label-sub">RAG &mdash; recall past mistakes to DecisionMaker</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="cfg-LESSON_LEARNING">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
             </div>
-            <label class="toggle">
-              <input type="checkbox" id="cfg-LESSON_LEARNING">
-              <span class="toggle-track"></span>
-              <span class="toggle-thumb"></span>
-            </label>
-          </div>
-          <div class="toggle-row">
-            <div>
-              <div class="toggle-label-text">DRY RUN</div>
-              <div class="toggle-label-sub">ทดสอบ pipeline — ไม่ส่ง order จริง</div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label-text">Dry Run</div>
+                <div class="toggle-label-sub">Test pipeline &mdash; do not send live orders</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="cfg-DRY_RUN">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
             </div>
-            <label class="toggle">
-              <input type="checkbox" id="cfg-DRY_RUN">
-              <span class="toggle-track"></span>
-              <span class="toggle-thumb"></span>
-            </label>
           </div>
         </div>
       </div>
 
-      <!-- Breakeven -->
-      <div class="settings-card">
-        <h3>Breakeven <span style="font-size:11px;color:var(--muted);font-weight:400">ขยับ SL มาหน้าทุน</span></h3>
-        <div class="field-group">
-          <div class="field">
-            <label>BE Trigger (R) <span style="color:var(--muted);font-size:11px">trigger เมื่อกำไร ≥ X × SL distance</span></label>
-            <input type="number" id="cfg-BE_TRIGGER_R" step="0.05" min="0.5" max="1.5">
-            <div style="font-size:11px;color:var(--muted);margin-top:4px">
-              0.8 = trigger ที่ 80% ของ SL (แนะนำ) &nbsp;|&nbsp; 1.0 = รอถึง 1R
+      <!-- News / Twitter -->
+      <div class="accordion-section" data-section="news">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          <h3>News &amp; Twitter <span class="hint">Accounts &amp; keywords for sentiment</span></h3>
+          <div class="accordion-icon">&rsaquo;</div>
+        </div>
+        <div class="accordion-body">
+          <div class="field-group">
+            <div class="field">
+              <label>Accounts to Follow (comma-separated)</label>
+              <textarea id="cfg-X_ACCOUNTS_TO_FOLLOW" rows="3" placeholder="kun_purich,cnnbrk,BBCBreaking"></textarea>
+              <div class="field-help">Username only, no @</div>
             </div>
-          </div>
-          <div class="field">
-            <label>BE Buffer (pips) <span style="color:var(--muted);font-size:11px">SL วางที่ entry + X pips</span></label>
-            <input type="number" id="cfg-BE_BUFFER_PIPS" step="50" min="0" max="1000">
-            <div style="font-size:11px;color:var(--muted);margin-top:4px">
-              200 = entry + $2 (เผื่อ spread) &nbsp;|&nbsp; 0 = หน้าทุนพอดี
-            </div>
-          </div>
-          <div class="field">
-            <label>BE Confirm Cycles <span style="color:var(--muted);font-size:11px">ค้างเหนือ trigger กี่รอบก่อน SL ย้าย</span></label>
-            <input type="number" id="cfg-BE_CONFIRM_CYCLES" step="1" min="1" max="10">
-            <div style="font-size:11px;color:var(--muted);margin-top:4px">
-              2 ≈ 4–10 นาที (แนะนำ) &nbsp;|&nbsp; 3–4 ถ้าตลาด consolidate ที่ HTF zone
+            <div class="field">
+              <label>Keywords (comma-separated)</label>
+              <textarea id="cfg-X_KEYWORDS" rows="3" placeholder="XAUUSD,gold,XAU,Fed,inflation"></textarea>
             </div>
           </div>
         </div>
       </div>
 
       <!-- NNLB Mode -->
-      <div class="settings-card">
-        <h3>NNLB Mode <span style="font-size:11px;color:var(--muted);font-weight:400">(No-Risk-No-Lamborghini)</span></h3>
-        <div class="field-group">
-          <div class="toggle-row" style="margin-bottom:12px">
-            <div>
-              <div class="toggle-label-text">เปิด NNLB Mode</div>
-              <div class="toggle-label-sub">ข้าม gates / MM ทั้งหมด — lot scale ตาม equity</div>
+      <div class="accordion-section" data-section="nnlb">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          <h3>NNLB Mode <span class="hint">No-Risk-No-Lamborghini &mdash; bypass MM gates</span></h3>
+          <div class="accordion-icon">&rsaquo;</div>
+        </div>
+        <div class="accordion-body">
+          <div class="field-group">
+            <div class="toggle-row" style="margin-bottom:8px">
+              <div>
+                <div class="toggle-label-text" style="color:var(--red)">Enable NNLB Mode</div>
+                <div class="toggle-label-sub">Bypasses all gates / MM &mdash; lot scales with equity tier</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="cfg-NNLB_MODE">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
             </div>
-            <label class="toggle">
-              <input type="checkbox" id="cfg-NNLB_MODE">
-              <span class="toggle-track"></span>
-              <span class="toggle-thumb"></span>
-            </label>
-          </div>
-          <div class="field">
-            <label>Base Equity ($) <span style="color:var(--muted);font-size:11px">ขั้นต่ำก่อนเข้า order</span></label>
-            <input type="number" id="cfg-NNLB_BASE_EQUITY" step="1" min="1">
-          </div>
-          <div class="field">
-            <label>Equity per Lot ($) <span style="color:var(--muted);font-size:11px">tier +1 ทุก X USD</span></label>
-            <input type="number" id="cfg-NNLB_EQUITY_PER_LOT" step="1" min="1">
-          </div>
-          <div class="field">
-            <label>Max Loss per Trade (%) <span style="color:var(--muted);font-size:11px">ลด lot ถ้าเกิน</span></label>
-            <input type="number" id="cfg-NNLB_MAX_LOSS_PCT" step="1" min="1" max="100">
+            <div class="accordion-grid">
+              <div class="field">
+                <label>Base Equity ($)</label>
+                <input type="number" id="cfg-NNLB_BASE_EQUITY" step="1" min="1">
+                <div class="field-help">Minimum equity to enter orders</div>
+              </div>
+              <div class="field">
+                <label>Equity per Lot ($)</label>
+                <input type="number" id="cfg-NNLB_EQUITY_PER_LOT" step="1" min="1">
+                <div class="field-help">Tier +1 every X USD</div>
+              </div>
+              <div class="field">
+                <label>Max Loss / Trade (%)</label>
+                <input type="number" id="cfg-NNLB_MAX_LOSS_PCT" step="1" min="1" max="100">
+                <div class="field-help">Reduce lot if exceeded</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Trailing Stop -->
-      <div class="settings-card">
-        <h3>Trailing Stop <span style="font-size:11px;color:var(--muted);font-weight:400">(ATR-based)</span></h3>
-        <div class="field-group">
-          <div class="toggle-row" style="margin-bottom:12px">
-            <div>
-              <div class="toggle-label-text">เปิด Trailing Stop</div>
-              <div class="toggle-label-sub">SL ขยับตามราคา N × ATR ของ TF ที่เลือก</div>
-            </div>
-            <label class="toggle">
-              <input type="checkbox" id="cfg-TRAILING_STOP">
-              <span class="toggle-track"></span>
-              <span class="toggle-thumb"></span>
-            </label>
-          </div>
-          <div class="field">
-            <label>ATR Timeframe</label>
-            <select id="cfg-TRAILING_ATR_TF"
-              style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);
-                     padding:8px 12px;border-radius:6px;font-size:13px;outline:none;width:100%">
-              <option value="H4">H4 (~$40 ATR)</option>
-              <option value="D1">D1 (~$70 ATR) — แนะนำ</option>
-              <option value="W1">W1 (~$150 ATR)</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Swing Buffer ($) <span style="color:var(--muted);font-size:11px">SL อยู่ใต้/เหนือ swing point กี่ดอลลาร์</span></label>
-            <input type="number" id="cfg-TRAILING_ATR_MULT" step="0.5" min="0.5" max="20.0">
-          </div>
-        </div>
-      </div>
+    </div><!-- /accordion -->
 
-    </div><!-- /settings-grid -->
-
-    <div style="margin-top:20px;display:flex;align-items:center;gap:14px">
-      <button class="save-btn" onclick="saveConfig()">บันทึกการตั้งค่า</button>
-      <span id="cfg-status" style="font-size:12px;color:var(--muted)"></span>
+    <div style="margin-top:18px;display:flex;align-items:center;gap:14px">
+      <button class="save-btn" onclick="saveConfig()">Save Configuration</button>
+      <span id="cfg-status" style="font-size:11px;color:var(--muted);font-family:var(--mono);letter-spacing:0.5px"></span>
     </div>
 
   </div><!-- /tab-settings -->
@@ -1580,12 +2123,21 @@
 </div>
 
 <script>
+/* ════════════════════════════════════════════════════════════
+   STATE
+   ════════════════════════════════════════════════════════════ */
 let equityChart, winlossChart;
 let allTrades = [];
 let currentPage = 1;
 const PAGE_SIZE = 20;
 let lastFiltered = [];
+let activeSystem = 'xauusd';
+let _lastBid = null, _lastAsk = null;
+let _equityHistory = [];
 
+/* ════════════════════════════════════════════════════════════
+   FORMATTERS
+   ════════════════════════════════════════════════════════════ */
 function fmtPnl(v) {
   if (v === null || v === undefined) return '<span style="color:var(--muted2)">—</span>';
   const cls  = v >= 0 ? 'pnl-pos' : 'pnl-neg';
@@ -1599,10 +2151,10 @@ function fmtNum(v, d = 2) {
 
 function fmtThb(v) {
   if (v === null || v === undefined) return '—';
-  return v.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ฿';
+  return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ฿';
 }
 
-function fmtUsd(v) {
+function fmtUsdShort(v) {
   if (v === null || v === undefined) return '—';
   return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' THB';
 }
@@ -1616,9 +2168,12 @@ function confBar(pct) {
   </div>`;
 }
 
+/* ════════════════════════════════════════════════════════════
+   CHARTS
+   ════════════════════════════════════════════════════════════ */
 function initCharts() {
-  const gridColor = '#1f1f1f';
-  const tickColor = '#4a4a4a';
+  const gridColor = 'rgba(255,255,255,0.04)';
+  const tickColor = '#5a6275';
 
   equityChart = new Chart(document.getElementById('equityChart'), {
     type: 'line',
@@ -1626,27 +2181,31 @@ function initCharts() {
       labels: [],
       datasets: [{
         data: [],
-        borderColor: '#f5c842',
-        borderWidth: 2,
+        borderColor: '#D4AC0D',
+        borderWidth: 1.8,
         fill: true,
-        backgroundColor: 'rgba(245,200,66,0.05)',
+        backgroundColor: 'rgba(212,172,13,0.06)',
         tension: 0.35,
-        pointRadius: 2,
-        pointBackgroundColor: '#f5c842',
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointBackgroundColor: '#D4AC0D',
       }]
     },
     options: {
       responsive: true,
-      animation: false,
+      maintainAspectRatio: true,
+      animation: { duration: 300 },
       plugins: { legend: { display: false } },
       scales: {
         x: {
-          ticks: { color: tickColor, maxTicksLimit: 7, maxRotation: 0, font: { size: 11 } },
-          grid: { color: gridColor },
+          ticks: { color: tickColor, maxTicksLimit: 7, maxRotation: 0, font: { size: 10, family: 'JetBrains Mono' } },
+          grid: { color: gridColor, drawBorder: false },
+          border: { display: false },
         },
         y: {
-          ticks: { color: tickColor, font: { size: 11 } },
-          grid: { color: gridColor },
+          ticks: { color: tickColor, font: { size: 10, family: 'JetBrains Mono' } },
+          grid: { color: gridColor, drawBorder: false },
+          border: { display: false },
         },
       },
     },
@@ -1658,23 +2217,52 @@ function initCharts() {
       labels: ['WIN', 'LOSS'],
       datasets: [{
         data: [0, 0],
-        backgroundColor: ['rgba(38,166,154,0.85)', 'rgba(239,83,80,0.85)'],
+        backgroundColor: ['rgba(38,194,129,0.85)', 'rgba(233,69,96,0.85)'],
         borderWidth: 0,
-        hoverOffset: 4,
+        hoverOffset: 5,
       }]
     },
     options: {
       responsive: true,
-      cutout: '68%',
+      cutout: '70%',
       plugins: {
         legend: {
-          labels: { color: tickColor, font: { size: 12 }, boxWidth: 12, padding: 16 }
+          labels: { color: tickColor, font: { size: 11, family: 'JetBrains Mono' }, boxWidth: 10, padding: 14 }
         }
       }
     },
   });
 }
 
+/* ════════════════════════════════════════════════════════════
+   SPARKLINE
+   ════════════════════════════════════════════════════════════ */
+function renderSparkline(values) {
+  const line = document.getElementById('spark-line');
+  const area = document.getElementById('spark-area');
+  if (!line || !area || !values.length) return;
+  const W = 160, H = 40, pad = 2;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const pts = values.map((v, i) => {
+    const x = pad + (i * (W - pad * 2) / Math.max(1, values.length - 1));
+    const y = H - pad - ((v - min) / range) * (H - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  line.setAttribute('points', pts.join(' '));
+  // area: close at bottom
+  const areaPts = [`${pad},${H}`, ...pts, `${W - pad},${H}`].join(' ');
+  area.setAttribute('points', areaPts);
+  // color by trend
+  const trendUp = values[values.length - 1] >= values[0];
+  line.setAttribute('stroke', trendUp ? 'var(--green)' : 'var(--red)');
+  area.setAttribute('fill', trendUp ? 'rgba(38,194,129,0.10)' : 'rgba(233,69,96,0.10)');
+}
+
+/* ════════════════════════════════════════════════════════════
+   STATS
+   ════════════════════════════════════════════════════════════ */
 function updateStats(stats) {
   function setVal(id, val, unit, cls) {
     const el = document.getElementById(id);
@@ -1708,19 +2296,23 @@ function updateStats(stats) {
   const alert = document.getElementById('alert-bar');
   if (streak >= 5) {
     alert.style.display = 'flex';
-    alert.textContent = '⚠  Losing streak ' + streak + ' — ต้อง confidence ≥ 62% ถึงจะเข้า order';
+    alert.textContent = '⚠  Losing streak ' + streak + ' — confidence ≥ 62% required for new orders';
   } else if (streak >= 3) {
     alert.style.display = 'flex';
-    alert.textContent = '⚠  Losing streak ' + streak + ' — ระวัง กำลังติดลบต่อเนื่อง';
+    alert.textContent = '⚠  Losing streak ' + streak + ' — caution, consecutive losses';
   } else {
     alert.style.display = 'none';
   }
 
-  // Equity curve
+  // Equity curve + sparkline
   const eq = stats.equity_curve || [];
-  equityChart.data.labels              = eq.map(e => e.time.substring(5));
-  equityChart.data.datasets[0].data   = eq.map(e => e.equity);
+  equityChart.data.labels            = eq.map(e => e.time.substring(5));
+  equityChart.data.datasets[0].data = eq.map(e => e.equity);
   equityChart.update('none');
+
+  // sparkline last 10 points
+  const sparkData = eq.slice(-10).map(e => e.equity);
+  if (sparkData.length) renderSparkline(sparkData);
 
   // Win/Loss doughnut
   winlossChart.data.datasets[0].data = [stats.wins || 0, stats.losses || 0];
@@ -1745,12 +2337,15 @@ function updateStats(stats) {
       const pnlSign  = s.pnl >= 0 ? '+' : '';
       return `<div style="display:flex;justify-content:space-between;gap:16px;padding:1px 0">
         <span style="color:var(--text)">${k}</span>
-        <span>${s.count} trades &nbsp;·&nbsp; ${wr}% WR &nbsp;·&nbsp; <span style="color:${pnlColor}">${pnlSign}${s.pnl.toFixed(2)}</span></span>
+        <span>${s.count} &middot; ${wr}% WR &middot; <span style="color:${pnlColor}">${pnlSign}${s.pnl.toFixed(2)}</span></span>
       </div>`;
     }).join('');
   }
 }
 
+/* ════════════════════════════════════════════════════════════
+   PAGINATION + TABLE
+   ════════════════════════════════════════════════════════════ */
 function changePage(delta) {
   const totalPages = Math.max(1, Math.ceil(lastFiltered.length / PAGE_SIZE));
   currentPage = Math.min(Math.max(1, currentPage + delta), totalPages);
@@ -1766,7 +2361,7 @@ function renderPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   if (!total) {
-    tbody.innerHTML = '<tr><td colspan="11" class="no-data">ไม่มีข้อมูล</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="no-data">No data</td></tr>';
     pgInfo.textContent = '';
     pgPrev.disabled = pgNext.disabled = true;
     return;
@@ -1774,7 +2369,7 @@ function renderPage() {
 
   const start   = (currentPage - 1) * PAGE_SIZE;
   const pageRows = lastFiltered.slice(start, start + PAGE_SIZE);
-  pgInfo.textContent = `หน้า ${currentPage} / ${totalPages}  (${total} รายการ)`;
+  pgInfo.textContent = `Page ${currentPage} / ${totalPages}  ·  ${total} items`;
   pgPrev.disabled = currentPage <= 1;
   pgNext.disabled = currentPage >= totalPages;
 
@@ -1782,31 +2377,33 @@ function renderPage() {
     const dir      = (t.direction || '').toLowerCase();
     const status   = (t.status   || '').toLowerCase();
     const isManual = t.source === 'MANUAL';
-    const rowCls   = isManual ? ' class="manual-row"' : '';
+    const rowClasses = [];
+    if (isManual) rowClasses.push('manual-row');
+    if (t.pnl !== null && t.pnl !== undefined) {
+      rowClasses.push(t.pnl > 0 ? 'row-win' : 'row-loss');
+    }
+    const rowCls = rowClasses.length ? ` class="${rowClasses.join(' ')}"` : '';
 
-    const result = t.pnl !== null
+    const result = (t.pnl !== null && t.pnl !== undefined)
       ? (t.pnl > 0
           ? '<span class="badge badge-win">WIN</span>'
           : '<span class="badge badge-loss">LOSS</span>')
       : '';
 
-    // Source badge
     const srcBadge = isManual
       ? '<span class="badge badge-manual">MANUAL</span>'
       : '<span class="badge badge-system">SYS</span>';
 
-    // Strategy column
     let strategyCell = '<span style="color:var(--muted2)">—</span>';
     if (!isManual && t.entry_type && t.entry_type !== 'NONE') {
-      strategyCell = `<div style="font-size:12px">
-        <div style="color:var(--text);margin-bottom:4px">${t.entry_type}</div>
+      strategyCell = `<div style="font-size:11px">
+        <div style="color:var(--text);margin-bottom:4px;font-family:var(--mono)">${t.entry_type}</div>
         ${confBar(t.technical_confidence || 0)}
       </div>`;
     } else if (isManual) {
-      strategyCell = '<span style="color:#f0a500;font-size:11px">MANUAL</span>';
+      strategyCell = '<span style="color:var(--amber);font-size:10px;font-family:var(--mono);letter-spacing:1px">MANUAL</span>';
     }
 
-    // Analysis / Rationale column
     const tags = [];
     if (t.trend)      tags.push(`<span class="tag">Trend: ${t.trend}</span>`);
     if (t.sr_zone && t.sr_zone !== 'NONE') tags.push(`<span class="tag">SR: ${t.sr_zone}</span>`);
@@ -1831,17 +2428,24 @@ function renderPage() {
         : '<span style="color:var(--muted2)">—</span>';
     }
 
+    // Close reason
+    const closeReason = t.close_reason || t.exit_reason || (t.status === 'CLOSED' ? (t.pnl > 0 ? 'TP' : (t.pnl < 0 ? 'SL' : '—')) : '—');
+    const closeReasonHtml = t.status === 'OPEN'
+      ? '<span style="color:var(--muted2)">—</span>'
+      : `<span style="font-size:11px;color:var(--text-dim);font-family:var(--mono);letter-spacing:0.5px">${closeReason}</span>`;
+
     return `<tr${rowCls}>
-      <td style="color:var(--muted);font-size:12px">${(t.timestamp || '').substring(0, 16).replace('T', ' ')}</td>
+      <td style="color:var(--muted);font-size:11px;font-family:var(--mono)">${(t.timestamp || '').substring(0, 16).replace('T', ' ')}</td>
       <td class="center">${srcBadge}</td>
       <td class="center"><span class="badge badge-${dir}">${t.direction || '—'}</span></td>
       <td class="num">${fmtNum(t.lot, 2)}</td>
-      <td class="num" style="font-variant-numeric:tabular-nums">${fmtNum(t.entry_price, 2)}</td>
-      <td class="num" style="color:var(--red);font-size:12px">${fmtNum(t.sl, 2)}</td>
-      <td class="num" style="color:var(--green);font-size:12px">${fmtNum(t.tp, 2)}</td>
+      <td class="num">${fmtNum(t.entry_price, 2)}</td>
+      <td class="num" style="color:var(--red);font-size:11px">${fmtNum(t.sl, 2)}</td>
+      <td class="num" style="color:var(--green);font-size:11px">${fmtNum(t.tp, 2)}</td>
       <td>${strategyCell}</td>
       <td>${analysisHtml}</td>
       <td class="num">${fmtPnl(t.pnl)}</td>
+      <td>${closeReasonHtml}</td>
       <td class="center"><span class="badge badge-${status}">${t.status || '—'}</span> ${result}</td>
     </tr>`;
   }).join('');
@@ -1865,9 +2469,12 @@ function renderTable(trades) {
   renderPage();
 }
 
+/* ════════════════════════════════════════════════════════════
+   PORTFOLIO
+   ════════════════════════════════════════════════════════════ */
 function updatePortfolio(account, usd_thb) {
   if (!account || !account.balance) {
-    document.getElementById('port-balance-thb').textContent = 'ไม่ได้เชื่อมต่อ MT5';
+    document.getElementById('port-balance-thb').textContent = 'MT5 not connected';
     return;
   }
 
@@ -1875,73 +2482,43 @@ function updatePortfolio(account, usd_thb) {
 
   document.getElementById('port-balance-thb').textContent = fmtThb(account.balance_thb);
   document.getElementById('port-rate').textContent = isTHB
-    ? 'สกุลเงิน: THB'
-    : '1 USD = ' + (usd_thb || '—') + ' THB';
+    ? 'Currency: THB'
+    : (account.balance ? '$' + account.balance.toFixed(2) + ' USD  ·  1$ = ' + (usd_thb || '—') + ' THB' : '—');
 
   document.getElementById('port-equity-thb').textContent = fmtThb(account.equity_thb);
-  document.getElementById('port-equity-usd').textContent = isTHB ? '' : fmtUsd(account.equity);
+  document.getElementById('port-equity-usd').textContent = isTHB
+    ? ''
+    : (account.equity ? '$' + account.equity.toFixed(2) + ' USD' : '');
 
   const profitThb = account.profit_thb || 0;
   const profEl = document.getElementById('port-profit-thb');
   profEl.textContent = (profitThb >= 0 ? '+' : '') + fmtThb(profitThb);
   profEl.style.color = profitThb >= 0 ? 'var(--green)' : 'var(--red)';
 
-  document.getElementById('port-profit-usd').textContent = isTHB ? '' : fmtUsd(account.profit);
+  document.getElementById('port-profit-usd').textContent = isTHB
+    ? ''
+    : (account.profit !== undefined ? (account.profit >= 0 ? '+' : '') + '$' + account.profit.toFixed(2) + ' USD' : '');
   document.getElementById('port-margin-thb').textContent = fmtThb(account.free_margin_thb);
-  document.getElementById('port-margin-usd').textContent = isTHB ? '' : fmtUsd(account.free_margin);
+  document.getElementById('port-margin-usd').textContent = isTHB
+    ? ''
+    : (account.free_margin ? '$' + account.free_margin.toFixed(2) + ' USD' : '');
 }
 
-let activeSystem = 'xauusd';
-
+/* ════════════════════════════════════════════════════════════
+   SYSTEM / TAB SWITCHING
+   ════════════════════════════════════════════════════════════ */
 function switchSystem(sys) {
   activeSystem = sys;
   document.querySelectorAll('.sys-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.system === sys));
-  const titles = { xauusd: 'XAUUSD · Trading Dashboard', btcusd: 'BTC · Trading Dashboard' };
-  document.getElementById('dashboard-title').textContent = titles[sys] || sys.toUpperCase() + ' · Trading Dashboard';
+  const titles = { xauusd: 'XAUUSD · Trading Terminal', btcusd: 'BTC · Trading Terminal' };
+  document.getElementById('dashboard-title').textContent = titles[sys] || sys.toUpperCase() + ' · Trading Terminal';
   fetchData();
+  loadLivePrice();
   const activeTab = document.querySelector('.tab-btn.active');
   if (activeTab && activeTab.dataset.tab === 'accounting') loadAccounting();
 }
 
-async function fetchData() {
-  let data = null;
-  try {
-    const res = await fetch('/api/data?system=' + activeSystem);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    data = await res.json();
-  } catch (e) {
-    document.getElementById('last-update').textContent = 'เชื่อมต่อ server ไม่ได้ — ' + e.message;
-    return;
-  }
-
-  // stats + trades มาจาก trades.json — แสดงได้เสมอ ไม่ขึ้นกับ MT5
-  try {
-    allTrades = data.trades || [];
-    updateStats(data.stats || {});
-    renderTable(allTrades);
-  } catch (e) {
-    console.error('stats/table error:', e);
-    document.getElementById('last-update').textContent = 'Dashboard error: ' + e.message;
-  }
-
-  // portfolio มาจาก MT5 — ถ้าไม่ได้เชื่อมต่อให้แสดง placeholder
-  try {
-    updatePortfolio(data.account, data.usd_thb);
-  } catch (e) {
-    document.getElementById('port-balance-thb').textContent = 'MT5 ไม่ได้เชื่อมต่อ';
-  }
-
-  document.getElementById('last-update').textContent =
-    'อัปเดต ' + new Date().toLocaleTimeString('th-TH') +
-    (data.account && data.account.balance ? '' : '  (MT5 offline)');
-}
-
-['filter-source', 'filter-dir', 'filter-status', 'filter-result'].forEach(id => {
-  document.getElementById(id).addEventListener('change', () => renderTable(allTrades));
-});
-
-// ─── TAB SWITCHING ───────────────────────────────────────────
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.tab === name));
@@ -1953,7 +2530,193 @@ function switchTab(name) {
   if (name === 'backtest')   loadBacktest();
 }
 
-// ─── ACCOUNTING ──────────────────────────────────────────────
+/* ════════════════════════════════════════════════════════════
+   FETCH DATA
+   ════════════════════════════════════════════════════════════ */
+async function fetchData() {
+  let data = null;
+  try {
+    const res = await fetch('/api/data?system=' + activeSystem);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    data = await res.json();
+  } catch (e) {
+    document.getElementById('last-update').textContent = 'Disconnected — ' + e.message;
+    return;
+  }
+
+  try {
+    allTrades = data.trades || [];
+    updateStats(data.stats || {});
+    renderTable(allTrades);
+  } catch (e) {
+    console.error('stats/table error:', e);
+    document.getElementById('last-update').textContent = 'Dashboard error: ' + e.message;
+  }
+
+  try {
+    updatePortfolio(data.account, data.usd_thb);
+  } catch (e) {
+    document.getElementById('port-balance-thb').textContent = 'MT5 not connected';
+  }
+
+  document.getElementById('last-update').textContent =
+    'Updated ' + new Date().toLocaleTimeString('en-US', { hour12: false }) +
+    (data.account && data.account.balance ? '' : '  (MT5 offline)');
+}
+
+['filter-source', 'filter-dir', 'filter-status', 'filter-result'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => renderTable(allTrades));
+});
+
+/* ════════════════════════════════════════════════════════════
+   LIVE PRICE TICKER + PIPELINE LIVE STATUS
+   ════════════════════════════════════════════════════════════ */
+function _flashCell(el, isUp) {
+  if (!el) return;
+  el.classList.remove('flash-up', 'flash-down');
+  void el.offsetWidth; // restart animation
+  el.classList.add(isUp ? 'flash-up' : 'flash-down');
+}
+
+async function loadLivePrice() {
+  try {
+    const res  = await fetch('/api/monitor?system=' + activeSystem);
+    const data = await res.json();
+    if (!data.ok) return;
+    const bs = data.bot_status || {};
+    const px = bs.price_info || {};
+
+    // Live ticker
+    const bidEl  = document.getElementById('px-bid');
+    const askEl  = document.getElementById('px-ask');
+    const spEl   = document.getElementById('px-spread');
+    const chEl   = document.getElementById('px-change');
+    const chWrap = document.getElementById('px-change-wrap');
+
+    if (px.bid !== undefined && px.bid !== null) {
+      if (_lastBid !== null && px.bid !== _lastBid) _flashCell(bidEl, px.bid > _lastBid);
+      bidEl.textContent = px.bid.toFixed(2);
+      _lastBid = px.bid;
+    }
+    if (px.ask !== undefined && px.ask !== null) {
+      if (_lastAsk !== null && px.ask !== _lastAsk) _flashCell(askEl, px.ask > _lastAsk);
+      askEl.textContent = px.ask.toFixed(2);
+      _lastAsk = px.ask;
+    }
+    if (px.spread !== undefined && px.spread !== null) {
+      spEl.textContent = px.spread.toFixed(2);
+    }
+    if (px.change_pct !== undefined && px.change_pct !== null) {
+      const cp = px.change_pct;
+      chEl.textContent = (cp >= 0 ? '+' : '') + cp.toFixed(2) + '%';
+      chWrap.classList.toggle('up', cp >= 0);
+      chWrap.classList.toggle('down', cp < 0);
+    }
+
+    // Ready mode banner
+    updateReadyBanner(bs);
+
+    // Pipeline live status
+    updatePipelineFromStatus(bs);
+  } catch (e) {
+    console.error('loadLivePrice error:', e);
+  }
+}
+
+function updateReadyBanner(bs) {
+  const banner = document.getElementById('ready-banner');
+  const desc   = document.getElementById('ready-desc');
+  const timer  = document.getElementById('ready-timer');
+  const rm = bs.ready_mode || {};
+  if (rm.active && rm.zone) {
+    banner.classList.add('active');
+    const z = rm.zone;
+    const lvl = (z.level !== undefined && z.level !== null) ? Number(z.level).toFixed(2) : '—';
+    desc.innerHTML = `Awaiting entry into <strong style="color:var(--gold)">${z.tf || '—'} ${z.zone_type || '—'}</strong> @ <span class="mono" style="color:var(--gold)">$${lvl}</span>`;
+    if (rm.expires_at || rm.set_at) {
+      const setT = new Date(rm.set_at || rm.expires_at);
+      timer.textContent = setT.toLocaleTimeString('en-US', { hour12: false });
+    } else {
+      timer.textContent = '';
+    }
+  } else {
+    banner.classList.remove('active');
+  }
+}
+
+function updatePipelineFromStatus(bs) {
+  const ls = bs.last_signal || {};
+  const decision = (bs.decision || ls.action || '').toUpperCase();
+  const signal   = (bs.last_signal && bs.last_signal.direction) || (typeof bs.last_signal === 'string' ? bs.last_signal : '—');
+  const conf     = bs.confidence ?? ls.confidence ?? 0;
+  const trend    = bs.trend ?? ls.trend ?? '—';
+  const sr       = bs.sr_zone ?? ls.sr_zone ?? '—';
+  const entry    = bs.entry_type ?? ls.entry_type ?? '—';
+  const sent     = bs.sentiment ?? '—';
+  const reason   = bs.reason ?? ls.reason ?? '';
+
+  // Set meta + status defaults
+  function setMeta(idx, text) {
+    const el = document.getElementById(`step-${idx}-meta`);
+    if (el) el.innerHTML = text;
+  }
+  function setStatus(idx, cls, label) {
+    const el = document.getElementById(`step-${idx}-status`);
+    if (!el) return;
+    el.className = 'step-status ' + cls;
+    el.innerHTML = `<span class="dot"></span>${label}`;
+  }
+
+  // Step 1: Chart Watcher
+  setMeta(1, `<span style="color:var(--text-dim)">Trend</span> <span style="color:var(--text)">${trend}</span> · <span style="color:var(--text-dim)">SR</span> <span style="color:var(--text)">${sr}</span>`);
+  setStatus(1, 'status-done', 'DONE');
+
+  // Step 2: Market Advisor (sentiment)
+  setMeta(2, `<span style="color:var(--text-dim)">Sent</span> <span style="color:var(--text)">${sent}</span>`);
+  if (bs.skip_ai) {
+    setStatus(2, 'status-waiting', 'SKIPPED');
+  } else {
+    setStatus(2, 'status-done', 'DONE');
+  }
+
+  // Step 3: Risk Guard / Analyst
+  setMeta(3, `<span style="color:var(--text-dim)">Entry</span> <span style="color:var(--text)">${entry}</span>`);
+  setStatus(3, 'status-done', 'DONE');
+
+  // Step 4: Decision Maker
+  let sigColor = 'var(--text)';
+  if (signal === 'BUY') sigColor = 'var(--green)';
+  else if (signal === 'SELL') sigColor = 'var(--red)';
+  setMeta(4, `<span style="color:${sigColor};font-weight:600">${signal || '—'}</span> · <span style="color:var(--text-dim)">${conf}%</span>`);
+  if (decision === 'EXECUTE' || decision === 'BUY' || decision === 'SELL') {
+    setStatus(4, 'status-active', 'EXECUTE');
+  } else if (decision === 'SKIP' || decision === 'NO_TRADE') {
+    setStatus(4, 'status-waiting', 'SKIP');
+  } else {
+    setStatus(4, 'status-ready', 'READY');
+  }
+
+  // Step 5: Reporter
+  const cycle = bs.cycle ?? '—';
+  setMeta(5, `<span style="color:var(--text-dim)">Cycle</span> <span style="color:var(--text)">#${cycle}</span>`);
+  if (decision === 'EXECUTE' || decision === 'BUY' || decision === 'SELL') {
+    setStatus(5, 'status-done', 'SENT');
+  } else {
+    setStatus(5, 'status-ready', 'READY');
+  }
+
+  // If reason short, also show under step 4
+  if (reason && reason.length < 80) {
+    const m4 = document.getElementById('step-4-meta');
+    if (m4) {
+      m4.innerHTML += `<div style="margin-top:2px;color:var(--muted);font-size:9px;font-style:italic">${reason}</div>`;
+    }
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   ACCOUNTING
+   ════════════════════════════════════════════════════════════ */
 let dailyCostChart = null;
 
 function fmtUsd(v) {
@@ -1974,7 +2737,6 @@ async function loadAccounting() {
     const agents  = data.agents  || {};
     const daily   = data.daily   || {};
 
-    // ── summary cards ────────────────────────────────────────
     const todayCycles = today.cycles || 0;
     const todayTrades = today.trades || 0;
     document.getElementById('acc-today-cost').textContent    = fmtUsd(today.total_cost_usd || 0);
@@ -1988,16 +2750,14 @@ async function loadAccounting() {
     document.getElementById('acc-avg-cycle').textContent = fmtUsd(avgCycle);
 
     if (totalTrades > 0) {
-      // sum cost only from cycles that had a trade
       const tradeCycles = Object.values(daily).reduce((sum, d) => sum + (d.trades || 0), 0);
       const tradeCost   = (s.total_cost_usd || 0) * (tradeCycles / totalCycles);
       document.getElementById('acc-avg-trade').textContent     = fmtUsd(tradeCost / totalTrades);
-      document.getElementById('acc-total-trades-sub').textContent = `${totalTrades} trades ที่มี AI cost`;
+      document.getElementById('acc-total-trades-sub').textContent = `${totalTrades} trades with AI cost`;
     } else {
       document.getElementById('acc-avg-trade').textContent = '—';
     }
 
-    // ── agent table ──────────────────────────────────────────
     const ORDER = ['chart_watcher','market_advisor','analyst','decision_maker','reporter'];
     const rows = ORDER.filter(k => agents[k]).concat(
       Object.keys(agents).filter(k => !ORDER.includes(k))
@@ -2005,7 +2765,7 @@ async function loadAccounting() {
 
     const tbody = document.getElementById('agent-cost-tbody');
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="no-data">ยังไม่มีข้อมูล — รัน bot อย่างน้อย 1 cycle</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data">No data — run bot ≥ 1 cycle</td></tr>';
     } else {
       tbody.innerHTML = rows.map(name => {
         const a       = agents[name];
@@ -2017,9 +2777,9 @@ async function loadAccounting() {
         const modelCls   = isHaiku ? 'model-haiku' : 'model-sonnet';
         const modelLabel = isHaiku ? 'Haiku' : 'Sonnet';
         const barWidth   = Math.min(hitRate, 100).toFixed(0);
-        const hitColor   = hitRate >= 70 ? 'var(--green)' : hitRate >= 40 ? '#f09642' : 'var(--red)';
+        const hitColor   = hitRate >= 70 ? 'var(--green)' : hitRate >= 40 ? 'var(--amber)' : 'var(--red)';
         return `<tr>
-          <td><strong>${name}</strong></td>
+          <td><strong style="font-family:var(--mono)">${name}</strong></td>
           <td><span class="model-badge ${modelCls}">${modelLabel}</span></td>
           <td class="num">${calls.toLocaleString()}</td>
           <td class="num">${fmtUsd(cost)}</td>
@@ -2029,7 +2789,7 @@ async function loadAccounting() {
               <div class="hit-bar-track">
                 <div class="hit-bar-fill" style="width:${barWidth}%;background:${hitColor}"></div>
               </div>
-              <span style="font-size:12px;color:${hitColor}">${hitRate.toFixed(1)}%</span>
+              <span style="font-size:11px;color:${hitColor};font-family:var(--mono)">${hitRate.toFixed(1)}%</span>
             </div>
           </td>
           <td class="num">${a.avg_latency_ms ? (a.avg_latency_ms / 1000).toFixed(1) + 's' : '—'}</td>
@@ -2037,17 +2797,16 @@ async function loadAccounting() {
       }).join('');
     }
 
-    // ── daily cost chart ─────────────────────────────────────
     const todayKey   = new Date().toISOString().slice(0, 10);
     const sortedDays = Object.keys(daily).sort().slice(-30);
-    const labels     = sortedDays.map(d => d.slice(5));   // MM-DD
+    const labels     = sortedDays.map(d => d.slice(5));
     const costs      = sortedDays.map(d => +(daily[d].total_cost_usd || 0).toFixed(6));
     const cycles     = sortedDays.map(d => daily[d].cycles || 0);
     const barColors  = sortedDays.map(d =>
-      d === todayKey ? 'rgba(245,200,66,0.7)' : 'rgba(245,200,66,0.22)'
+      d === todayKey ? 'rgba(212,172,13,0.85)' : 'rgba(212,172,13,0.28)'
     );
     const barBorders = sortedDays.map(d =>
-      d === todayKey ? 'rgba(245,200,66,1)' : 'rgba(245,200,66,0.55)'
+      d === todayKey ? 'rgba(212,172,13,1)' : 'rgba(212,172,13,0.55)'
     );
 
     if (dailyCostChart) dailyCostChart.destroy();
@@ -2063,7 +2822,7 @@ async function loadAccounting() {
             backgroundColor: barColors,
             borderColor: barBorders,
             borderWidth: 1,
-            borderRadius: 3,
+            borderRadius: 2,
             yAxisID: 'yCost',
             order: 2,
           },
@@ -2071,11 +2830,11 @@ async function loadAccounting() {
             label: 'Cycles',
             data: cycles,
             type: 'line',
-            borderColor: 'rgba(126,200,227,0.8)',
-            backgroundColor: 'rgba(126,200,227,0.06)',
+            borderColor: 'rgba(0,180,216,0.85)',
+            backgroundColor: 'rgba(0,180,216,0.06)',
             borderWidth: 1.5,
             pointRadius: 2,
-            pointBackgroundColor: 'rgba(126,200,227,0.9)',
+            pointBackgroundColor: 'rgba(0,180,216,0.9)',
             fill: false,
             tension: 0.3,
             yAxisID: 'yCycles',
@@ -2098,20 +2857,23 @@ async function loadAccounting() {
         },
         scales: {
           x: {
-            grid: { color: 'rgba(255,255,255,0.04)' },
-            ticks: { color: '#5a5a5a', maxTicksLimit: 15, maxRotation: 0 },
+            grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+            border: { display: false },
+            ticks: { color: '#5a6275', maxTicksLimit: 15, maxRotation: 0, font: { size: 10, family: 'JetBrains Mono' } },
           },
           yCost: {
             type: 'linear',
             position: 'left',
-            grid: { color: 'rgba(255,255,255,0.04)' },
-            ticks: { color: '#5a5a5a', callback: v => '$' + v.toFixed(4) },
+            grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+            border: { display: false },
+            ticks: { color: '#5a6275', callback: v => '$' + v.toFixed(4), font: { size: 10, family: 'JetBrains Mono' } },
           },
           yCycles: {
             type: 'linear',
             position: 'right',
-            grid: { drawOnChartArea: false },
-            ticks: { color: '#5a5a5a', stepSize: 1, precision: 0 },
+            grid: { drawOnChartArea: false, drawBorder: false },
+            border: { display: false },
+            ticks: { color: '#5a6275', stepSize: 1, precision: 0, font: { size: 10, family: 'JetBrains Mono' } },
           },
         },
       },
@@ -2122,13 +2884,17 @@ async function loadAccounting() {
   }
 }
 
-// ─── CONFIG LOAD ─────────────────────────────────────────────
+/* ════════════════════════════════════════════════════════════
+   CONFIG
+   ════════════════════════════════════════════════════════════ */
 const _NUM_KEYS  = ['START_BALANCE','RISK_PER_TRADE','MAX_DAILY_LOSS','MAX_OPEN_TRADES',
   'DEFAULT_SL_PIPS','DEFAULT_TP_PIPS','MIN_RR_RATIO','FIXED_LOT','MIN_LOT','MAX_LOT',
   'MAX_LOSING_STREAK','STREAK_MIN_CONFIDENCE','MAX_PENDING_BUY','MAX_PENDING_SELL',
   'PENDING_EXPIRY_HOURS','HEDGE_BUFFER_PIPS',
   'BE_TRIGGER_R','BE_BUFFER_PIPS','BE_CONFIRM_CYCLES',
-  'NNLB_BASE_EQUITY','NNLB_EQUITY_PER_LOT','NNLB_MAX_LOSS_PCT','TRAILING_ATR_MULT'];
+  'HTF_BE_TRIGGER_R','HTF_BE_BUFFER_PIPS',
+  'NNLB_BASE_EQUITY','NNLB_EQUITY_PER_LOT','NNLB_MAX_LOSS_PCT',
+  'TRAILING_ATR_MULT','TRAILING_MIN_PROFIT_R','TRAILING_LOOKBACK'];
 const _TXT_KEYS  = ['SYMBOL','LOT_MODE','X_ACCOUNTS_TO_FOLLOW','X_KEYWORDS','TRAILING_ATR_TF'];
 const _BOOL_KEYS = ['PORTFOLIO_PROTECTION','STREAK_PROTECTION','DYNAMIC_TP',
   'LESSON_LEARNING','DRY_RUN','NNLB_MODE','TRAILING_STOP'];
@@ -2145,7 +2911,6 @@ async function loadConfig() {
     _TXT_KEYS.forEach(k => {
       const el = document.getElementById('cfg-' + k);
       if (!el || cfg[k] === undefined) return;
-      // textarea: แสดงแต่ละ item บนบรรทัดแยก เพื่อให้อ่านง่าย
       if (el.tagName === 'TEXTAREA') {
         el.value = cfg[k].split(',').map(s => s.trim()).join(',\n');
       } else {
@@ -2157,23 +2922,21 @@ async function loadConfig() {
       if (el) el.checked = String(cfg[k]).toLowerCase() !== 'false';
     });
   } catch (e) {
-    document.getElementById('cfg-status').textContent = 'โหลด config ไม่ได้: ' + e.message;
+    document.getElementById('cfg-status').textContent = 'Failed to load config: ' + e.message;
   }
 }
 
-// ─── CONFIG SAVE ─────────────────────────────────────────────
 async function saveConfig() {
   const btn    = document.querySelector('.save-btn');
   const status = document.getElementById('cfg-status');
   btn.disabled = true;
   status.style.color   = 'var(--muted)';
-  status.textContent   = 'กำลังบันทึก...';
+  status.textContent   = 'Saving…';
 
   const payload = {};
   [..._NUM_KEYS, ..._TXT_KEYS].forEach(k => {
     const el = document.getElementById('cfg-' + k);
     if (!el) return;
-    // textarea: normalize newlines/spaces → comma-separated single line
     if (el.tagName === 'TEXTAREA') {
       payload[k] = el.value.split(/[\n,]+/).map(s => s.trim()).filter(Boolean).join(',');
     } else {
@@ -2194,11 +2957,11 @@ async function saveConfig() {
     const data = await res.json();
     if (data.ok) {
       if (data.pm2_ok) {
-        status.textContent = '✓ บันทึกแล้ว — ' + data.pm2_msg;
+        status.textContent = '✓ Saved — ' + data.pm2_msg;
       } else if (data.pm2_msg && data.pm2_msg.includes('not found')) {
-        status.textContent = '✓ บันทึกแล้ว — restart main.py เองด้วย (pm2 not found)';
+        status.textContent = '✓ Saved — restart main.py manually (pm2 not found)';
       } else {
-        status.textContent = '✓ บันทึกแล้ว — PM2: ' + (data.pm2_msg || 'ไม่ตอบสนอง');
+        status.textContent = '✓ Saved — PM2: ' + (data.pm2_msg || 'no response');
       }
       status.style.color = data.pm2_ok ? 'var(--green)' : 'var(--gold)';
     } else {
@@ -2212,7 +2975,17 @@ async function saveConfig() {
   btn.disabled = false;
 }
 
-// ─── ECONOMIC CALENDAR ───────────────────────────────────────
+/* ════════════════════════════════════════════════════════════
+   ACCORDION
+   ════════════════════════════════════════════════════════════ */
+function toggleAccordion(headerEl) {
+  const section = headerEl.parentElement;
+  section.classList.toggle('open');
+}
+
+/* ════════════════════════════════════════════════════════════
+   ECONOMIC CALENDAR
+   ════════════════════════════════════════════════════════════ */
 async function fetchCalendar() {
   try {
     const res  = await fetch('/api/calendar');
@@ -2220,7 +2993,7 @@ async function fetchCalendar() {
     renderCalendar(data.events || []);
   } catch(e) {
     const el = document.getElementById('cal-container');
-    if (el) el.innerHTML = '<div style="color:var(--muted);font-size:13px">โหลด calendar ไม่ได้: ' + e.message + '</div>';
+    if (el) el.innerHTML = '<div style="color:var(--muted);font-size:12px;font-family:var(--mono)">Failed to load calendar: ' + e.message + '</div>';
   }
 }
 
@@ -2228,15 +3001,14 @@ function renderCalendar(events) {
   const container = document.getElementById('cal-container');
   if (!container) return;
   if (!events.length) {
-    container.innerHTML = '<div style="color:var(--muted);font-size:13px">ไม่มี high-impact events สัปดาห์นี้</div>';
+    container.innerHTML = '<div style="color:var(--muted);font-size:12px;font-family:var(--mono)">No high-impact events this week</div>';
     return;
   }
 
-  const todayStr  = new Date().toISOString().slice(0, 10);
-  const DAY_TH    = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
-  const MONTH_TH  = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const DAY_EN   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const MONTH_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-  // Group by date
   const byDay = {};
   events.forEach(ev => {
     const d = ev.timestamp_iso ? ev.timestamp_iso.slice(0, 10) : '?';
@@ -2248,20 +3020,19 @@ function renderCalendar(events) {
   Object.keys(byDay).sort().forEach(dateStr => {
     const isToday = dateStr === todayStr;
     const dt      = new Date(dateStr + 'T12:00:00');
-    const label   = DAY_TH[dt.getDay()] + ' ' + dt.getDate() + ' ' + MONTH_TH[dt.getMonth()];
+    const label   = DAY_EN[dt.getDay()] + ' ' + dt.getDate() + ' ' + MONTH_EN[dt.getMonth()];
 
     html += `<div class="cal-day-group">`;
     html += `<div class="cal-day-label${isToday ? ' is-today' : ''}">`;
     if (isToday) html += `<span class="cal-day-dot"></span>`;
     html += label;
-    if (isToday) html += `<span style="font-size:10px;color:var(--gold);margin-left:4px">— วันนี้</span>`;
+    if (isToday) html += `<span style="font-size:9px;color:var(--gold);margin-left:4px">— TODAY</span>`;
     html += `</div><div class="cal-cards">`;
 
     byDay[dateStr].forEach(ev => {
       const impClass  = ev.impact === 'High' ? 'impact-high' : 'impact-medium';
       const todayCls  = isToday ? ' is-today-card' : '';
 
-      // UTC → BKK (+7)
       let bkkTime = ev.time || '';
       if (ev.timestamp_iso) {
         const d = new Date(ev.timestamp_iso);
@@ -2284,13 +3055,9 @@ function renderCalendar(events) {
   container.innerHTML = html;
 }
 
-initCharts();
-fetchData();
-fetchCalendar();
-setInterval(fetchData, 10000);
-setInterval(fetchCalendar, 1800000);
-
-// ─── MANUAL RANGE ────────────────────────────────────────────
+/* ════════════════════════════════════════════════════════════
+   MANUAL RANGE
+   ════════════════════════════════════════════════════════════ */
 async function loadManualRange() {
   try {
     const res  = await fetch('/api/manual-range');
@@ -2305,10 +3072,10 @@ async function loadManualRange() {
       document.getElementById('range-set-at').textContent   =
         'Set at: ' + (data.set_at || '').slice(0, 19);
       wrap.style.display = 'block';
-      statusEl.innerHTML = '<span style="color:var(--green);font-weight:700">● ACTIVE</span> — bot ใช้ manual range';
+      statusEl.innerHTML = '<span style="color:var(--green);font-weight:700">● ACTIVE</span> — bot using manual range';
     } else {
       wrap.style.display = 'none';
-      statusEl.innerHTML = '<span style="color:var(--muted)">○ ไม่ได้ตั้งค่า</span> — ใช้ Auto-detect';
+      statusEl.innerHTML = '<span style="color:var(--muted)">○ NOT SET</span> — auto-detect';
     }
   } catch(e) { console.error('loadManualRange:', e); }
 }
@@ -2316,8 +3083,8 @@ async function loadManualRange() {
 async function setManualRange() {
   const high = parseFloat(document.getElementById('range-high').value);
   const low  = parseFloat(document.getElementById('range-low').value);
-  if (!high || !low) { alert('กรุณากรอก High และ Low ก่อน'); return; }
-  if (high <= low)   { alert('High ต้องมากกว่า Low'); return; }
+  if (!high || !low) { alert('Please enter both High and Low'); return; }
+  if (high <= low)   { alert('High must be greater than Low'); return; }
   try {
     const res  = await fetch('/api/manual-range', {
       method: 'POST',
@@ -2339,21 +3106,22 @@ async function clearManualRange() {
   } catch(e) { alert('Network error: ' + e); }
 }
 
-// ─── MONITOR ─────────────────────────────────────────────────
+/* ════════════════════════════════════════════════════════════
+   MONITOR TAB
+   ════════════════════════════════════════════════════════════ */
 async function loadMonitor() {
   await loadManualRange();
   try {
-    const res  = await fetch('/api/monitor');
+    const res  = await fetch('/api/monitor?system=' + activeSystem);
     const data = await res.json();
     if (!data.ok) return;
 
     const bs = data.bot_status || {};
     const ls = bs.last_signal  || {};
 
-    // status cards
     document.getElementById('mon-cycle').textContent   = bs.cycle ?? '—';
     document.getElementById('mon-updated').textContent = bs.updated_at
-      ? 'อัปเดต ' + bs.updated_at.slice(11, 19) : '—';
+      ? 'Updated ' + bs.updated_at.slice(11, 19) : '—';
 
     const action = ls.action || '—';
     const actionEl = document.getElementById('mon-action');
@@ -2374,35 +3142,33 @@ async function loadMonitor() {
     sentEl.className   = 'value ' + (sent === 'BULLISH' ? 'green' : sent === 'BEARISH' ? 'red' : 'gold');
     document.getElementById('mon-sent-conf').textContent = `${bs.sent_conf ?? 0}% confidence`;
 
-    // detail row
     document.getElementById('mon-trend').textContent      = ls.trend      || '—';
     document.getElementById('mon-srzone').textContent     = ls.sr_zone    || '—';
     document.getElementById('mon-entry-type').textContent = ls.entry_type || '—';
     document.getElementById('mon-conf').textContent       = conf + '%';
     document.getElementById('mon-reason').textContent     = ls.reason     || '—';
 
-    // pending table
     const orders  = data.pending_orders || [];
     const grouped = data.pending_grouped || {};
     const tagCounts = Object.entries(grouped).map(([k, v]) => `${k}: ${v.length}`).join('  ·  ');
-    document.getElementById('mon-pending-summary').textContent = tagCounts || 'ไม่มี pending';
+    document.getElementById('mon-pending-summary').textContent = tagCounts || 'No pending';
 
     const tbody = document.getElementById('mon-pending-tbody');
     if (!orders.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="no-data">ไม่มี pending orders</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="no-data">No pending orders</td></tr>';
     } else {
-      const tagColors = { 'AP': '#7ec8e3', 'WK': '#f0a500', 'RNG': '#9b8aff', 'SL-RE': 'var(--red)' };
+      const tagColors = { 'AP': 'var(--cyan)', 'WK': 'var(--amber)', 'RNG': 'var(--violet)', 'SL-RE': 'var(--red)' };
       tbody.innerHTML = orders.map(o => {
         const tc = tagColors[o.tag] || 'var(--muted)';
         const typeDir = o.type.includes('BUY') ? 'green' : 'red';
         return `<tr>
-          <td><span style="color:${tc};font-weight:700;font-size:11px">${o.tag}</span></td>
-          <td class="center"><span class="badge badge-${typeDir}" style="font-size:10px">${o.type}</span></td>
+          <td><span style="color:${tc};font-weight:700;font-size:10px;font-family:var(--mono);letter-spacing:1px">${o.tag}</span></td>
+          <td class="center"><span class="badge badge-${typeDir}" style="font-size:9px">${o.type}</span></td>
           <td class="num">${fmtNum(o.price, 2)}</td>
           <td class="num" style="color:var(--red)">${o.sl ? fmtNum(o.sl, 2) : '—'}</td>
           <td class="num" style="color:var(--green)">${o.tp ? fmtNum(o.tp, 2) : '—'}</td>
-          <td style="font-size:11px;color:var(--muted)">${o.comment || '—'}</td>
-          <td style="font-size:11px;color:var(--muted)">${o.expiry ? o.expiry.slice(0, 16).replace('T', ' ') : '—'}</td>
+          <td style="font-size:10px;color:var(--muted);font-family:var(--mono)">${o.comment || '—'}</td>
+          <td style="font-size:10px;color:var(--muted);font-family:var(--mono)">${o.expiry ? o.expiry.slice(0, 16).replace('T', ' ') : '—'}</td>
         </tr>`;
       }).join('');
     }
@@ -2411,7 +3177,9 @@ async function loadMonitor() {
   }
 }
 
-// ─── BACKTEST ────────────────────────────────────────────────
+/* ════════════════════════════════════════════════════════════
+   BACKTEST
+   ════════════════════════════════════════════════════════════ */
 function _btRow(key, b) {
   const pnlCls = b.pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
   const pnlSign = b.pnl >= 0 ? '+' : '';
@@ -2439,7 +3207,6 @@ async function loadBacktest() {
     document.getElementById('bt-total').textContent     = data.trades_count ?? '—';
     document.getElementById('bt-sys-count').textContent = (data.sys_count ?? 0) + ' system trades';
 
-    // Best cards
     const bestEntry = _bestBucket(data.entry_types);
     if (bestEntry) {
       document.getElementById('bt-best-entry').textContent     = bestEntry[0];
@@ -2456,13 +3223,12 @@ async function loadBacktest() {
       document.getElementById('bt-best-hold-sub').textContent = `${bestHold[1].count} trades · ${bestHold[1].win_rate}% WR`;
     }
 
-    // Tables
     const _fill = (tbodyId, buckets, sortFn) => {
       const tbody = document.getElementById(tbodyId);
       const rows  = Object.entries(buckets || {})
         .sort(sortFn || (([, a], [, b]) => b.pnl - a.pnl));
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="no-data">ไม่มีข้อมูล</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="no-data">No data</td></tr>';
       } else {
         tbody.innerHTML = rows.map(([k, v]) => _btRow(k, v)).join('');
       }
@@ -2482,15 +3248,17 @@ async function loadBacktest() {
   }
 }
 
-// ─── NNLB RISK MODAL ─────────────────────────────────────────
+/* ════════════════════════════════════════════════════════════
+   NNLB RISK MODAL
+   ════════════════════════════════════════════════════════════ */
 (function () {
   const nnlbToggle = document.getElementById('cfg-NNLB_MODE');
   if (!nnlbToggle) return;
 
   nnlbToggle.addEventListener('change', function (e) {
-    if (!this.checked) return; // turning OFF is fine, no warning needed
+    if (!this.checked) return;
     e.preventDefault();
-    this.checked = false; // revert until user confirms
+    this.checked = false;
     document.getElementById('nnlb-modal').style.display = 'flex';
   });
 
@@ -2511,40 +3279,50 @@ async function loadBacktest() {
     }
   });
 })();
+
+/* ════════════════════════════════════════════════════════════
+   BOOTSTRAP
+   ════════════════════════════════════════════════════════════ */
+initCharts();
+fetchData();
+fetchCalendar();
+loadLivePrice();
+setInterval(fetchData, 10000);
+setInterval(fetchCalendar, 1800000);
+setInterval(loadLivePrice, 5000);
 </script>
 
 <!-- NNLB Risk Warning Modal -->
 <div id="nnlb-modal" style="
   display:none; position:fixed; inset:0; z-index:9999;
-  background:rgba(0,0,0,0.7); align-items:center; justify-content:center;">
+  background:rgba(0,0,0,0.78); align-items:center; justify-content:center;
+  backdrop-filter: blur(4px);">
   <div style="
-    background:var(--surface1,#1e1e2e); border:1px solid #f38ba8;
-    border-radius:12px; padding:28px 32px; max-width:440px; width:90%; box-shadow:0 8px 40px rgba(0,0,0,0.6);">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-      <span style="font-size:24px">⚠️</span>
-      <h3 style="margin:0;color:#f38ba8;font-size:16px">เปิด NNLB Mode — รับทราบความเสี่ยง</h3>
+    background:var(--surface); border:1px solid var(--red);
+    border-radius:10px; padding:26px 30px; max-width:460px; width:90%;
+    box-shadow:0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(233,69,96,0.2);">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <span style="font-size:22px">⚠️</span>
+      <h3 style="margin:0;color:var(--red);font-size:13px;letter-spacing:1.5px;text-transform:uppercase;font-family:var(--mono)">Enable NNLB Mode — Risk Acknowledgement</h3>
     </div>
-    <ul style="margin:0 0 20px 0;padding-left:18px;line-height:1.8;font-size:13px;color:var(--text,#cdd6f4)">
-      <li>ข้าม Money Management gates <strong>ทั้งหมด</strong> — ไม่มีการกรอง confidence, RR, daily loss</li>
-      <li>Lot size scale ตาม equity tier โดยตรง — อาจขาดทุน <strong>เกิน % ที่ยอมรับได้ในโหมดปกติ</strong></li>
-      <li>หาก MIN_LOT เกิน Max Loss Budget ระบบ <strong>ยังคงเข้า order</strong> ที่ MIN_LOT ต่อไป</li>
-      <li>เหมาะสำหรับทุนน้อยที่ยอมรับความเสี่ยงสูง <strong>เท่านั้น</strong></li>
+    <ul style="margin:0 0 18px 0;padding-left:18px;line-height:1.7;font-size:12px;color:var(--text)">
+      <li>Bypasses <strong>all</strong> Money Management gates — no confidence, RR, or daily-loss filtering</li>
+      <li>Lot size scales directly with equity tier — losses may <strong>exceed normal-mode tolerance</strong></li>
+      <li>If MIN_LOT exceeds Max Loss budget, orders <strong>still execute at MIN_LOT</strong></li>
+      <li>Intended for <strong>small accounts willing to accept high risk only</strong></li>
     </ul>
-    <p style="margin:0 0 20px 0;font-size:12px;color:#f38ba8;background:rgba(243,139,168,0.1);
-      padding:10px 14px;border-radius:6px;border-left:3px solid #f38ba8">
-      โหมดนี้ออกแบบสำหรับผู้ที่เข้าใจความเสี่ยงอย่างครบถ้วนแล้ว<br>
-      <strong>ระบบจะไม่รับผิดชอบต่อการขาดทุนที่เกิดขึ้น</strong>
+    <p style="margin:0 0 18px 0;font-size:11px;color:var(--red);background:rgba(233,69,96,0.08);
+      padding:10px 14px;border-radius:5px;border-left:3px solid var(--red);font-family:var(--mono);line-height:1.6">
+      This mode is designed for users who fully understand the risks.<br>
+      <strong>The system accepts no responsibility for losses incurred.</strong>
     </p>
     <div style="display:flex;gap:10px;justify-content:flex-end">
-      <button id="nnlb-modal-cancel" style="
-        padding:9px 20px;border-radius:6px;border:1px solid var(--border2,#45475a);
-        background:transparent;color:var(--text,#cdd6f4);font-size:13px;cursor:pointer">
-        ยกเลิก
-      </button>
+      <button id="nnlb-modal-cancel" class="secondary-btn">Cancel</button>
       <button id="nnlb-modal-confirm" style="
-        padding:9px 20px;border-radius:6px;border:none;
-        background:#f38ba8;color:#1e1e2e;font-size:13px;font-weight:700;cursor:pointer">
-        รับทราบ — เปิด NNLB Mode
+        padding:7px 18px;border-radius:5px;border:none;
+        background:var(--red);color:#fff;font-size:11px;font-weight:800;cursor:pointer;
+        letter-spacing:1px;text-transform:uppercase;font-family:var(--mono)">
+        Acknowledge — Enable
       </button>
     </div>
   </div>
