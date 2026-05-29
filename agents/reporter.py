@@ -15,10 +15,24 @@ from loguru import logger
 def _log_file() -> str:
     sym = _cfg.SYMBOL.upper().replace("/", "")
     return "logs/trades.json" if sym == "XAUUSD" else f"logs/{sym.lower()}_trades.json"
-_REPORTER_PROMPT  = Path("agents/prompts/reporter.md").read_text(encoding="utf-8")
-_ANALYSIS_COOLDOWN = 900  # วิเคราะห์ใหม่ได้ทุก 15 นาที
-_last_analysis_at: datetime | None = None
+_REPORTER_PROMPT   = Path("agents/prompts/reporter.md").read_text(encoding="utf-8")
+_ANALYSIS_COOLDOWN = 900   # seconds between reporter LLM calls
+_COOLDOWN_FILE     = "logs/reporter_last_run.txt"
 _last_usage = None   # set after each API call — read by accountant
+
+
+def _read_cooldown_ts() -> datetime | None:
+    """Read persisted last-run timestamp so cooldown survives process restarts."""
+    try:
+        ts = Path(_COOLDOWN_FILE).read_text().strip()
+        return datetime.fromisoformat(ts)
+    except Exception:
+        return None
+
+
+def _write_cooldown_ts(dt: datetime):
+    os.makedirs("logs", exist_ok=True)
+    Path(_COOLDOWN_FILE).write_text(dt.isoformat())
 
 
 def _load_log() -> dict:
@@ -662,12 +676,13 @@ def get_trade_history_summary() -> dict:
 # ─────────────────────────────────────────────────────────────
 
 def analyze_performance() -> str:
-    """เรียก Claude ด้วย reporter.md + ข้อมูลจริงจาก trades.json + balance MT5
-    คืนค่า report text หรือ "" ถ้า cooldown ยังไม่หมดหรือข้อมูลน้อยเกินไป
+    """Call Claude with reporter.md + real trade data + MT5 balance.
+    Returns report text or "" if cooldown hasn't elapsed or too few trades.
+    Cooldown is persisted to disk so restarts don't trigger a burst of calls.
     """
-    global _last_analysis_at
     now = datetime.now()
-    if _last_analysis_at and (now - _last_analysis_at) < timedelta(seconds=_ANALYSIS_COOLDOWN):
+    last_run = _read_cooldown_ts()
+    if last_run and (now - last_run) < timedelta(seconds=_ANALYSIS_COOLDOWN):
         return ""
 
     log    = _load_log()
@@ -695,16 +710,29 @@ def analyze_performance() -> str:
     drawdown_pct = round((1 - balance / START_BALANCE) * 100, 1) if START_BALANCE > 0 else 0
     v1_count = len(all_closed) - len(closed)
 
-    user_msg = f"""วิเคราะห์ performance จากข้อมูลต่อไปนี้:
+    # Compact 10-trade history — one line per trade, avoids raw JSON bloat
+    compact_history = ""
+    for t in closed[-10:]:
+        pnl = t.get("pnl") or 0
+        compact_history += (
+            f"  {t.get('timestamp','')[:10]} {t.get('direction','?'):4} "
+            f"{t.get('entry_type','?'):20} "
+            f"conf={str(t.get('confidence') or '?'):>3} "
+            f"SR={t.get('sr_zone','?'):12} "
+            f"trend={t.get('trend','?'):8} "
+            f"pnl={pnl:+.2f}\n"
+        )
 
-=== บัญชี (ข้อมูลจริงจาก MT5) ===
+    user_msg = f"""Analyze trading performance from the data below:
+
+=== Account (live MT5) ===
 Balance       : {balance:,.2f} {currency}
 Equity        : {equity:,.2f} {currency}
 Open P&L      : {open_pnl:+.2f} {currency}
-Start Balance : {START_BALANCE:,.2f} {currency}  ← ทุนเริ่มต้นจริง (ใช้ค่านี้คำนวณ drawdown)
-Drawdown      : {drawdown_pct:.1f}% (คำนวณจาก Start Balance แล้ว)
+Start Balance : {START_BALANCE:,.2f} {currency}
+Drawdown      : {drawdown_pct:.1f}%
 
-=== สถิติรวม (v2 strategy เท่านั้น{f" | v1 legacy excluded: {v1_count}" if v1_count else ""}) ===
+=== Stats (v2 strategy only{f" | v1 legacy excluded: {v1_count}" if v1_count else ""}) ===
 Total Closed  : {len(closed)} trades
 Win Rate      : {round(wr*100, 1)}%  ({len(wins)} W / {len(losses)} L)
 Expectancy    : {expectancy:+.2f} {currency}
@@ -713,11 +741,10 @@ Losing Streak : {history['losing_streak']}
 
 === Strategy Performance (entry type) ===
 {history['entry_perf_text']}
-=== 5 Trade ล่าสุด (v2) ===
+=== Last 5 Trades ===
 {history['recent_trades_text']}
-=== ประวัติการเทรด v2 (30 trades ล่าสุด) ===
-{json.dumps(closed[-30:], ensure_ascii=False, indent=2)}
-"""
+=== Last 10 Trades (compact) ===
+{compact_history}"""
 
     global _last_usage
     _last_usage = None
@@ -733,7 +760,7 @@ Losing Streak : {history['losing_streak']}
         )
         _last_usage = response.usage
         report = response.content[0].text
-        _last_analysis_at = now
+        _write_cooldown_ts(now)
         logger.info("Performance analysis completed")
         return report
     except Exception as e:
