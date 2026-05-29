@@ -666,8 +666,9 @@ def get_trade_history_summary() -> dict:
         "last_10_loss":       last_10_loss,
         "losing_streak":      losing_streak,
         "recent_trades":      closed_v2[-5:],
-        "recent_trades_text": recent_trades_text or "  ยังไม่มีประวัติการเทรด",
-        "entry_perf_text":    entry_perf_text    or "  ยังไม่มีข้อมูล",
+        "recent_trades_text": recent_trades_text or "  No trade history yet",
+        "entry_perf_text":    entry_perf_text    or "  No data",
+        "_all_closed":        closed,    # all closed trades from DB (for analyze_performance)
     }
 
 
@@ -685,22 +686,23 @@ def analyze_performance() -> str:
     if last_run and (now - last_run) < timedelta(seconds=_ANALYSIS_COOLDOWN):
         return ""
 
-    log    = _load_log()
-    all_closed = [t for t in log.get("trades", []) if t.get("status") == "CLOSED"]
-    closed     = [t for t in all_closed if t.get("strategy_version", 1) == 2]
-    if len(closed) < 3:
-        return ""  # v2 trades น้อยเกินไป
-
     from config import START_BALANCE
     account       = get_account_info()
     open_pos      = get_open_positions()
-    history       = get_trade_history_summary()
+    history       = get_trade_history_summary()   # reads from DB
+
+    # Use DB trades (authoritative) — JSON file may be missing strategy_version tags
+    all_db = history.get("_all_closed", [])
+    closed = [t for t in all_db if t.get("strategy_version", 1) == 2]
+    if len(closed) < 3:
+        return ""  # not enough v2 trades yet
+
     open_pnl      = sum(p.get("profit", 0) for p in open_pos)
     currency      = account.get("currency", "USD")
     balance       = account.get("balance", 0)
     equity        = account.get("equity", 0)
 
-    # คำนวณ expectancy จาก v2 trades เท่านั้น
+    # Expectancy from v2 trades only
     wins   = [t for t in closed if (t.get("pnl") or 0) > 0]
     losses = [t for t in closed if (t.get("pnl") or 0) < 0]
     avg_win  = sum(t["pnl"] for t in wins)   / len(wins)   if wins   else 0
@@ -708,7 +710,7 @@ def analyze_performance() -> str:
     wr       = len(wins) / len(closed) if closed else 0
     expectancy = round((wr * avg_win) + ((1 - wr) * avg_loss), 2)
     drawdown_pct = round((1 - balance / START_BALANCE) * 100, 1) if START_BALANCE > 0 else 0
-    v1_count = len(all_closed) - len(closed)
+    v1_count = len(all_db) - len(closed)
 
     # Compact 10-trade history — one line per trade, avoids raw JSON bloat
     compact_history = ""
@@ -745,6 +747,12 @@ Losing Streak : {history['losing_streak']}
 {history['recent_trades_text']}
 === Last 10 Trades (compact) ===
 {compact_history}"""
+
+    logger.info(f"[REPORTER] user_msg size: {len(user_msg):,} chars | "
+                f"entry_perf={len(history['entry_perf_text']):,} | "
+                f"recent_trades={len(history['recent_trades_text']):,} | "
+                f"compact={len(compact_history):,} | "
+                f"closed_v2={len(closed)}")
 
     global _last_usage
     _last_usage = None
