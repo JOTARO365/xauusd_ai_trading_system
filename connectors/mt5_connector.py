@@ -1184,11 +1184,12 @@ def _ema_np(prices: np.ndarray, period: int) -> np.ndarray:
     return out
 
 
-def _is_momentum_strong(direction: str) -> bool:
+def _is_momentum_strong(direction: str, min_score: int = 4) -> bool:
     """
     ตรวจ momentum แบบ lightweight จากข้อมูล M15 โดยตรง — ไม่เรียก AI
-    คืน True ถ้า momentum แรง (score ≥ 4) สอดคล้องกับ direction
+    คืน True ถ้า momentum แรง (score ≥ min_score) สอดคล้องกับ direction
     สัญญาณ: RSI(14) slope, MACD hist + expansion, Price ROC(5), EMA stack
+    max score = 5 (rsi 1 + macd 2 + roc 1 + ema 1) — min_score=5 = ต้อง align ครบ
     """
     bars = mt5.copy_rates_from_pos(SYMBOL, mt5.TIMEFRAME_M15, 0, 55)
     if bars is None or len(bars) < 35:
@@ -1237,12 +1238,17 @@ def _is_momentum_strong(direction: str) -> bool:
     if ema_bull: up += 1
     elif ema_bear: dn += 1
 
-    return (up >= 4 and up > dn) if is_buy else (dn >= 4 and dn > up)
+    return (up >= min_score and up > dn) if is_buy else (dn >= min_score and dn > up)
 
 
-MOMENTUM_EXIT_MIN_LOSS_PIPS = 500   # absolute floor (pips) — $5 minimum loss before momentum exit
-MOMENTUM_EXIT_SL_FRACTION   = 0.60  # ต้องขาดทุนอย่างน้อย 60% ของ SL distance ก่อน trigger
-M1_SPIKE_EXIT_PIPS          = 800   # M1 candle range ขั้นต่ำที่ถือว่า spike — ออกทันทีไม่รอ loss
+# ── Momentum exit thresholds (STRICT) ────────────────────────────────
+# เดิม 500p / 0.60 / score≥4 ตัดไม้เร็วเกินไป → ไม้ที่ drawdown ปกติถูกล็อกขาดทุน
+# ก่อนได้โอกาสฟื้นไป TP (TP=3R). วิเคราะห์ DB: ไม้ถือ <30m = WR 34% avg -145฿,
+# ไม้ถือ >8h = WR 73% avg +220฿ → ให้ไม้หายใจนานขึ้นคุ้มกว่ามาก
+MOMENTUM_EXIT_MIN_LOSS_PIPS = 800   # floor (pips) — ต้องขาดทุน ≥$8 ก่อน (เดิม 500/$5)
+MOMENTUM_EXIT_SL_FRACTION   = 0.85  # ต้องขาดทุน ≥85% ของ SL distance ก่อน trigger (เดิม 0.60)
+MOMENTUM_EXIT_MIN_SCORE     = 5     # momentum ต้อง align ครบทุกสัญญาณ (เดิม 4)
+M1_SPIKE_EXIT_PIPS          = 1000  # spike จริงเท่านั้น (flash crash/news) ออกทันที (เดิม 800)
 
 
 def _is_1m_spike(counter_dir: str) -> bool:
@@ -1301,7 +1307,7 @@ def manage_momentum_exit() -> int:
         threshold    = max(MOMENTUM_EXIT_MIN_LOSS_PIPS, sl_dist_pips * MOMENTUM_EXIT_SL_FRACTION)
 
         spike    = _is_1m_spike(counter_dir)
-        momentum = profit_pips <= -threshold and _is_momentum_strong(counter_dir)
+        momentum = profit_pips <= -threshold and _is_momentum_strong(counter_dir, MOMENTUM_EXIT_MIN_SCORE)
 
         if not spike and not momentum:
             continue
