@@ -27,18 +27,44 @@ _BASE = os.path.dirname(__file__)
 
 # ── Simple in-process cache to avoid hammering Supabase on every 10s poll ──
 import time as _time_mod
-_data_cache: dict = {}   # key -> (timestamp, payload)
-_DATA_CACHE_TTL = 20     # seconds
+import threading as _threading
+_data_cache: dict = {}       # key -> (timestamp, payload)
+_cache_refreshing: set = set()  # keys currently being refreshed in background
+_DATA_CACHE_TTL = 20         # seconds
 
 def _cached(key: str, fn, ttl: int = _DATA_CACHE_TTL):
-    """Return cached value or recompute if stale."""
+    """Stale-while-revalidate cache.
+
+    - Fresh entry  → return it.
+    - Stale entry  → return the stale value *immediately* and refresh in a
+      background thread (so a slow fn never blocks the request).
+    - No entry yet → compute synchronously (only happens once per key; the
+      startup warm-up pays this cost before the frontend ever polls).
+
+    NOTE: the timestamp is stored *after* fn() finishes, so a fn that takes
+    longer than ttl does not produce an already-expired entry.
+    """
     now = _time_mod.time()
-    if key in _data_cache:
-        ts, val = _data_cache[key]
+    entry = _data_cache.get(key)
+    if entry is not None:
+        ts, val = entry
         if now - ts < ttl:
             return val
+        # stale → kick off a single background refresh, serve stale meanwhile
+        if key not in _cache_refreshing:
+            _cache_refreshing.add(key)
+            def _refresh():
+                try:
+                    _data_cache[key] = (_time_mod.time(), fn())
+                except Exception:
+                    pass
+                finally:
+                    _cache_refreshing.discard(key)
+            _threading.Thread(target=_refresh, daemon=True).start()
+        return val
+    # cold: compute synchronously
     val = fn()
-    _data_cache[key] = (now, val)
+    _data_cache[key] = (_time_mod.time(), val)
     return val
 _SYSTEM_LOGS = {
     "xauusd": os.path.join(_BASE, "../logs/trades.json"),
@@ -69,6 +95,7 @@ _EDITABLE_KEYS = {
 }
 
 _usd_thb_cache = {"rate": 33.0, "fetched_at": None}
+_login_cache = {"login": None, "fetched_at": None}
 
 
 def _db_sync_trade(trade: dict) -> None:
@@ -166,7 +193,7 @@ def _sync_from_mt5(data: dict) -> bool:
             changed = True
 
     # ── 2. Closed positions from deal history ──────────────────────
-    from_dt = datetime.now() - timedelta(days=60)
+    from_dt = datetime.now() - timedelta(days=7)
     all_deals = mt5.history_deals_get(from_dt, datetime.now()) or []
 
     deals_by_pos: dict[int, list] = {}
@@ -279,23 +306,33 @@ def get_mt5_account(data_to_sync: dict | None = None) -> dict:
 
 def _get_actual_mt5_login() -> int | None:
     """ดึง account login ที่กำลัง connect อยู่จริงจาก mt5.account_info()
-    ถ้า MT5 ยังไม่ init ให้ init/shutdown เอง — fallback เป็น MT5_LOGIN จาก .env"""
+    ถ้า MT5 ยังไม่ init ให้ init/shutdown เอง — fallback เป็น MT5_LOGIN จาก .env
+    Cache ผลไว้ 5 นาที — login ไม่เปลี่ยนระหว่าง session และ MT5 init ช้า (~7s)"""
+    now = datetime.now()
+    if _login_cache["fetched_at"] and (now - _login_cache["fetched_at"]) < timedelta(minutes=5):
+        return _login_cache["login"]
     if not _MT5_AVAILABLE:
+        _login_cache.update({"login": MT5_LOGIN or None, "fetched_at": now})
         return MT5_LOGIN or None
+    result = MT5_LOGIN or None
     try:
         already_init = mt5.terminal_info() is not None
         if not already_init:
             if not mt5.initialize():
-                return MT5_LOGIN or None
+                _login_cache.update({"login": result, "fetched_at": now})
+                return result
             if not mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
                 mt5.shutdown()
-                return MT5_LOGIN or None
+                _login_cache.update({"login": result, "fetched_at": now})
+                return result
         info = mt5.account_info()
         if not already_init:
             mt5.shutdown()
-        return int(info.login) if info else (MT5_LOGIN or None)
+        result = int(info.login) if info else (MT5_LOGIN or None)
     except Exception:
-        return MT5_LOGIN or None
+        pass
+    _login_cache.update({"login": result, "fetched_at": now})
+    return result
 
 
 def load_trades(system: str = "xauusd", account_login: int | None = None) -> dict:
@@ -514,7 +551,13 @@ def api_data():
     cache_key = f"trades:{system}:{login}"
     data    = _cached(cache_key, lambda: load_trades(system, account_login=login), ttl=15)
     usd_thb = get_usd_thb()
-    account = get_mt5_account(data_to_sync=data) if system == "xauusd" else {}
+    # MT5 account + 7-day sync is the slow part — served stale-while-revalidate
+    # (background refresh) so the 10s frontend poll never blocks on a fresh sync.
+    account = _cached(
+        f"mt5acct:{system}",
+        lambda: get_mt5_account(data_to_sync=data),
+        ttl=30,
+    ) if system == "xauusd" else {}
     trades  = data.get("trades", [])
     stats   = calc_stats(trades)
 
@@ -761,6 +804,25 @@ def api_calendar():
         return jsonify({"events": [], "ok": False, "error": str(e)})
 
 
+def _warm_cache() -> None:
+    """Pre-load slow MT5 + DB caches at startup so the first frontend poll
+    gets data instantly instead of blocking ~40s on a cold MT5 sync."""
+    try:
+        login = _get_actual_mt5_login()
+        data  = _cached("trades:xauusd:None",
+                        lambda: load_trades("xauusd", account_login=None), ttl=15)
+        _cached("mt5acct:xauusd",
+                lambda: get_mt5_account(data_to_sync=data), ttl=30)
+        if login:
+            key = f"trades:xauusd:{login}"
+            _cached(key, lambda: load_trades("xauusd", account_login=login), ttl=15)
+        print("[warm_cache] done", flush=True)
+    except Exception as e:
+        print(f"[warm_cache] error: {e}", flush=True)
+
+
 if __name__ == "__main__":
+    import threading
+    threading.Thread(target=_warm_cache, daemon=True).start()
     from waitress import serve
     serve(app, host="0.0.0.0", port=5050, threads=4)
