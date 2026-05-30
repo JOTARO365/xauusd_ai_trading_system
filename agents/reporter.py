@@ -16,7 +16,7 @@ def _log_file() -> str:
     sym = _cfg.SYMBOL.upper().replace("/", "")
     return "logs/trades.json" if sym == "XAUUSD" else f"logs/{sym.lower()}_trades.json"
 _REPORTER_PROMPT   = Path("agents/prompts/reporter.md").read_text(encoding="utf-8")
-_ANALYSIS_COOLDOWN = 900   # seconds between reporter LLM calls
+_ANALYSIS_COOLDOWN = 1800  # seconds between reporter LLM calls (30min — perf report ไม่ต้องถี่)
 _COOLDOWN_FILE     = "logs/reporter_last_run.txt"
 _last_usage = None   # set after each API call — read by accountant
 
@@ -716,15 +716,17 @@ def analyze_performance() -> str:
     v1_count = len(all_db) - len(closed)
 
     # Compact 10-trade history — one line per trade, avoids raw JSON bloat
+    # NB: use `(x or '?')` not `.get(k,'?')` — a present-but-None value would
+    # crash the f-string format spec (TypeError on None) and kill the report.
     compact_history = ""
     for t in closed[-10:]:
         pnl = t.get("pnl") or 0
         compact_history += (
-            f"  {t.get('timestamp','')[:10]} {t.get('direction','?'):4} "
-            f"{t.get('entry_type','?'):20} "
+            f"  {(t.get('timestamp') or '')[:10]} {(t.get('direction') or '?'):4} "
+            f"{(t.get('entry_type') or '?'):20} "
             f"conf={str(t.get('confidence') or '?'):>3} "
-            f"SR={t.get('sr_zone','?'):12} "
-            f"trend={t.get('trend','?'):8} "
+            f"SR={(t.get('sr_zone') or '?'):12} "
+            f"trend={(t.get('trend') or '?'):8} "
             f"pnl={pnl:+.2f}\n"
         )
 
@@ -764,7 +766,7 @@ Losing Streak : {history['losing_streak']}
         client   = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=2000,
+            max_tokens=800,   # report กระชับ — เดิม 2000 ตันเพดานทุก call (86% ของ cost)
             system=[{"type": "text", "text": _REPORTER_PROMPT,
                      "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_msg}],

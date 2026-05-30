@@ -90,6 +90,9 @@ Provide recommendations:
 
 ## OUTPUT (TERMINAL REPORT)
 
+**BE CONCISE** — fill the template below, max 3 insights + 3 recommendations.
+Keep the whole report under ~500 words. No preamble, output the template directly.
+
 ==================================================
 📊 PERFORMANCE REPORT
 ==================================================
