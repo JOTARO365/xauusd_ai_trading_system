@@ -436,6 +436,14 @@ def _read_env_file() -> dict[str, str]:
                 if not stripped or stripped.startswith("#") or "=" not in stripped:
                     continue
                 key, _, val = stripped.partition("=")
+                val = val.strip()
+                # strip inline comment (whitespace + #) like python-dotenv does,
+                # but preserve values such as SYMBOL=GOLD# (# with no leading space)
+                if not (val.startswith('"') or val.startswith("'")):
+                    for sep in (" #", "\t#"):
+                        ci = val.find(sep)
+                        if ci != -1:
+                            val = val[:ci].rstrip()
                 result[key.strip()] = val.strip().strip('"').strip("'")
     except FileNotFoundError:
         pass
