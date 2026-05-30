@@ -373,13 +373,20 @@ def calc_stats(trades: list) -> dict:
         abs(sum(t.get("pnl", 0) for t in wins)) / abs(sum(t.get("pnl", 0) for t in losses)), 2
     ) if losses and sum(t.get("pnl", 0) for t in losses) != 0 else 0
 
+    # Equity curve must be chronological (oldest → newest). The DB returns
+    # trades newest-first, so iterating as-is plotted the cumulative curve
+    # backwards in time (gains looked like losses and vice versa). Sort by
+    # realized close time (fallback to open time) ascending.
+    chrono = sorted(closed, key=lambda x: (x.get("close_time") or x.get("timestamp") or ""))
     equity_curve = []
     running = 0
-    for t in closed:
+    for t in chrono:
         running += t.get("pnl") or 0
-        equity_curve.append({"time": t.get("timestamp", "")[:16], "equity": round(running, 2)})
+        ts = t.get("close_time") or t.get("timestamp") or ""
+        equity_curve.append({"time": ts[:16], "equity": round(running, 2)})
 
-    today_closed  = [t for t in closed if t.get("timestamp", "").startswith(today_str)]
+    # Current losing streak = most recent consecutive losses → walk newest first
+    today_closed  = [t for t in chrono if t.get("timestamp", "").startswith(today_str)]
     losing_streak = 0
     for t in reversed(today_closed):
         if (t.get("pnl") or 0) < 0:
