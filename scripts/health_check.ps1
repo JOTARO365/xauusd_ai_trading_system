@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 #  health_check.ps1 — เช็กว่า bot "รันจริง" มั้ย (ไม่ใช่แค่ process เปิด)
 #  รัน:  powershell -ExecutionPolicy Bypass -File scripts\health_check.ps1
 #  เช็ก 5 อย่าง: process/task, liveness, MT5+activity, dashboard, token cost
