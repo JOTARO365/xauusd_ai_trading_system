@@ -89,15 +89,18 @@ Every cycle (~15 min normal / ~5 min with open position)
 
 ### Smart Skip Gate
 
-The system will **not skip** and runs AI immediately when:
+To stay within a token budget while running 24/7, the gate **throttles** AI calls — it force-runs AI only on genuine signals, and throttles the rest:
 
-| Condition | Reason |
+| Condition | Behavior |
 |---|---|
-| Ready Mode active | Price is at a D1/W1 HTF zone — high-probability opportunity |
-| First cycle after start | No prior data available |
-| Price spike ≥ 500 pips | Breaking news / flash crash |
-| Price within ≤ 0.3% of an S/R zone | M15 setup may be forming |
-| News window (8–9, 13–15, 18–19 UTC) | Interval reduced to 3 minutes |
+| First cycle after start | Always runs |
+| Price spike ≥ `AI_SPIKE_PIPS` (500) | Always runs — breaking news / flash crash (overrides throttle) |
+| Ready Mode active (price at D1/W1 HTF zone) | Runs AI, but **throttled** to once per `READY_AI_MIN_SECS` (5 min) |
+| Price within ≤ `AI_SR_PROXIMITY_PCT` (0.1%) of a **major HTF (D1/W1)** zone | Same 5-min throttle |
+| News window (8–9, 13–15, 18–19 UTC) | AI interval reduced to 3 minutes |
+| Otherwise | Normal: 15 min idle / 5 min with an open position |
+
+> **Why throttle?** Older builds treated *every* H4/H1 minor S/R level (within 0.3%) **and** Ready Mode as "never skip", so the full 4-agent pipeline fired every ~2 minutes and dominated token cost (~$24/day). The gate now only force-runs on real signals (spikes, major D1/W1 zones) and caps AI frequency to once per 5 min during those windows — the spike override still reacts instantly to fast moves in any session.
 
 ### Why LangGraph?
 
@@ -304,6 +307,36 @@ docker compose -f docker-compose.windows.yml down
 | **Build time** | ~2-5 min | ~15-30 min |
 | **MetaTrader5** | Not supported | Supported (Windows IPC) |
 | **Docker mode** | Linux (default) | Windows containers |
+
+---
+
+## 24/7 Cloud Deployment (GCP Windows VM)
+
+Scripts in `scripts/` provision a Windows VM that runs MT5 + bot 24/7. A Windows host is required because MT5 needs a GUI session (`mt5.initialize()` attaches to a running terminal).
+
+### One-shot (from GCP Cloud Shell)
+
+```bash
+# Creates an e2-medium Windows Server 2022 VM (Singapore), then installs
+# Python/Git/MT5(XM) + clones the repo via a startup script.
+bash scripts/create_vm.sh <github_token> <your_ip>/32
+```
+
+> ⚠️ **Security** — always pass `<your_ip>/32` (check at whatismyip.com) to restrict RDP. Open RDP (3389) to `0.0.0.0/0` is a top brute-force target; if you omit the IP, the script now **prompts for confirmation** before exposing it publicly.
+
+### On the VM (after RDP in)
+
+1. Open MT5 (XM) and log in once — the terminal must have run interactively
+2. Fill `C:\trading\xauusd_ai_trading_system\.env`
+3. Enable 24/7 auto-start (PowerShell **as Administrator**):
+
+```powershell
+C:\trading\xauusd_ai_trading_system\scripts\autostart_vm.ps1
+```
+
+This registers At-LogOn / Interactive scheduled tasks for the bot + dashboard that restart on crash and survive reboot. Follow the auto-logon note it prints so MT5 has a desktop session after reboots.
+
+> The startup script (`setup_vm_startup.ps1`) is **idempotent** — it skips already-installed components on later boots (markers: `.mt5_installed`, `.deps_installed`). The dashboard port (5050) is **not** opened in the firewall; reach it from mobile over a private network (e.g. Tailscale) rather than exposing it publicly — the dashboard has no auth and can close trades / edit config.
 
 ---
 
