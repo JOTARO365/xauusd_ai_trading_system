@@ -385,9 +385,11 @@ This registers At-LogOn / Interactive scheduled tasks for the bot + dashboard th
 | `LESSON_LEARNING` | `true` | RAG-based Lesson Retrieval — remembers past mistakes and warns DecisionMaker (requires GEMINI_API_KEY) |
 | `DRY_RUN` | `false` | Mock MT5 execution — full pipeline runs but no real orders are sent |
 | `NNLB_MODE` | `false` | **No-Risk-No-Lamborghini** — bypasses all gates and money management; lot scales with equity tier |
-| `NNLB_BASE_EQUITY` | `100` | NNLB: minimum equity before first order is allowed |
-| `NNLB_EQUITY_PER_LOT` | `100` | NNLB: equity per lot tier — e.g. equity $300 → 3× MIN_LOT |
+| `NNLB_BASE_EQUITY` | `100` | NNLB: minimum equity (**USD**) before first order — auto-converted to account currency |
+| `NNLB_EQUITY_PER_LOT` | `100` | NNLB: profit (**USD**) per +0.01 lot — e.g. base 25 + per_lot 25 → equity $75 = lot 0.03 |
 | `NNLB_MAX_LOSS_PCT` | `25` | NNLB: max loss per trade as % of equity — lot auto-reduced to stay within budget |
+
+> **NNLB values are USD-canonical.** `NNLB_BASE_EQUITY` and `NNLB_EQUITY_PER_LOT` are entered in USD and auto-converted to the account currency at runtime (rate derived from gold's pip value: USD → ×1, THB → ×~36). One config set works for USD and THB accounts alike — no per-currency tuning. ⚠️ Also raise `MAX_LOT` (default `0.01` caps all scaling).
 
 ### Position Sizing (Confidence-based)
 
@@ -693,20 +695,25 @@ Old trades will have `strategy_version=1` (legacy), new trades will be `2` autom
 
 ## Preset for Small Account (~$28 / 1,000 THB)
 
-Use **NNLB mode** to bypass money management gates and scale lot with equity:
+Use **NNLB mode** to bypass money management gates and scale lot with equity. NNLB
+values are **USD** and auto-convert to the account currency, so this same preset
+works for a USD or a THB account unchanged:
 
 ```env
 NNLB_MODE=true
-NNLB_BASE_EQUITY=25         # Minimum $25 equity before first order
-NNLB_EQUITY_PER_LOT=25      # +1 tier per $25 (equity $28 → tier=1 → lot=0.01)
+NNLB_BASE_EQUITY=25         # USD — min equity before first order (THB acct → ~900฿)
+NNLB_EQUITY_PER_LOT=25      # USD — +0.01 lot per $25 profit above base
 NNLB_MAX_LOSS_PCT=30        # Auto-reduce lot so max loss ≤ 30% per trade
 MIN_LOT=0.01
-MAX_LOT=0.01
+MAX_LOT=0.05                # ⚠️ must be > MIN_LOT or lot can never scale up
 DEFAULT_SL_PIPS=500         # Tighter SL to keep risk reasonable
 DEFAULT_TP_PIPS=1500        # R:R 3:1
 START_BALANCE=28
 PORTFOLIO_PROTECTION=false  # Disable daily loss gate (too small to keep it enabled)
 ```
+
+Lot progression with this preset: equity $28 (profit $3) → `lot 0.01`; equity $50
+(profit $25) → `lot 0.02`; equity $75 → `lot 0.03` … capped at `MAX_LOT`.
 
 > **Note**: With $28 capital and MIN_LOT=0.01, SL=500 pips — max loss per trade is $50 (178% of capital).
 > The system will log an `NNLB ⚠` warning but will still enter since NNLB is explicitly an accept-all-risk mode.

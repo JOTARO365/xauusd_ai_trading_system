@@ -93,34 +93,45 @@ def _nnlb_lot_and_check(equity: float, sl_pips: float) -> tuple[float, str]:
     NNLB lot calculation + equity gate
     คืน (lot, error_msg)  — error_msg ว่าง = ผ่าน
 
-    Profit-tier logic:
-      profit = equity - NNLB_BASE_EQUITY            ← กำไรที่ได้จากทุนเริ่มต้น
-      steps  = floor(profit / NNLB_EQUITY_PER_LOT)  ← เพิ่ม 0.01 lot ต่อทุก profit step
+    *** Config เป็น USD-canonical ***
+    NNLB_BASE_EQUITY / NNLB_EQUITY_PER_LOT ตั้งเป็น **USD** แล้วแปลงเป็นสกุลบัญชี
+    อัตโนมัติด้วย rate = _calc_pip_value(SYMBOL). ทองราคา 1 pip = $1 USD พอดี →
+    pip value ในสกุลบัญชี = อัตราแลกเปลี่ยน USD→account ccy (USD→1.0, THB→~36).
+    ค่าชุดเดียวจึงใช้ได้ทุกสกุล (USD/THB/EUR ...) ใน multi-user setup
+
+    Profit-tier logic (หน่วยสกุลบัญชี หลังแปลงจาก USD):
+      profit = equity - base_acct
+      steps  = floor(profit / per_step_acct)        ← เพิ่ม 0.01 lot ต่อ step
       lot    = MIN_LOT + steps × 0.01  (clamped MIN_LOT–MAX_LOT)
 
-    ตัวอย่าง NNLB_BASE_EQUITY=1, NNLB_EQUITY_PER_LOT=5000 (THB), MIN_LOT=0.01:
-      equity 10,000 (กำไร ~9,999) → lot 0.02
-      equity 15,000 (กำไร 14,999) → lot 0.03
-      equity 20,000 (กำไร 19,999) → lot 0.04
+    ตัวอย่าง NNLB_BASE_EQUITY=25 (USD), NNLB_EQUITY_PER_LOT=25 (USD), MIN_LOT=0.01:
+      บัญชี USD (rate=1)  : base=$25,  +0.01 lot ทุก $25 กำไร
+      บัญชี THB (rate~36) : base~900฿, +0.01 lot ทุก ~900฿ กำไร
     """
+    # ── USD → account currency (rate = pip value ของทอง = $1/pip) ──────
+    # ใช้ค่าเดียวกันทั้งแปลง config และ max-loss calc → MT5 จัดการ conversion ให้
+    rate         = _calc_pip_value(_cfg.SYMBOL)          # account-ccy ต่อ 1 USD (per pip per lot)
+    base_acct    = _cfg.NNLB_BASE_EQUITY * rate
+    per_step     = max(1e-9, _cfg.NNLB_EQUITY_PER_LOT * rate)   # guard against div/0
+    acct         = mt5.account_info()
+    ccy          = acct.currency if acct else "?"
+
     # ── Gate: equity ต่ำกว่า base → ไม่คุ้มกับ SL ────────────────
-    if equity < _cfg.NNLB_BASE_EQUITY:
-        msg = f"[NNLB] equity {equity:.2f} < base {_cfg.NNLB_BASE_EQUITY:.0f} — skip (ทุนไม่พอ)"
+    if equity < base_acct:
+        msg = (f"[NNLB] equity {equity:.2f} {ccy} < base {base_acct:.2f} {ccy} "
+               f"(${_cfg.NNLB_BASE_EQUITY:.0f} × {rate:.2f}) — skip (ทุนไม่พอ)")
         logger.warning(msg)
         return 0.0, msg
 
-    # ── Profit-based tier: เพิ่ม 0.01 lot ทุก NNLB_EQUITY_PER_LOT กำไร ──
-    per_step     = max(1.0, _cfg.NNLB_EQUITY_PER_LOT)   # guard against div/0
-    profit       = max(0.0, equity - _cfg.NNLB_BASE_EQUITY)
+    # ── Profit-based tier: เพิ่ม 0.01 lot ทุก per_step กำไร ──
+    profit       = max(0.0, equity - base_acct)
     profit_steps = int(profit / per_step)
     lot          = round(min(_cfg.MIN_LOT + profit_steps * 0.01, _cfg.MAX_LOT), 2)
     lot          = max(_cfg.MIN_LOT, lot)
 
     # ── NNLB_MAX_LOSS_PCT: cap lot ให้ max_loss ไม่เกิน X% ของ equity ──
-    # ใช้ _calc_pip_value เพื่อให้ถูกต้องทั้ง USD, THB, EUR ฯลฯ
-    acct         = mt5.account_info()
-    ccy          = acct.currency if acct else "?"
-    pv_1lot      = _calc_pip_value(_cfg.SYMBOL)           # per pip per 1 lot ใน account ccy
+    # pv_1lot = rate (เป็นค่าเดียวกัน: per pip per 1 lot ใน account ccy)
+    pv_1lot      = rate
     max_loss         = round(lot * sl_pips * pv_1lot, 2)
     max_loss_allowed = round(equity * (_cfg.NNLB_MAX_LOSS_PCT / 100), 2)
 

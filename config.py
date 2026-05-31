@@ -148,21 +148,22 @@ LESSON_LEARNING = os.getenv("LESSON_LEARNING", "true").lower() != "false"
 DRY_RUN = os.getenv("DRY_RUN", "false").lower() == "true"
 
 # ── NNLB mode (No-Risk-No-Lamborghini) ───────────────────────
-# true  = ข้าม money management / gates ทั้งหมด — lot คำนวณจาก equity tier
+# true  = ข้าม money management / gates ทั้งหมด — lot scale ตาม equity tier
 # false = ปกติ (แนะนำ)
+# *** ค่า BASE_EQUITY / EQUITY_PER_LOT เป็น USD แล้วแปลงเป็นสกุลบัญชีอัตโนมัติ ***
+# (rate = pip value ของทอง = $1/pip → USD=1.0, THB~36) → ค่าชุดเดียวใช้ได้ทุกสกุล
 NNLB_MODE = os.getenv("NNLB_MODE", "false").lower() == "true"
 
-# equity ขั้นต่ำ (USD) ก่อนอนุญาตให้เข้า order แรก
-# ถ้า equity < NNLB_BASE_EQUITY → skip (ทุนน้อยเกินไป ไม่คุ้มกับ SL)
+# equity ขั้นต่ำ (USD) ก่อนอนุญาตให้เข้า order แรก — แปลงเป็นสกุลบัญชีอัตโนมัติ
+# ถ้า equity < base(แปลงแล้ว) → skip (ทุนน้อยเกินไป ไม่คุ้มกับ SL)
 NNLB_BASE_EQUITY = float(os.getenv("NNLB_BASE_EQUITY", "100"))
 
-# equity ที่ต้องการต่อ 1 MIN_LOT
-# tier = floor(equity / NNLB_EQUITY_PER_LOT) → lot = MIN_LOT × tier
-# ตัวอย่าง: equity=300, NNLB_EQUITY_PER_LOT=100, MIN_LOT=0.01
-#   → tier=3 → lot=0.03
+# กำไร (USD) ต่อการเพิ่ม 0.01 lot — แปลงเป็นสกุลบัญชีอัตโนมัติ
+# steps = floor((equity − base) / per_lot) → lot = MIN_LOT + steps×0.01
+# ตัวอย่าง USD: base=25, per_lot=25 → equity $75 (กำไร $50) → steps=2 → lot=0.03
 NNLB_EQUITY_PER_LOT = float(os.getenv("NNLB_EQUITY_PER_LOT", "100"))
 
-# max loss ต่อ trade (% ของ equity) — ถ้า SL กว้างเกินไปสำหรับทุนที่มี → skip
+# max loss ต่อ trade (% ของ equity) — cap lot ให้ loss ไม่เกิน X% (ไม่ขึ้นกับสกุล)
 # ค่า 25 หมายถึง ยอมรับ loss ได้ 25% ของ equity ต่อ trade
 NNLB_MAX_LOSS_PCT = float(os.getenv("NNLB_MAX_LOSS_PCT", "25"))
 
