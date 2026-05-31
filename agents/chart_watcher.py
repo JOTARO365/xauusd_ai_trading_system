@@ -1,5 +1,7 @@
+import os
 import anthropic
 import json
+from datetime import datetime
 import pandas as pd
 import numpy as np
 import ta
@@ -17,6 +19,100 @@ SYSTEM_PROMPT = json.dumps(
 )
 
 _last_usage = None   # set after each API call — read by accountant
+
+# ── A/B SHADOW HARNESS (Phase 1 — พิสูจน์ terse output ก่อนสลับจริง) ──────────
+# เปิดด้วย env CHART_SHADOW=true → ยิง terse-variant คู่ขนานบน input เดียวกัน
+# เทียบผลลง logs/shadow_chart.jsonl — ไม่แตะ result/_last_usage/การเทรด (zero-risk)
+_CHART_SHADOW = (os.getenv("CHART_SHADOW") or "").strip().lower() in ("1", "true", "yes", "on")
+
+_TERSE_SUFFIX = (
+    "\n\n[OUTPUT MODE: TERSE] ใช้กฎ/ข้อมูลเดิมทุกประการในการตัดสิน "
+    "แต่ตอบเฉพาะฟิลด์ด้านล่างเท่านั้น — ห้าม markdown header, ห้ามเล่าซ้ำ input, "
+    "ห้ามบทวิเคราะห์ยาว. รูปแบบ (บรรทัดละฟิลด์):\n"
+    "SIGNAL: <BUY|SELL|NO_TRADE>\nCONFIDENCE: <0-100>\nTREND: <...>\n"
+    "SR_ZONE: <...>\nSR_STRENGTH: <...>\nENTRY_TYPE: <...>\nMOMENTUM: <...>\n"
+    "FIB_LEVEL: <...>\nSL_PIPS: <number>\nTP_PIPS: <number>\nREASON: <สั้น 1 บรรทัด>"
+)
+SYSTEM_PROMPT_TERSE = SYSTEM_PROMPT + _TERSE_SUFFIX
+
+
+def _parse_chart_fields(text: str) -> dict:
+    """Parse 10 ฟิลด์จาก response (กฎเดียวกับ parser หลัก) — ใช้เทียบ shadow."""
+    out = {}
+    for line in text.splitlines():
+        if ":" not in line:
+            continue
+        key = line.split(":")[0].strip()
+        val = line.split(":", 1)[1].strip()
+        if key == "SIGNAL":
+            s = val.strip().upper().split()[0] if val.strip() else ""
+            if s in ("BUY", "SELL", "NO_TRADE"):
+                out["signal"] = s
+        elif key == "CONFIDENCE":
+            try: out["confidence"] = int(val)
+            except Exception: pass
+        elif key == "TREND":       out["trend"] = val
+        elif key == "SR_ZONE":     out["sr_zone"] = val.split("—")[0].strip()
+        elif key == "SR_STRENGTH": out["sr_strength"] = val.split("—")[0].strip()
+        elif key == "ENTRY_TYPE":  out["entry_type"] = val
+        elif key == "MOMENTUM":    out["momentum"] = val
+        elif key == "FIB_LEVEL":   out["fib_level"] = val
+        elif key == "SL_PIPS":
+            try: out["sl_pips"] = float(val)
+            except Exception: pass
+        elif key == "TP_PIPS":
+            try: out["tp_pips"] = float(val)
+            except Exception: pass
+    return out
+
+
+def _shadow_chart_call(user_message: str, real_result: dict) -> None:
+    """A/B SHADOW: ยิง terse-variant บน input เดียวกัน เทียบกับของจริง.
+    ไม่แตะ result/_last_usage/การเทรด — ของจริงใช้ output เดิมตลอด (zero-risk).
+    เปิดด้วย env CHART_SHADOW=true."""
+    if not _CHART_SHADOW:
+        return
+    try:
+        import time as _time
+        t0 = _time.monotonic()
+        resp = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=300,
+            system=[{"type": "text", "text": SYSTEM_PROMPT_TERSE,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": user_message}],
+        )
+        lat = int((_time.monotonic() - t0) * 1000)
+        sf  = _parse_chart_fields(resp.content[0].text)
+
+        crit = ("signal", "confidence", "sl_pips", "tp_pips")
+        real = {k: real_result.get(k) for k in crit}
+        shad = {k: sf.get(k) for k in crit}
+        sig_match  = real["signal"] == shad["signal"]
+        conf_match = (real["confidence"] is not None and shad["confidence"] is not None
+                      and abs(real["confidence"] - shad["confidence"]) <= 5)
+        decision_match = sig_match and conf_match   # จุดชี้ขาด: terse เปลี่ยน "การตัดสินใจเทรด" มั้ย
+
+        real_out   = getattr(_last_usage, "output_tokens", None)
+        shadow_out = getattr(resp.usage, "output_tokens", None)
+        rec = {
+            "ts": datetime.now().isoformat(timespec="seconds"),
+            "decision_match": decision_match,
+            "sig_match": sig_match, "conf_match": conf_match,
+            "sl_match": real["sl_pips"] == shad["sl_pips"],
+            "tp_match": real["tp_pips"] == shad["tp_pips"],
+            "real": real, "shadow": shad,
+            "real_out_tok": real_out, "shadow_out_tok": shadow_out,
+            "shadow_lat_ms": lat,
+        }
+        with Path("logs/shadow_chart.jsonl").open("a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        tag = "MATCH" if decision_match else "DIFF "
+        logger.info(f"[SHADOW] {tag} out {real_out}->{shadow_out} tok | "
+                    f"real={real['signal']}/{real['confidence']} "
+                    f"shadow={shad['signal']}/{shad['confidence']}")
+    except Exception as e:
+        logger.warning(f"[SHADOW] failed (ignored): {e}")
 
 SR_ZONE_PCT   = 0.004   # 0.4% = "อยู่ในโซน S/R" (ขยายสำหรับ scalping)
 EMA_TOUCH_PCT = 0.002   # 0.2% = "แตะ EMA"
@@ -1153,4 +1249,5 @@ RSI:{m15['rsi']} MACD Hist:{m15['macd_hist']}
             except Exception:
                 pass
 
+    _shadow_chart_call(user_message, result)   # A/B shadow (no-op ถ้า CHART_SHADOW ปิด)
     return result
