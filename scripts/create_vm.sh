@@ -10,8 +10,30 @@
 set -e
 
 GH_TOKEN="${1:-}"
-RDP_SRC="${2:-0.0.0.0/0}"
+RDP_SRC="${2:-}"
 ZONE="asia-southeast1-b"
+
+# ── ความปลอดภัย: ไม่เปิด RDP ทั้งอินเทอร์เน็ตโดยไม่ตั้งใจ ──────────────
+# RDP (3389) ที่เปิดให้ 0.0.0.0/0 = เป้า brute-force/hack อันดับต้นๆ ของ Windows VM
+if [ -z "$RDP_SRC" ]; then
+  echo ""
+  echo "  ⚠️  ไม่ได้ระบุ IP สำหรับจำกัด RDP (arg ที่ 2)"
+  echo "     การเปิด RDP (3389) ให้ทั้งอินเทอร์เน็ต (0.0.0.0/0) เสี่ยงโดน hack สูงมาก"
+  echo "     เช็ก IP บ้าน/มือถือคุณที่ whatismyip.com (อย่าใช้ IP ของ Cloud Shell)"
+  echo ""
+  read -r -p "  พิมพ์ IP ที่จะอนุญาต เช่น 1.2.3.4/32 (Enter = เปิดทั้งอินเทอร์เน็ต ไม่แนะนำ): " ANS
+  if [ -n "$ANS" ]; then
+    RDP_SRC="$ANS"
+  else
+    read -r -p "  ยืนยันเปิด RDP ทั้งอินเทอร์เน็ต? พิมพ์ 'yes' เท่านั้นจึงจะดำเนินการ: " CONFIRM
+    if [ "$CONFIRM" != "yes" ]; then
+      echo "  ยกเลิก — รันใหม่พร้อมระบุ IP:  bash scripts/create_vm.sh \"$GH_TOKEN\" <your_ip>/32"
+      exit 1
+    fi
+    RDP_SRC="0.0.0.0/0"
+  fi
+fi
+echo "    RDP source range = $RDP_SRC"
 
 echo "==> [1/5] Ensuring Compute Engine API ..."
 gcloud services enable compute.googleapis.com
@@ -34,9 +56,11 @@ gcloud compute instances create mt5-vm \
   --metadata-from-file windows-startup-script-ps1=scripts/setup_vm_startup.ps1
 
 echo "==> [3/5] RDP firewall rule (source: $RDP_SRC) ..."
+# create ถ้ายังไม่มี — ถ้ามีอยู่แล้วให้ update source-ranges ตาม IP ที่เลือกรอบนี้
+# (กันกรณี rule เก่าเปิด 0.0.0.0/0 ค้างไว้จากการรันครั้งก่อน)
 gcloud compute firewall-rules create allow-rdp \
   --allow=tcp:3389 --source-ranges="$RDP_SRC" 2>/dev/null \
-  || echo "    (firewall rule อาจมีอยู่แล้ว — ข้าม)"
+  || gcloud compute firewall-rules update allow-rdp --source-ranges="$RDP_SRC"
 
 echo "==> [4/5] ตั้งรหัส Windows (user: trader) — *** เก็บรหัสที่ขึ้นไว้ ***"
 gcloud compute reset-windows-password mt5-vm --zone="$ZONE" --user=trader --quiet
