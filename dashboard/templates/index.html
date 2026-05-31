@@ -2446,9 +2446,39 @@ function renderPage() {
       <td>${analysisHtml}</td>
       <td class="num">${fmtPnl(t.pnl)}</td>
       <td>${closeReasonHtml}</td>
-      <td class="center"><span class="badge badge-${status}">${t.status || '—'}</span> ${result}</td>
+      <td class="center"><span class="badge badge-${status}">${t.status || '—'}</span> ${result}${t.status === 'OPEN' && t.ticket ? `<button onclick="closePosition(${t.ticket}, ${t.pnl || 0})" style="margin-left:6px;padding:4px 9px;font-size:10px;background:var(--red);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--mono);letter-spacing:0.5px">✕ Close</button>` : ''}</td>
     </tr>`;
   }).join('');
+}
+
+/* ════════════════════════════════════════════════════════════
+   TRADE CONTROL (close / cancel / modify) — สั่งจากมือถือผ่าน dashboard
+   ════════════════════════════════════════════════════════════ */
+async function closePosition(ticket, pnl) {
+  const pnlTxt = (pnl >= 0 ? '+' : '') + Number(pnl).toFixed(2);
+  if (!confirm(`ปิด position #${ticket} ?\nP/L ปัจจุบัน: ${pnlTxt} THB`)) return;
+  try {
+    const res = await fetch('/api/close', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticket })
+    });
+    const j = await res.json();
+    if (j.ok) { alert(`✅ ปิดแล้ว #${ticket}\nP/L: ${j.closed_pnl} THB`); fetchData(); }
+    else alert('❌ ปิดไม่สำเร็จ: ' + (j.error || 'unknown'));
+  } catch (e) { alert('error: ' + e.message); }
+}
+
+async function cancelPending(ticket) {
+  if (!confirm(`ยกเลิก pending order #${ticket} ?`)) return;
+  try {
+    const res = await fetch('/api/cancel-pending', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticket })
+    });
+    const j = await res.json();
+    if (j.ok) { alert(`✅ ยกเลิกแล้ว #${ticket}`); loadMonitor(); }
+    else alert('❌ ยกเลิกไม่สำเร็จ: ' + (j.error || 'unknown'));
+  } catch (e) { alert('error: ' + e.message); }
 }
 
 function renderTable(trades) {
@@ -3168,7 +3198,7 @@ async function loadMonitor() {
           <td class="num" style="color:var(--red)">${o.sl ? fmtNum(o.sl, 2) : '—'}</td>
           <td class="num" style="color:var(--green)">${o.tp ? fmtNum(o.tp, 2) : '—'}</td>
           <td style="font-size:10px;color:var(--muted);font-family:var(--mono)">${o.comment || '—'}</td>
-          <td style="font-size:10px;color:var(--muted);font-family:var(--mono)">${o.expiry ? o.expiry.slice(0, 16).replace('T', ' ') : '—'}</td>
+          <td style="font-size:10px;color:var(--muted);font-family:var(--mono)">${o.expiry ? o.expiry.slice(0, 16).replace('T', ' ') : '—'}${o.ticket ? ` <button onclick="cancelPending(${o.ticket})" style="margin-left:4px;padding:3px 7px;font-size:10px;background:var(--red);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--mono)">✕</button>` : ''}</td>
         </tr>`;
       }).join('');
     }

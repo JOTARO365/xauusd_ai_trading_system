@@ -808,6 +808,111 @@ def api_clear_manual_range():
     return jsonify({"ok": True, "active": False})
 
 
+# ── Trade control endpoints (มือถือสั่งผ่าน dashboard → PC ต่อ MT5 ให้) ──
+def _ensure_mt5() -> bool:
+    """Ensure MT5 is initialized + logged in. Returns True if ready to trade."""
+    if not _MT5_AVAILABLE:
+        return False
+    try:
+        if mt5.terminal_info() is not None:
+            return True
+        if not mt5.initialize():
+            return False
+        return bool(mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER))
+    except Exception:
+        return False
+
+
+def _ticket_from_body() -> tuple[int | None, object]:
+    body = request.get_json(silent=True) or {}
+    try:
+        ticket = int(body.get("ticket", 0))
+    except (TypeError, ValueError):
+        return None, body
+    return (ticket or None), body
+
+
+@app.route("/api/close", methods=["POST"])
+def api_close_position():
+    """ปิด position ตาม ticket (market close) — ใช้ได้ทั้ง SYSTEM และ MANUAL"""
+    ticket, _ = _ticket_from_body()
+    if not ticket:
+        return jsonify({"ok": False, "error": "ต้องระบุ ticket เป็นตัวเลข"}), 400
+    if not _ensure_mt5():
+        return jsonify({"ok": False, "error": "MT5 not connected"}), 503
+
+    pos_list = mt5.positions_get(ticket=ticket)
+    if not pos_list:
+        return jsonify({"ok": False, "error": f"ไม่พบ position #{ticket}"}), 404
+    pos  = pos_list[0]
+    tick = mt5.symbol_info_tick(pos.symbol)
+    if tick is None:
+        return jsonify({"ok": False, "error": "ดึงราคาไม่ได้"}), 503
+
+    is_buy = pos.type == 0
+    result = mt5.order_send({
+        "action":    mt5.TRADE_ACTION_DEAL,
+        "symbol":    pos.symbol,
+        "volume":    pos.volume,
+        "type":      mt5.ORDER_TYPE_SELL if is_buy else mt5.ORDER_TYPE_BUY,
+        "position":  pos.ticket,
+        "price":     tick.bid if is_buy else tick.ask,
+        "deviation": 20,
+        "comment":   "DASHBOARD_CLOSE",
+    })
+    if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+        err = mt5.last_error() if result is None else f"retcode={result.retcode} {result.comment}"
+        return jsonify({"ok": False, "error": str(err)}), 500
+    return jsonify({"ok": True, "ticket": ticket, "closed_pnl": round(pos.profit, 2)})
+
+
+@app.route("/api/cancel-pending", methods=["POST"])
+def api_cancel_pending_order():
+    """ยกเลิก pending order ตาม ticket"""
+    ticket, _ = _ticket_from_body()
+    if not ticket:
+        return jsonify({"ok": False, "error": "ต้องระบุ ticket เป็นตัวเลข"}), 400
+    if not _ensure_mt5():
+        return jsonify({"ok": False, "error": "MT5 not connected"}), 503
+
+    result = mt5.order_send({"action": mt5.TRADE_ACTION_REMOVE, "order": ticket})
+    if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+        err = mt5.last_error() if result is None else f"retcode={result.retcode} {result.comment}"
+        return jsonify({"ok": False, "error": str(err)}), 500
+    return jsonify({"ok": True, "ticket": ticket})
+
+
+@app.route("/api/modify", methods=["POST"])
+def api_modify_position():
+    """ปรับ SL/TP ของ position (ส่ง 0 = ไม่ตั้ง)"""
+    ticket, body = _ticket_from_body()
+    if not ticket:
+        return jsonify({"ok": False, "error": "ต้องระบุ ticket เป็นตัวเลข"}), 400
+    try:
+        sl = float(body.get("sl") or 0)
+        tp = float(body.get("tp") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "sl/tp ต้องเป็นตัวเลข"}), 400
+    if not _ensure_mt5():
+        return jsonify({"ok": False, "error": "MT5 not connected"}), 503
+
+    pos_list = mt5.positions_get(ticket=ticket)
+    if not pos_list:
+        return jsonify({"ok": False, "error": f"ไม่พบ position #{ticket}"}), 404
+    pos = pos_list[0]
+    result = mt5.order_send({
+        "action":   mt5.TRADE_ACTION_SLTP,
+        "symbol":   pos.symbol,
+        "position": pos.ticket,
+        "sl":       sl,
+        "tp":       tp,
+    })
+    if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+        err = mt5.last_error() if result is None else f"retcode={result.retcode} {result.comment}"
+        return jsonify({"ok": False, "error": str(err)}), 500
+    return jsonify({"ok": True, "ticket": ticket, "sl": sl, "tp": tp})
+
+
 @app.route("/api/calendar")
 def api_calendar():
     """ดึง economic calendar สัปดาห์นี้ (High + Medium impact events)"""
