@@ -21,5 +21,14 @@ module.exports = {
       max_restarts: 10,
       restart_delay: 1000,
     },
+    {
+      name: "auto-deploy",
+      script: "pm2_autodeploy.js",
+      cwd: APP_DIR,
+      autorestart: true,
+      watch: false,
+      max_restarts: 50,
+      restart_delay: 5000,
+    },
   ],
 };
