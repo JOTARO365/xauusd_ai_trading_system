@@ -43,7 +43,7 @@ Write-Host "`n[2] Liveness (bot_status.json)" -ForegroundColor Cyan
 $statusFile = Join-Path $LOGS "bot_status.json"
 if (Test-Path $statusFile) {
     try {
-        $st  = Get-Content $statusFile -Raw | ConvertFrom-Json
+        $st  = Get-Content $statusFile -Raw -Encoding UTF8 | ConvertFrom-Json
         $upd = [datetime]$st.updated_at
         $age = [int]((Get-Date) - $upd).TotalMinutes
         if ($age -le 20)      { Ok   "updated $age min ago — cycle #$($st.cycle), decision=$($st.decision)" }
@@ -58,7 +58,7 @@ if (Test-Path $statusFile) {
 Write-Host "`n[3] MT5 + activity (system.log)" -ForegroundColor Cyan
 $logFile = Join-Path $LOGS "system.log"
 if (Test-Path $logFile) {
-    $tail = Get-Content $logFile -Tail 80 -ErrorAction SilentlyContinue
+    $tail = Get-Content $logFile -Tail 80 -Encoding UTF8 -ErrorAction SilentlyContinue
     $lastConn = $tail | Select-String "เชื่อมต่อ MT5 สำเร็จ|MT5 หลุด" | Select-Object -Last 1
     if ($lastConn -and $lastConn -match "หลุด") { Warn "log ล่าสุดแจ้ง MT5 หลุด — กำลัง reconnect?" }
     elseif ($lastConn)                          { Ok "MT5 connected (จาก log)" }
@@ -84,7 +84,7 @@ Write-Host "`n[5] Token cost วันนี้" -ForegroundColor Cyan
 $acctFile = Join-Path $LOGS "accounting.json"
 if (Test-Path $acctFile) {
     try {
-        $ac    = Get-Content $acctFile -Raw | ConvertFrom-Json
+        $ac    = Get-Content $acctFile -Raw -Encoding UTF8 | ConvertFrom-Json
         $today = (Get-Date).ToString("yyyy-MM-dd")
         $day   = $ac.daily.$today
         if ($day) {

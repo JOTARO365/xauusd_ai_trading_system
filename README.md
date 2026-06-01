@@ -33,6 +33,17 @@ The trading pipeline runs as a **state machine** — each step is a node in a gr
 
 ### Graph Flow
 
+<p align="center">
+  <img src="docs/langgraph_state.png" alt="LangGraph state machine" width="360">
+</p>
+
+> **Legend** — 🟢 AI nodes (Claude) · 🟠 position-mgmt / reporter / accounting · 🔵 `_entry` router.
+> Edge colors = the 3 auto-selected paths: 🟧 **orange** = skip-AI · 🟩 **green** = full cycle · 🟥 **red** = network-degraded.
+> Regenerate with `python scripts/gen_graph_png.py` after editing the graph.
+
+<details>
+<summary>Text version (ASCII)</summary>
+
 ```
 Every cycle (~15 min normal / ~5 min with open position)
                         │
@@ -60,6 +71,8 @@ Every cycle (~15 min normal / ~5 min with open position)
                                           │
                                          END
 ```
+
+</details>
 
 ### What Each Node Does
 
@@ -109,7 +122,7 @@ To stay within a token budget while running 24/7, the gate **throttles** AI call
 | State | 6 scattered globals | Single `TradingState` TypedDict |
 | Error handling | 6 duplicated try/except blocks | Isolated per node |
 | Position mgmt code | Duplicated in 2 places | Single `position_mgmt` node |
-| Crash recovery | Restarts cycle from scratch | **MemorySaver** resumes from last checkpoint |
+| Cross-cycle state | Carried implicitly, easy to leak | Stateless per cycle — `compile()` has **no checkpointer**, so nothing bleeds between cycles; only `_last_chart_data`/`_last_sentiment` are carried forward explicitly |
 | Adding a new agent | Edit main.py | One `add_node()` call |
 
 ---
@@ -338,6 +351,17 @@ This registers At-LogOn / Interactive scheduled tasks for the bot + dashboard th
 
 > The startup script (`setup_vm_startup.ps1`) is **idempotent** — it skips already-installed components on later boots (markers: `.mt5_installed`, `.deps_installed`). The dashboard port (5050) is **not** opened in the firewall; reach it from mobile over a private network (e.g. Tailscale) rather than exposing it publicly — the dashboard has no auth and can close trades / edit config.
 
+### Auto-deploy & ops scripts
+
+| Script | Purpose |
+|---|---|
+| `scripts/auto_deploy.ps1` (run via `pm2_autodeploy.js`) | PM2 watcher — every **60 s** runs `git fetch`; if the remote moved, does a stash-safe `git pull` + `pm2 restart main dashboard`. Pushed code reaches the VM automatically. |
+| `scripts/health_check.ps1` | One-shot liveness check: process/PID, `bot_status.json` freshness, MT5 + cycle activity, dashboard `200`, today's token cost vs budget. `exit 0` healthy / `1` problem. |
+| `scripts/apply_vm_config.ps1` | Safely edit the VM `.env` (e.g. `NNLB_EQUITY_PER_LOT`, `CHART_SHADOW`) — backs up first, edits only the target keys (keeps comments), restarts PM2, then verifies. Use `-DryRun` to preview. |
+| `scripts/gen_graph_png.py` | Regenerate the LangGraph diagram (`docs/langgraph_state.png`). |
+
+> ⚠️ **`.env` is git-ignored** — auto-deploy ships *code* only, never your `.env`. Change runtime config on the VM with `apply_vm_config.ps1` (or edit `.env` + `pm2 restart main`); a `git pull` showing "up-to-date" means code is synced, **not** that `.env` values changed.
+
 ---
 
 ## Environment Variables
@@ -388,6 +412,7 @@ This registers At-LogOn / Interactive scheduled tasks for the bot + dashboard th
 | `NNLB_BASE_EQUITY` | `100` | NNLB: minimum equity (**USD**) before first order — auto-converted to account currency |
 | `NNLB_EQUITY_PER_LOT` | `100` | NNLB: profit (**USD**) per +0.01 lot — e.g. base 25 + per_lot 25 → equity $75 = lot 0.03 |
 | `NNLB_MAX_LOSS_PCT` | `25` | NNLB: max loss per trade as % of equity — lot auto-reduced to stay within budget |
+| `CHART_SHADOW` | `false` | A/B token test — runs a **terse-output** variant of `chart_watcher` in parallel on the same input, logging a field-by-field comparison to `logs/shadow_chart.jsonl`. Real trading is unaffected (always uses the verbose output). Analyze with `python scripts/shadow_report.py`; switch to terse only if `decision_match ≥ 95%`. |
 
 > **NNLB values are USD-canonical.** `NNLB_BASE_EQUITY` and `NNLB_EQUITY_PER_LOT` are entered in USD and auto-converted to the account currency at runtime (rate derived from gold's pip value: USD → ×1, THB → ×~36). One config set works for USD and THB accounts alike — no per-currency tuning. ⚠️ Also raise `MAX_LOT` (default `0.01` caps all scaling).
 
