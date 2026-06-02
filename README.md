@@ -595,21 +595,35 @@ The system requires **WR ≥ 40%** (breakeven = 33.3%, but a margin is needed).
 
 ---
 
-## Multi-User Setup (Shared Database)
+## Multi-User Setup (RLS + Supabase Auth)
 
-The system supports **multiple users running simultaneously on a single Supabase instance** — every trade and cycle is tagged with `account_login` (MT5 account number) to identify ownership.
+The system supports **multiple users on a single Supabase instance** — every trade and cycle is tagged with `account_login` (MT5 account number), and **Row Level Security (RLS)** enforces that each user sees only their own data.
 
-### Setup
+> ⚠️ **Never share `SUPABASE_KEY` (anon/service) with users.** With RLS enabled, the anon key alone is denied everything; the service key is owner-only. Distribute access via the **API proxy** (bots) or **Supabase Auth JWT** (web) instead — see below.
 
-1. **Owner**: Create a Supabase project → run the migration → share `SUPABASE_URL` and `SUPABASE_KEY` with each user
-2. **Each user**: Add to their own `.env` — no additional configuration needed (MT5_LOGIN is used as the identifier automatically)
+### Roles & keys
+
+| Who | Connects with | RLS | Sees |
+|---|---|---|---|
+| **Owner bot** (your VM) | `SUPABASE_SERVICE_KEY` (service_role) | bypassed | all accounts |
+| **API proxy** (Render) | `SUPABASE_SERVICE_KEY` | bypassed | write only |
+| **Web user** (Phase 2) | anon key + Supabase Auth **JWT** | enforced | own account only |
+| **Leaked anon key** | anon, no JWT | deny-all | **nothing** |
+
+### Setup (owner)
+
+1. Create a Supabase project → run `db/schema.sql`, then `db/migration_enable_rls_auth.sql`
+2. On the VM `.env`: set `SUPABASE_SERVICE_KEY=<service_role>` **before** running the RLS migration (so the bot keeps writing — it bypasses RLS)
+3. Link a user to their MT5 account after they sign up:
+   ```sql
+   INSERT INTO user_accounts (user_id, account_login, role)
+   VALUES ('<auth.users.id>', <mt5_login>, 'viewer');
+   ```
 
 ```env
-# All users share the same values
+# Owner bot only — service_role bypasses RLS (keep secret, never commit/share)
 SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_KEY=eyJhbGciOiJIUzI1NiJ9...
-
-# Each user's MT5_LOGIN differs → DB separates trades automatically
+SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiJ9...
 MT5_LOGIN=381706956
 ```
 
@@ -639,11 +653,30 @@ psql $DATABASE_URL < db/migration_add_api_keys.sql
 
 Instead of sharing the Supabase key directly — the owner deploys a proxy on Render.com (free tier) and issues individual keys to each user.
 
+### Requesting access — you cloned the repo, now what?
+
+A fresh clone ships with **no keys** (`.env` is git-ignored). To save trades to the shared database you need a `TRADING_API_KEY`, which **only the owner can issue** (this is the whitelist — not anyone can self-register yet). The flow is manual and out-of-band:
+
+1. **Contact the owner** (Line / Discord / email) and provide:
+   - your **MT5 login** (account number) — this becomes your data's owner tag
+   - a display name (label) so the owner can recognize you
+2. **Owner verifies** you actually own that MT5 account, then issues a key (see *Issue API keys* below).
+3. **Owner sends you back two values** — put them in your `.env`:
+   ```env
+   TRADING_API_URL=https://xauusd-proxy.onrender.com   # owner's proxy URL
+   TRADING_API_KEY=key_received_from_owner             # your personal key
+   ```
+4. Run the bot — trades now write through the proxy under *your* account only. You never touch a Supabase key.
+
+> **Why manual?** The key binds to an MT5 login. Letting anyone self-claim a login would expose other users' data, so the owner vouches for each one. Self-service signup (web + ownership verification) is planned for Phase 2 — see `docs/saas_platform_plan.html`.
+>
+> **Lost / leaked your key?** Ask the owner to revoke it (`manage_api_keys.py` → *Revoke*) and issue a new one — old key dies instantly.
+
 ### Architecture
 
 ```
 User Bot → HTTPS + API_KEY → Render Proxy → Supabase (service key)
-Owner Bot ──────────────────────────────→ Supabase (direct)
+Owner Bot ──────────────────────────────→ Supabase (service key, direct)
 ```
 
 ### Deploy Proxy (Owner does this once)

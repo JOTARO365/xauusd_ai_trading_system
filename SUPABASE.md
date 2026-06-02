@@ -14,11 +14,19 @@
 
 ```env
 SUPABASE_URL=https://esfhjkmcuiwlzvxniifu.supabase.co
-SUPABASE_KEY=<anon key จาก Settings → API → anon public>
+# Owner bot/dashboard — service_role (bypass RLS). เก็บลับ! อย่า commit อย่าแจก
+SUPABASE_SERVICE_KEY=<service_role key จาก Settings → API → service_role>
+# anon key — ใช้เฉพาะชั้น web (Supabase Auth + JWT); บอทไม่ต้องใช้
+# SUPABASE_ANON_KEY=<anon public key>
 ```
 
-> **หา key:** Supabase Dashboard → Settings → API → **anon public**
+> **หา key:** Supabase Dashboard → Settings → API
+> • **service_role** = owner bot (เห็นทุก account, bypass RLS) — ห้ามหลุด
+> • **anon public** = ชั้น web เท่านั้น (ปลอดภัยเพราะ RLS เปิด — เห็นเฉพาะ account ของ user ที่ login)
 > ไม่ต้อง commit `.env` — อยู่ใน `.gitignore` แล้ว
+>
+> ⚠️ `SUPABASE_KEY` แบบเดิม (anon) ยังใช้ได้ในฐานะ fallback แต่ถ้า RLS เปิดแล้ว
+> anon เดี่ยวๆ จะ **เขียน/อ่านไม่ได้** — owner ต้องเปลี่ยนเป็น `SUPABASE_SERVICE_KEY`
 
 ---
 
@@ -103,22 +111,36 @@ CREATE TRIGGER trg_trades_updated_at
     BEFORE UPDATE ON trades
     FOR EACH ROW EXECUTE FUNCTION _set_updated_at();
 
--- Disable RLS (server-side app ใช้ anon key + RLS ปิด)
-ALTER TABLE trades      DISABLE ROW LEVEL SECURITY;
-ALTER TABLE agent_usage DISABLE ROW LEVEL SECURITY;
-ALTER TABLE cycles      DISABLE ROW LEVEL SECURITY;
+-- RLS: เปิดแล้ว (multi-tenant) — ดู db/migration_enable_rls_auth.sql
+--   owner bot ใช้ service_role → bypass RLS; web user ใช้ anon+JWT → เห็นเฉพาะ account ตัวเอง
 ```
 
 ---
 
-## Security
+## Security (RLS + Supabase Auth — multi-tenant)
 
 | | |
 |---|---|
-| **Key ที่ใช้** | `anon` (publishable) — ปลอดภัยเพราะ RLS disabled |
-| **RLS** | Disabled บน 3 tables (server-to-server ไม่ต้องการ) |
+| **Owner bot/proxy** | `service_role` key → **bypass RLS** เขียน/อ่านทุก account (เก็บลับ) |
+| **Web user** | `anon` + **JWT** (Supabase Auth) → RLS บังคับให้เห็นเฉพาะ account ที่ผูกใน `user_accounts` |
+| **anon key เปล่า (หลุด)** | ไม่มี policy → **อ่าน/เขียนอะไรไม่ได้เลย** (deny-all) |
+| **RLS** | **Enabled** บน `trades` / `agent_usage` / `cycles` + `user_accounts` |
 | **Network** | Supabase เปิด HTTPS เท่านั้น — ข้อมูล encrypt in transit |
 | **`.env`** | อยู่ใน `.gitignore` — ไม่ถูก commit ขึ้น Git |
+
+### Rollout (ลำดับสำคัญ — กันบอทเงินจริงพัง)
+
+1. **VM ก่อน:** ตั้ง `SUPABASE_SERVICE_KEY=<service_role>` ใน `.env` แล้ว `pm2 restart main`
+   → owner bot สลับมา bypass RLS (ยังเขียน DB ได้แม้ RLS เปิด)
+2. **แล้วค่อย:** Supabase SQL Editor → รัน `db/migration_enable_rls_auth.sql`
+3. ผูก user เข้ากับ account (ต่อ user หลังเขา sign up):
+   ```sql
+   INSERT INTO user_accounts (user_id, account_login, role)
+   VALUES ('<auth.users.id>', <mt5_login>, 'viewer');
+   ```
+
+> สลับลำดับ (เปิด RLS ก่อนตั้ง service key) = บอทถือ anon → เขียน DB ไม่ได้
+> แต่ระบบ fail-soft (JSON primary) → **การเทรดไม่หยุด** แค่ accounting/dashboard หยุดบันทึกชั่วคราว
 
 ---
 
