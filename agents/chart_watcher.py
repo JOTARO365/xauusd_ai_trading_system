@@ -1108,7 +1108,9 @@ def analyze_chart() -> dict:
     mom_m15 = calc_momentum(m15, m15["df"])
 
     def _mom_str(m: dict) -> str:
-        return f"{m['direction']}_{m['strength']}  (RSI_slope={m['rsi_slope']:+.1f}  MACD_hist={m['macd_hist']:+.4f}{'↑exp' if m['hist_expanding'] else '↓con'}  ROC5={m['roc_5bar']:+.3f}%  EMA={m['ema_align']})"
+        # ส่งเฉพาะ direction/strength (Python คำนวณแล้ว) + EMA align — rule ใช้แค่นี้.
+        # raw RSI_slope/MACD_hist/ROC5/expanding ตัดออก (prompt ไม่อ้างถึง → ลด input token)
+        return f"{m['direction']}_{m['strength']}  (EMA={m['ema_align']})"
 
     # Entry setup scanner
     scan         = scan_entry_setups(h4, h1, m15, h4_sr, h1_sr, key_lvl, d1_sr, w1_sr)
