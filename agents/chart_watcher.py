@@ -8,7 +8,7 @@ import ta
 import MetaTrader5 as mt5
 from pathlib import Path
 from connectors.price_feed import get_ohlcv, get_current_price
-from config import ANTHROPIC_API_KEY, SYMBOL
+from config import ANTHROPIC_API_KEY, SYMBOL, EMA_PULLBACK_MAX_SL, EMA_PULLBACK_MIN_CONF
 from loguru import logger
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -1248,6 +1248,19 @@ RSI:{m15['rsi']} MACD Hist:{m15['macd_hist']}
                 result["tp_pips"] = float(val)
             except Exception:
                 pass
+
+    # ── EMA_PULLBACK toxicity gate (deterministic — ผลวิเคราะห์ 2026-06) ──────────
+    # EMA_PULLBACK ที่ SL กว้าง (ATR สูง) หรือ confidence ต่ำ → ~0% WR.
+    # บล็อกใน Python ไม่พึ่ง LLM (penalty ใน prompt ไม่ enforce). replay: +$2,981, block 7/514, 0 collateral.
+    if result["entry_type"].strip().upper().startswith("EMA_PULLBACK") \
+            and result["signal"] in ("BUY", "SELL"):
+        _sl   = result.get("sl_pips") or 0
+        _conf = result.get("confidence") or 0
+        if _sl >= EMA_PULLBACK_MAX_SL or _conf < EMA_PULLBACK_MIN_CONF:
+            logger.info(f"[GATE] EMA_PULLBACK→NO_TRADE  sl={_sl} conf={_conf} "
+                        f"(limits sl<{EMA_PULLBACK_MAX_SL}, conf>={EMA_PULLBACK_MIN_CONF})")
+            result["signal"] = "NO_TRADE"
+            result["gate_block"] = f"ema_pullback sl={_sl}/conf={_conf}"
 
     _shadow_chart_call(user_message, result)   # A/B shadow (no-op ถ้า CHART_SHADOW ปิด)
     return result

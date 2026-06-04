@@ -66,6 +66,13 @@ MONEY_MANAGEMENT = {
     "conf_min_scale":        float(os.getenv("CONF_MIN_SCALE")        or 0.5),
 }
 
+# ── EMA_PULLBACK toxicity gate ────────────────────────────────
+# Loss analysis 2026-06: EMA_PULLBACK entries with a wide SL (high ATR) or a
+# marginal confidence have ~0% win rate. chart_watcher blocks those deterministically.
+# Replay over 514 historical AI trades: removes 7 toxic trades, +$2,981, 0 collateral.
+EMA_PULLBACK_MAX_SL   = int(os.getenv("EMA_PULLBACK_MAX_SL")   or 1500)  # SL pips ≥ this → block
+EMA_PULLBACK_MIN_CONF = int(os.getenv("EMA_PULLBACK_MIN_CONF") or 70)    # confidence < this → block
+
 def reload_config():
     """อ่าน .env ใหม่และอัปเดตตัวแปรทั้งหมด — เรียกทุกต้น cycle เพื่อ pick up dashboard changes"""
     global SYMBOL, START_BALANCE, LOT_MODE, FIXED_LOT, MIN_LOT, MAX_LOT
