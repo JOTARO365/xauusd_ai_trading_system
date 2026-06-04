@@ -25,6 +25,23 @@ app = Flask(__name__)
 
 _BASE = os.path.dirname(__file__)
 
+# ── Opt-in HTTP Basic Auth (defense-in-depth เสริม Tailscale) ─────────────────
+# ตั้ง DASHBOARD_USER + DASHBOARD_PASS ใน .env เพื่อเปิด auth ทุก route.
+# ไม่ตั้ง = ปิด (โหมด Tailscale-only เดิม) — กันล็อกตัวเองออกตอน rollout.
+import secrets as _secrets
+
+
+@app.before_request
+def _require_auth():
+    user = os.getenv("DASHBOARD_USER")
+    pw   = os.getenv("DASHBOARD_PASS")
+    if not user or not pw:
+        return  # auth disabled
+    a = request.authorization
+    if not a or a.username != user or not _secrets.compare_digest(a.password or "", pw):
+        return make_response("Authentication required", 401,
+                             {"WWW-Authenticate": 'Basic realm="XAUUSD dashboard"'})
+
 # ── Simple in-process cache to avoid hammering Supabase on every 10s poll ──
 import time as _time_mod
 import threading as _threading

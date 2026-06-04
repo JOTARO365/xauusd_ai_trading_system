@@ -5,8 +5,13 @@ manage_api_keys.py — Owner tool สำหรับสร้าง/ลบ API k
 
 ต้องการ .env ที่มี SUPABASE_URL และ SUPABASE_KEY (หรือ SUPABASE_SERVICE_KEY)
 """
-import sys, os, secrets
+import sys, os, secrets, hashlib
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _hash(raw: str) -> str:
+    """sha256 hex — DB เก็บแค่ hash ของ key (กัน DB หลุดแล้ว key ใช้ได้)."""
+    return hashlib.sha256(raw.encode()).hexdigest()
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -27,7 +32,7 @@ def list_keys():
     if not rows:
         print("ยังไม่มี API key ใดๆ")
         return
-    print(f"\n{'Label':<20} {'account_login':<15} {'active':<8} {'key[:12]...'}")
+    print(f"\n{'Label':<20} {'account_login':<15} {'active':<8} {'hash[:12]...'}")
     print("-" * 70)
     for r in rows:
         status = "✓" if r["active"] else "✗"
@@ -35,25 +40,26 @@ def list_keys():
 
 
 def create_key(account_login: int, label: str) -> str:
-    key = secrets.token_urlsafe(32)
+    raw = secrets.token_urlsafe(32)
     _db().table("api_keys").insert({
-        "key":           key,
+        "key":           _hash(raw),     # เก็บแค่ hash — raw แสดงให้ owner ครั้งเดียว
         "account_login": account_login,
         "label":         label,
         "active":        True,
     }).execute()
-    return key
+    return raw
 
 
-def revoke_key(key_prefix: str):
-    rows = _db().table("api_keys").select("key,label").execute().data
-    matches = [r for r in rows if r["key"].startswith(key_prefix)]
+def revoke_key(label: str):
+    # owner ไม่มี raw key แล้ว (เก็บแค่ hash) → revoke ด้วย label
+    rows = _db().table("api_keys").select("key,label,account_login").execute().data
+    matches = [r for r in rows if (r.get("label") or "") == label]
     if not matches:
-        print(f"ไม่พบ key ที่ขึ้นต้นด้วย '{key_prefix}'")
+        print(f"ไม่พบ key ที่ label = '{label}'")
         return
     for r in matches:
         _db().table("api_keys").update({"active": False}).eq("key", r["key"]).execute()
-        print(f"Revoked: {r.get('label')} ({r['key'][:16]}...)")
+        print(f"Revoked: {r.get('label')} (login {r.get('account_login')})")
 
 
 def main():
@@ -80,8 +86,8 @@ def main():
         print(f"   TRADING_API_KEY={key}")
 
     elif choice == "3":
-        prefix = input("พิมพ์ 8+ ตัวแรกของ key ที่จะ revoke: ").strip()
-        revoke_key(prefix)
+        label = input("พิมพ์ label ของ key ที่จะ revoke: ").strip()
+        revoke_key(label)
 
     elif choice == "q":
         return

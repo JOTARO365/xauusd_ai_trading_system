@@ -6,6 +6,7 @@ Environment variables ที่ต้องตั้งบน Render:
   SUPABASE_URL          = https://xxx.supabase.co
   SUPABASE_SERVICE_KEY  = service_role key (ไม่ใช่ anon key)
 """
+import hashlib
 import os
 from datetime import datetime
 
@@ -27,13 +28,15 @@ def _db() -> Client:
 
 
 def _resolve_account(api_key: str) -> int:
-    """ตรวจ api_keys table → คืน account_login หรือ raise 401"""
+    """ตรวจ api_keys table → คืน account_login หรือ raise 401.
+    DB เก็บแค่ sha256(key) → hash ค่าที่ส่งมาแล้วค่อย match (กัน DB หลุดแล้ว key ใช้ได้)."""
+    key_hash = hashlib.sha256((api_key or "").encode()).hexdigest()
     try:
         res = (
             _db()
             .table("api_keys")
             .select("account_login")
-            .eq("key", api_key)
+            .eq("key", key_hash)
             .eq("active", True)
             .single()
             .execute()
