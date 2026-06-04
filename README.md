@@ -413,6 +413,8 @@ This registers At-LogOn / Interactive scheduled tasks for the bot + dashboard th
 | `NNLB_EQUITY_PER_LOT` | `100` | NNLB: profit (**USD**) per +0.01 lot — e.g. base 25 + per_lot 25 → equity $75 = lot 0.03 |
 | `NNLB_MAX_LOSS_PCT` | `25` | NNLB: max loss per trade as % of equity — lot auto-reduced to stay within budget |
 | `CHART_SHADOW` | `false` | A/B token test — runs a **terse-output** variant of `chart_watcher` in parallel on the same input, logging a field-by-field comparison to `logs/shadow_chart.jsonl`. Real trading is unaffected (always uses the verbose output). Analyze with `python scripts/shadow_report.py`; switch to terse only if `decision_match ≥ 95%`. |
+| `EMA_PULLBACK_MAX_SL` | `1500` | EMA_PULLBACK toxicity gate — block the signal when planned SL ≥ this (wide SL = high ATR ≈ 0% win rate). Deterministic Python gate in `chart_watcher`. |
+| `EMA_PULLBACK_MIN_CONF` | `70` | EMA_PULLBACK toxicity gate — block when confidence < this. Loss analysis: EMA_PULLBACK was the worst entry type (−$4.3k, 20% WR); the gate removes the proven-toxic slice (replay: +$2,981, 0 collateral). |
 
 > **NNLB values are USD-canonical.** `NNLB_BASE_EQUITY` and `NNLB_EQUITY_PER_LOT` are entered in USD and auto-converted to the account currency at runtime (rate derived from gold's pip value: USD → ×1, THB → ×~36). One config set works for USD and THB accounts alike — no per-currency tuning. ⚠️ Also raise `MAX_LOT` (default `0.01` caps all scaling).
 
@@ -732,6 +734,25 @@ ALTER TABLE trades ADD COLUMN IF NOT EXISTS strategy_version SMALLINT DEFAULT 1;
 ```
 
 Old trades will have `strategy_version=1` (legacy), new trades will be `2` automatically.
+
+### Decision-snapshot columns (learned filter v2)
+
+To capture **leakage-free, decision-time features** on every new trade (for training a
+learned trade filter), run `db/migration_add_decision_snapshot.sql` **before** deploying
+the snapshot code (schema-before-code — else writes hit "column does not exist"):
+
+```sql
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS planned_sl_pips NUMERIC;  -- planned SL at entry (NOT the break-even-moved sl)
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS entry_score     NUMERIC;
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS atr_h4          NUMERIC;
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS momentum        TEXT;
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS htf_zone_tf     TEXT;
+```
+
+> **Why a separate `planned_sl_pips`?** The live `sl` column is moved by break-even /
+> trailing, so it leaks the outcome (winners end up with a tiny stop). Training on it
+> gives a fake 0.87 AUC that collapses to 0.55 once removed. The snapshot stores the
+> *original planned* values, frozen at entry. Train offline with `python ml/train_filter.py`.
 
 ---
 

@@ -452,6 +452,8 @@ def log_trade(decision_result: dict):
         "pa_patterns": pa_patterns,
         "sr_zone":     tech.get("sr_zone"),
         "sr_strength": tech.get("sr_strength"),
+        # ── Decision snapshot (leakage-free features → learned filter v2) ──
+        **_decision_snapshot(tech),
         # ── Analysis (Claude's decision reasoning) ────
         "analysis":    decision_result.get("analysis", ""),
         # ── Manual fields (ว่างสำหรับ system trades) ─
@@ -483,6 +485,21 @@ def log_trade(decision_result: dict):
     _save_log(log)
     logger.info(f"System trade logged — Ticket:{ticket} | PA:{pa_action} | Type:{entry_type}")
     _db_write_trade(trade_entry)
+
+
+def _decision_snapshot(tech: dict) -> dict:
+    """Leakage-free decision-time features (frozen at entry) สำหรับ learned filter v2.
+    planned_sl_pips = SL ที่ "วางแผนตอนเข้าไม้" — ไม่ใช่ `sl` สุดท้ายที่ breakeven/trailing
+    ขยับ (อันนั้นรั่ว outcome). ทุก field รู้ตอนตัดสินใจ ไม่ถูกแก้ภายหลัง."""
+    ind = (tech.get("indicators") or {}).get("h4") or {}
+    htf = tech.get("htf_zone") or {}
+    return {
+        "planned_sl_pips": tech.get("sl_pips"),
+        "entry_score":     tech.get("entry_score"),
+        "atr_h4":          ind.get("atr"),
+        "momentum":        tech.get("momentum"),
+        "htf_zone_tf":     htf.get("tf"),
+    }
 
 
 def _db_write_trade(trade: dict) -> None:
@@ -544,6 +561,7 @@ def log_pending_order(decision_result: dict):
         "sr_zone":              tech.get("sr_zone"),
         "sr_strength":          tech.get("sr_strength"),
         "sentiment":            decision_result.get("sentiment", {}).get("sentiment"),
+        **_decision_snapshot(tech),   # leakage-free decision snapshot → learned filter v2
         "strategy_version":     2,
         "manual_analysis": None,
         "manual_reason":   None,

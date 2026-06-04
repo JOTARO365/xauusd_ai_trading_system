@@ -92,6 +92,11 @@ async def ingest_trade(request: Request, x_api_key: str = Header()):
         "pa_action":            trade.get("pa_action"),
         "sentiment":            trade.get("sentiment"),
         "analysis":             trade.get("analysis"),
+        "planned_sl_pips":      trade.get("planned_sl_pips"),
+        "entry_score":          trade.get("entry_score"),
+        "atr_h4":               trade.get("atr_h4"),
+        "momentum":             trade.get("momentum"),
+        "htf_zone_tf":          trade.get("htf_zone_tf"),
         "strategy_version":     trade.get("strategy_version", 2),
     }
     row = {k: v for k, v in row.items() if v is not None or k in ("pnl", "sl", "tp", "closed_at")}

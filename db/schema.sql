@@ -29,6 +29,12 @@ CREATE TABLE IF NOT EXISTS trades (
     pa_action            TEXT,
     sentiment            TEXT,
     analysis             TEXT,
+    -- decision snapshot (leakage-free features frozen at entry → learned filter v2)
+    planned_sl_pips      NUMERIC,
+    entry_score          NUMERIC,
+    atr_h4               NUMERIC,
+    momentum             TEXT,
+    htf_zone_tf          TEXT,
     -- strategy versioning (1=legacy, 2=current v2 strategy)
     strategy_version     SMALLINT DEFAULT 1,
     -- meta
