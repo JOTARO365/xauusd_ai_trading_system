@@ -16,7 +16,7 @@ def _log_file() -> str:
     sym = _cfg.SYMBOL.upper().replace("/", "")
     return "logs/trades.json" if sym == "XAUUSD" else f"logs/{sym.lower()}_trades.json"
 _REPORTER_PROMPT   = Path("agents/prompts/reporter.md").read_text(encoding="utf-8")
-_ANALYSIS_COOLDOWN = 1800  # seconds between reporter LLM calls (30min — perf report ไม่ต้องถี่)
+_ANALYSIS_COOLDOWN = int(os.getenv("REPORTER_COOLDOWN_SEC") or 3600)  # 60min — perf report ไม่ต้องถี่ (ลด token)
 _COOLDOWN_FILE     = "logs/reporter_last_run.txt"
 _last_usage = None   # set after each API call — read by accountant
 
@@ -766,8 +766,6 @@ Losing Streak : {history['losing_streak']}
 
 === Strategy Performance (entry type) ===
 {history['entry_perf_text']}
-=== Last 5 Trades ===
-{history['recent_trades_text']}
 === Last 10 Trades (compact) ===
 {compact_history}"""
 
@@ -784,7 +782,7 @@ Losing Streak : {history['losing_streak']}
         client   = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=800,   # report กระชับ — เดิม 2000 ตันเพดานทุก call (86% ของ cost)
+            max_tokens=600,   # report กระชับ — เดิม 2000→800→600 (ลด token; perf report สั้นได้)
             system=[{"type": "text", "text": _REPORTER_PROMPT,
                      "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_msg}],
