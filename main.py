@@ -382,6 +382,11 @@ async def main():
 
     console.print(f"  [green]✓[/green]  เชื่อมต่อ MT5 สำเร็จ\n")
 
+    # ── Position-Guardian thread (default OFF; เปิดด้วย GUARDIAN_ENABLED=true บน VM หลังทดสอบ) ──
+    from agents.position_guardian import start_guardian
+    if start_guardian():
+        console.print(f"  [green]✓[/green]  Position-Guardian thread: ON\n")
+
     # ── DB connectivity check ──────────────────────────────────
     from db.connection import is_available, get_url
     if is_available():
@@ -552,6 +557,8 @@ async def main():
     except KeyboardInterrupt:
         console.print("\n  [dim]หยุดระบบโดยผู้ใช้[/dim]\n")
     finally:
+        from agents.position_guardian import stop_guardian
+        stop_guardian()        # หยุด guardian ก่อน disconnect MT5 (กัน guardian เรียก mt5 หลังตัด)
         disconnect_mt5()
 
 

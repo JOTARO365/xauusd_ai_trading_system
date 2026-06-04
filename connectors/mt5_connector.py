@@ -1,10 +1,28 @@
 import re
 import time as _time
+import threading as _threading
+import functools as _functools
 import numpy as np
 import MetaTrader5 as mt5
 import config as _cfg
 from config import SYMBOL, MONEY_MANAGEMENT
 from loguru import logger
+
+# ── MT5 access lock (Philosophers: MT5 = "fork" เดียว → mutex เดียว) ──────────
+# MetaTrader5 มี connection เดียว ไม่ thread-safe. Position-Guardian thread กับ
+# main async cycle เรียก mt5.* ร่วมกัน → ต้อง serialize ผ่าน lock เดียว.
+# RLock = re-entrant กัน self-deadlock เมื่อฟังก์ชันที่ถือ lock เรียกฟังก์ชันที่ถือ lock อีก
+# (บทเรียน lone-philosopher: อย่า lock ตัวเดิมซ้ำจนตาย). lock เดียว = ไม่มี circular wait.
+_mt5_lock = _threading.RLock()
+
+
+def _locked(fn):
+    """ครอบฟังก์ชันให้ acquire _mt5_lock — critical section สั้น กัน starvation main cycle."""
+    @_functools.wraps(fn)
+    def _w(*a, **k):
+        with _mt5_lock:
+            return fn(*a, **k)
+    return _w
 
 
 def _safe_comment(text: str) -> str:
@@ -1757,3 +1775,17 @@ def get_closed_deal_pnl(order_ticket: int) -> float | None:
         return None
 
     return round(sum(d.profit + d.swap + d.commission for d in matched), 2)
+
+
+# ── Serialize ทุก MT5 position/order access ผ่าน _mt5_lock เดียว ──────────────
+# guardian thread + main cycle ใช้ MT5 ร่วมกัน → wrap ที่นี่จุดเดียว (audit ง่าย).
+# ปลอดภัยแม้ guardian ปิด: single-thread → lock ว่างเสมอ, overhead ละเลยได้.
+# RLock → ฟังก์ชันที่ถูก wrap เรียกกันเองข้ามชั้นได้ ไม่ deadlock.
+for _fn_name in (
+    "open_order", "_close_position", "get_open_positions", "get_pending_orders",
+    "place_pending_order", "cancel_pending_order", "manage_trailing_stop",
+    "manage_breakeven", "manage_partial_close", "manage_momentum_exit",
+    "manage_zone_break_close", "manage_dynamic_tp", "manage_post_event_tp",
+    "_force_breakeven_opposing",
+):
+    globals()[_fn_name] = _locked(globals()[_fn_name])

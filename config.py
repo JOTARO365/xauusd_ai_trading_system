@@ -73,6 +73,12 @@ MONEY_MANAGEMENT = {
 EMA_PULLBACK_MAX_SL   = int(os.getenv("EMA_PULLBACK_MAX_SL")   or 1500)  # SL pips ≥ this → block
 EMA_PULLBACK_MIN_CONF = int(os.getenv("EMA_PULLBACK_MIN_CONF") or 70)    # confidence < this → block
 
+# ── Position-Guardian thread ──────────────────────────────────
+# daemon thread เฝ้าไม้เปิดถี่ๆ (breakeven/trailing/momentum-exit) อิสระจาก AI cycle ที่ช้า
+# *** DEFAULT OFF *** — เปิดบน VM หลังทดสอบกับ MT5 จริงแล้วเท่านั้น (concurrency + เงินจริง)
+GUARDIAN_ENABLED      = os.getenv("GUARDIAN_ENABLED", "false").lower() == "true"
+GUARDIAN_INTERVAL_SEC = int(os.getenv("GUARDIAN_INTERVAL_SEC") or 4)     # poll ทุกกี่วินาที
+
 def reload_config():
     """อ่าน .env ใหม่และอัปเดตตัวแปรทั้งหมด — เรียกทุกต้น cycle เพื่อ pick up dashboard changes"""
     global SYMBOL, START_BALANCE, LOT_MODE, FIXED_LOT, MIN_LOT, MAX_LOT
