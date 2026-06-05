@@ -39,7 +39,9 @@ def _regime_context() -> str:
     marker = "<!-- REGIME_START -->"
     if marker in txt:
         txt = txt.split(marker, 1)[1]
-    return txt.strip()
+    # drop tooling marker lines (e.g. MACRO_AUTO_START/END) so they don't add noise
+    lines = [ln for ln in txt.splitlines() if not ln.lstrip().startswith("<!--")]
+    return "\n".join(lines).strip()
 
 
 _last_usage = None   # set after each API call — read by accountant
