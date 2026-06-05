@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -1226,6 +1227,10 @@
       <button class="sys-btn active" data-system="xauusd" onclick="switchSystem('xauusd')">XAUUSD</button>
       <button class="sys-btn"        data-system="btcusd"  onclick="switchSystem('btcusd')">BTC</button>
     </div>
+    <a href="/3d" target="_blank" title="Open 3D Control Room"
+       style="display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid var(--border2,#2a3142);border-radius:8px;color:var(--gold,#D4AC0D);text-decoration:none;font-size:12px;font-weight:600;letter-spacing:.05em;white-space:nowrap;transition:border-color .2s,box-shadow .2s"
+       onmouseover="this.style.borderColor='var(--gold,#D4AC0D)';this.style.boxShadow='0 0 12px var(--gold-glow,rgba(212,172,13,0.35))'"
+       onmouseout="this.style.borderColor='var(--border2,#2a3142)';this.style.boxShadow='none'">&#9638; 3D</a>
     <span id="last-update">Loading…</span>
   </div>
 </header>
@@ -1393,7 +1398,7 @@
     <div class="chart-row">
       <div class="chart-card">
         <div class="chart-title">Equity Curve</div>
-        <canvas id="equityChart" height="110"></canvas>
+        <div id="equityChart" style="height:120px;width:100%"></div>
       </div>
       <div class="chart-card">
         <div class="chart-title">Win / Loss Distribution</div>
@@ -2126,7 +2131,7 @@
 /* ════════════════════════════════════════════════════════════
    STATE
    ════════════════════════════════════════════════════════════ */
-let equityChart, winlossChart;
+let equityChart, equitySeries, winlossChart;
 let allTrades = [];
 let currentPage = 1;
 const PAGE_SIZE = 20;
@@ -2175,41 +2180,30 @@ function initCharts() {
   const gridColor = 'rgba(255,255,255,0.04)';
   const tickColor = '#5a6275';
 
-  equityChart = new Chart(document.getElementById('equityChart'), {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [{
-        data: [],
-        borderColor: '#D4AC0D',
-        borderWidth: 1.8,
-        fill: true,
-        backgroundColor: 'rgba(212,172,13,0.06)',
-        tension: 0.35,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        pointBackgroundColor: '#D4AC0D',
-      }]
+  // Equity curve — TradingView Lightweight Charts (financial-grade time series)
+  const _eqEl = document.getElementById('equityChart');
+  equityChart = LightweightCharts.createChart(_eqEl, {
+    height: 120,
+    layout: { background: { type: 'solid', color: 'transparent' }, textColor: tickColor,
+              fontFamily: 'JetBrains Mono', fontSize: 10 },
+    grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
+    rightPriceScale: { borderVisible: false },
+    timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Magnet,
+      vertLine: { color: 'rgba(212,172,13,0.45)', width: 1, labelBackgroundColor: '#D4AC0D' },
+      horzLine: { color: 'rgba(212,172,13,0.45)', labelBackgroundColor: '#D4AC0D' },
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      animation: { duration: 300 },
-      plugins: { legend: { display: false } },
-      scales: {
-        x: {
-          ticks: { color: tickColor, maxTicksLimit: 7, maxRotation: 0, font: { size: 10, family: 'JetBrains Mono' } },
-          grid: { color: gridColor, drawBorder: false },
-          border: { display: false },
-        },
-        y: {
-          ticks: { color: tickColor, font: { size: 10, family: 'JetBrains Mono' } },
-          grid: { color: gridColor, drawBorder: false },
-          border: { display: false },
-        },
-      },
-    },
+    handleScroll: false, handleScale: false,
   });
+  equitySeries = equityChart.addAreaSeries({
+    lineColor: '#D4AC0D', lineWidth: 2,
+    topColor: 'rgba(212,172,13,0.20)', bottomColor: 'rgba(212,172,13,0.0)',
+    priceLineVisible: false, lastValueVisible: true,
+    priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+  });
+  new ResizeObserver(() => equityChart.applyOptions({ width: _eqEl.clientWidth })).observe(_eqEl);
+  equityChart.applyOptions({ width: _eqEl.clientWidth });
 
   winlossChart = new Chart(document.getElementById('winlossChart'), {
     type: 'doughnut',
@@ -2306,9 +2300,16 @@ function updateStats(stats) {
 
   // Equity curve + sparkline
   const eq = stats.equity_curve || [];
-  equityChart.data.labels            = eq.map(e => e.time.substring(5));
-  equityChart.data.datasets[0].data = eq.map(e => e.equity);
-  equityChart.update('none');
+  { let _last = 0;
+    const _data = eq.map(e => {
+      let t = Math.floor(new Date(String(e.time).replace(' ', 'T')).getTime() / 1000);
+      if (!t || t <= _last) t = _last + 1;   // keep strictly ascending (LWC requirement)
+      _last = t;
+      return { time: t, value: e.equity };
+    });
+    equitySeries.setData(_data);
+    if (_data.length) equityChart.timeScale().fitContent();
+  }
 
   // sparkline last 10 points
   const sparkData = eq.slice(-10).map(e => e.equity);
