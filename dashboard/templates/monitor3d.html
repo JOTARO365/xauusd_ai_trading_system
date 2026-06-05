@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XAUUSD · 3D Control Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#020617; --bg2:#0b1120; --panel:rgba(15,23,42,.72); --border:rgba(51,65,85,.6);
+    --fg:#f8fafc; --muted:#94a3b8; --gold:#d4ac0d; --gold2:#e6bc18;
+    --green:#22c55e; --red:#ef4444; --amber:#f5a623; --cyan:#38bdf8;
+  }
+  html,body{height:100%;background:radial-gradient(120% 120% at 50% 0%,#0b1120 0%,var(--bg) 60%);
+    color:var(--fg);font-family:'Space Grotesk',system-ui,sans-serif;overflow:hidden}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+  .mono{font-family:'JetBrains Mono',monospace}
+  /* ── HUD ── */
+  .hud{position:fixed;left:0;right:0;pointer-events:none;z-index:10}
+  .top{top:0;display:flex;justify-content:space-between;align-items:flex-start;padding:18px 22px;
+    background:linear-gradient(180deg,rgba(2,6,23,.85),transparent)}
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand h1{font-size:15px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+  .brand .sub{font-size:10px;color:var(--muted);letter-spacing:.2em}
+  .beacon{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);
+    box-shadow:0 0 0 0 rgba(34,197,94,.5);transition:background .3s}
+  .dot.live{background:var(--green);animation:pulse 2s infinite}
+  .dot.warn{background:var(--amber)} .dot.off{background:var(--red)}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.45)}70%{box-shadow:0 0 0 10px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+  .kpis{display:flex;gap:10px}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 16px;
+    backdrop-filter:blur(10px);min-width:120px}
+  .kpi .lab{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .kpi .val{font-size:19px;font-weight:700;margin-top:3px}
+  .pos{color:var(--green)} .neg{color:var(--red)}
+  .bottom{bottom:0;display:flex;justify-content:space-between;align-items:flex-end;padding:18px 22px;
+    background:linear-gradient(0deg,rgba(2,6,23,.85),transparent)}
+  .legend{display:flex;gap:18px;font-size:10px;color:var(--muted);letter-spacing:.08em}
+  .legend b{color:var(--gold)}
+  .hint{font-size:10px;color:var(--muted);letter-spacing:.1em}
+  #tip{position:fixed;pointer-events:none;z-index:20;background:var(--panel);border:1px solid var(--gold);
+    border-radius:8px;padding:8px 11px;font-size:11px;opacity:0;transition:opacity .12s;backdrop-filter:blur(8px)}
+  #tip .n{font-weight:700;color:var(--gold2)} #tip .c{color:var(--muted);font-size:10px}
+  .err{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:15;color:var(--amber);
+    font-size:11px;letter-spacing:.06em;opacity:0;transition:opacity .3s}
+  a.back{display:inline-block;margin-top:8px;pointer-events:auto;color:var(--muted);
+    font-size:10px;text-decoration:none;letter-spacing:.12em}
+  a.back:hover{color:var(--gold)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="hud top">
+  <div class="brand">
+    <div>
+      <h1 style="color:var(--gold)">XAUUSD · Control Room</h1>
+      <div class="sub mono">AGENT PIPELINE · LIVE 3D MONITOR</div>
+      <a class="back" href="/">&larr; back to terminal</a>
+    </div>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><div class="lab">Equity</div><div class="val mono" id="k-eq">—</div></div>
+    <div class="kpi"><div class="lab">Floating P&amp;L</div><div class="val mono" id="k-pnl">—</div></div>
+    <div class="kpi"><div class="lab">Win&nbsp;Rate</div><div class="val mono" id="k-wr">—</div></div>
+    <div class="kpi"><div class="lab">AI&nbsp;Cost&nbsp;Today</div><div class="val mono" id="k-cost">—</div></div>
+  </div>
+  <div class="beacon"><span class="dot" id="beacon"></span><span id="beacon-t">connecting</span></div>
+</div>
+<div class="hud bottom">
+  <div class="legend">
+    <span>pillar height = <b>token cost</b></span>
+    <span>green = profit · red = loss</span>
+    <span>core pulse = <b>bot heartbeat</b></span>
+  </div>
+  <div class="hint">drag to orbit · scroll to zoom</div>
+</div>
+<div id="tip"></div>
+<div class="err" id="err"></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const C = { gold:0xd4ac0d, green:0x22c55e, red:0xef4444, amber:0xf5a623,
+            cyan:0x38bdf8, base:0x1e293b, bg:0x020617 };
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ── renderer / scene / camera ─────────────────────────────────
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(C.bg);
+scene.fog = new THREE.FogExp2(C.bg, 0.018);
+
+const camera = new THREE.PerspectiveCamera(52, innerWidth/innerHeight, 0.1, 200);
+camera.position.set(0, 9, 19);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI*0.49; controls.minDistance = 8; controls.maxDistance = 42;
+controls.target.set(0, 2.5, 0);
+controls.autoRotate = !reduceMotion; controls.autoRotateSpeed = 0.5;
+
+// ── lights ────────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0x223049, 0.9));
+const key = new THREE.DirectionalLight(0xffffff, 1.1); key.position.set(6,14,8); scene.add(key);
+const goldFill = new THREE.PointLight(C.gold, 40, 60); goldFill.position.set(0,7,0); scene.add(goldFill);
+
+// ── floor grid ────────────────────────────────────────────────
+const grid = new THREE.GridHelper(80, 80, 0x1f2a40, 0x131c2e);
+grid.position.y = 0; scene.add(grid);
+const disc = new THREE.Mesh(
+  new THREE.CircleGeometry(13, 64),
+  new THREE.MeshStandardMaterial({ color:0x0b1322, roughness:.9, metalness:.1 }));
+disc.rotation.x = -Math.PI/2; disc.position.y = 0.01; scene.add(disc);
+
+// ── central core (bot heartbeat) ──────────────────────────────
+const core = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(1.6, 1),
+  new THREE.MeshStandardMaterial({ color:C.gold, emissive:C.gold, emissiveIntensity:.6,
+    metalness:.7, roughness:.25, flatShading:true }));
+core.position.y = 3.4; scene.add(core);
+const ring = new THREE.Mesh(
+  new THREE.TorusGeometry(2.6, .06, 12, 80),
+  new THREE.MeshBasicMaterial({ color:C.gold }));
+ring.position.y = 3.4; ring.rotation.x = Math.PI/2; scene.add(ring);
+
+// ── label sprites ─────────────────────────────────────────────
+function makeLabel(text, sub){
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 80;
+  const x = cv.getContext('2d');
+  x.fillStyle = '#f8fafc'; x.font = '600 26px "Space Grotesk",sans-serif';
+  x.textAlign = 'center'; x.fillText(text, 128, 30);
+  if(sub){ x.fillStyle = '#94a3b8'; x.font = '600 18px "JetBrains Mono",monospace';
+           x.fillText(sub, 128, 58); }
+  const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true, depthTest:false }));
+  sp.scale.set(4, 1.25, 1); return sp;
+}
+
+// ── agent pillars (built dynamically from accounting) ─────────
+const pillars = new Map();   // name -> {group, bar, mat, label, cost}
+const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2();
+let hovered = null;
+
+function pillarFor(name, i, total){
+  if(pillars.has(name)) return pillars.get(name);
+  const ang = (-Math.PI/2) - Math.PI + (i+0.5)/total * (Math.PI*2);  // ring around core
+  const R = 8.5;
+  const group = new THREE.Group();
+  group.position.set(Math.cos(ang)*R, 0, Math.sin(ang)*R);
+  const mat = new THREE.MeshStandardMaterial({ color:C.base, emissive:C.gold,
+    emissiveIntensity:.15, metalness:.6, roughness:.35 });
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1, 1.4), mat);
+  bar.position.y = 0.5; bar.userData.name = name; group.add(bar);
+  const label = makeLabel(name.replace(/_/g,' '), '');
+  label.position.y = 2.2; group.add(label);
+  group.lookAt(0, group.position.y, 0);
+  scene.add(group);
+  const rec = { group, bar, mat, label, cost:0 }; pillars.set(name, rec); return rec;
+}
+
+// ── data polling ──────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmt = (n,d=2)=> (n==null||isNaN(n)) ? '—' : Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+let beat = 1, beatTarget = 1, errTimer = 0;
+
+function setErr(msg){ const e=$('err'); if(msg){e.textContent=msg;e.style.opacity=1;errTimer=Date.now();} else {e.style.opacity=0;} }
+
+async function poll(){
+  try{
+    const [d, a, m] = await Promise.all([
+      fetch('/api/data?system=xauusd&account=own').then(r=>r.json()),
+      fetch('/api/accounting?system=xauusd&account=own').then(r=>r.json()),
+      fetch('/api/monitor').then(r=>r.json()).catch(()=>({})),
+    ]);
+    // KPIs
+    const acct = d.account||{}, st = d.stats||{};
+    $('k-eq').textContent = '$'+fmt(acct.equity);
+    const pnl = acct.profit ?? 0;
+    const pe = $('k-pnl'); pe.textContent = (pnl>=0?'+':'')+'$'+fmt(pnl);
+    pe.className = 'val mono '+(pnl>=0?'pos':'neg');
+    $('k-wr').textContent = (st.win_rate!=null? fmt(st.win_rate,1)+'%':'—');
+    const today = (a.today&&(a.today.cost??a.today.total_cost)) ?? a?.summary?.today_cost;
+    $('k-cost').textContent = today!=null ? '$'+fmt(today) : '—';
+
+    // bot status beacon
+    const bs = m.bot_status||m||{};
+    const running = bs.running ?? bs.is_running ?? (bs.status==='running');
+    const degraded = bs.net_degraded || bs.degraded;
+    const bd = $('beacon'), bt = $('beacon-t');
+    bd.className = 'dot ' + (running ? (degraded?'warn':'live') : 'off');
+    bt.textContent = running ? (degraded?'degraded':'live') : 'stopped';
+    beatTarget = running ? (degraded?0.5:1) : 0.12;
+
+    // core color by P&L
+    core.material.emissive.setHex(pnl>=0 ? C.green : C.red);
+    core.material.color.setHex(pnl>=0 ? C.green : C.gold);
+
+    // pillars from agents
+    const agents = a.agents || {};
+    const entries = Object.entries(agents);
+    const costs = entries.map(([,v]) => v.total_cost ?? v.cost ?? v.cost_usd ?? 0);
+    const maxC = Math.max(0.0001, ...costs);
+    entries.forEach(([name,v], i)=>{
+      const rec = pillarFor(name, i, Math.max(entries.length,1));
+      const c = v.total_cost ?? v.cost ?? v.cost_usd ?? 0;
+      rec.cost = c;
+      const h = 0.6 + (c/maxC)*7.5;             // height ∝ cost
+      rec.bar.scale.y = reduceMotion ? h : rec.bar.scale.y + (h-rec.bar.scale.y)*0.25;
+      rec.bar.position.y = rec.bar.scale.y/2;
+      rec.mat.emissiveIntensity = 0.12 + (c/maxC)*0.7;
+    });
+    setErr(null);
+  }catch(e){ setErr('data feed unavailable — retrying'); }
+}
+poll(); setInterval(poll, 5000);
+
+// ── hover tooltip ─────────────────────────────────────────────
+const tip = $('tip');
+addEventListener('pointermove', ev=>{
+  pointer.x = (ev.clientX/innerWidth)*2-1; pointer.y = -(ev.clientY/innerHeight)*2+1;
+  tip.style.left = (ev.clientX+14)+'px'; tip.style.top = (ev.clientY+14)+'px';
+});
+
+// ── resize / animate ──────────────────────────────────────────
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+const clock = new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  beat += (beatTarget-beat)*0.05;
+  if(!reduceMotion){
+    core.rotation.y = t*0.4; core.rotation.x = Math.sin(t*0.3)*0.2;
+    const s = 1 + Math.sin(t*2.2)*0.06*beat; core.scale.setScalar(s);
+    ring.rotation.z = t*0.6; ring.scale.setScalar(1+Math.sin(t*2.2)*0.04*beat);
+  }
+  goldFill.intensity = 30 + Math.sin(t*2.2)*12*beat;
+
+  // hover detection
+  raycaster.setFromCamera(pointer, camera);
+  const bars = [...pillars.values()].map(p=>p.bar);
+  const hit = raycaster.intersectObjects(bars)[0];
+  if(hit){
+    if(hovered!==hit.object){ hovered=hit.object; }
+    const rec = pillars.get(hit.object.userData.name);
+    tip.innerHTML = `<div class="n">${hit.object.userData.name.replace(/_/g,' ')}</div>`+
+                    `<div class="c">token cost · $${fmt(rec.cost,3)}</div>`;
+    tip.style.opacity = 1; document.body.style.cursor='pointer';
+  } else { hovered=null; tip.style.opacity=0; document.body.style.cursor='default'; }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

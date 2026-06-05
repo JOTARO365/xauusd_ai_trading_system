@@ -572,6 +572,13 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/3d")
+def monitor_3d():
+    """3D control-room monitor (Three.js). Reads /api/data, /api/accounting,
+    /api/monitor. Additive, read-only — does not touch the main terminal."""
+    return render_template("monitor3d.html")
+
+
 @app.route("/api/data")
 def api_data():
     system  = request.args.get("system", "xauusd").lower()
