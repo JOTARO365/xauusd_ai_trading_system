@@ -3,38 +3,37 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>XAUUSD · 3D Control Room</title>
+<title>XAUUSD · Agent Office</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
   :root{
-    --bg:#020617; --bg2:#0b1120; --panel:rgba(15,23,42,.72); --border:rgba(51,65,85,.6);
+    --bg:#020617; --panel:rgba(15,23,42,.72); --border:rgba(51,65,85,.6);
     --fg:#f8fafc; --muted:#94a3b8; --gold:#d4ac0d; --gold2:#e6bc18;
-    --green:#22c55e; --red:#ef4444; --amber:#f5a623; --cyan:#38bdf8;
+    --green:#22c55e; --red:#ef4444; --amber:#f5a623;
   }
   html,body{height:100%;background:radial-gradient(120% 120% at 50% 0%,#0b1120 0%,var(--bg) 60%);
     color:var(--fg);font-family:'Space Grotesk',system-ui,sans-serif;overflow:hidden}
-  #app{position:fixed;inset:0}
-  canvas{display:block}
+  #app{position:fixed;inset:0} canvas{display:block}
   .mono{font-family:'JetBrains Mono',monospace}
-  /* ── HUD ── */
   .hud{position:fixed;left:0;right:0;pointer-events:none;z-index:10}
   .top{top:0;display:flex;justify-content:space-between;align-items:flex-start;padding:18px 22px;
     background:linear-gradient(180deg,rgba(2,6,23,.85),transparent)}
-  .brand{display:flex;align-items:center;gap:12px}
-  .brand h1{font-size:15px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+  .brand h1{font-size:15px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
   .brand .sub{font-size:10px;color:var(--muted);letter-spacing:.2em}
+  .back{display:inline-block;margin-top:8px;pointer-events:auto;color:var(--muted);
+    font-size:10px;text-decoration:none;letter-spacing:.12em}
+  .back:hover{color:var(--gold)}
   .beacon{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.12em;
     text-transform:uppercase;color:var(--muted)}
-  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);
-    box-shadow:0 0 0 0 rgba(34,197,94,.5);transition:background .3s}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
   .dot.live{background:var(--green);animation:pulse 2s infinite}
   .dot.warn{background:var(--amber)} .dot.off{background:var(--red)}
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.45)}70%{box-shadow:0 0 0 10px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
   .kpis{display:flex;gap:10px}
   .kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 16px;
-    backdrop-filter:blur(10px);min-width:120px}
+    backdrop-filter:blur(10px);min-width:118px}
   .kpi .lab{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
   .kpi .val{font-size:19px;font-weight:700;margin-top:3px}
   .pos{color:var(--green)} .neg{color:var(--red)}
@@ -46,22 +45,17 @@
   #tip{position:fixed;pointer-events:none;z-index:20;background:var(--panel);border:1px solid var(--gold);
     border-radius:8px;padding:8px 11px;font-size:11px;opacity:0;transition:opacity .12s;backdrop-filter:blur(8px)}
   #tip .n{font-weight:700;color:var(--gold2)} #tip .c{color:var(--muted);font-size:10px}
-  .err{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:15;color:var(--amber);
+  .err{position:fixed;left:50%;bottom:60px;transform:translateX(-50%);z-index:15;color:var(--amber);
     font-size:11px;letter-spacing:.06em;opacity:0;transition:opacity .3s}
-  a.back{display:inline-block;margin-top:8px;pointer-events:auto;color:var(--muted);
-    font-size:10px;text-decoration:none;letter-spacing:.12em}
-  a.back:hover{color:var(--gold)}
 </style>
 </head>
 <body>
 <div id="app"></div>
 <div class="hud top">
   <div class="brand">
-    <div>
-      <h1 style="color:var(--gold)">XAUUSD · Control Room</h1>
-      <div class="sub mono">AGENT PIPELINE · LIVE 3D MONITOR</div>
-      <a class="back" href="/">&larr; back to terminal</a>
-    </div>
+    <h1>XAUUSD · Agent Office</h1>
+    <div class="sub mono">8-BIT AGENT OFFICE · LIVE</div>
+    <a class="back" href="/">&larr; back to terminal</a>
   </div>
   <div class="kpis">
     <div class="kpi"><div class="lab">Equity</div><div class="val mono" id="k-eq">—</div></div>
@@ -73,11 +67,11 @@
 </div>
 <div class="hud bottom">
   <div class="legend">
-    <span>pillar height = <b>token cost</b></span>
-    <span>green = profit · red = loss</span>
+    <span>each <b>cat</b> = an agent</span>
+    <span>bigger cat = more <b>token cost</b></span>
     <span>core pulse = <b>bot heartbeat</b></span>
   </div>
-  <div class="hint">drag to orbit · scroll to zoom</div>
+  <div class="hint">drag to orbit · scroll to zoom · hover a cat</div>
 </div>
 <div id="tip"></div>
 <div class="err" id="err"></div>
@@ -92,9 +86,11 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-const C = { gold:0xd4ac0d, green:0x22c55e, red:0xef4444, amber:0xf5a623,
-            cyan:0x38bdf8, base:0x1e293b, bg:0x020617 };
+const C = { gold:0xd4ac0d, green:0x22c55e, red:0xef4444, amber:0xf5a623, bg:0x020617 };
+// saturated 8-bit / retro per-agent coat colors
+const COAT = [0xff7b00,0x00e5ff,0x6fff3a,0xff4fa3,0xb05cff,0xffd60a,0x2d9bff,0xff3b3b];
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const FLOOR_R = 9;
 
 // ── renderer / scene / camera ─────────────────────────────────
 const app = document.getElementById('app');
@@ -106,171 +102,217 @@ app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(C.bg);
-scene.fog = new THREE.FogExp2(C.bg, 0.018);
+scene.fog = new THREE.FogExp2(C.bg, 0.022);
 
-const camera = new THREE.PerspectiveCamera(52, innerWidth/innerHeight, 0.1, 200);
-camera.position.set(0, 9, 19);
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 200);
+camera.position.set(0, 10, 16);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.dampingFactor = 0.08;
-controls.maxPolarAngle = Math.PI*0.49; controls.minDistance = 8; controls.maxDistance = 42;
-controls.target.set(0, 2.5, 0);
-controls.autoRotate = !reduceMotion; controls.autoRotateSpeed = 0.5;
+controls.maxPolarAngle = Math.PI*0.49; controls.minDistance = 7; controls.maxDistance = 40;
+controls.target.set(0, 1.5, 0);
+controls.autoRotate = !reduceMotion; controls.autoRotateSpeed = 0.35;
 
 // ── lights ────────────────────────────────────────────────────
-scene.add(new THREE.AmbientLight(0x223049, 0.9));
-const key = new THREE.DirectionalLight(0xffffff, 1.1); key.position.set(6,14,8); scene.add(key);
-const goldFill = new THREE.PointLight(C.gold, 40, 60); goldFill.position.set(0,7,0); scene.add(goldFill);
+scene.add(new THREE.AmbientLight(0x2a3b57, 1.0));
+const key = new THREE.DirectionalLight(0xffffff, 1.0); key.position.set(6,14,8); scene.add(key);
+const goldFill = new THREE.PointLight(C.gold, 30, 60); goldFill.position.set(0,6,0); scene.add(goldFill);
 
-// ── floor grid ────────────────────────────────────────────────
-const grid = new THREE.GridHelper(80, 80, 0x1f2a40, 0x131c2e);
-grid.position.y = 0; scene.add(grid);
-const disc = new THREE.Mesh(
-  new THREE.CircleGeometry(13, 64),
-  new THREE.MeshStandardMaterial({ color:0x0b1322, roughness:.9, metalness:.1 }));
+// ── floor + grid ──────────────────────────────────────────────
+scene.add(new THREE.GridHelper(80,80,0x1f2a40,0x131c2e));
+const disc = new THREE.Mesh(new THREE.CircleGeometry(FLOOR_R+2,64),
+  new THREE.MeshStandardMaterial({ color:0x0b1322, roughness:.95, metalness:.05 }));
 disc.rotation.x = -Math.PI/2; disc.position.y = 0.01; scene.add(disc);
 
-// ── central core (bot heartbeat) ──────────────────────────────
-const core = new THREE.Mesh(
-  new THREE.IcosahedronGeometry(1.6, 1),
+// ── central core (heartbeat) on a pedestal ───────────────────
+const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.4,0.5,24),
+  new THREE.MeshStandardMaterial({color:0x141c2c,roughness:.8,metalness:.2}));
+pedestal.position.y=0.25; scene.add(pedestal);
+const core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.1,1),
   new THREE.MeshStandardMaterial({ color:C.gold, emissive:C.gold, emissiveIntensity:.6,
     metalness:.7, roughness:.25, flatShading:true }));
-core.position.y = 3.4; scene.add(core);
-const ring = new THREE.Mesh(
-  new THREE.TorusGeometry(2.6, .06, 12, 80),
+core.position.y = 2.0; scene.add(core);
+const ring = new THREE.Mesh(new THREE.TorusGeometry(1.9,.05,12,80),
   new THREE.MeshBasicMaterial({ color:C.gold }));
-ring.position.y = 3.4; ring.rotation.x = Math.PI/2; scene.add(ring);
+ring.position.y = 2.0; ring.rotation.x = Math.PI/2; scene.add(ring);
 
-// ── label sprites ─────────────────────────────────────────────
-function makeLabel(text, sub){
-  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 80;
-  const x = cv.getContext('2d');
-  x.fillStyle = '#f8fafc'; x.font = '600 26px "Space Grotesk",sans-serif';
-  x.textAlign = 'center'; x.fillText(text, 128, 30);
-  if(sub){ x.fillStyle = '#94a3b8'; x.font = '600 18px "JetBrains Mono",monospace';
-           x.fillText(sub, 128, 58); }
-  const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true, depthTest:false }));
-  sp.scale.set(4, 1.25, 1); return sp;
+// ── label sprite ──────────────────────────────────────────────
+function makeLabel(text){
+  const cv=document.createElement('canvas'); cv.width=256; cv.height=64;
+  const x=cv.getContext('2d');
+  x.fillStyle='#f8fafc'; x.font='600 26px "Space Grotesk",sans-serif'; x.textAlign='center';
+  x.shadowColor='rgba(0,0,0,.6)'; x.shadowBlur=4; x.fillText(text,128,40);
+  const tex=new THREE.CanvasTexture(cv); tex.anisotropy=4;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
+  sp.scale.set(3.4,0.85,1); return sp;
 }
 
-// ── agent pillars (built dynamically from accounting) ─────────
-const pillars = new Map();   // name -> {group, bar, mat, label, cost}
-const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2();
-let hovered = null;
+// ── 8-bit voxel cat (built from cubes, Crossy-Road style) ─────
+function makeCat(name, color){
+  const g = new THREE.Group();
+  const coat = new THREE.MeshStandardMaterial({ color, flatShading:true, roughness:.9,
+    metalness:0, emissive:color, emissiveIntensity:.05 });
+  const dark = new THREE.MeshStandardMaterial({ color:0x10131c, roughness:.6 });
+  const gold = new THREE.MeshStandardMaterial({ color:C.gold, emissive:C.gold, emissiveIntensity:.3 });
+  const box = (w,h,d,mat)=> new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
 
-function pillarFor(name, i, total){
-  if(pillars.has(name)) return pillars.get(name);
-  const ang = (-Math.PI/2) - Math.PI + (i+0.5)/total * (Math.PI*2);  // ring around core
-  const R = 8.5;
-  const group = new THREE.Group();
-  group.position.set(Math.cos(ang)*R, 0, Math.sin(ang)*R);
-  const mat = new THREE.MeshStandardMaterial({ color:C.base, emissive:C.gold,
-    emissiveIntensity:.15, metalness:.6, roughness:.35 });
-  const bar = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1, 1.4), mat);
-  bar.position.y = 0.5; bar.userData.name = name; group.add(bar);
-  const label = makeLabel(name.replace(/_/g,' '), '');
-  label.position.y = 2.2; group.add(label);
-  group.lookAt(0, group.position.y, 0);
-  scene.add(group);
-  const rec = { group, bar, mat, label, cost:0 }; pillars.set(name, rec); return rec;
+  const body = box(0.66,0.50,0.92,coat); body.position.y = 0.55; g.add(body);
+  const head = box(0.56,0.52,0.50,coat); head.position.set(0,0.80,0.54); g.add(head);
+  for(const sx of [-1,1]){
+    const ear=box(0.16,0.20,0.12,coat); ear.position.set(sx*0.17,1.10,0.52); g.add(ear);
+    const eye=box(0.09,0.11,0.06,dark); eye.position.set(sx*0.14,0.84,0.80); g.add(eye);
+  }
+  const nose=box(0.10,0.08,0.06,gold); nose.position.set(0,0.70,0.81); g.add(nose);
+
+  const legs=[];
+  for(const [x,z] of [[-0.20,0.30],[0.20,0.30],[-0.20,-0.30],[0.20,-0.30]]){
+    const pivot=new THREE.Group(); pivot.position.set(x,0.34,z);
+    const leg=box(0.18,0.34,0.18,coat); leg.position.y=-0.17; pivot.add(leg);
+    g.add(pivot); legs.push(pivot);
+  }
+  const tail=new THREE.Group(); tail.position.set(0,0.72,-0.48);
+  const t1=box(0.12,0.12,0.52,coat); t1.position.set(0,0.16,-0.14); t1.rotation.x=-0.6; tail.add(t1);
+  g.add(tail);
+
+  const label=makeLabel(name.replace(/_/g,' ')); label.position.y=1.75; g.add(label);
+  return { group:g, body, bodyBase:body.position.y, legs, tail, coat, color };
+}
+
+// ── desks (office props) ──────────────────────────────────────
+for(let i=0;i<8;i++){
+  const a=(i/8)*Math.PI*2, R=FLOOR_R-0.6;
+  const desk=new THREE.Group(); desk.position.set(Math.cos(a)*R,0,Math.sin(a)*R);
+  const top=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.1,0.8),
+    new THREE.MeshStandardMaterial({color:0x182234,roughness:.8}));
+  top.position.y=0.7; desk.add(top);
+  const mon=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.45,0.05),
+    new THREE.MeshStandardMaterial({color:0x0a0f1a,emissive:C.gold,emissiveIntensity:.12}));
+  mon.position.set(0,1.0,-0.2); desk.add(mon);
+  desk.lookAt(0,0.7,0); scene.add(desk);
+}
+
+// ── cats (built from accounting agents) ───────────────────────
+const cats = new Map();
+const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2(-2,-2);
+function randPoint(){ const a=Math.random()*Math.PI*2, r=1.5+Math.random()*(FLOOR_R-2);
+  return new THREE.Vector3(Math.cos(a)*r,0,Math.sin(a)*r); }
+function ensureCat(name,i,total){
+  if(cats.has(name)) return cats.get(name);
+  const c=makeCat(name, COAT[i%COAT.length]);
+  const a=(i/total)*Math.PI*2, R=FLOOR_R-3;
+  c.group.position.set(Math.cos(a)*R,0,Math.sin(a)*R);
+  c.target=randPoint(); c.speed=0.9+Math.random()*0.6; c.phase=Math.random()*6;
+  c.pause=0; c.cost=0; c.scale=1; c.targetScale=1;
+  c.group.scale.setScalar(1);
+  scene.add(c.group); cats.set(name,c); return c;
 }
 
 // ── data polling ──────────────────────────────────────────────
 const $ = id => document.getElementById(id);
-const fmt = (n,d=2)=> (n==null||isNaN(n)) ? '—' : Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
-let beat = 1, beatTarget = 1, errTimer = 0;
-
-function setErr(msg){ const e=$('err'); if(msg){e.textContent=msg;e.style.opacity=1;errTimer=Date.now();} else {e.style.opacity=0;} }
+const fmt = (n,d=2)=> (n==null||isNaN(n))?'—':Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+let beatTarget=1;
+function setErr(m){ const e=$('err'); if(m){e.textContent=m;e.style.opacity=1;}else{e.style.opacity=0;} }
 
 async function poll(){
   try{
-    const [d, a, m] = await Promise.all([
+    const [d,a,m]=await Promise.all([
       fetch('/api/data?system=xauusd&account=own').then(r=>r.json()),
       fetch('/api/accounting?system=xauusd&account=own').then(r=>r.json()),
       fetch('/api/monitor').then(r=>r.json()).catch(()=>({})),
     ]);
-    // KPIs
-    const acct = d.account||{}, st = d.stats||{};
-    $('k-eq').textContent = '$'+fmt(acct.equity);
-    const pnl = acct.profit ?? 0;
-    const pe = $('k-pnl'); pe.textContent = (pnl>=0?'+':'')+'$'+fmt(pnl);
-    pe.className = 'val mono '+(pnl>=0?'pos':'neg');
-    $('k-wr').textContent = (st.win_rate!=null? fmt(st.win_rate,1)+'%':'—');
-    const today = (a.today&&(a.today.cost??a.today.total_cost)) ?? a?.summary?.today_cost;
-    $('k-cost').textContent = today!=null ? '$'+fmt(today) : '—';
+    const acct=d.account||{}, st=d.stats||{};
+    $('k-eq').textContent='$'+fmt(acct.equity);
+    const pnl=acct.profit??0, pe=$('k-pnl');
+    pe.textContent=(pnl>=0?'+':'')+'$'+fmt(pnl); pe.className='val mono '+(pnl>=0?'pos':'neg');
+    $('k-wr').textContent=(st.win_rate!=null?fmt(st.win_rate,1)+'%':'—');
+    const today=(a.today&&(a.today.cost??a.today.total_cost))??a?.summary?.today_cost;
+    $('k-cost').textContent=today!=null?'$'+fmt(today):'—';
 
-    // bot status beacon
-    const bs = m.bot_status||m||{};
-    const running = bs.running ?? bs.is_running ?? (bs.status==='running');
-    const degraded = bs.net_degraded || bs.degraded;
-    const bd = $('beacon'), bt = $('beacon-t');
-    bd.className = 'dot ' + (running ? (degraded?'warn':'live') : 'off');
-    bt.textContent = running ? (degraded?'degraded':'live') : 'stopped';
-    beatTarget = running ? (degraded?0.5:1) : 0.12;
+    const bs=m.bot_status||m||{};
+    const running=bs.running??bs.is_running??(bs.status==='running');
+    const degraded=bs.net_degraded||bs.degraded;
+    $('beacon').className='dot '+(running?(degraded?'warn':'live'):'off');
+    $('beacon-t').textContent=running?(degraded?'degraded':'live'):'stopped';
+    beatTarget=running?(degraded?0.5:1):0.12;
+    core.material.emissive.setHex(pnl>=0?C.green:C.red);
+    core.material.color.setHex(pnl>=0?C.green:C.gold);
 
-    // core color by P&L
-    core.material.emissive.setHex(pnl>=0 ? C.green : C.red);
-    core.material.color.setHex(pnl>=0 ? C.green : C.gold);
-
-    // pillars from agents
-    const agents = a.agents || {};
-    const entries = Object.entries(agents);
-    const costs = entries.map(([,v]) => v.total_cost ?? v.cost ?? v.cost_usd ?? 0);
-    const maxC = Math.max(0.0001, ...costs);
-    entries.forEach(([name,v], i)=>{
-      const rec = pillarFor(name, i, Math.max(entries.length,1));
-      const c = v.total_cost ?? v.cost ?? v.cost_usd ?? 0;
-      rec.cost = c;
-      const h = 0.6 + (c/maxC)*7.5;             // height ∝ cost
-      rec.bar.scale.y = reduceMotion ? h : rec.bar.scale.y + (h-rec.bar.scale.y)*0.25;
-      rec.bar.position.y = rec.bar.scale.y/2;
-      rec.mat.emissiveIntensity = 0.12 + (c/maxC)*0.7;
+    const agents=a.agents||{}, entries=Object.entries(agents);
+    const costs=entries.map(([,v])=>v.total_cost??v.cost??v.cost_usd??0);
+    const maxC=Math.max(0.0001,...costs);
+    entries.forEach(([name,v],i)=>{
+      const c=ensureCat(name,i,Math.max(entries.length,1));
+      const cost=v.total_cost??v.cost??v.cost_usd??0; c.cost=cost;
+      c.targetScale=0.8+(cost/maxC)*0.8;             // bigger cat = more cost
+      c.coat.emissiveIntensity=0.05+(cost/maxC)*0.45;
     });
     setErr(null);
   }catch(e){ setErr('data feed unavailable — retrying'); }
 }
-poll(); setInterval(poll, 5000);
+poll(); setInterval(poll,5000);
 
 // ── hover tooltip ─────────────────────────────────────────────
-const tip = $('tip');
-addEventListener('pointermove', ev=>{
-  pointer.x = (ev.clientX/innerWidth)*2-1; pointer.y = -(ev.clientY/innerHeight)*2+1;
-  tip.style.left = (ev.clientX+14)+'px'; tip.style.top = (ev.clientY+14)+'px';
+const tip=$('tip');
+addEventListener('pointermove',ev=>{
+  pointer.x=(ev.clientX/innerWidth)*2-1; pointer.y=-(ev.clientY/innerHeight)*2+1;
+  tip.style.left=(ev.clientX+14)+'px'; tip.style.top=(ev.clientY+14)+'px';
+});
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
 });
 
-// ── resize / animate ──────────────────────────────────────────
-addEventListener('resize', ()=>{
-  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
+// ── walk animation helpers ────────────────────────────────────
+function lerpAngle(a,b,t){ let d=((b-a+Math.PI)%(Math.PI*2))-Math.PI; if(d<-Math.PI)d+=Math.PI*2; return a+d*t; }
+const tmp=new THREE.Vector3();
+function stepCat(c,dt,t){
+  c.scale+=(c.targetScale-c.scale)*0.1; c.group.scale.setScalar(c.scale);
+  const p=c.group.position;
+  tmp.copy(c.target).sub(p); tmp.y=0; const dist=tmp.length();
+  let moving=false;
+  if(c.pause>0){ c.pause-=dt; }
+  else if(dist<0.5){ c.target=randPoint(); c.pause=0.6+Math.random()*1.4; }
+  else { tmp.normalize(); p.addScaledVector(tmp,c.speed*dt); moving=true;
+    c.group.rotation.y=lerpAngle(c.group.rotation.y,Math.atan2(tmp.x,tmp.z),0.12); }
+  if(moving && !reduceMotion){
+    c.phase+=dt*c.speed*9;
+    c.body.position.y=c.bodyBase+Math.abs(Math.sin(c.phase))*0.07;
+    const sw=Math.sin(c.phase)*0.5;
+    c.legs[0].rotation.x=sw; c.legs[3].rotation.x=sw;
+    c.legs[1].rotation.x=-sw; c.legs[2].rotation.x=-sw;
+  } else {
+    c.body.position.y+=(c.bodyBase-c.body.position.y)*0.2;
+    c.legs.forEach(l=>l.rotation.x*=0.8);
+  }
+  c.tail.rotation.z=Math.sin(t*3+c.phase*0.3)*0.35;
+}
 
-const clock = new THREE.Clock();
+// ── main loop ─────────────────────────────────────────────────
+let beat=1; const clock=new THREE.Clock();
 function animate(){
   requestAnimationFrame(animate);
-  const t = clock.getElapsedTime();
-  beat += (beatTarget-beat)*0.05;
+  const dt=Math.min(clock.getDelta(),0.05), t=clock.elapsedTime;
+  beat+=(beatTarget-beat)*0.05;
   if(!reduceMotion){
-    core.rotation.y = t*0.4; core.rotation.x = Math.sin(t*0.3)*0.2;
-    const s = 1 + Math.sin(t*2.2)*0.06*beat; core.scale.setScalar(s);
-    ring.rotation.z = t*0.6; ring.scale.setScalar(1+Math.sin(t*2.2)*0.04*beat);
+    core.rotation.y=t*0.4; core.rotation.x=Math.sin(t*0.3)*0.2;
+    core.scale.setScalar(1+Math.sin(t*2.2)*0.06*beat);
+    ring.rotation.z=t*0.6;
   }
-  goldFill.intensity = 30 + Math.sin(t*2.2)*12*beat;
+  goldFill.intensity=24+Math.sin(t*2.2)*10*beat;
+  cats.forEach(c=>stepCat(c,dt,t));
 
-  // hover detection
-  raycaster.setFromCamera(pointer, camera);
-  const bars = [...pillars.values()].map(p=>p.bar);
-  const hit = raycaster.intersectObjects(bars)[0];
-  if(hit){
-    if(hovered!==hit.object){ hovered=hit.object; }
-    const rec = pillars.get(hit.object.userData.name);
-    tip.innerHTML = `<div class="n">${hit.object.userData.name.replace(/_/g,' ')}</div>`+
-                    `<div class="c">token cost · $${fmt(rec.cost,3)}</div>`;
-    tip.style.opacity = 1; document.body.style.cursor='pointer';
-  } else { hovered=null; tip.style.opacity=0; document.body.style.cursor='default'; }
+  raycaster.setFromCamera(pointer,camera);
+  const hit=raycaster.intersectObjects([...cats.values()].map(c=>c.group),true)[0];
+  let rec=null, nm='';
+  if(hit){ let node=hit.object;
+    while(node && !rec){ for(const [n,c] of cats){ if(c.group===node){rec=c;nm=n;break;} } node=node.parent; } }
+  if(rec){
+    tip.innerHTML=`<div class="n">${nm.replace(/_/g,' ')}</div><div class="c">token cost · $${fmt(rec.cost,3)}</div>`;
+    tip.style.opacity=1; document.body.style.cursor='pointer';
+  } else { tip.style.opacity=0; document.body.style.cursor='default'; }
 
   controls.update();
-  renderer.render(scene, camera);
+  renderer.render(scene,camera);
 }
 animate();
 </script>
