@@ -47,6 +47,10 @@
   #tip .n{font-weight:700;color:var(--gold2)} #tip .c{color:var(--muted);font-size:10px}
   .err{position:fixed;left:50%;bottom:60px;transform:translateX(-50%);z-index:15;color:var(--amber);
     font-size:11px;letter-spacing:.06em;opacity:0;transition:opacity .3s}
+  #minimap-cap{position:fixed;right:18px;bottom:228px;z-index:11;font-size:9px;letter-spacing:.16em;
+    color:var(--muted);text-transform:uppercase;font-family:'JetBrains Mono',monospace;pointer-events:none}
+  #minimap{position:fixed;right:18px;bottom:52px;z-index:11;width:170px;height:170px;pointer-events:none;
+    background:rgba(2,6,23,.55);border:1px solid var(--border);border-radius:12px;backdrop-filter:blur(6px)}
 </style>
 </head>
 <body>
@@ -73,6 +77,8 @@
   </div>
   <div class="hint">drag to orbit · scroll to zoom · hover a cat</div>
 </div>
+<div id="minimap-cap">office map</div>
+<canvas id="minimap" width="170" height="170"></canvas>
 <div id="tip"></div>
 <div class="err" id="err"></div>
 
@@ -207,6 +213,69 @@ function ensureCat(name,i,total){
   scene.add(c.group); cats.set(name,c); return c;
 }
 
+// ── pipeline edges (fdf: connect points + per-edge color lerp) ─
+// FdF draws a line from each point to its neighbour and lerps the endpoint
+// colours along the edge. Here the "neighbours" are consecutive agents in the
+// pipeline, so the wireframe literally traces the data flow chart->...->acct.
+const ORDER = ['chart_watcher','market_advisor','news_gatherer','analyst',
+               'decision_maker','reporter','lesson_learner','accountant'];
+const edges = [];
+const hexRGB = h => [(h>>16&255)/255, (h>>8&255)/255, (h&255)/255];
+function buildEdges(){
+  for(let i=0;i<ORDER.length-1;i++){
+    const a=cats.get(ORDER[i]), b=cats.get(ORDER[i+1]);
+    if(!a||!b || edges.some(e=>e.a===a&&e.b===b)) continue;
+    const geom=new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6),3));
+    geom.setAttribute('color', new THREE.BufferAttribute(    // fdf per-edge gradient
+      new Float32Array([...hexRGB(a.color), ...hexRGB(b.color)]),3));
+    const line=new THREE.Line(geom, new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:.55}));
+    line.renderOrder=-1; scene.add(line);
+    const pulse=new THREE.Mesh(new THREE.SphereGeometry(0.11,8,8), new THREE.MeshBasicMaterial({color:C.gold}));
+    scene.add(pulse);
+    edges.push({a,b,geom,line,pulse,off:Math.random()});
+  }
+}
+const _va=new THREE.Vector3(), _vb=new THREE.Vector3();
+function updateEdges(t){
+  for(const e of edges){
+    _va.copy(e.a.group.position); _va.y=0.6;
+    _vb.copy(e.b.group.position); _vb.y=0.6;
+    const p=e.geom.attributes.position.array;
+    p[0]=_va.x;p[1]=_va.y;p[2]=_va.z; p[3]=_vb.x;p[4]=_vb.y;p[5]=_vb.z;
+    e.geom.attributes.position.needsUpdate=true;
+    e.pulse.position.lerpVectors(_va,_vb,(t*0.4+e.off)%1);   // data flowing a->b
+  }
+}
+// fdf auto-fit: frame all cats once (zoom from the map span)
+let fitted=false;
+function fitView(){
+  let r=4; for(const c of cats.values()) r=Math.max(r, Math.hypot(c.group.position.x,c.group.position.z));
+  const d=Math.max(11, (r+3)*1.7);
+  camera.position.set(0, d*0.62, d); controls.update();
+}
+
+// ── minimap (cub3d: top-down map + entities) ──────────────────
+const mm=document.getElementById('minimap'), mx=mm.getContext('2d');
+const MM=170, MMR=FLOOR_R+2;
+const w2m=(x,z)=>[MM/2 + x/MMR*(MM/2-12), MM/2 + z/MMR*(MM/2-12)];
+function drawMinimap(){
+  mx.clearRect(0,0,MM,MM);
+  mx.strokeStyle='rgba(148,163,184,.25)'; mx.lineWidth=1;
+  mx.beginPath(); mx.arc(MM/2,MM/2,MM/2-7,0,Math.PI*2); mx.stroke();
+  for(const e of edges){
+    const [ax,ay]=w2m(e.a.group.position.x,e.a.group.position.z);
+    const [bx,by]=w2m(e.b.group.position.x,e.b.group.position.z);
+    mx.strokeStyle='rgba(212,172,13,.45)'; mx.beginPath(); mx.moveTo(ax,ay); mx.lineTo(bx,by); mx.stroke();
+  }
+  mx.fillStyle='#d4ac0d'; mx.beginPath(); mx.arc(MM/2,MM/2,4,0,Math.PI*2); mx.fill();
+  for(const c of cats.values()){
+    const [x,y]=w2m(c.group.position.x,c.group.position.z);
+    mx.fillStyle='#'+c.color.toString(16).padStart(6,'0');
+    mx.beginPath(); mx.arc(x,y,3.6,0,Math.PI*2); mx.fill();
+  }
+}
+
 // ── data polling ──────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 const fmt = (n,d=2)=> (n==null||isNaN(n))?'—':Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -246,6 +315,8 @@ async function poll(){
       c.targetScale=0.8+(cost/maxC)*0.8;             // bigger cat = more cost
       c.coat.emissiveIntensity=0.05+(cost/maxC)*0.45;
     });
+    buildEdges();
+    if(!fitted && cats.size){ fitted=true; fitView(); }
     setErr(null);
   }catch(e){ setErr('data feed unavailable — retrying'); }
 }
@@ -300,6 +371,7 @@ function animate(){
   }
   goldFill.intensity=24+Math.sin(t*2.2)*10*beat;
   cats.forEach(c=>stepCat(c,dt,t));
+  updateEdges(t); drawMinimap();
 
   raycaster.setFromCamera(pointer,camera);
   const hit=raycaster.intersectObjects([...cats.values()].map(c=>c.group),true)[0];
