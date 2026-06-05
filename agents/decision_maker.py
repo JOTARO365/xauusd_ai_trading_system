@@ -576,10 +576,12 @@ Account — Today: {history['today_pnl']:+.2f} USD ({history['today_trades']} tr
         out_direction    = result.direction
         trade_quality    = result.trade_quality
         confidence_score = result.confidence_score
+        decision_text    = result.reason
         logger.info(f"Decision: {decision} {out_direction}")
     except Exception as e:
         logger.error(f"[DM] structured output failed: {e} — defaulting SKIP")
         decision, out_direction, trade_quality, confidence_score = "SKIP", "NONE", "C", 0
+        decision_text = f"decision unavailable ({e})"
 
     logger.info(f"Quality:{trade_quality} ConfScore:{confidence_score}")
 
