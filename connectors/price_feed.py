@@ -1,7 +1,10 @@
+import os
 import time
 import MetaTrader5 as mt5
 from config import MT5_LOGIN, MT5_PASSWORD, MT5_SERVER, SYMBOL
 from loguru import logger
+
+AI_QUIET_RATIO = float(os.getenv("AI_QUIET_RATIO") or 0.6)  # recent/ref range < นี้ = เงียบจริง
 
 
 def is_mt5_connected() -> bool:
@@ -102,6 +105,36 @@ def get_ohlcv(symbol: str = SYMBOL, timeframe=mt5.TIMEFRAME_H1, count: int = 100
             time.sleep(1.5)
     logger.error(f"Cannot get OHLCV for {symbol}: {mt5.last_error()}")
     return None
+
+
+def recent_movement(lookback: int = 50, recent_n: int = 4) -> dict:
+    """Cheap pure-data movement probe (NO AI call) for the idle AI-throttle gate.
+
+    Self-calibrating: compares the last `recent_n` M15 bars' average range to the
+    median range of the last `lookback` bars, so 'quiet' adapts to the current
+    volatility regime instead of a hardcoded pip value. Measured data showed even
+    the quietest UTC hours carry a tail of large bars (a $30-46 M15 move in the
+    'Late'/Asian session), so the gate MUST read realized movement, never the
+    clock — extending the throttle only when the market is genuinely flat.
+
+    Returns {ok, recent_atr_pts, ref_med_pts, ratio, last_range_pts, quiet}.
+    Any failure → ok=False, quiet=False (fail-safe: run AI as usual, never skip).
+    """
+    try:
+        rates = get_ohlcv(timeframe=mt5.TIMEFRAME_M15, count=lookback)
+        if rates is None or len(rates) < recent_n + 10:
+            return {"ok": False, "quiet": False}
+        import numpy as np
+        rng = (rates["high"] - rates["low"]) / 0.01          # per-bar range in points
+        ref_med    = float(np.median(rng))
+        recent_atr = float(np.mean(rng[-recent_n:]))
+        ratio = recent_atr / ref_med if ref_med > 0 else 1.0
+        return {"ok": True, "recent_atr_pts": recent_atr, "ref_med_pts": ref_med,
+                "ratio": ratio, "last_range_pts": float(rng[-1]),
+                "quiet": ratio < AI_QUIET_RATIO}
+    except Exception as e:
+        logger.debug(f"recent_movement probe failed: {e}")
+        return {"ok": False, "quiet": False}
 
 
 def get_account_info() -> dict:
