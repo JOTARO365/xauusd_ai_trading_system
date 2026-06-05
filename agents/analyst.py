@@ -19,6 +19,29 @@ SYSTEM_PROMPT = json.dumps(
     separators=(",", ":"),
 )
 
+_REGIME_PATH = Path("agents/prompts/macro_regime.md")
+
+
+def _regime_context() -> str:
+    """Current-phase macro regime note (editable; fed by youtube-to-knowhow).
+
+    Fundamentals are regime-dependent — the same event maps to gold differently
+    across economic phases (e.g. hot inflation is bullish when the Fed is easing
+    but bearish when it's fighting inflation). This file lets the analyst's
+    factor interpretation change over time WITHOUT touching the cached system
+    prompt. Only the text below the REGIME_START marker is used; an empty body
+    (or a missing file) means the analyst falls back to the default gold_factors.
+    """
+    try:
+        txt = _REGIME_PATH.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    marker = "<!-- REGIME_START -->"
+    if marker in txt:
+        txt = txt.split(marker, 1)[1]
+    return txt.strip()
+
+
 _last_usage = None   # set after each API call — read by accountant
 
 
@@ -74,15 +97,24 @@ def analyze_sentiment(news_data: dict, chart_data: dict | None = None) -> dict:
         relevant_section = "\n=== Most Relevant News (vector search) ===\n" + \
             "\n".join(f"  - {r[:200]}" for r in relevant)
 
+    # ── Current macro regime — conditions fundamental mapping for this phase ──
+    regime = _regime_context()
+    regime_section = (
+        "=== CURRENT MACRO REGIME (authoritative for current phase) ===\n"
+        f"{regime}\n"
+        "↑ ใช้บริบทนี้กำหนดทิศของปัจจัยพื้นฐานในช่วงนี้ — ถ้าขัดกับ default ให้ยึด regime นี้\n\n"
+        if regime else ""
+    )
+
     user_message = f"""วิเคราะห์ sentiment XAUUSD จากข้อมูลต่อไปนี้:
 
-=== News Summary (AI-compressed) ===
+{regime_section}=== News Summary (AI-compressed) ===
 {summary}
 {relevant_section}
 
 {cal_section}
 
-หมายเหตุ: ให้น้ำหนัก ForexFactory calendar สูงสุด (hard data) → News Summary → Relevant items"""
+หมายเหตุ: ให้น้ำหนัก CURRENT MACRO REGIME (ถ้ามี) → ForexFactory calendar (hard data) → News Summary → Relevant items"""
 
     global _last_usage
     _last_usage = None

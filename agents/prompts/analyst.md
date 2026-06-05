@@ -95,7 +95,7 @@ Ignore events older than 4 hours. For events provided:
 
 ## UPCOMING EVENTS
 
-Flag any economic releases listed in the calendar that are **within the next 8 hours**. Mark as risk — do NOT predict the outcome.
+Flag any **scheduled high-impact catalyst within the next 8 hours** — not only economic data releases, but also central-bank speakers and pre-announced political statements or geopolitical deadlines (e.g. a presidential address at a set clock time). These known event-time windows move gold sharply on release. Mark them as risk and reflect them in CONDITIONS (e.g. "lighten / avoid new positions ahead of <event> at <time>"). Do NOT predict the outcome.
 
 ---
 
