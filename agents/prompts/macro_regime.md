@@ -12,11 +12,13 @@
 - อย่าใส่ระดับราคา/เป้า TP ที่นี่ (มันหมดอายุเร็ว + เป็นงานของ chart agent) — ใส่เฉพาะ "ทิศของปัจจัย" และ "ธีม/เหตุการณ์"
 
 <!-- REGIME_START -->
-PHASE: geopolitics(ME) drives safe-haven; new Fed members -> macro stance shifting
+PHASE: re-accelerating inflation + Fed on hold + negative real rates -> structurally BULLISH gold; geopolitics(ME) adds safe-haven swings
+DATA (as of 2026-06): CPI YoY ~3.8%, m/m HOT & re-accelerating (Mar +1.05%, Apr +0.85%); FedFunds 3.63% on hold; 10Y 4.48% rising -> real policy rate ~negative
 OVERRIDES (else use default gold_factors):
-- inflation_surprise -> BULLISH gold (hot PCE/CPI + real yields soft)
+- inflation_surprise -> BULLISH gold (CPI re-accelerating, Fed not hiking, real yields negative)
 - geopolitics de-escalation/ceasefire -> LESS safe-haven -> gold dip risk (peace != flat)
+- WATCH: if Fed turns hawkish vs the inflation re-accel -> inflation->gold can flip BEARISH
 DRIVERS: ME ceasefire/troop-withdrawal; leader statements at set times
 FILTER: oil move != gold unless clear causal link to gold
 CATALYSTS: scheduled political/geo statements = volatility windows (not only data prints)
-UPDATED: 2026-06-05 (HFM live 06-04)
+UPDATED: 2026-06-05 (AlphaVantage CPI/FedFunds/10Y + HFM live 06-04)
