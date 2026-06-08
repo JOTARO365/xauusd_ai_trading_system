@@ -20,18 +20,21 @@ SYSTEM_PROMPT = json.dumps(
 
 _last_usage = None   # set after each API call — read by accountant
 
-# ── A/B SHADOW HARNESS (Phase 1 — พิสูจน์ terse output ก่อนสลับจริง) ──────────
-# เปิดด้วย env CHART_SHADOW=true → ยิง terse-variant คู่ขนานบน input เดียวกัน
-# เทียบผลลง logs/shadow_chart.jsonl — ไม่แตะ result/_last_usage/การเทรด (zero-risk)
+# ── A/B SHADOW HARNESS (Phase 1+2 — พิสูจน์ terse + Haiku ก่อนสลับจริง) ──────────
+# เปิดด้วย env CHART_SHADOW=true → ยิง variant "terse + Haiku" (= end state จริง) คู่ขนาน
+# บน input เดียวกัน เทียบผลลง logs/shadow_chart.jsonl — ไม่แตะ result/_last_usage/การเทรด.
+# shadow รอบเดียวพิสูจน์ทั้ง 2 เรื่อง: (1) terse เปลี่ยนการตัดสินใจมั้ย (2) Haiku เก่งพอมั้ย.
+# ปรับ model ที่ทดสอบได้ด้วย CHART_SHADOW_MODEL (default = Haiku 4.5).
 _CHART_SHADOW = (os.getenv("CHART_SHADOW") or "").strip().lower() in ("1", "true", "yes", "on")
+_SHADOW_MODEL = (os.getenv("CHART_SHADOW_MODEL") or "claude-haiku-4-5-20251001").strip()
 
 _TERSE_SUFFIX = (
     "\n\n[OUTPUT MODE: TERSE] ใช้กฎ/ข้อมูลเดิมทุกประการในการตัดสิน "
     "แต่ตอบเฉพาะฟิลด์ด้านล่างเท่านั้น — ห้าม markdown header, ห้ามเล่าซ้ำ input, "
-    "ห้ามบทวิเคราะห์ยาว. รูปแบบ (บรรทัดละฟิลด์):\n"
+    "ห้ามบทวิเคราะห์ยาว. (SL/TP คำนวณในโค้ด ไม่ต้องตอบ). รูปแบบ (บรรทัดละฟิลด์):\n"
     "SIGNAL: <BUY|SELL|NO_TRADE>\nCONFIDENCE: <0-100>\nTREND: <...>\n"
     "SR_ZONE: <...>\nSR_STRENGTH: <...>\nENTRY_TYPE: <...>\nMOMENTUM: <...>\n"
-    "FIB_LEVEL: <...>\nSL_PIPS: <number>\nTP_PIPS: <number>\nREASON: <สั้น 1 บรรทัด>"
+    "FIB_LEVEL: <...>\nREASON: <สั้น 1 บรรทัด>"
 )
 SYSTEM_PROMPT_TERSE = SYSTEM_PROMPT + _TERSE_SUFFIX
 
@@ -76,7 +79,7 @@ def _shadow_chart_call(user_message: str, real_result: dict) -> None:
         import time as _time
         t0 = _time.monotonic()
         resp = client.messages.create(
-            model="claude-sonnet-4-6",
+            model=_SHADOW_MODEL,
             max_tokens=300,
             system=[{"type": "text", "text": SYSTEM_PROMPT_TERSE,
                      "cache_control": {"type": "ephemeral"}}],
@@ -85,7 +88,9 @@ def _shadow_chart_call(user_message: str, real_result: dict) -> None:
         lat = int((_time.monotonic() - t0) * 1000)
         sf  = _parse_chart_fields(resp.content[0].text)
 
-        crit = ("signal", "confidence", "sl_pips", "tp_pips")
+        # SL/TP คำนวณในโค้ดแล้ว (เหมือนกันทั้ง verbose/terse) → เทียบเฉพาะ signal+confidence
+        # ซึ่งคือ "การตัดสินใจเทรด" จริง.
+        crit = ("signal", "confidence")
         real = {k: real_result.get(k) for k in crit}
         shad = {k: sf.get(k) for k in crit}
         sig_match  = real["signal"] == shad["signal"]
@@ -99,16 +104,15 @@ def _shadow_chart_call(user_message: str, real_result: dict) -> None:
             "ts": datetime.now().isoformat(timespec="seconds"),
             "decision_match": decision_match,
             "sig_match": sig_match, "conf_match": conf_match,
-            "sl_match": real["sl_pips"] == shad["sl_pips"],
-            "tp_match": real["tp_pips"] == shad["tp_pips"],
             "real": real, "shadow": shad,
             "real_out_tok": real_out, "shadow_out_tok": shadow_out,
+            "shadow_model": _SHADOW_MODEL,
             "shadow_lat_ms": lat,
         }
         with Path("logs/shadow_chart.jsonl").open("a", encoding="utf-8") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         tag = "MATCH" if decision_match else "DIFF "
-        logger.info(f"[SHADOW] {tag} out {real_out}->{shadow_out} tok | "
+        logger.info(f"[SHADOW] {tag} ({_SHADOW_MODEL.split('-')[1]}) out {real_out}->{shadow_out} tok | "
                     f"real={real['signal']}/{real['confidence']} "
                     f"shadow={shad['signal']}/{shad['confidence']}")
     except Exception as e:
@@ -290,6 +294,26 @@ def calc_sl_from_wick(m15: dict, direction: str, h4_atr: float = 0.0) -> int:
     # ใช้ค่าที่กว้างกว่า: wick vs ATR floor — ป้องกันโดนทั้งสองทาง
     sl = max(wick_pips, atr_floor)
     return max(SL_MIN_PIPS, min(SL_MAX_PIPS, sl))
+
+
+def compute_tp_pips(signal: str, price: float, sl_pips: float,
+                    levels: list, min_rr: float = 2.0) -> int:
+    """TP = next S/R level in trade direction, อย่างน้อย min_rr × SL; ถ้าไม่มี zone → min_rr × SL.
+    คำนวณในโค้ด (deterministic, auditable) — แทนการให้ LLM ตอบ TP_PIPS.
+    ตรงตาม tp_rule ใน chart_watcher.json: target=next_sr_in_direction, min_rr=2.0.
+    """
+    point = 0.01
+    floor = sl_pips * min_rr
+    cands = []
+    for lv in levels or []:
+        try:
+            dist = (lv - price) if signal == "BUY" else (price - lv)
+        except Exception:
+            continue
+        if dist > 0:
+            cands.append(dist / point)          # แปลงเป็น pips
+    qualifying = [c for c in cands if c >= floor]
+    return int(round(min(qualifying) if qualifying else floor))
 
 
 def format_sr_text(h4_sr: dict, h1_sr: dict, key: dict, current_price: float) -> str:
@@ -1240,16 +1264,16 @@ RSI:{m15['rsi']} MACD Hist:{m15['macd_hist']}
             result["momentum"] = val
         elif key == "FIB_LEVEL":
             result["fib_level"] = val
-        elif key == "SL_PIPS":
-            try:
-                result["sl_pips"] = float(val)
-            except Exception:
-                pass
-        elif key == "TP_PIPS":
-            try:
-                result["tp_pips"] = float(val)
-            except Exception:
-                pass
+
+    # ── SL/TP คำนวณในโค้ด (deterministic) — LLM ไม่ต้องตอบแล้ว (42 compute-in-code) ──────
+    # SL = buy/sell_sl_pips ที่คำนวณไว้แล้ว (= sl_rule), TP = next S/R min 2.0×SL (= tp_rule).
+    # ลด output token ของ LLM + ตัด failure mode (LLM ตอบ SL/TP เพี้ยน/ขาด).
+    _sig = result["signal"]
+    if _sig in ("BUY", "SELL"):
+        _sl = buy_sl_pips if _sig == "BUY" else sell_sl_pips
+        result["sl_pips"] = float(_sl)
+        result["tp_pips"] = float(compute_tp_pips(_sig, current, _sl, all_levels))
+    # NO_TRADE: คง default (ไม่ถูกใช้)
 
     # ── EMA_PULLBACK toxicity gate (deterministic — ผลวิเคราะห์ 2026-06) ──────────
     # EMA_PULLBACK ที่ SL กว้าง (ATR สูง) หรือ confidence ต่ำ → ~0% WR.

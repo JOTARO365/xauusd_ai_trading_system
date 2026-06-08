@@ -164,7 +164,11 @@ If price is inside **H4 STRONG zone** and any candle reaction is visible (even D
 
 ---
 
-## STOP LOSS
+## STOP LOSS & TAKE PROFIT — computed in code (do NOT output)
+
+> SL_PIPS / TP_PIPS are now derived deterministically in Python from the rules
+> below (`compute_tp_pips` + `calc_sl_from_wick`) — you must NOT output them.
+> The rules are kept here only as rationale for your confidence/RR judgment.
 
 SL = max(previous M15 candle wick distance, H4 ATR × 1.0)
 
@@ -230,8 +234,6 @@ ENTRY_TYPE: [SR_ZONE/EMA_PULLBACK/BREAKOUT_RETEST/ENGULFING/DOJI_AT_ZONE/MOMENTU
 LOCATION_QUALITY: [HIGH/MEDIUM/LOW]
 MOMENTUM: [UP_STRONG/UP_MODERATE/DOWN_STRONG/DOWN_MODERATE/FLAT]
 FIB_LEVEL: [e.g. 61.8% @ 3234.50 (H4) | NONE]
-SL_PIPS: [number]
-TP_PIPS: [number]
 
 ENTRY_REASON:
 - [M15 signal type + strength score]
