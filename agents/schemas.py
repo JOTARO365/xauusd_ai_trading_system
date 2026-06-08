@@ -43,12 +43,13 @@ class MarketAdvisorOutput(BaseModel):
 
 
 class AnalystOutput(BaseModel):
+    # decision drivers (ใช้จริง downstream) — ห้ามแตะ
     sentiment: Literal["BULLISH", "BEARISH", "NEUTRAL"]
     confidence: int = Field(ge=0, le=90)
     bias: Literal["BUY", "SELL", "NEUTRAL"]
-    summary: str = Field(default="")
-    key_factors: List[str] = Field(default_factory=list)
-    alignment: Literal["ALIGNED", "CONFLICTED", "NEUTRAL"]
+    # rationale — ใช้แค่ 60 ตัวแรก (decision_maker log) → จำกัดสั้นเพื่อลด output token
+    summary: str = Field(default="", description="เหตุผลสั้นมาก 1 วลี ไม่เกิน 60 ตัวอักษร")
+    # หมายเหตุ: ตัด key_factors + alignment ออก (generate แล้วทิ้ง ไม่ถูกใช้ downstream — ลด output token)
 
 
 class DecisionMakerOutput(BaseModel):
