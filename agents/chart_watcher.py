@@ -1208,6 +1208,18 @@ RSI:{m15['rsi']} MACD Hist:{m15['macd_hist']}
     analysis_text = response.content[0].text
     logger.info(f"Chart result: {analysis_text[:200]}")
 
+    # ── Fast-move (news-spike) detector — net M15 move ~45min, signed (+ = ขึ้น) ──
+    # ใช้ใน decision_maker เป็น counter-spike guard: ห้ามเข้าสวนการสไปก์แรง (มักเป็นข่าว)
+    _m15_df = m15.get("df") if isinstance(m15, dict) else None
+    fast_move_pips = 0.0
+    if _m15_df is not None and len(_m15_df) >= 4:
+        try:
+            _fm_now = float(_m15_df["close"].iloc[-1])
+            _fm_ago = float(_m15_df["close"].iloc[-4])
+            fast_move_pips = round((_fm_now - _fm_ago) / 0.01, 0)
+        except Exception:
+            fast_move_pips = 0.0
+
     result = {
         "raw":           analysis_text,
         "signal":        "NO_TRADE",
@@ -1216,6 +1228,7 @@ RSI:{m15['rsi']} MACD Hist:{m15['macd_hist']}
         "tp_pips":       1500,
         "buy_sl_pips":   buy_sl_pips,
         "sell_sl_pips":  sell_sl_pips,
+        "fast_move_pips": fast_move_pips,
         "trend":         scan["h4_bias"],
         "sr_zone":       "NONE",
         "sr_strength":   "NORMAL",

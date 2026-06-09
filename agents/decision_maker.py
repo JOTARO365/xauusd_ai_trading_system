@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime, timezone as _tz
 from pathlib import Path
 from langchain_anthropic import ChatAnthropic
@@ -27,6 +28,97 @@ SYSTEM_PROMPT = json.dumps(
 )
 
 MIN_TECHNICAL_CONFIDENCE = 50
+
+# News-spike guard — ห้ามเข้าออเดอร์สวนการสไปก์แรง (มักเป็นข่าว). ตั้ง 0 = ปิด guard
+COUNTER_SPIKE_PIPS = float(os.getenv("COUNTER_SPIKE_PIPS") or 500)
+
+
+def _counter_spike_reason(direction: str, chart_data: dict) -> str | None:
+    """News-first guard: ราคาที่สไปก์แรงคือผลของข่าวทันที → ห้ามเข้าสวนทาง.
+    fast_move_pips (จาก chart_watcher, net M15 ~45min, + = ขึ้น):
+      พุ่งขึ้นแรง → ห้าม SELL (สวนการเด้ง);  ดิ่งลงแรง → ห้าม BUY (สวนการร่วง).
+    """
+    if COUNTER_SPIKE_PIPS <= 0:
+        return None
+    fast = float(chart_data.get("fast_move_pips", 0) or 0)
+    if abs(fast) < COUNTER_SPIKE_PIPS:
+        return None
+    if fast > 0 and direction == "SELL":
+        return f"Counter-spike: ราคาพุ่งขึ้น {fast:.0f}p (น่าจะข่าว) — ห้าม SELL สวนการเด้ง"
+    if fast < 0 and direction == "BUY":
+        return f"Counter-spike: ราคาดิ่งลง {abs(fast):.0f}p (น่าจะข่าว) — ห้าม BUY สวนการร่วง"
+    return None
+
+
+# News-first — ข่าว/macro คุมทิศหลัก (user role: ดูข่าว → price action → วิเคราะห์ → เข้า)
+NEWS_FIRST         = (os.getenv("NEWS_FIRST", "true").strip().lower() in ("1", "true", "yes", "on"))
+NEWS_BIAS_MIN_CONF = float(os.getenv("NEWS_BIAS_MIN_CONF") or 55)
+
+
+def _news_bias_dir(sentiment_data: dict, advisor_data: dict | None) -> tuple[str | None, str]:
+    """คืน (news_dir, why). news_dir='BUY'/'SELL' เมื่อข่าวชี้ทิศชัด, ไม่งั้น None.
+    ยึด analyst.bias (รวม macro_regime.md แล้ว) เป็นหลักเมื่อ conf ถึงเกณฑ์;
+    ถ้า regime (advisor) ชี้ตรงข้ามชัด → ถือว่าไม่ชัด (ไม่บังคับทิศ ปล่อยเทคนิคตัดสิน)."""
+    if not NEWS_FIRST:
+        return None, ""
+    a_bias = (sentiment_data or {}).get("bias", "NEUTRAL")
+    a_conf = float((sentiment_data or {}).get("confidence", 0) or 0)
+    if a_bias not in ("BUY", "SELL") or a_conf < NEWS_BIAS_MIN_CONF:
+        return None, ""
+    adv_dir = {"BULLISH": "BUY", "BEARISH": "SELL"}.get(
+        (advisor_data or {}).get("bias", "NEUTRAL"), "NEUTRAL")
+    if adv_dir in ("BUY", "SELL") and adv_dir != a_bias:
+        return None, f"analyst={a_bias} ขัด regime={adv_dir} — ไม่บังคับทิศ"
+    return a_bias, f"analyst conf {a_conf:.0f}%≥{NEWS_BIAS_MIN_CONF:.0f}"
+
+
+# HTF-fade guard — ห้ามเข้าสวนแนว D1/W1: SELL ที่ support / BUY ที่ resistance = fade โอกาสพลาดสูง
+HTF_FADE_BLOCK = (os.getenv("HTF_FADE_BLOCK", "true").strip().lower() in ("1", "true", "yes", "on"))
+
+
+def _htf_fade_reason(direction: str, chart_data: dict) -> str | None:
+    """ห้ามเข้าสวนแนว HTF (D1/W1): ที่ SUPPORT ราคามักเด้ง → ห้าม SELL;
+    ที่ RESISTANCE มักย่อ → ห้าม BUY. (htf_zone ถูกตั้งเฉพาะ D1/W1 เท่านั้น)"""
+    if not HTF_FADE_BLOCK:
+        return None
+    z = chart_data.get("htf_zone")
+    if not z:
+        return None
+    zt, tf, lvl = z.get("zone_type"), z.get("tf"), z.get("level")
+    if zt == "SUPPORT" and direction == "SELL":
+        return f"HTF-fade: SELL ที่ {tf} SUPPORT ({lvl}) — แนวรับใหญ่ มักเด้ง โอกาสพลาดสูง"
+    if zt == "RESISTANCE" and direction == "BUY":
+        return f"HTF-fade: BUY ที่ {tf} RESISTANCE ({lvl}) — แนวต้านใหญ่ มักย่อ โอกาสพลาดสูง"
+    return None
+
+
+# Option C — news ลากเข้าได้แม้สวนเทรนด์ H4 (ต้องตรงข่าว + price action ยืนยัน)
+NEWS_OVERRIDE_TREND    = (os.getenv("NEWS_OVERRIDE_TREND", "true").strip().lower() in ("1", "true", "yes", "on"))
+NEWS_CONFIRM_PIPS      = float(os.getenv("NEWS_CONFIRM_PIPS") or 500)
+NEWS_OVERRIDE_MIN_CONF = float(os.getenv("NEWS_OVERRIDE_MIN_CONF") or 50)
+
+
+def _news_override_ok(direction: str, chart_data: dict, news_dir: str | None,
+                      conf: int) -> tuple[bool, str]:
+    """อนุญาตเข้าสวนเทรนด์ H4 เมื่อ 'ตรงข่าว + price action ยืนยัน' (role: ดูข่าว→price action→เข้า).
+    เงื่อนไข: NEWS_OVERRIDE_TREND on, direction==news_dir, conf≥floor, และยืนยัน 1 ใน 2:
+      (a) สไปก์ไปทางเดียวกับไม้ ≥ NEWS_CONFIRM_PIPS (ข่าวดันราคาจริง), หรือ
+      (b) อยู่ที่ HTF zone ที่หนุนไม้ (BUY ที่ SUPPORT / SELL ที่ RESISTANCE)."""
+    if not NEWS_OVERRIDE_TREND:
+        return False, ""
+    if not news_dir or direction != news_dir:
+        return False, ""
+    if float(conf or 0) < NEWS_OVERRIDE_MIN_CONF:
+        return False, f"conf {conf}<{NEWS_OVERRIDE_MIN_CONF:.0f}"
+    fast = float(chart_data.get("fast_move_pips", 0) or 0)
+    if (direction == "BUY" and fast >= NEWS_CONFIRM_PIPS) or \
+       (direction == "SELL" and fast <= -NEWS_CONFIRM_PIPS):
+        return True, f"ข่าว {news_dir} + สไปก์ยืนยัน {fast:+.0f}p"
+    z = chart_data.get("htf_zone") or {}
+    if (direction == "BUY" and z.get("zone_type") == "SUPPORT") or \
+       (direction == "SELL" and z.get("zone_type") == "RESISTANCE"):
+        return True, f"ข่าว {news_dir} + อยู่ที่ {z.get('tf')} {z.get('zone_type')}"
+    return False, "ไม่มี price action ยืนยัน (ต้องสไปก์ตามทิศ หรืออยู่ที่ HTF zone หนุน)"
 
 _last_usage = None   # set after each API call — read by accountant
 
@@ -207,6 +299,17 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         if not _can_open:
             return _fail(f"NNLB: {_slot_reason}")
 
+        # Anti-fade guards — แม้ NNLB ข้าม gates ก็ยังห้ามเข้าสวน: สไปก์ข่าว / ทิศข่าว / แนว HTF
+        _cs = _counter_spike_reason(direction, chart_data)
+        if _cs:
+            return _fail(f"NNLB: {_cs}")
+        _ndir, _nwhy = _news_bias_dir(sentiment_data, advisor_data)
+        if _ndir and direction != _ndir:
+            return _fail(f"NNLB: News-first ข่าวชี้ {_ndir} — บล็อก {direction} สวนข่าว ({_nwhy})")
+        _hf = _htf_fade_reason(direction, chart_data)
+        if _hf:
+            return _fail(f"NNLB: {_hf}")
+
         logger.warning(f"[NNLB] ข้าม gates ทั้งหมด — {direction} SL={sl_pips:.0f}p TP={tp_pips:.0f}p conf={conf}%")
         return {
             "pass":         True,
@@ -260,6 +363,21 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     else:
         return _fail(f"ทิศทางไม่ชัดเจน: {tech_signal}")
 
+    # 2b. News-spike guard — ห้ามเข้าสวนการสไปก์แรง (ข่าว): ไม่ขายสวนการเด้ง/ไม่ซื้อสวนการร่วง
+    _cs = _counter_spike_reason(direction, chart_data)
+    if _cs:
+        return _fail(_cs)
+
+    # 2c. News-first — ข่าว macro เป็นหลัก: บล็อกการเข้าสวนทิศข่าวที่ชัด
+    _ndir, _nwhy = _news_bias_dir(sentiment_data, advisor_data)
+    if _ndir and direction != _ndir:
+        return _fail(f"News-first: ข่าวชี้ {_ndir} — บล็อก {direction} สวนข่าว ({_nwhy})")
+
+    # 2d. HTF-fade — ห้าม SELL ที่แนวรับ D1/W1 / ห้าม BUY ที่แนวต้าน (โอกาสพลาดสูง)
+    _hf = _htf_fade_reason(direction, chart_data)
+    if _hf:
+        return _fail(_hf)
+
     # 3. UNKNOWN trend — ไม่เทรดเมื่อ trend ไม่ชัดเจน (WR 32% ใน historical data)
     if not trend or trend.upper() in ("UNKNOWN", "?", ""):
         return _fail(f"UNKNOWN trend — ไม่เทรดเมื่อทิศทาง H4 ไม่ชัดเจน")
@@ -268,9 +386,14 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     is_counter = (trend == "BULLISH" and direction == "SELL") or \
                  (trend == "BEARISH" and direction == "BUY")
     if is_counter:
-        at_strong = sr_str == "STRONG" and sr_zone in ("RESISTANCE", "SUPPORT")
-        if not (at_strong and conf >= 80):
-            return _fail(f"Counter-trend {direction} blocked (trend={trend}, conf={conf}, need 80%)")
+        # Option C — news ลากเข้า: ตรงข่าว + price action ยืนยัน → ข่าวมีอำนาจเหนือเทรนด์ H4
+        _ovr_ok, _ovr_why = _news_override_ok(direction, chart_data, _ndir, conf)
+        if _ovr_ok:
+            logger.warning(f"[News-override] {direction} สวนเทรนด์ H4={trend} แต่ {_ovr_why} → อนุญาต")
+        else:
+            at_strong = sr_str == "STRONG" and sr_zone in ("RESISTANCE", "SUPPORT")
+            if not (at_strong and conf >= 80):
+                return _fail(f"Counter-trend {direction} blocked (trend={trend}, conf={conf}, need 80%)")
 
     # 5. SIDEWAYS — range bounce strategy
     # อนุญาต: SR_ZONE bounce ที่ขอบ range, MOMENTUM_BREAKOUT (breakout จาก range)

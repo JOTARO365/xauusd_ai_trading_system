@@ -191,5 +191,7 @@ X_ACCOUNTS_TO_FOLLOW = (
 _keywords_raw = os.getenv("X_KEYWORDS", "")
 X_KEYWORDS = (
     [k.strip() for k in _keywords_raw.split(",") if k.strip()]
-    or ["XAUUSD", "gold", "XAU", "bullion", "Fed", "inflation"]
+    or ["XAUUSD", "gold", "XAU", "bullion", "Fed", "inflation",
+        # geopolitics (safe-haven driver) + cross-asset — เพิ่มจาก HFM live 06-08 (ceasefire→ทองเด้ง)
+        "Iran", "Israel", "ceasefire", "geopolitical", "war", "oil", "crude"]
 )

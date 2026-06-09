@@ -19,8 +19,8 @@ DATA (auto 2026-06-05): CPI YoY +3.8% m/m re-accel (2026-04 +0.85%, 2026-03 +1.0
 - inflation_surprise -> BULLISH gold (hot inflation, Fed not hiking, real policy rate negative)
 - WATCH: a hawkish Fed pivot vs the inflation re-accel would flip inflation->gold BEARISH
 <!-- MACRO_AUTO_END -->
-- geopolitics de-escalation/ceasefire -> LESS safe-haven -> gold dip risk (peace != flat)
-DRIVERS: ME ceasefire/troop-withdrawal; leader statements at set times
-FILTER: oil move != gold unless clear causal link to gold
+- geopolitics de-escalation/ceasefire (CURRENT, 06-08): observed market reaction = gold BID UP (short-covering + structural bull intact) while oil falls -> treat ceasefire/negotiation headlines as BULLISH gold near-term; do NOT sell into the ceasefire bounce until price clearly rejects
+DRIVERS: ME ceasefire/troop-withdrawal (IRGC halt 06-08); oil falling; leader statements at set times
+FILTER: oil down + ceasefire = current gold-up driver; reassess if oil reverses up or a hawkish Fed headline hits
 CATALYSTS: scheduled political/geo statements = volatility windows (not only data prints)
-UPDATED: 2026-06-05 (AlphaVantage CPI/FedFunds/10Y + HFM live 06-04)
+UPDATED: 2026-06-09 (ceasefire reaction; HFM live 06-08 + prior AlphaVantage CPI/FedFunds/10Y)
