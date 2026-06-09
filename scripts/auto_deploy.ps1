@@ -1,4 +1,7 @@
-$REPO = "C:\xauusd_ai_trading_system"
+# Derive repo root from this script's own location (<repo>\scripts\auto_deploy.ps1)
+# so it works at any install path — C:\trading\xauusd_ai_trading_system (create_vm.sh)
+# or the legacy C:\xauusd_ai_trading_system — without a hardcoded constant.
+$REPO = Split-Path $PSScriptRoot -Parent
 $LOG  = "$REPO\logs\auto_deploy.log"
 
 function Write-Log {
