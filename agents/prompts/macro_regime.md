@@ -19,8 +19,8 @@ DATA (auto 2026-06-05): CPI YoY +3.8% m/m re-accel (2026-04 +0.85%, 2026-03 +1.0
 - inflation_surprise -> BULLISH gold (hot inflation, Fed not hiking, real policy rate negative)
 - WATCH: a hawkish Fed pivot vs the inflation re-accel would flip inflation->gold BEARISH
 <!-- MACRO_AUTO_END -->
-- geopolitics de-escalation/ceasefire (CURRENT, 06-08): observed market reaction = gold BID UP (short-covering + structural bull intact) while oil falls -> treat ceasefire/negotiation headlines as BULLISH gold near-term; do NOT sell into the ceasefire bounce until price clearly rejects
-DRIVERS: ME ceasefire/troop-withdrawal (IRGC halt 06-08); oil falling; leader statements at set times
-FILTER: oil down + ceasefire = current gold-up driver; reassess if oil reverses up or a hawkish Fed headline hits
+- geopolitics (CURRENT, 06-09): ceasefire narrative REVERSED — Israeli official says the conflict is "not over, will take months". US-Iran negotiation UNRESOLVED, headlines swing both ways -> HIGH two-way volatility, NO clean directional bias this phase. Do not assume bullish OR bearish from a single headline; let price action lead.
+DRIVERS: US-Iran negotiation (unresolved, multi-month per Israeli official); Israeli/US official statements at set times; high two-way headline risk
+FILTER: choppy/high-vol regime — anti-fade + counter-spike guards most valuable; avoid chasing extended moves and avoid fading hard into headlines
 CATALYSTS: scheduled political/geo statements = volatility windows (not only data prints)
-UPDATED: 2026-06-09 (ceasefire reaction; HFM live 06-08 + prior AlphaVantage CPI/FedFunds/10Y)
+UPDATED: 2026-06-10 (ceasefire REVERSED -> negotiation unresolved/high-vol; HFM live 06-09)
