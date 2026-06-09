@@ -6,7 +6,7 @@ import sys
 import time
 from datetime import date as _date, datetime as _dt
 from loguru import logger
-from connectors.price_feed import connect_mt5, disconnect_mt5, is_mt5_connected, recent_movement
+from connectors.price_feed import connect_mt5, disconnect_mt5, is_mt5_connected, recent_movement, get_account_info
 from connectors.mt5_connector import get_open_positions, get_current_price, is_hedge_active, check_open_slot, is_algo_trading_enabled
 from agents.chart_watcher import analyze_m5_pa
 from agents.pending_manager import place_weekly_calendar_pending
@@ -38,6 +38,7 @@ READY_AI_MIN_SECS     = 300   # Ready Mode / near-HTF: ไม่ยิง AI ถ
                               # (เดิม never-skip → ยิง 4-agent Sonnet ทุก 120s = ตัวกิน token หลัก)
 AI_IDLE_GATE          = os.getenv("AI_IDLE_GATE", "false").lower() == "true"
 AI_QUIET_INTERVAL_SECS= int(os.getenv("AI_QUIET_INTERVAL_SECS") or 1800)  # idle + เงียบจริง → ยืด throttle (default 30 นาที)
+MIN_AI_EQUITY         = float(os.getenv("MIN_AI_EQUITY") or 150)  # ทุนต่ำกว่านี้ (สกุลบัญชี/บาท) → ไม่รัน AI เลย (0 = ปิด)
 _last_ai_mono:  float = 0.0   # monotonic time ของ AI cycle ล่าสุด
 _last_ai_price: float = 0.0   # bid price ตอน AI cycle ล่าสุด
 
@@ -233,7 +234,17 @@ def _should_skip_ai() -> tuple[bool, str]:
 
     since = time.monotonic() - _last_ai_mono
 
-    # 0. First cycle — รัน AI เสมอ
+    # 0. Capital floor — ทุนต่ำกว่าเกณฑ์ → ไม่รัน AI เลย (override ทุกอย่าง รวม spike/first cycle)
+    #    pos mgmt ยังทำงานผ่าน graph; ประหยัด token ตอนพอร์ตเล็กเกินกว่าจะเทรดมีความหมาย
+    if MIN_AI_EQUITY > 0:
+        try:
+            _eq = get_account_info().get("equity")
+            if _eq is not None and _eq < MIN_AI_EQUITY:
+                return True, f"capital floor: equity {_eq:.0f} < {MIN_AI_EQUITY:.0f} — ข้าม AI"
+        except Exception:
+            pass
+
+    # 0b. First cycle — รัน AI เสมอ
     if _last_ai_mono == 0.0:
         return False, "first cycle"
 
