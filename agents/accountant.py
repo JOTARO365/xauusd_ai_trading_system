@@ -20,6 +20,10 @@ _PRICING: dict[str, dict[str, float]] = {
         "cache_write":  3.75 / 1_000_000,
         "cache_read":   0.30 / 1_000_000,
     },
+    # ── เพิ่ม provider อื่นตอน migrate (ใส่ราคาจริงจาก doc ของแต่ละค่าย; ค่า cache 0 ได้ถ้าไม่มี) ──
+    # "grok-...":  {"input": _/1e6, "output": _/1e6, "cache_write": 0, "cache_read": 0},
+    # "gemini-...":{"input": _/1e6, "output": _/1e6, "cache_write": 0, "cache_read": 0},
+    # "qwen-...":  {"input": _/1e6, "output": _/1e6, "cache_write": 0, "cache_read": 0},
 }
 _FALLBACK = _PRICING["claude-haiku-4-5-20251001"]
 
@@ -64,13 +68,41 @@ def _save(data: dict) -> None:
 
 # ── Cost calculation ──────────────────────────────────────────────────────────
 
+def _normalize_usage(usage) -> tuple[int, int, int, int]:
+    """คืน (input, output, cache_read, cache_write) จาก usage ของ provider ใดก็ได้.
+    รองรับ: Anthropic (input_tokens/cache_*_input_tokens), OpenAI-compatible — Qwen/Grok
+    ผ่าน OpenAI SDK (prompt_tokens/completion_tokens, prompt_tokens_details.cached_tokens),
+    LangChain usage_metadata (input_tokens/output_tokens), dict, หรือ None.
+    หมายเหตุ: OpenAI-style prompt_tokens รวม cached แล้ว ส่วน Anthropic input_tokens แยก —
+    การ map นี้พอสำหรับ cost ระดับ accounting ไม่ได้ละเอียดระดับ cache discount ทุกค่าย."""
+    if usage is None:
+        return 0, 0, 0, 0
+    if isinstance(usage, dict):
+        g = lambda k, d=0: usage.get(k, d) or 0
+        _details = usage.get("prompt_tokens_details") or {}
+    else:
+        g = lambda k, d=0: getattr(usage, k, d) or 0
+        _details = getattr(usage, "prompt_tokens_details", None) or {}
+    inp = g("input_tokens") or g("prompt_tokens")
+    out = g("output_tokens") or g("completion_tokens")
+    cr  = g("cache_read_input_tokens")
+    cw  = g("cache_creation_input_tokens")
+    if not cr:   # OpenAI-style cached tokens
+        cr = (_details.get("cached_tokens", 0) if isinstance(_details, dict)
+              else getattr(_details, "cached_tokens", 0)) or 0
+    return int(inp or 0), int(out or 0), int(cr or 0), int(cw or 0)
+
+
 def calc_cost(model: str, usage) -> dict:
-    """คำนวณต้นทุน USD จาก response.usage object"""
-    p   = _PRICING.get(model, _FALLBACK)
-    inp = getattr(usage, "input_tokens",                0) or 0
-    out = getattr(usage, "output_tokens",               0) or 0
-    cr  = getattr(usage, "cache_read_input_tokens",     0) or 0
-    cw  = getattr(usage, "cache_creation_input_tokens", 0) or 0
+    """คำนวณต้นทุน USD จาก usage object ของ provider ใดก็ได้ (ดู _normalize_usage)."""
+    p = _PRICING.get(model)
+    if p is None:
+        logger.warning(
+            f"[accounting] ไม่มีราคา model '{model}' ใน _PRICING — ใช้ fallback (cost อาจผิด). "
+            f"เพิ่มราคาจริงใน agents/accountant.py::_PRICING"
+        )
+        p = _FALLBACK
+    inp, out, cr, cw = _normalize_usage(usage)
 
     cost = (inp * p["input"]
           + out * p["output"]

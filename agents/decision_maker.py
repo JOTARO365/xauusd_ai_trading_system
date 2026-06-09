@@ -14,7 +14,7 @@ from loguru import logger
 _llm = ChatAnthropic(
     model="claude-sonnet-4-6",
     api_key=ANTHROPIC_API_KEY,
-    max_tokens=120,
+    max_tokens=256,   # 120 เดิมคับ — reason ฟิลด์ free-text ถูก truncate → structured parse fail → SKIP เงียบ
     temperature=0,
 ).with_structured_output(DecisionMakerOutput)
 
@@ -31,6 +31,12 @@ MIN_TECHNICAL_CONFIDENCE = 50
 
 # News-spike guard — ห้ามเข้าออเดอร์สวนการสไปก์แรง (มักเป็นข่าว). ตั้ง 0 = ปิด guard
 COUNTER_SPIKE_PIPS = float(os.getenv("COUNTER_SPIKE_PIPS") or 500)
+
+# TREND_CONT (NNLB) — conf สังเคราะห์ + ต้องเป็น pullback จริง (ราคาใกล้ H1 EMA20) ไม่ใช่ entry กลางเทรนด์
+TREND_CONT_CONF         = float(os.getenv("TREND_CONT_CONF") or 55)
+TREND_CONT_MAX_DIST_PCT = float(os.getenv("TREND_CONT_MAX_DIST_PCT") or 0.3)   # % ห่าง H1 EMA20 สูงสุด
+# NNLB fast-path: เปิด order ตรงโดยข้าม Claude. ตั้ง false = บังคับผ่าน Claude decision (ปลอดภัยขึ้น ช้าลง)
+NNLB_FASTPATH           = (os.getenv("NNLB_FASTPATH", "true").strip().lower() in ("1", "true", "yes", "on"))
 
 
 def _counter_spike_reason(direction: str, chart_data: dict) -> str | None:
@@ -256,12 +262,21 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
                             and _h4e20 > _h4e50):
                         _tc_dir = "BUY"
 
+                # #2 — ต้องเป็น pullback จริง: ราคาใกล้ H1 EMA20 ไม่ใช่ entry กลางเทรนด์ที่ยืดแล้ว
+                #      (conf 55 เป็นค่าสังเคราะห์ ไม่มี zone/PA ยืนยัน → อย่างน้อยขอ proximity เป็นหลักฐาน)
+                if _tc_dir and _px and abs(_px - _e20) / _px * 100 > TREND_CONT_MAX_DIST_PCT:
+                    logger.info(
+                        f"[TREND_CONT] skip {_tc_dir} — ราคาห่าง H1 EMA20 "
+                        f"{abs(_px - _e20) / _px * 100:.2f}% > {TREND_CONT_MAX_DIST_PCT}% (extended ไม่ใช่ pullback)"
+                    )
+                    _tc_dir = None
+
                 if _tc_dir:
                     tech_signal = f"TREND_CONT_{_tc_dir}"
                     chart_data["signal"]     = _tc_dir
-                    chart_data["confidence"] = 55            # moderate — no zone anchor
+                    chart_data["confidence"] = int(TREND_CONT_CONF)   # tunable; ยังไม่มี zone anchor
                     chart_data["entry_type"] = "EMA_PULLBACK"
-                    conf = 55
+                    conf = int(TREND_CONT_CONF)
                     # SL = H4 ATR (clamped), TP = SL × 2  → R:R = 2.0
                     _h4_atr = float(chart_data.get("indicators", {}).get("h4", {}).get("atr") or 0)
                     _tc_sl  = int(min(max(round(_h4_atr / 0.01), 500), 3500)) if _h4_atr else 1500
@@ -564,7 +579,8 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
     trend       = chart_data.get("trend", "SIDEWAYS")
 
     # NNLB fast-path: HTF zone override หรือ TREND_CONT — ข้าม Claude เข้า order ทันที
-    if _cfg.NNLB_MODE and ("TREND_CONT" in tech_signal or tech_signal.startswith("HTF_")):
+    # (NNLB_FASTPATH=false → ตกไปใช้ Claude decision ปกติ = ปลอดภัยขึ้นแลกกับช้า/เสีย token)
+    if NNLB_FASTPATH and _cfg.NNLB_MODE and ("TREND_CONT" in tech_signal or tech_signal.startswith("HTF_")):
         tag = "HTF_ZONE" if tech_signal.startswith("HTF_") else "TREND_CONT"
         logger.warning(
             f"[{tag}] Fast-path → {direction} SL={sl_pips:.0f}p TP={tp_pips:.0f}p "

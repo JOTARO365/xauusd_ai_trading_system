@@ -278,6 +278,23 @@ def calc_sl_atr_floor(h4_atr: float) -> int:
     return max(SL_MIN_PIPS, min(SL_MAX_PIPS, atr_pips))
 
 
+def _sane_atr(h4: dict) -> float:
+    """กัน H4 ATR เพี้ยนช่วง thin/holiday market — clamp ATR ปัจจุบันให้อยู่ในช่วง median 20 แท่ง.
+    ATR ตัวเดียว (แท่งล่าสุด) สูง/ต่ำผิดปกติ → SL แคบหรือกว้างเกินจริง. ใช้ median เป็นกรอบสมเหตุผล.
+    """
+    cur = float(h4.get("atr", 0.0) or 0.0)
+    df  = h4.get("df")
+    try:
+        if df is not None and "atr" in df.columns and len(df) >= 20:
+            import numpy as np
+            med = float(np.nanmedian(df["atr"].tail(20).to_numpy()))
+            if med > 0:
+                return float(min(max(cur, 0.4 * med), 2.5 * med))
+    except Exception:
+        pass
+    return cur
+
+
 def calc_sl_from_wick(m15: dict, direction: str, h4_atr: float = 0.0) -> int:
     """SL = max(prev M15 wick distance, ATR-based floor)
     - wick SL: ปลาย wick แท่งก่อนหน้า M15
@@ -1117,7 +1134,7 @@ def analyze_chart() -> dict:
     candle_pat = detect_candle_pattern(m15["df"])
 
     # SL = max(prev M15 wick, ATR floor จาก H4) — ทั้งสองทิศทาง
-    h4_atr = h4.get("atr", 0.0)
+    h4_atr = _sane_atr(h4)   # #3 — clamp ATR เพี้ยน (thin market) ก่อนคำนวณ SL
     buy_sl_pips  = calc_sl_from_wick(m15, "BUY",  h4_atr)
     sell_sl_pips = calc_sl_from_wick(m15, "SELL", h4_atr)
 

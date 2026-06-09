@@ -267,6 +267,7 @@ def node_accounting(state: TradingState) -> dict:
     import agents.reporter       as _rp
     import config
     from agents.accountant import record_cycle
+    from agents.llm_models import model_for   # single source of truth: agent -> model
     try:
         ticket = (
             state.get("decision", {}).get("order", {}).get("ticket")
@@ -275,11 +276,11 @@ def node_accounting(state: TradingState) -> dict:
         record_cycle(
             symbol=config.SYMBOL,
             agent_usages={
-                "chart_watcher":  ("claude-sonnet-4-6",          _cw._last_usage),
-                "market_advisor": ("claude-sonnet-4-6",          _ma._last_usage),
-                "analyst":        ("claude-sonnet-4-6",          _an._last_usage),
-                "decision_maker": ("claude-sonnet-4-6",          _dm._last_usage),
-                "reporter":       ("claude-haiku-4-5-20251001",  _rp._last_usage),
+                "chart_watcher":  (model_for("chart_watcher"),  _cw._last_usage),
+                "market_advisor": (model_for("market_advisor"), _ma._last_usage),
+                "analyst":        (model_for("analyst"),        _an._last_usage),
+                "decision_maker": (model_for("decision_maker"), _dm._last_usage),
+                "reporter":       (model_for("reporter"),       _rp._last_usage),
             },
             ticket=ticket,
             latencies_ms=state.get("latencies", {}),
