@@ -239,6 +239,10 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
                     )
                 tech_signal = f"HTF_{_htf_dir}"
                 chart_data["signal"] = _htf_dir
+                # conf สังเคราะห์แบบเดียวกับ TREND_CONT — เดิมเปิดไม้ได้ทั้งที่ conf=0
+                # (chart บอก NO_TRADE) ซึ่งข้อมูลจริง band conf 0-9 = 21 ไม้ −633
+                conf = max(conf, int(TREND_CONT_CONF))
+                chart_data["confidence"] = conf
                 logger.warning(
                     f"[NNLB] HTF zone override: NO_TRADE → {_htf_dir} "
                     f"({_htf['tf']} {_htf['zone_type']} @ {_htf['level']} dist={_htf['dist_pct']}%)"
@@ -318,6 +322,14 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         _can_open, _slot_reason = check_open_slot(direction, last_dir_lost=_last_lost)
         if not _can_open:
             return _fail(f"NNLB: {_slot_reason}")
+
+        # Quality gates ที่ replay พิสูจน์ (489 ไม้) — NNLB ข้ามเฉพาะ money-management
+        # ไม่ใช่ quality: conf 50-59 = WR 23.5%, Asian conf ต่ำ = −115/ไม้ → ใช้กับ NNLB ด้วย
+        _conf_now = int(chart_data.get("confidence", conf) or 0)
+        if _conf_now < MIN_TECHNICAL_CONFIDENCE:
+            return _fail(f"NNLB: conf {_conf_now}% < floor {MIN_TECHNICAL_CONFIDENCE}%")
+        if datetime.now(_tz.utc).hour < 7 and _conf_now < ASIAN_MIN_CONF:
+            return _fail(f"NNLB Asian (0-7 UTC): conf {_conf_now}% < {ASIAN_MIN_CONF:.0f}%")
 
         # Anti-fade guards — แม้ NNLB ข้าม gates ก็ยังห้ามเข้าสวน: สไปก์ข่าว / ทิศข่าว / แนว HTF
         _cs = _counter_spike_reason(direction, chart_data)

@@ -1,8 +1,15 @@
 import asyncio
+import re
 from connectors.twitter_client import fetch_from_accounts
 from connectors.web_news import fetch_forexfactory_calendar, fetch_investing_news
 from config import X_KEYWORDS
 from loguru import logger
+
+# word-boundary match — substring เดิมทำให้คำสั้นจับผิดเป้า ("war"→forward/award,
+# "oil"→boiling) → tweet ขยะไหลเข้า analyst; \b ทำให้ทุก keyword จับเฉพาะคำเต็ม
+_KW_RE = re.compile(
+    r"\b(" + "|".join(re.escape(k.lower()) for k in X_KEYWORDS) + r")\b"
+) if X_KEYWORDS else None
 
 
 async def gather_news() -> dict:
@@ -15,11 +22,10 @@ async def gather_news() -> dict:
         asyncio.to_thread(fetch_investing_news, 10),
     )
 
-    # กรอง keyword (gold/XAU/etc) จาก raw tweets
-    keywords_lower = [k.lower() for k in X_KEYWORDS]
+    # กรอง keyword (gold/XAU/etc) จาก raw tweets — word-boundary (ดู _KW_RE)
     keyword_tweets = [
         t for t in raw_tweets
-        if any(kw in t["text"].lower() for kw in keywords_lower)
+        if _KW_RE and _KW_RE.search(t["text"].lower())
     ]
     logger.info(f"กรอง keyword แล้ว: {len(keyword_tweets)}/{len(raw_tweets)} tweets")
 
