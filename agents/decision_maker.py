@@ -27,13 +27,18 @@ SYSTEM_PROMPT = json.dumps(
     separators=(",", ":"),  # minified — saves ~15% tokens vs pretty-printed
 )
 
-MIN_TECHNICAL_CONFIDENCE = 50
+# Replay 489 ไม้ (2026-06-10): conf 50-59 = WR 23.5% / −3,807 THB (โซนพิษ); 70-79 ดีสุด
+# → ยก floor 50→62; HTF zone ห้ามลด floor อีก (ของเดิม 42/45 คือประตูให้โซนพิษเข้า)
+MIN_TECHNICAL_CONFIDENCE = int(os.getenv("MIN_TECH_CONF") or 62)
+# Asian 0-7 UTC: ทุก entry ต้องผ่าน conf นี้ (replay: ตัด −4,506 เสีย +57)
+ASIAN_MIN_CONF           = float(os.getenv("ASIAN_MIN_CONF") or 72)
 
 # News-spike guard — ห้ามเข้าออเดอร์สวนการสไปก์แรง (มักเป็นข่าว). ตั้ง 0 = ปิด guard
 COUNTER_SPIKE_PIPS = float(os.getenv("COUNTER_SPIKE_PIPS") or 500)
 
 # TREND_CONT (NNLB) — conf สังเคราะห์ + ต้องเป็น pullback จริง (ราคาใกล้ H1 EMA20) ไม่ใช่ entry กลางเทรนด์
-TREND_CONT_CONF         = float(os.getenv("TREND_CONT_CONF") or 55)
+# default 55→65: 55 อยู่กลางโซนพิษ conf 50-59 (replay: WR 23.5%)
+TREND_CONT_CONF         = float(os.getenv("TREND_CONT_CONF") or 65)
 TREND_CONT_MAX_DIST_PCT = float(os.getenv("TREND_CONT_MAX_DIST_PCT") or 0.3)   # % ห่าง H1 EMA20 สูงสุด
 # NNLB fast-path: เปิด order ตรงโดยข้าม Claude. ตั้ง false = บังคับผ่าน Claude decision (ปลอดภัยขึ้น ช้าลง)
 NNLB_FASTPATH           = (os.getenv("NNLB_FASTPATH", "true").strip().lower() in ("1", "true", "yes", "on"))
@@ -365,7 +370,7 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
             return _fail("NO_TRADE — momentum override ไม่ตรง H4/sentiment")
 
         tech_signal = f"MOM_{mo_dir}"
-        conf = max(conf, 55)
+        conf = max(conf, MIN_TECHNICAL_CONFIDENCE)   # ตาม floor — ค่าตายตัว 55 จะโดน gate 6 (62) ฆ่าเงียบ
         chart_data["signal"]     = tech_signal
         chart_data["confidence"] = conf
         logger.info(f"Momentum override: NO_TRADE → {tech_signal} (conf={conf})")
@@ -448,6 +453,10 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     _in_quiet_session = not (7 <= _sess_hour < 21)   # Asian 0-7 UTC or dead zone 21-24 UTC
     if _in_quiet_session:
         _sess_lbl = "Asian (quiet)" if _sess_hour < 7 else "NY Close (quiet)"
+        # Asian 0-7 UTC: ทุก entry ต้อง conf ≥ ASIAN_MIN_CONF — replay 489 ไม้:
+        # Asian = −4,380 (avg −115/ไม้); บล็อก conf<72 ตัด −4,506 เสียกำไรดีแค่ +57
+        if _sess_hour < 7 and conf < ASIAN_MIN_CONF:
+            return _fail(f"{_sess_lbl}: ALL entries require conf ≥{ASIAN_MIN_CONF:.0f}% (got {conf}%)")
         if entry_type in ("EMA_PULLBACK", "STRUCTURE_PULLBACK") and conf < 72:
             return _fail(f"{_sess_lbl}: EMA/structure entries require conf ≥72% (got {conf}%)")
         if sr_zone == "NONE" and conf < 72:
@@ -458,18 +467,12 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         if not (sr_str == "STRONG" and conf >= 80):
             return _fail(f"SELL+RESISTANCE in BEARISH: WR=39% — requires STRONG zone + conf >=80% (got {sr_str}/{conf}%)")
 
-    # 6. Min confidence — ลด threshold ถ้าอยู่ที่ D1/W1 major zone
+    # 6. Min confidence — floor เดียวทุกกรณี (replay 489 ไม้: การลด floor ที่ HTF zone
+    #    เหลือ 42/45 คือประตูให้ไม้ conf 50-59 ที่ WR 23.5% / −3,807 เข้ามา — เลิกลด)
     htf_zone = chart_data.get("htf_zone")
     _min_conf = MIN_TECHNICAL_CONFIDENCE
     if htf_zone:
-        if htf_zone["tf"] == "W1":
-            _min_conf = 42   # W1 zone: โอกาสพลิกกลับสูง — ยอมรับ conf ต่ำกว่า
-        elif htf_zone["tf"] == "D1":
-            _min_conf = 45   # D1 zone: structural level
-        logger.info(
-            f"[HTF] {htf_zone['tf']} zone detected — gate 5 threshold: {_min_conf}% "
-            f"(ปกติ {MIN_TECHNICAL_CONFIDENCE}%)"
-        )
+        logger.info(f"[HTF] {htf_zone['tf']} zone detected — floor คงที่ {_min_conf}% (ไม่ลดแล้ว)")
     if conf < _min_conf:
         return _fail(f"Confidence {conf}% < {_min_conf}% (HTF={htf_zone['tf'] if htf_zone else 'none'})")
 

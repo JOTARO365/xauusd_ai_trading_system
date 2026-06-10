@@ -295,6 +295,43 @@ def manage_trailing_stop() -> int:
     return moved
 
 
+# ── Close-reason registry ────────────────────────────────────────────────────
+# MT5 ตีทุกการปิดโดยบอทเป็น deal.reason=0 (client) → แยก MOMENTUM_EXIT/ZONE_BREAK
+# จาก manual ไม่ได้ → บันทึกเหตุผลฝั่งบอทไว้เองที่ logs/close_reasons.json
+# (reporter._sync_closed_trades อ่านอันนี้ก่อน แล้วค่อย fallback ไป MT5 deal.reason)
+_CLOSE_REASON_PATH = "logs/close_reasons.json"
+
+
+def record_close_reason(ticket, reason: str) -> None:
+    """จดว่าบอทปิด ticket นี้เพราะอะไร — เรียกหลังปิดทั้งไม้สำเร็จเท่านั้น (ห้ามใช้กับ partial)"""
+    import json, os
+    from datetime import datetime, timezone
+    try:
+        data = {}
+        if os.path.exists(_CLOSE_REASON_PATH):
+            with open(_CLOSE_REASON_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        data[str(ticket)] = {"reason": reason, "at": datetime.now(timezone.utc).isoformat()}
+        if len(data) > 500:   # กันไฟล์โตไม่จำกัด — เก็บล่าสุด 500 ไม้พอ (sync ใช้แค่ไม่กี่วันหลังปิด)
+            data = dict(sorted(data.items(), key=lambda kv: kv[1].get("at", ""))[-500:])
+        with open(_CLOSE_REASON_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception as e:
+        logger.debug(f"record_close_reason failed (non-fatal): {e}")
+
+
+def get_bot_close_reason(ticket) -> str | None:
+    """คืนเหตุผลที่บอทจดไว้ตอนปิด ticket นี้ (None = บอทไม่ได้ปิดเอง เช่น SL/TP/manual)"""
+    import json, os
+    try:
+        if os.path.exists(_CLOSE_REASON_PATH):
+            with open(_CLOSE_REASON_PATH, "r", encoding="utf-8") as f:
+                return (json.load(f).get(str(ticket)) or {}).get("reason")
+    except Exception:
+        pass
+    return None
+
+
 def _close_position(pos) -> bool:
     """ปิด market position ด้วยราคาตลาดขณะนั้น"""
     tick = mt5.symbol_info_tick(SYMBOL)
@@ -322,6 +359,7 @@ def _close_position(pos) -> bool:
         logger.error(f"Close conflict failed ticket={pos.ticket}: {err}")
         return False
     logger.info(f"Closed conflicting position: ticket={pos.ticket} {'BUY' if is_buy else 'SELL'} @ {close_price:.2f}")
+    record_close_reason(pos.ticket, "CONFLICT_CLOSE")
     return True
 
 
@@ -1369,6 +1407,7 @@ def manage_momentum_exit() -> int:
             logger.error(f"Momentum exit FAILED {tag}: {err}")
         else:
             logger.warning(f"[MOMENTUM_EXIT] Closed early: {tag}")
+            record_close_reason(pos.ticket, "MOMENTUM_EXIT")
             closed += 1
 
     return closed
@@ -1464,6 +1503,7 @@ def manage_zone_break_close(chart_data: dict) -> int:
                 f"[ZONE BREAK] closed {dir_str} ticket={pos.ticket} @ {close_price:.2f} "
                 f"| {zone['tf']} {ztype} @ {level:.2f} ทะลุ {abs(m15_close - level) / point:.0f}p"
             )
+            record_close_reason(pos.ticket, "ZONE_BREAK")
 
         # เก็บไว้รอ false-break re-entry (ทั้ง live + DRY_RUN)
         _zone_break_pending_reentry.append({
