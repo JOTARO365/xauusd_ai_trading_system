@@ -188,6 +188,9 @@ def _sync_closed_trades(log: dict):
 
     open_tickets  = {str(p["ticket"]) for p in get_open_positions()}
     close_map     = _get_close_times()
+    # registry ฝั่งบอท (MOMENTUM_EXIT/ZONE_BREAK/...) — อ่านไฟล์ครั้งเดียวก่อน loop
+    from connectors.mt5_connector import get_bot_close_reasons
+    bot_reasons   = get_bot_close_reasons()
     changed       = False
 
     for t in open_in_log:
@@ -207,8 +210,7 @@ def _sync_closed_trades(log: dict):
         if not t.get("close_reason"):
             # registry ฝั่งบอทแม่นกว่า (MOMENTUM_EXIT/ZONE_BREAK/CONFLICT_CLOSE) —
             # MT5 ตีการปิดโดยบอทเป็น reason=0 ("MANUAL") แยกไม่ออก
-            from connectors.mt5_connector import get_bot_close_reason
-            t["close_reason"]  = get_bot_close_reason(t["ticket"]) or _ci.get("close_reason", "UNKNOWN")
+            t["close_reason"]  = bot_reasons.get(tk) or _ci.get("close_reason", "UNKNOWN")
             t["close_price"]   = _ci.get("close_price")
         changed = True
         logger.info(f"Trade closed — Ticket:{t['ticket']} PnL:{pnl:+.2f}")

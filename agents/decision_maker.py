@@ -1,5 +1,4 @@
 import json
-import os
 from datetime import datetime, timezone as _tz
 from pathlib import Path
 from langchain_anthropic import ChatAnthropic
@@ -27,21 +26,8 @@ SYSTEM_PROMPT = json.dumps(
     separators=(",", ":"),  # minified — saves ~15% tokens vs pretty-printed
 )
 
-# Replay 489 ไม้ (2026-06-10): conf 50-59 = WR 23.5% / −3,807 THB (โซนพิษ); 70-79 ดีสุด
-# → ยก floor 50→62; HTF zone ห้ามลด floor อีก (ของเดิม 42/45 คือประตูให้โซนพิษเข้า)
-MIN_TECHNICAL_CONFIDENCE = int(os.getenv("MIN_TECH_CONF") or 62)
-# Asian 0-7 UTC: ทุก entry ต้องผ่าน conf นี้ (replay: ตัด −4,506 เสีย +57)
-ASIAN_MIN_CONF           = float(os.getenv("ASIAN_MIN_CONF") or 72)
-
-# News-spike guard — ห้ามเข้าออเดอร์สวนการสไปก์แรง (มักเป็นข่าว). ตั้ง 0 = ปิด guard
-COUNTER_SPIKE_PIPS = float(os.getenv("COUNTER_SPIKE_PIPS") or 500)
-
-# TREND_CONT (NNLB) — conf สังเคราะห์ + ต้องเป็น pullback จริง (ราคาใกล้ H1 EMA20) ไม่ใช่ entry กลางเทรนด์
-# default 55→65: 55 อยู่กลางโซนพิษ conf 50-59 (replay: WR 23.5%)
-TREND_CONT_CONF         = float(os.getenv("TREND_CONT_CONF") or 65)
-TREND_CONT_MAX_DIST_PCT = float(os.getenv("TREND_CONT_MAX_DIST_PCT") or 0.3)   # % ห่าง H1 EMA20 สูงสุด
-# NNLB fast-path: เปิด order ตรงโดยข้าม Claude. ตั้ง false = บังคับผ่าน Claude decision (ปลอดภัยขึ้น ช้าลง)
-NNLB_FASTPATH           = (os.getenv("NNLB_FASTPATH", "true").strip().lower() in ("1", "true", "yes", "on"))
+# Gate/guard knobs ทั้งหมดอยู่ใน config.py (อ่านผ่าน _cfg.* ตอนเรียกใช้ → reload_config()
+# จาก dashboard เห็นผลทันที ไม่ต้อง restart) — replay 489 ไม้หนุนค่า default ดู config.py
 
 
 def _counter_spike_reason(direction: str, chart_data: dict) -> str | None:
@@ -49,10 +35,10 @@ def _counter_spike_reason(direction: str, chart_data: dict) -> str | None:
     fast_move_pips (จาก chart_watcher, net M15 ~45min, + = ขึ้น):
       พุ่งขึ้นแรง → ห้าม SELL (สวนการเด้ง);  ดิ่งลงแรง → ห้าม BUY (สวนการร่วง).
     """
-    if COUNTER_SPIKE_PIPS <= 0:
+    if _cfg.COUNTER_SPIKE_PIPS <= 0:
         return None
     fast = float(chart_data.get("fast_move_pips", 0) or 0)
-    if abs(fast) < COUNTER_SPIKE_PIPS:
+    if abs(fast) < _cfg.COUNTER_SPIKE_PIPS:
         return None
     if fast > 0 and direction == "SELL":
         return f"Counter-spike: ราคาพุ่งขึ้น {fast:.0f}p (น่าจะข่าว) — ห้าม SELL สวนการเด้ง"
@@ -61,36 +47,27 @@ def _counter_spike_reason(direction: str, chart_data: dict) -> str | None:
     return None
 
 
-# News-first — ข่าว/macro คุมทิศหลัก (user role: ดูข่าว → price action → วิเคราะห์ → เข้า)
-NEWS_FIRST         = (os.getenv("NEWS_FIRST", "true").strip().lower() in ("1", "true", "yes", "on"))
-NEWS_BIAS_MIN_CONF = float(os.getenv("NEWS_BIAS_MIN_CONF") or 55)
-
-
 def _news_bias_dir(sentiment_data: dict, advisor_data: dict | None) -> tuple[str | None, str]:
     """คืน (news_dir, why). news_dir='BUY'/'SELL' เมื่อข่าวชี้ทิศชัด, ไม่งั้น None.
     ยึด analyst.bias (รวม macro_regime.md แล้ว) เป็นหลักเมื่อ conf ถึงเกณฑ์;
     ถ้า regime (advisor) ชี้ตรงข้ามชัด → ถือว่าไม่ชัด (ไม่บังคับทิศ ปล่อยเทคนิคตัดสิน)."""
-    if not NEWS_FIRST:
+    if not _cfg.NEWS_FIRST:
         return None, ""
     a_bias = (sentiment_data or {}).get("bias", "NEUTRAL")
     a_conf = float((sentiment_data or {}).get("confidence", 0) or 0)
-    if a_bias not in ("BUY", "SELL") or a_conf < NEWS_BIAS_MIN_CONF:
+    if a_bias not in ("BUY", "SELL") or a_conf < _cfg.NEWS_BIAS_MIN_CONF:
         return None, ""
     adv_dir = {"BULLISH": "BUY", "BEARISH": "SELL"}.get(
         (advisor_data or {}).get("bias", "NEUTRAL"), "NEUTRAL")
     if adv_dir in ("BUY", "SELL") and adv_dir != a_bias:
         return None, f"analyst={a_bias} ขัด regime={adv_dir} — ไม่บังคับทิศ"
-    return a_bias, f"analyst conf {a_conf:.0f}%≥{NEWS_BIAS_MIN_CONF:.0f}"
-
-
-# HTF-fade guard — ห้ามเข้าสวนแนว D1/W1: SELL ที่ support / BUY ที่ resistance = fade โอกาสพลาดสูง
-HTF_FADE_BLOCK = (os.getenv("HTF_FADE_BLOCK", "true").strip().lower() in ("1", "true", "yes", "on"))
+    return a_bias, f"analyst conf {a_conf:.0f}%≥{_cfg.NEWS_BIAS_MIN_CONF:.0f}"
 
 
 def _htf_fade_reason(direction: str, chart_data: dict) -> str | None:
     """ห้ามเข้าสวนแนว HTF (D1/W1): ที่ SUPPORT ราคามักเด้ง → ห้าม SELL;
     ที่ RESISTANCE มักย่อ → ห้าม BUY. (htf_zone ถูกตั้งเฉพาะ D1/W1 เท่านั้น)"""
-    if not HTF_FADE_BLOCK:
+    if not _cfg.HTF_FADE_BLOCK:
         return None
     z = chart_data.get("htf_zone")
     if not z:
@@ -104,26 +81,21 @@ def _htf_fade_reason(direction: str, chart_data: dict) -> str | None:
 
 
 # Option C — news ลากเข้าได้แม้สวนเทรนด์ H4 (ต้องตรงข่าว + price action ยืนยัน)
-NEWS_OVERRIDE_TREND    = (os.getenv("NEWS_OVERRIDE_TREND", "true").strip().lower() in ("1", "true", "yes", "on"))
-NEWS_CONFIRM_PIPS      = float(os.getenv("NEWS_CONFIRM_PIPS") or 500)
-NEWS_OVERRIDE_MIN_CONF = float(os.getenv("NEWS_OVERRIDE_MIN_CONF") or 50)
-
-
 def _news_override_ok(direction: str, chart_data: dict, news_dir: str | None,
                       conf: int) -> tuple[bool, str]:
     """อนุญาตเข้าสวนเทรนด์ H4 เมื่อ 'ตรงข่าว + price action ยืนยัน' (role: ดูข่าว→price action→เข้า).
     เงื่อนไข: NEWS_OVERRIDE_TREND on, direction==news_dir, conf≥floor, และยืนยัน 1 ใน 2:
       (a) สไปก์ไปทางเดียวกับไม้ ≥ NEWS_CONFIRM_PIPS (ข่าวดันราคาจริง), หรือ
       (b) อยู่ที่ HTF zone ที่หนุนไม้ (BUY ที่ SUPPORT / SELL ที่ RESISTANCE)."""
-    if not NEWS_OVERRIDE_TREND:
+    if not _cfg.NEWS_OVERRIDE_TREND:
         return False, ""
     if not news_dir or direction != news_dir:
         return False, ""
-    if float(conf or 0) < NEWS_OVERRIDE_MIN_CONF:
-        return False, f"conf {conf}<{NEWS_OVERRIDE_MIN_CONF:.0f}"
+    if float(conf or 0) < _cfg.NEWS_OVERRIDE_MIN_CONF:
+        return False, f"conf {conf}<{_cfg.NEWS_OVERRIDE_MIN_CONF:.0f}"
     fast = float(chart_data.get("fast_move_pips", 0) or 0)
-    if (direction == "BUY" and fast >= NEWS_CONFIRM_PIPS) or \
-       (direction == "SELL" and fast <= -NEWS_CONFIRM_PIPS):
+    if (direction == "BUY" and fast >= _cfg.NEWS_CONFIRM_PIPS) or \
+       (direction == "SELL" and fast <= -_cfg.NEWS_CONFIRM_PIPS):
         return True, f"ข่าว {news_dir} + สไปก์ยืนยัน {fast:+.0f}p"
     z = chart_data.get("htf_zone") or {}
     if (direction == "BUY" and z.get("zone_type") == "SUPPORT") or \
@@ -219,6 +191,8 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     def _fail(reason: str) -> dict:
         return {"pass": False, "reason": reason}
 
+    _utc_hour = datetime.now(_tz.utc).hour   # คำนวณครั้งเดียว — ใช้ใน NNLB Asian / gate 5b / LN-NY overlap
+
     # ── NNLB mode: ข้าม gates ทั้งหมดยกเว้นทิศทาง ────────────────
     if _cfg.NNLB_MODE:
         if tech_signal == "NO_TRADE":
@@ -241,7 +215,7 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
                 chart_data["signal"] = _htf_dir
                 # conf สังเคราะห์แบบเดียวกับ TREND_CONT — เดิมเปิดไม้ได้ทั้งที่ conf=0
                 # (chart บอก NO_TRADE) ซึ่งข้อมูลจริง band conf 0-9 = 21 ไม้ −633
-                conf = max(conf, int(TREND_CONT_CONF))
+                conf = max(conf, int(_cfg.TREND_CONT_CONF))
                 chart_data["confidence"] = conf
                 logger.warning(
                     f"[NNLB] HTF zone override: NO_TRADE → {_htf_dir} "
@@ -273,19 +247,19 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
 
                 # #2 — ต้องเป็น pullback จริง: ราคาใกล้ H1 EMA20 ไม่ใช่ entry กลางเทรนด์ที่ยืดแล้ว
                 #      (conf 55 เป็นค่าสังเคราะห์ ไม่มี zone/PA ยืนยัน → อย่างน้อยขอ proximity เป็นหลักฐาน)
-                if _tc_dir and _px and abs(_px - _e20) / _px * 100 > TREND_CONT_MAX_DIST_PCT:
+                if _tc_dir and _px and abs(_px - _e20) / _px * 100 > _cfg.TREND_CONT_MAX_DIST_PCT:
                     logger.info(
                         f"[TREND_CONT] skip {_tc_dir} — ราคาห่าง H1 EMA20 "
-                        f"{abs(_px - _e20) / _px * 100:.2f}% > {TREND_CONT_MAX_DIST_PCT}% (extended ไม่ใช่ pullback)"
+                        f"{abs(_px - _e20) / _px * 100:.2f}% > {_cfg.TREND_CONT_MAX_DIST_PCT}% (extended ไม่ใช่ pullback)"
                     )
                     _tc_dir = None
 
                 if _tc_dir:
                     tech_signal = f"TREND_CONT_{_tc_dir}"
                     chart_data["signal"]     = _tc_dir
-                    chart_data["confidence"] = int(TREND_CONT_CONF)   # tunable; ยังไม่มี zone anchor
+                    chart_data["confidence"] = int(_cfg.TREND_CONT_CONF)   # tunable; ยังไม่มี zone anchor
                     chart_data["entry_type"] = "EMA_PULLBACK"
-                    conf = int(TREND_CONT_CONF)
+                    conf = int(_cfg.TREND_CONT_CONF)
                     # SL = H4 ATR (clamped), TP = SL × 2  → R:R = 2.0
                     _h4_atr = float(chart_data.get("indicators", {}).get("h4", {}).get("atr") or 0)
                     _tc_sl  = int(min(max(round(_h4_atr / 0.01), 500), 3500)) if _h4_atr else 1500
@@ -326,10 +300,10 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         # Quality gates ที่ replay พิสูจน์ (489 ไม้) — NNLB ข้ามเฉพาะ money-management
         # ไม่ใช่ quality: conf 50-59 = WR 23.5%, Asian conf ต่ำ = −115/ไม้ → ใช้กับ NNLB ด้วย
         _conf_now = int(chart_data.get("confidence", conf) or 0)
-        if _conf_now < MIN_TECHNICAL_CONFIDENCE:
-            return _fail(f"NNLB: conf {_conf_now}% < floor {MIN_TECHNICAL_CONFIDENCE}%")
-        if datetime.now(_tz.utc).hour < 7 and _conf_now < ASIAN_MIN_CONF:
-            return _fail(f"NNLB Asian (0-7 UTC): conf {_conf_now}% < {ASIAN_MIN_CONF:.0f}%")
+        if _conf_now < _cfg.MIN_TECHNICAL_CONFIDENCE:
+            return _fail(f"NNLB: conf {_conf_now}% < floor {_cfg.MIN_TECHNICAL_CONFIDENCE}%")
+        if _utc_hour < 7 and _conf_now < _cfg.ASIAN_MIN_CONF:
+            return _fail(f"NNLB Asian (0-7 UTC): conf {_conf_now}% < {_cfg.ASIAN_MIN_CONF:.0f}%")
 
         # Anti-fade guards — แม้ NNLB ข้าม gates ก็ยังห้ามเข้าสวน: สไปก์ข่าว / ทิศข่าว / แนว HTF
         _cs = _counter_spike_reason(direction, chart_data)
@@ -382,7 +356,7 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
             return _fail("NO_TRADE — momentum override ไม่ตรง H4/sentiment")
 
         tech_signal = f"MOM_{mo_dir}"
-        conf = max(conf, MIN_TECHNICAL_CONFIDENCE)   # ตาม floor — ค่าตายตัว 55 จะโดน gate 6 (62) ฆ่าเงียบ
+        conf = max(conf, _cfg.MIN_TECHNICAL_CONFIDENCE)   # ตาม floor — ค่าตายตัวต่ำกว่า floor จะโดน gate 6 ฆ่าเงียบ
         chart_data["signal"]     = tech_signal
         chart_data["confidence"] = conf
         logger.info(f"Momentum override: NO_TRADE → {tech_signal} (conf={conf})")
@@ -453,26 +427,23 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
             return _fail("SIDEWAYS — trend-following blocked, ใช้ range bounce ที่ SR zone เท่านั้น")
         if not _at_sr_zone and not _is_breakout:
             return _fail("SIDEWAYS — ต้องอยู่ที่ SR zone หรือ MOMENTUM_BREAKOUT")
-        if _at_sr_zone:
-            _sw_min = 52 if sr_str == "STRONG" else 60
-            if conf < _sw_min:
-                return _fail(f"SIDEWAYS SR_ZONE ({sr_str}) requires conf ≥{_sw_min}% (got {conf}%)")
-        elif _is_breakout and conf < 65:
+        # SR_ZONE bounce: เกณฑ์เดิม 52/60 ถูกครอบด้วย floor รวม (gate 6) ที่สูงกว่าแล้ว — ตัดทิ้ง
+        if not _at_sr_zone and _is_breakout and conf < 65:
             return _fail(f"SIDEWAYS MOMENTUM_BREAKOUT requires conf ≥65% (got {conf}%)")
 
     # 5b. Session gate — Asian/dead-zone sessions block weak entries (data shows Asian = noise)
-    _sess_hour        = datetime.now(_tz.utc).hour
-    _in_quiet_session = not (7 <= _sess_hour < 21)   # Asian 0-7 UTC or dead zone 21-24 UTC
+    _in_quiet_session = not (7 <= _utc_hour < 21)   # Asian 0-7 UTC or dead zone 21-24 UTC
     if _in_quiet_session:
-        _sess_lbl = "Asian (quiet)" if _sess_hour < 7 else "NY Close (quiet)"
+        _sess_lbl = "Asian (quiet)" if _utc_hour < 7 else "NY Close (quiet)"
+        _q_min = _cfg.ASIAN_MIN_CONF
         # Asian 0-7 UTC: ทุก entry ต้อง conf ≥ ASIAN_MIN_CONF — replay 489 ไม้:
         # Asian = −4,380 (avg −115/ไม้); บล็อก conf<72 ตัด −4,506 เสียกำไรดีแค่ +57
-        if _sess_hour < 7 and conf < ASIAN_MIN_CONF:
-            return _fail(f"{_sess_lbl}: ALL entries require conf ≥{ASIAN_MIN_CONF:.0f}% (got {conf}%)")
-        if entry_type in ("EMA_PULLBACK", "STRUCTURE_PULLBACK") and conf < 72:
-            return _fail(f"{_sess_lbl}: EMA/structure entries require conf ≥72% (got {conf}%)")
-        if sr_zone == "NONE" and conf < 72:
-            return _fail(f"{_sess_lbl}: no-zone entries blocked — conf {conf}% < 72%")
+        if _utc_hour < 7 and conf < _q_min:
+            return _fail(f"{_sess_lbl}: ALL entries require conf ≥{_q_min:.0f}% (got {conf}%)")
+        if entry_type in ("EMA_PULLBACK", "STRUCTURE_PULLBACK") and conf < _q_min:
+            return _fail(f"{_sess_lbl}: EMA/structure entries require conf ≥{_q_min:.0f}% (got {conf}%)")
+        if sr_zone == "NONE" and conf < _q_min:
+            return _fail(f"{_sess_lbl}: no-zone entries blocked — conf {conf}% < {_q_min:.0f}%")
 
     # 5c. SELL at RESISTANCE in BEARISH trend — WR=39% historically, require STRONG zone + high conf
     if direction == "SELL" and trend == "BEARISH" and sr_zone == "RESISTANCE":
@@ -482,9 +453,7 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     # 6. Min confidence — floor เดียวทุกกรณี (replay 489 ไม้: การลด floor ที่ HTF zone
     #    เหลือ 42/45 คือประตูให้ไม้ conf 50-59 ที่ WR 23.5% / −3,807 เข้ามา — เลิกลด)
     htf_zone = chart_data.get("htf_zone")
-    _min_conf = MIN_TECHNICAL_CONFIDENCE
-    if htf_zone:
-        logger.info(f"[HTF] {htf_zone['tf']} zone detected — floor คงที่ {_min_conf}% (ไม่ลดแล้ว)")
+    _min_conf = _cfg.MIN_TECHNICAL_CONFIDENCE
     if conf < _min_conf:
         return _fail(f"Confidence {conf}% < {_min_conf}% (HTF={htf_zone['tf'] if htf_zone else 'none'})")
 
@@ -496,8 +465,7 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
 
     # MOMENTUM_BREAKOUT: require higher conf threshold at gate 7+8
     # Other entries: conf ≥ 62 is enough
-    _hour_utc      = datetime.now(_tz.utc).hour
-    _ln_ny_overlap = 12 <= _hour_utc < 16   # London/NY overlap (12-16 UTC)
+    _ln_ny_overlap = 12 <= _utc_hour < 16   # London/NY overlap (12-16 UTC)
     _mo_threshold  = 65 if _ln_ny_overlap else 70
     _gate_min_conf = _mo_threshold if entry_type == "MOMENTUM_BREAKOUT" else 62
 
@@ -511,16 +479,8 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     if h4_atr > 20 and conf < _gate_min_conf:
         return _fail(f"High ATR ({h4_atr:.1f}) requires conf ≥{_gate_min_conf}% (got {conf}%)")
 
-    # 9. Regime alignment
-    adv         = advisor_data or {}
-    regime_bias = adv.get("bias", "NEUTRAL")
-    regime      = adv.get("regime", "")
-    is_cnt_reg  = (regime_bias == "BULLISH" and direction == "SELL") or \
-                  (regime_bias == "BEARISH" and direction == "BUY")
-    if "TRANSITION" in regime and conf < 52:
-        return _fail(f"TRANSITION regime requires conf ≥52% (got {conf}%)")
-    if is_cnt_reg and conf < 55:
-        return _fail(f"Counter-trend vs {regime_bias} regime requires conf ≥55% (got {conf}%)")
+    # 9. Regime alignment — เกณฑ์เดิม (TRANSITION<52, counter-regime<55) เป็น dead code
+    #    หลัง gate 6 การันตี conf ≥ 62 แล้ว — ตัดทิ้ง (จะคืนชีพได้ก็ต่อเมื่อตั้งเกณฑ์ > floor)
 
     # 10. Max open trades + hedge slot
     # ถ้า trade ล่าสุดทิศนี้แพ้ → ตัด bonus slot (ป้องกัน pyramid ทิศเดียวหลัง trend เปลี่ยน)
@@ -595,7 +555,7 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
 
     # NNLB fast-path: HTF zone override หรือ TREND_CONT — ข้าม Claude เข้า order ทันที
     # (NNLB_FASTPATH=false → ตกไปใช้ Claude decision ปกติ = ปลอดภัยขึ้นแลกกับช้า/เสีย token)
-    if NNLB_FASTPATH and _cfg.NNLB_MODE and ("TREND_CONT" in tech_signal or tech_signal.startswith("HTF_")):
+    if _cfg.NNLB_FASTPATH and _cfg.NNLB_MODE and ("TREND_CONT" in tech_signal or tech_signal.startswith("HTF_")):
         tag = "HTF_ZONE" if tech_signal.startswith("HTF_") else "TREND_CONT"
         logger.warning(
             f"[{tag}] Fast-path → {direction} SL={sl_pips:.0f}p TP={tp_pips:.0f}p "

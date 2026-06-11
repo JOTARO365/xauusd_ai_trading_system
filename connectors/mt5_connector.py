@@ -320,16 +320,21 @@ def record_close_reason(ticket, reason: str) -> None:
         logger.debug(f"record_close_reason failed (non-fatal): {e}")
 
 
-def get_bot_close_reason(ticket) -> str | None:
-    """คืนเหตุผลที่บอทจดไว้ตอนปิด ticket นี้ (None = บอทไม่ได้ปิดเอง เช่น SL/TP/manual)"""
+def get_bot_close_reasons() -> dict:
+    """คืน {ticket(str): reason} ทั้ง registry — อ่านไฟล์ครั้งเดียว ใช้ lookup เป็นชุด (เช่นใน sync loop)"""
     import json, os
     try:
         if os.path.exists(_CLOSE_REASON_PATH):
             with open(_CLOSE_REASON_PATH, "r", encoding="utf-8") as f:
-                return (json.load(f).get(str(ticket)) or {}).get("reason")
+                return {k: (v or {}).get("reason") for k, v in json.load(f).items()}
     except Exception:
         pass
-    return None
+    return {}
+
+
+def get_bot_close_reason(ticket) -> str | None:
+    """คืนเหตุผลที่บอทจดไว้ตอนปิด ticket นี้ (None = บอทไม่ได้ปิดเอง เช่น SL/TP/manual)"""
+    return get_bot_close_reasons().get(str(ticket))
 
 
 def _close_position(pos) -> bool:

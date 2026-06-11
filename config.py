@@ -73,6 +73,22 @@ MONEY_MANAGEMENT = {
 EMA_PULLBACK_MAX_SL   = int(os.getenv("EMA_PULLBACK_MAX_SL")   or 1500)  # SL pips ≥ this → block
 EMA_PULLBACK_MIN_CONF = int(os.getenv("EMA_PULLBACK_MIN_CONF") or 70)    # confidence < this → block
 
+# ── Decision gates & anti-fade guards ─────────────────────────
+# Replay 489 ไม้ (2026-06-10): conf 50-59 = WR 23.5% / −3,807; Asian 0-7 UTC = −115/ไม้
+MIN_TECHNICAL_CONFIDENCE = int(os.getenv("MIN_TECH_CONF") or 62)      # floor ทุก entry (HTF zone ไม่ลดแล้ว)
+ASIAN_MIN_CONF           = float(os.getenv("ASIAN_MIN_CONF") or 72)   # Asian 0-7 UTC ทุก entry
+COUNTER_SPIKE_PIPS       = float(os.getenv("COUNTER_SPIKE_PIPS") or 500)  # ห้ามเข้าสวนสไปก์ ≥ นี้ (0=ปิด)
+NEWS_FIRST               = os.getenv("NEWS_FIRST", "true").lower() != "false"      # บล็อกเข้าสวนทิศข่าวชัด
+NEWS_BIAS_MIN_CONF       = float(os.getenv("NEWS_BIAS_MIN_CONF") or 55)
+HTF_FADE_BLOCK           = os.getenv("HTF_FADE_BLOCK", "true").lower() != "false"  # ห้าม SELL@D1/W1 support ฯลฯ
+NEWS_OVERRIDE_TREND      = os.getenv("NEWS_OVERRIDE_TREND", "true").lower() != "false"  # option C: ข่าว+PA ยืนยัน → เข้าสวน H4 ได้
+NEWS_CONFIRM_PIPS        = float(os.getenv("NEWS_CONFIRM_PIPS") or 500)
+NEWS_OVERRIDE_MIN_CONF   = float(os.getenv("NEWS_OVERRIDE_MIN_CONF") or 50)
+TREND_CONT_CONF          = float(os.getenv("TREND_CONT_CONF") or 65)      # conf สังเคราะห์ TREND_CONT/HTF override
+TREND_CONT_MAX_DIST_PCT  = float(os.getenv("TREND_CONT_MAX_DIST_PCT") or 0.3)  # % ห่าง H1 EMA20 (pullback จริง)
+NNLB_FASTPATH            = os.getenv("NNLB_FASTPATH", "true").lower() != "false"   # false = NNLB ผ่าน Claude เสมอ
+MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)   # ทุนต่ำกว่านี้ → ไม่เรียก AI เลย (0=ปิด)
+
 # ── Position-Guardian thread ──────────────────────────────────
 # daemon thread เฝ้าไม้เปิดถี่ๆ (breakeven/trailing/momentum-exit) อิสระจาก AI cycle ที่ช้า
 # *** DEFAULT OFF *** — เปิดบน VM หลังทดสอบกับ MT5 จริงแล้วเท่านั้น (concurrency + เงินจริง)
@@ -111,6 +127,23 @@ def reload_config():
     TRAILING_ATR_MULT    = float(os.getenv("TRAILING_ATR_MULT",  "1.5"))
     TRAILING_MIN_PROFIT_R= float(os.getenv("TRAILING_MIN_PROFIT_R", "1.5"))
     TRAILING_LOOKBACK    = int(os.getenv("TRAILING_LOOKBACK",    "6"))
+    global MIN_TECHNICAL_CONFIDENCE, ASIAN_MIN_CONF, COUNTER_SPIKE_PIPS
+    global NEWS_FIRST, NEWS_BIAS_MIN_CONF, HTF_FADE_BLOCK
+    global NEWS_OVERRIDE_TREND, NEWS_CONFIRM_PIPS, NEWS_OVERRIDE_MIN_CONF
+    global TREND_CONT_CONF, TREND_CONT_MAX_DIST_PCT, NNLB_FASTPATH, MIN_AI_EQUITY
+    MIN_TECHNICAL_CONFIDENCE = int(os.getenv("MIN_TECH_CONF") or 62)
+    ASIAN_MIN_CONF           = float(os.getenv("ASIAN_MIN_CONF") or 72)
+    COUNTER_SPIKE_PIPS       = float(os.getenv("COUNTER_SPIKE_PIPS") or 500)
+    NEWS_FIRST               = os.getenv("NEWS_FIRST", "true").lower() != "false"
+    NEWS_BIAS_MIN_CONF       = float(os.getenv("NEWS_BIAS_MIN_CONF") or 55)
+    HTF_FADE_BLOCK           = os.getenv("HTF_FADE_BLOCK", "true").lower() != "false"
+    NEWS_OVERRIDE_TREND      = os.getenv("NEWS_OVERRIDE_TREND", "true").lower() != "false"
+    NEWS_CONFIRM_PIPS        = float(os.getenv("NEWS_CONFIRM_PIPS") or 500)
+    NEWS_OVERRIDE_MIN_CONF   = float(os.getenv("NEWS_OVERRIDE_MIN_CONF") or 50)
+    TREND_CONT_CONF          = float(os.getenv("TREND_CONT_CONF") or 65)
+    TREND_CONT_MAX_DIST_PCT  = float(os.getenv("TREND_CONT_MAX_DIST_PCT") or 0.3)
+    NNLB_FASTPATH            = os.getenv("NNLB_FASTPATH", "true").lower() != "false"
+    MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
     global LESSON_LEARNING, DRY_RUN, NNLB_MODE, NNLB_BASE_EQUITY, NNLB_EQUITY_PER_LOT, NNLB_MAX_LOSS_PCT
     LESSON_LEARNING      = os.getenv("LESSON_LEARNING", "true").lower() != "false"
     DRY_RUN              = os.getenv("DRY_RUN", "false").lower() == "true"
@@ -193,5 +226,7 @@ X_KEYWORDS = (
     [k.strip() for k in _keywords_raw.split(",") if k.strip()]
     or ["XAUUSD", "gold", "XAU", "bullion", "Fed", "inflation",
         # geopolitics (safe-haven driver) + cross-asset — เพิ่มจาก HFM live 06-08 (ceasefire→ทองเด้ง)
-        "Iran", "Israel", "ceasefire", "geopolitical", "war", "oil", "crude"]
+        "Iran", "Israel", "ceasefire", "geopolitical", "war", "oil", "crude",
+        # macro prints — HFM live 06-10: CPI ต่ำ = driver หลักของวัน แต่ tweet มักพิมพ์แค่ "CPI"
+        "CPI", "rate cut"]
 )

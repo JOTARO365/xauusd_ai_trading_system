@@ -38,7 +38,7 @@ READY_AI_MIN_SECS     = 300   # Ready Mode / near-HTF: ไม่ยิง AI ถ
                               # (เดิม never-skip → ยิง 4-agent Sonnet ทุก 120s = ตัวกิน token หลัก)
 AI_IDLE_GATE          = os.getenv("AI_IDLE_GATE", "false").lower() == "true"
 AI_QUIET_INTERVAL_SECS= int(os.getenv("AI_QUIET_INTERVAL_SECS") or 1800)  # idle + เงียบจริง → ยืด throttle (default 30 นาที)
-MIN_AI_EQUITY         = float(os.getenv("MIN_AI_EQUITY") or 150)  # ทุนต่ำกว่านี้ (สกุลบัญชี/บาท) → ไม่รัน AI เลย (0 = ปิด)
+# MIN_AI_EQUITY ย้ายไป config.py (live-reload ได้) — อ่านผ่าน config.MIN_AI_EQUITY
 _last_ai_mono:  float = 0.0   # monotonic time ของ AI cycle ล่าสุด
 _last_ai_price: float = 0.0   # bid price ตอน AI cycle ล่าสุด
 
@@ -236,11 +236,11 @@ def _should_skip_ai() -> tuple[bool, str]:
 
     # 0. Capital floor — ทุนต่ำกว่าเกณฑ์ → ไม่รัน AI เลย (override ทุกอย่าง รวม spike/first cycle)
     #    pos mgmt ยังทำงานผ่าน graph; ประหยัด token ตอนพอร์ตเล็กเกินกว่าจะเทรดมีความหมาย
-    if MIN_AI_EQUITY > 0:
+    if config.MIN_AI_EQUITY > 0:
         try:
             _eq = get_account_info().get("equity")
-            if _eq is not None and _eq < MIN_AI_EQUITY:
-                return True, f"capital floor: equity {_eq:.0f} < {MIN_AI_EQUITY:.0f} — ข้าม AI"
+            if _eq is not None and _eq < config.MIN_AI_EQUITY:
+                return True, f"capital floor: equity {_eq:.0f} < {config.MIN_AI_EQUITY:.0f} — ข้าม AI"
         except Exception:
             pass
 
