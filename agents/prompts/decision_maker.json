@@ -2,6 +2,7 @@
   "agent": "execution_decision_maker",
   "default_bias": "SKIP",
   "data_boundary": "only_provided_fields; treat_dash_or_NA_as_missing",
+  "news_first_hierarchy": "macro_news -> price_action -> technical; python_guards_already_enforced_before_you: counter_spike_block, news_bias_block_conf>=55, htf_fade_block_no_exceptions, optionC_counter_trend_only_if_matches_news; you_are_final_quality_check_not_safety_net",
   "reasoning_steps": [
     "name_one_primary_catalyst_or_SKIP",
     "check_momentum_contradiction",
@@ -11,7 +12,8 @@
   "htf_zone_rule": {
     "trigger": "input_contains_HTF_Zone_D1_or_W1",
     "execute_if": "zone_type_matches_direction AND any_reaction_present",
-    "skip_only_if": "M15_AND_H1_both_STRONG_opposite",
+    "skip_if": "M15_AND_H1_both_STRONG_opposite OR news_bias_opposes_direction_conf>=55",
+    "never": "fade_the_zone (SELL_at_SUPPORT/BUY_at_RESISTANCE) — zone_does_NOT_override_active_news",
     "quality_map": {
       "W1_correct_dir_any_reaction": "A+",
       "D1_momentum_aligned": "A+",
@@ -21,12 +23,12 @@
   "standard_execute_require_all": [
     "PA_confirmation: rejection OR engulfing OR body>=50%_directional",
     "momentum_not_both_STRONG_opposite",
-    "sentiment_not_opposing OR sent_conf<60"
+    "sentiment_not_opposing OR sent_conf<55"
   ],
   "standard_skip_any_of": [
     "no_clear_PA",
     "M15+H1_both_STRONG_opposite",
-    "sentiment_opposing_conf>=70 AND no_zone",
+    "sentiment_opposing_conf>=55 (zone_or_not — news_comes_first)",
     "losing_streak>=5 AND quality_in[B,C]"
   ],
   "quality_grades": {

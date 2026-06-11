@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.4.0 — News-First Decision Layer + Anti-fade Guards (2026-06-11)
+
+> ที่มา: บอท SELL รัวสวนข่าว ceasefire (gold rally) จน port เสียหาย → ยกเครื่อง decision layer
+> ให้ "ดูข่าว macro ก่อน → หา price action → วิเคราะห์ → เข้า order" และพิสูจน์ gate ด้วย replay 489 ไม้จริง
+
+### เพิ่ม — Anti-fade Guards (`agents/decision_maker.py`)
+- **Counter-spike guard** — ห้ามเข้าสวน fast move สด ≥ `COUNTER_SPIKE_PIPS` (500)
+- **News-first block** — analyst bias conf ≥ 55 → hard-block เข้าทิศตรงข้ามข่าว
+- **HTF-fade block** — ห้าม SELL ที่ D1/W1 SUPPORT / BUY ที่ RESISTANCE
+- **Option C (news override)** — เข้าสวน H4 trend ได้เมื่อทิศตรงข่าว + spike ยืนยัน ≥ 500p หรือมี HTF zone หนุน
+- `fast_move_pips` ใน chart_watcher (M15 3 แท่งล่าสุด, มีเครื่องหมาย) ป้อน guard
+
+### เพิ่ม — Replay-proven Quality Gates
+- **Confidence floor 62** (`MIN_TECH_CONF`) — replay พบ band 50-59 ขาดทุนสุทธิ
+- **Asian floor 72** (`ASIAN_MIN_CONF`) — ก่อน 07:00 UTC
+- ผล replay บนประวัติ: ตัดขาดทุน −4,292 แลกกำไรที่เสียไป +332
+- NNLB mode ข้าม money-management ได้ แต่**ไม่ข้าม** quality gates + guards แล้ว
+
+### เพิ่ม — Infrastructure
+- **Capital floor** — equity < `MIN_AI_EQUITY` (150) → ไม่รัน AI pipeline เลย (`main.py`)
+- **Close-reason registry** — MT5 ตีทุกการปิดของบอทเป็น MANUAL → บอทบันทึกเอง
+  (`logs/close_reasons.json`: MOMENTUM_EXIT / ZONE_BREAK / CONFLICT_CLOSE) + reporter sync ใช้ registry ก่อน
+- **Config centralization + live-reload** — gate knobs 13 ตัวรวมใน `config.py`,
+  `reload_config()` อ่านใหม่ทุกต้น cycle → แก้ .env มีผลรอบถัดไปไม่ต้อง restart
+- **Multi-provider prereq** — `agents/llm_models.py` (`model_for()` + `MODEL_<AGENT>` env),
+  `_normalize_usage()` ใน accountant รองรับ usage shape ของ Anthropic / OpenAI-compatible / LangChain
+- **ATR sanity clamp** — clamp ATR เข้า [0.4×, 2.5×] ของ median 20 แท่ง กัน SL เพี้ยน
+- **Word-boundary keyword filter** — news_gatherer ใช้ regex `\b...\b` ("war" ไม่ match "forward")
+- X_KEYWORDS defaults เพิ่ม: Iran, Israel, ceasefire, war, oil, crude, CPI, rate cut, Hormuz, CENTCOM
+- `agents/prompts/macro_regime.md` — regime override ของ analyst (INVERT geopolitics→gold mapping ได้)
+- Scripts: `diagnose_trades.py` (segment 489 ไม้), `smoke_test.py` (8 checks), `check_recent.py` (ไม้ 48h)
+
+### แก้ไข
+- `scripts/auto_deploy.ps1` — derive repo path จาก `$PSScriptRoot` แทน hardcode
+- README.md ยกเครื่อง decision layer + ตาราง 13 knobs; `.env.example` เพิ่ม section gates
+- gate 5 SIDEWAYS เงื่อนไขซ้ำซ้อนถูกตัด, gate 9 dead code ถูกลบ, momentum override floor = 62
+
+---
+
 ## v0.3.0 — Multi-System Architecture (2026-05-04)
 
 ### เพิ่ม

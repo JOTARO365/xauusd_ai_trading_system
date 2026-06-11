@@ -1,7 +1,20 @@
 # XAUUSD Trading Strategy — Trend & Range Rulebook
-อัปเดต: 2026-05-10
+อัปเดต: 2026-06-11
 
 ไฟล์นี้เป็น **rulebook หลัก** ที่ Agent 4 (Decision Maker) ต้องอ่านและ enforce ทุกรอบ
+
+## 0. News-First Hierarchy (v0.4 — มาก่อนทุกกฎด้านล่าง)
+
+ลำดับการตัดสินใจ: **ดูข่าว macro → หา price action → วิเคราะห์ technical → เข้า order**
+
+Guard ที่ enforce ใน Python (`_run_gates`) ก่อนถึงกฎ trend ทุกข้อ:
+1. ห้ามเข้าสวน fast move สด ≥ 500 pips (counter-spike)
+2. ห้ามเข้าทิศตรงข้าม news bias เมื่อ analyst conf ≥ 55 (news-first block)
+3. ห้าม SELL ที่ D1/W1 SUPPORT / BUY ที่ D1/W1 RESISTANCE — **ไม่มีข้อยกเว้น แม้ conf สูง**
+4. **Option C**: เข้าสวน H4 trend ได้ ถ้าทิศ = news bias + conf ≥ 50 +
+   (spike ตามทิศข่าว ≥ 500p **หรือ** มี D1/W1 zone หนุนทิศนั้น)
+
+→ กฎ "BUY/SELL ONLY ตาม trend" ข้อ 1–2 ด้านล่าง ถูก override ได้ด้วย Option C เท่านั้น
 
 ---
 
@@ -31,7 +44,9 @@
 | Breakout retest | Resistance ที่เพิ่ง break กลายเป็น Support | สูง |
 
 **SELL signal → ปฏิเสธทันที** ไม่ว่า confidence จะสูงแค่ไหน  
-ยกเว้นเดียว: SELL ที่ H4 STRONG Resistance + confidence ≥ 70 → อนุญาต scalp สั้น (1 trade)
+ยกเว้น 2 กรณี:
+- SELL ที่ H4 STRONG Resistance + confidence ≥ 70 → อนุญาต scalp สั้น (1 trade)
+- **Option C**: SELL ตาม news bias (ดูข้อ 0) — ข่าว + ยืนยัน ชนะ technical trend
 
 ---
 
@@ -47,7 +62,9 @@
 | Breakdown retest | Support ที่เพิ่ง break กลายเป็น Resistance | สูง |
 
 **BUY signal → ปฏิเสธทันที**  
-ยกเว้นเดียว: BUY ที่ H4 STRONG Support + confidence ≥ 70 → อนุญาต scalp สั้น (1 trade)
+ยกเว้น 2 กรณี:
+- BUY ที่ H4 STRONG Support + confidence ≥ 70 → อนุญาต scalp สั้น (1 trade)
+- **Option C**: BUY ตาม news bias (ดูข้อ 0) — ข่าว + ยืนยัน ชนะ technical trend
 
 ---
 

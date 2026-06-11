@@ -50,6 +50,9 @@ Breakdown by:
 - Session (Asian / London / NY)
 - With news vs without news
 - Trend vs range market
+- Close reason — values: SL_HIT / TP_HIT / MOMENTUM_EXIT / ZONE_BREAK / CONFLICT_CLOSE / MANUAL / EA_CLOSE
+  (MOMENTUM_EXIT, ZONE_BREAK, CONFLICT_CLOSE = bot-initiated closes recorded by the bot itself;
+  MANUAL on a bot trade may be a legacy close before reason-tracking — do not assume human intervention)
 
 ---
 
