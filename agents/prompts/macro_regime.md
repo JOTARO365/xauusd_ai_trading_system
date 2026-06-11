@@ -19,8 +19,8 @@ DATA (auto 2026-06-05): CPI YoY +3.8% m/m re-accel (2026-04 +0.85%, 2026-03 +1.0
 - inflation_surprise -> BULLISH gold (hot inflation, Fed not hiking, real policy rate negative)
 - WATCH: a hawkish Fed pivot vs the inflation re-accel would flip inflation->gold BEARISH
 <!-- MACRO_AUTO_END -->
-- geopolitics (CURRENT, 06-09): ceasefire narrative REVERSED — Israeli official says the conflict is "not over, will take months". US-Iran negotiation UNRESOLVED, headlines swing both ways -> HIGH two-way volatility, NO clean directional bias this phase. Do not assume bullish OR bearish from a single headline; let price action lead.
-DRIVERS: US-Iran negotiation (unresolved, multi-month per Israeli official); Israeli/US official statements at set times; high two-way headline risk
-FILTER: choppy/high-vol regime — anti-fade + counter-spike guards most valuable; avoid chasing extended moves and avoid fading hard into headlines
-CATALYSTS: scheduled political/geo statements = volatility windows (not only data prints)
-UPDATED: 2026-06-10 (ceasefire REVERSED -> negotiation unresolved/high-vol; HFM live 06-09)
+- geopolitics (CURRENT, 06-10 late): ESCALATION — Trump announced heavy strikes on Iran "today"; CENTCOM active (tankers seized in Gulf of Oman, B-52s inbound). THIS PHASE INVERTS the default geopolitics->gold mapping: OIL IS THE HOSTAGE (Hormuz) -> shooting/sirens => oil UP + USD UP => gold DOWN; lull/fake headlines => gold rebounds. Two-way whipsaw ~$100 in hours. War-escalation headlines = BEARISH gold this phase; de-escalation/deal = relief bounce. Do not fade confirmed escalation moves.
+DRIVERS: Trump statements; CENTCOM operations/sirens; oil price (lead indicator — oil up = gold down); USD strength
+FILTER: oil up + escalation => gold DOWN (supply-side inflation + strong USD absorb safe-haven flows into bonds/oil instead of gold)
+CATALYSTS: scheduled political/geo statements + CENTCOM announcements = volatility windows (not only data prints)
+UPDATED: 2026-06-11 (escalation inversion: shooting=gold-down, oil-as-hostage; HFM live 06-10 late 22:50)

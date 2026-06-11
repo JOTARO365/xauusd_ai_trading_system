@@ -106,6 +106,7 @@ To stay within a token budget while running 24/7, the gate **throttles** AI call
 
 | Condition | Behavior |
 |---|---|
+| Equity < `MIN_AI_EQUITY` (150) | **Never runs AI** (capital floor — overrides everything); position mgmt still runs |
 | First cycle after start | Always runs |
 | Price spike ≥ `AI_SPIKE_PIPS` (500) | Always runs — breaking news / flash crash (overrides throttle) |
 | Ready Mode active (price at D1/W1 HTF zone) | Runs AI, but **throttled** to once per `READY_AI_MIN_SECS` (5 min) |
@@ -383,6 +384,7 @@ This registers At-LogOn / Interactive scheduled tasks for the bot + dashboard th
 | `X_USERNAME` | X (Twitter) username |
 | `X_PASSWORD` | X password |
 | `X_EMAIL` | X email (for 2FA) |
+| `X_KEYWORDS` | Tweet filter keywords (word-boundary match). **Setting this overrides the code defaults** — defaults include gold/Fed/inflation plus geopolitics & macro (`Iran, Israel, ceasefire, war, oil, crude, CPI, rate cut`) |
 
 ### Trading Config
 
@@ -415,6 +417,27 @@ This registers At-LogOn / Interactive scheduled tasks for the bot + dashboard th
 | `CHART_SHADOW` | `false` | A/B token test — runs a **terse-output** variant of `chart_watcher` in parallel on the same input, logging a field-by-field comparison to `logs/shadow_chart.jsonl`. Real trading is unaffected (always uses the verbose output). Analyze with `python scripts/shadow_report.py`; switch to terse only if `decision_match ≥ 95%`. |
 | `EMA_PULLBACK_MAX_SL` | `1500` | EMA_PULLBACK toxicity gate — block the signal when planned SL ≥ this (wide SL = high ATR ≈ 0% win rate). Deterministic Python gate in `chart_watcher`. |
 | `EMA_PULLBACK_MIN_CONF` | `70` | EMA_PULLBACK toxicity gate — block when confidence < this. Loss analysis: EMA_PULLBACK was the worst entry type (−$4.3k, 20% WR); the gate removes the proven-toxic slice (replay: +$2,981, 0 collateral). |
+
+### Decision Gates & Anti-fade Guards (live-reload — edits apply next cycle, no restart)
+
+All of these live in `config.py` and are re-read by `reload_config()` every cycle. Defaults
+are backed by a replay over 489 real closed trades (see `scripts/diagnose_trades.py`).
+
+| Key | Default | Description |
+|---|---|---|
+| `MIN_TECH_CONF` | `62` | Confidence floor for every entry (conf 50-59 band: WR 23.5%) |
+| `ASIAN_MIN_CONF` | `72` | Asian/quiet session (0-7 UTC): ALL entries need this conf |
+| `COUNTER_SPIKE_PIPS` | `500` | Block entries against a fresh spike ≥ this (0 = off) |
+| `NEWS_FIRST` | `true` | Block entries against a clear news/macro bias |
+| `NEWS_BIAS_MIN_CONF` | `55` | Analyst conf needed to count as "clear news bias" |
+| `HTF_FADE_BLOCK` | `true` | No SELL at D1/W1 SUPPORT / no BUY at RESISTANCE |
+| `NEWS_OVERRIDE_TREND` | `true` | Option C: news + price-action confirmation may enter against the H4 trend |
+| `NEWS_CONFIRM_PIPS` | `500` | With-direction spike that counts as confirmation for option C |
+| `NEWS_OVERRIDE_MIN_CONF` | `50` | Minimum conf for option C |
+| `TREND_CONT_CONF` | `65` | Synthetic conf for TREND_CONT / NNLB HTF override entries |
+| `TREND_CONT_MAX_DIST_PCT` | `0.3` | TREND_CONT must be a real pullback: price within this % of H1 EMA20 |
+| `NNLB_FASTPATH` | `true` | `false` = NNLB entries always go through the Claude decision |
+| `MIN_AI_EQUITY` | `150` | Equity (account currency) below this → skip all AI calls (0 = off) |
 
 > **NNLB values are USD-canonical.** `NNLB_BASE_EQUITY` and `NNLB_EQUITY_PER_LOT` are entered in USD and auto-converted to the account currency at runtime (rate derived from gold's pip value: USD → ×1, THB → ×~36). One config set works for USD and THB accounts alike — no per-currency tuning. ⚠️ Also raise `MAX_LOT` (default `0.01` caps all scaling).
 
@@ -536,18 +559,28 @@ See all variables in [`.env.example`](.env.example)
 ### Risk Management
 
 - **ATR-based SL floor** — SL = max(wick distance, 1.0× H4 ATR) to avoid noise stop-outs
+- **ATR sanity clamp** — the current H4 ATR is clamped into [0.4×, 2.5×] of its 20-bar median, so a thin/holiday-market bar can't distort the SL
 - **SL range**: 500–3500 pips (XAU: 1 pip = $0.01)
 - **Min R:R ratio**: 2.0 (breakeven WR = 33%)
 - **Confidence-based position sizing** — conf 50%→0.63× size, conf 65%→0.81×, conf ≥80%→1.0×
 - **Daily loss limit** — halts trading when max_daily_loss % is reached
 - **Momentum exit** — closes positions early when strong counter-momentum detected (loss ≥100 pips + M15 momentum, or M1 spike ≥500 pips)
 
-### Decision Layer
+### Decision Layer — news-first entry hierarchy
 
-- **12 Python gates** (gates 1–12) before calling Claude — quantitative filters only
+The entry flow follows **news → price action → analysis → order**:
+
+- **Anti-fade guards** (run before everything, both NNLB and normal mode):
+  - **Counter-spike** — never enter against a fresh ≥`COUNTER_SPIKE_PIPS` move (price spiking up = no SELL; usually a news move)
+  - **News-first** — when the analyst/macro-regime bias is clear (conf ≥ `NEWS_BIAS_MIN_CONF`), entries against it are blocked
+  - **HTF-fade** — no SELL at a D1/W1 SUPPORT, no BUY at a D1/W1 RESISTANCE (fading major levels = high failure odds)
+  - **News-override (option C)** — a counter-H4-trend entry is allowed only when it matches the news direction AND price action confirms (with-spike ≥ `NEWS_CONFIRM_PIPS`, or at a supporting HTF zone)
+- **Replay-proven confidence gates** (validated over 489 real closed trades):
+  - Floor **62%** for every entry (`MIN_TECH_CONF`) — the 50-59 band had WR 23.5% (−3,807 THB); HTF zones no longer lower the floor
+  - **Asian session (0-7 UTC): every entry needs ≥72%** (`ASIAN_MIN_CONF`) — Asian averaged −115/trade
+- **12 Python gates** (quantitative filters) before calling Claude
 - **Claude receives only an 8-line** clean summary — asked only "is the setup quality good enough?"
-- **Input tokens ~150** per call (reduced from ~600)
-- **Prompt caching** — reduces Claude API cost by ~80-90%
+- **Capital floor** — equity below `MIN_AI_EQUITY` (default 150, account currency) skips all AI calls; position management keeps running
 
 ### Trade Management
 
@@ -563,6 +596,9 @@ See all variables in [`.env.example`](.env.example)
 - **Market sleep** — auto-pauses on weekends and when markets are closed
 - **Portfolio protection** — daily loss limit, losing streak protection
 - **PostgreSQL / Supabase** — stores trades, agent usage, cost tracking
+- **Close-reason registry** — every bot-initiated close is tagged (`MOMENTUM_EXIT` / `ZONE_BREAK` / `CONFLICT_CLOSE`); SL/TP hits come from MT5 deal history — so per-exit diagnosis is possible (`scripts/diagnose_trades.py` segments + replays gates over DB history)
+- **Per-agent token accounting, multi-provider ready** — each agent's model comes from `agents/llm_models.py` (`MODEL_<AGENT>` env override) and `accountant._normalize_usage()` accepts Anthropic / OpenAI-compatible / LangChain usage objects
+- **Smoke test** — `python scripts/smoke_test.py` checks config knobs + entry guards after a refactor
 - **Strategy versioning** — all new trades include `strategy_version=2` to distinguish from legacy data
 - **Dashboard** — Flask web UI on port 5050 with economic calendar
 - **PM2 process manager** — auto-restart, live config changes via dashboard

@@ -228,5 +228,7 @@ X_KEYWORDS = (
         # geopolitics (safe-haven driver) + cross-asset — เพิ่มจาก HFM live 06-08 (ceasefire→ทองเด้ง)
         "Iran", "Israel", "ceasefire", "geopolitical", "war", "oil", "crude",
         # macro prints — HFM live 06-10: CPI ต่ำ = driver หลักของวัน แต่ tweet มักพิมพ์แค่ "CPI"
-        "CPI", "rate cut"]
+        "CPI", "rate cut",
+        # oil-as-hostage escalation theme (HFM live ดึก 06-10: ยิงกัน=ทองลง, น้ำมันคือตัวประกัน)
+        "Hormuz", "CENTCOM"]
 )
