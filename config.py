@@ -230,5 +230,7 @@ X_KEYWORDS = (
         # macro prints — HFM live 06-10: CPI ต่ำ = driver หลักของวัน แต่ tweet มักพิมพ์แค่ "CPI"
         "CPI", "rate cut",
         # oil-as-hostage escalation theme (HFM live ดึก 06-10: ยิงกัน=ทองลง, น้ำมันคือตัวประกัน)
-        "Hormuz", "CENTCOM"]
+        "Hormuz", "CENTCOM",
+        # HFM live 06-11: เป้ายึดเกาะ Kharg (oil terminal); PPI ร้อนชี้ CPI/เฟด; FOMC พุธหน้า = event ใหญ่
+        "Kharg", "PPI", "FOMC"]
 )
