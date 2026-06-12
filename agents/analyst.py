@@ -120,11 +120,10 @@ def analyze_sentiment(news_data: dict, chart_data: dict | None = None) -> dict:
 
     global _last_usage
     _last_usage = None
+    # NB: ห้ามใส่ cache_control ที่นี่ — cycle interval ยาวกว่า TTL 5 นาทีของ ephemeral cache
+    # ข้อมูลจริง 205 calls: cache_read = 0 ทุกครั้ง = จ่ายค่า write premium (1.25x) ฟรี
     messages = [
-        {"role": "system", "content": [
-            {"type": "text", "text": SYSTEM_PROMPT,
-             "cache_control": {"type": "ephemeral"}}
-        ]},
+        {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_message},
     ]
     try:

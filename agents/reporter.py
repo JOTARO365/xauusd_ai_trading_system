@@ -707,6 +707,11 @@ def analyze_performance() -> str:
     Returns report text or "" if cooldown hasn't elapsed or too few trades.
     Cooldown is persisted to disk so restarts don't trigger a burst of calls.
     """
+    # reset ก่อน early-return ทุกทาง — ไม่งั้น cycle ที่ติด cooldown จะทิ้ง usage เก่าไว้
+    # ให้ accounting node บันทึกซ้ำทุกรอบ (เคยทำ cost ของ reporter เฟ้อ ~10 เท่าใน DB)
+    global _last_usage
+    _last_usage = None
+
     now = datetime.now()
     last_run = _read_cooldown_ts()
     if last_run and (now - last_run) < timedelta(seconds=_ANALYSIS_COOLDOWN):
@@ -780,16 +785,14 @@ Losing Streak : {history['losing_streak']}
                 f"compact={len(compact_history):,} | "
                 f"closed_v2={len(closed)}")
 
-    global _last_usage
-    _last_usage = None
     try:
         from config import ANTHROPIC_API_KEY
         client   = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        # NB: ไม่ใส่ cache_control — เรียกชั่วโมงละครั้ง (cooldown 3600s) ไม่มีทาง hit TTL 5 นาที
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=600,   # report กระชับ — เดิม 2000→800→600 (ลด token; perf report สั้นได้)
-            system=[{"type": "text", "text": _REPORTER_PROMPT,
-                     "cache_control": {"type": "ephemeral"}}],
+            system=_REPORTER_PROMPT,
             messages=[{"role": "user", "content": user_msg}],
         )
         _last_usage = response.usage
