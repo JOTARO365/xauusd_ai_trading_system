@@ -106,7 +106,7 @@ To stay within a token budget while running 24/7, the gate **throttles** AI call
 
 | Condition | Behavior |
 |---|---|
-| Equity < `MIN_AI_EQUITY` (150) | **Never runs AI** (capital floor — overrides everything); position mgmt still runs |
+| Equity < `MIN_AI_EQUITY` | **Never runs AI** (capital floor — overrides everything); position mgmt still runs. ⚠️ unit = account currency — see note under [Decision Gates](#decision-gates--anti-fade-guards-live-reload--edits-apply-next-cycle-no-restart) |
 | First cycle after start | Always runs |
 | Price spike ≥ `AI_SPIKE_PIPS` (500) | Always runs — breaking news / flash crash (overrides throttle) |
 | Ready Mode active (price at D1/W1 HTF zone) | Runs AI, but **throttled** to once per `READY_AI_MIN_SECS` (5 min) |
@@ -384,7 +384,7 @@ This registers At-LogOn / Interactive scheduled tasks for the bot + dashboard th
 | `X_USERNAME` | X (Twitter) username |
 | `X_PASSWORD` | X password |
 | `X_EMAIL` | X email (for 2FA) |
-| `X_KEYWORDS` | Tweet filter keywords (word-boundary match). **Setting this overrides the code defaults** — defaults include gold/Fed/inflation plus geopolitics & macro (`Iran, Israel, ceasefire, war, oil, crude, CPI, rate cut`) |
+| `X_KEYWORDS` | Tweet filter keywords (word-boundary match). **Setting this overrides the code defaults entirely** (not merged) and is **not** live-reloaded — a `pm2 restart` is required. Defaults include gold/Fed/inflation plus geopolitics & macro (`Iran, Israel, ceasefire, war, oil, crude, CPI, rate cut, Hormuz, CENTCOM, Kharg, PPI, FOMC, Pakistan`) |
 
 ### Trading Config
 
@@ -437,8 +437,10 @@ are backed by a replay over 489 real closed trades (see `scripts/diagnose_trades
 | `TREND_CONT_CONF` | `65` | Synthetic conf for TREND_CONT / NNLB HTF override entries |
 | `TREND_CONT_MAX_DIST_PCT` | `0.3` | TREND_CONT must be a real pullback: price within this % of H1 EMA20 |
 | `NNLB_FASTPATH` | `true` | `false` = NNLB entries always go through the Claude decision |
-| `MIN_AI_EQUITY` | `150` | Equity (account currency) below this → skip all AI calls (0 = off) |
+| `MIN_AI_EQUITY` | `150` | Equity below this → skip all AI calls (0 = off). **⚠️ unit = MT5 account currency, NOT USD** — see warning below |
 
+> **⚠️ `MIN_AI_EQUITY` is in the account's currency — the code default `150` is THB-scale.** On a **USD account** this default silently blocks the bot whenever equity < $150 (e.g. a $100 account never calls AI — the skip path also bypasses accounting, so it's invisible in the DB). Set it to a USD-scale floor (e.g. `5`) on a USD account. This knob **is** live-reloaded (applies next cycle, no restart). `.env.example` ships `5`.
+>
 > **NNLB values are USD-canonical.** `NNLB_BASE_EQUITY` and `NNLB_EQUITY_PER_LOT` are entered in USD and auto-converted to the account currency at runtime (rate derived from gold's pip value: USD → ×1, THB → ×~36). One config set works for USD and THB accounts alike — no per-currency tuning. ⚠️ Also raise `MAX_LOT` (default `0.01` caps all scaling).
 
 ### Position Sizing (Confidence-based)
@@ -527,11 +529,15 @@ See all variables in [`.env.example`](.env.example)
 │   ├── market_clock.py        # Interval calculation + market sleep
 │   └── display.py             # Rich terminal UI
 │
-├── agents/prompts/
-│   ├── chart_watcher.md       # Prompt: chart analysis + scoring rules
-│   ├── decision_maker.md      # Prompt: execute/skip quality check
-│   ├── market_advisor.md      # Prompt: regime analysis
-│   └── analyst.md             # Prompt: sentiment analysis
+├── agents/prompts/            # ⚠ *.json = LIVE prompts (loaded at import); *.md = human docs only
+│   ├── *.json                 # chart_watcher/market_advisor/analyst/decision_maker — edit these to change agent behavior
+│   ├── chart_watcher.md       # Doc: chart analysis + scoring rules
+│   ├── decision_maker.md      # Doc: execute/skip quality check + pipeline context
+│   ├── market_advisor.md      # Doc: regime analysis
+│   ├── analyst.md             # Doc: sentiment analysis
+│   ├── trend_strategy.md      # Doc: news-first hierarchy + trend rules
+│   ├── reporter.md            # LIVE: reporter prompt (used directly, no .json)
+│   └── macro_regime.md        # LIVE: macro regime context injected into analyst each cycle
 │
 ├── backtest/
 │   └── monte_carlo.py         # Monte Carlo simulation
@@ -580,7 +586,7 @@ The entry flow follows **news → price action → analysis → order**:
   - **Asian session (0-7 UTC): every entry needs ≥72%** (`ASIAN_MIN_CONF`) — Asian averaged −115/trade
 - **12 Python gates** (quantitative filters) before calling Claude
 - **Claude receives only an 8-line** clean summary — asked only "is the setup quality good enough?"
-- **Capital floor** — equity below `MIN_AI_EQUITY` (default 150, account currency) skips all AI calls; position management keeps running
+- **Capital floor** — equity below `MIN_AI_EQUITY` skips all AI calls; position management keeps running. ⚠️ The threshold is in the **account's currency** (code default `150` is THB-scale; a USD account should use ~`5` — `.env.example` ships `5`)
 
 ### Trade Management
 
