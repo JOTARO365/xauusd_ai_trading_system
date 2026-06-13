@@ -232,5 +232,7 @@ X_KEYWORDS = (
         # oil-as-hostage escalation theme (HFM live ดึก 06-10: ยิงกัน=ทองลง, น้ำมันคือตัวประกัน)
         "Hormuz", "CENTCOM",
         # HFM live 06-11: เป้ายึดเกาะ Kharg (oil terminal); PPI ร้อนชี้ CPI/เฟด; FOMC พุธหน้า = event ใหญ่
-        "Kharg", "PPI", "FOMC"]
+        "Kharg", "PPI", "FOMC",
+        # HFM live 06-12: ทีมเจรจาอิหร่านบินไปปากีสถานวันอาทิตย์ 06-14 (multi-party talks)
+        "Pakistan"]
 )
