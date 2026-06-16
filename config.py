@@ -234,5 +234,7 @@ X_KEYWORDS = (
         # HFM live 06-11: เป้ายึดเกาะ Kharg (oil terminal); PPI ร้อนชี้ CPI/เฟด; FOMC พุธหน้า = event ใหญ่
         "Kharg", "PPI", "FOMC",
         # HFM live 06-12: ทีมเจรจาอิหร่านบินไปปากีสถานวันอาทิตย์ 06-14 (multi-party talks)
-        "Pakistan"]
+        "Pakistan",
+        # HFM live 06-15: กรอบ MOU ตกลง 06-14, เซ็นทางการศุกร์ 06-19 ที่ Geneva; Pezeshkian ประกาศจะเซ็น
+        "Pezeshkian", "Geneva"]
 )
