@@ -28,7 +28,7 @@ def calculate_lot_size(account_balance: float, sl_pips: float,
     """คำนวณ lot size โดยปรับตาม confidence_scale (0.5–1.0)
     confidence_scale < 1.0 → risk น้อยลงตามสัดส่วน confidence
     """
-    pip_value = 0.1  # XAU/USD: $0.1 per pip per 0.01 lot
+    pip_value = 0.01  # XAU/USD: $0.01 per point per 0.01 lot (ยืนยันจาก broker จริง: $2/100pts @ 0.02 lot)
     if _cfg.LOT_MODE == "fixed":
         lot = _cfg.FIXED_LOT
         logger.info(f"Lot mode: fixed → {lot}")
