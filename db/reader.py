@@ -40,7 +40,8 @@ def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list
                 "lot,entry_price,sl,tp,pnl,"
                 "opened_at,closed_at,"
                 "technical_signal,technical_confidence,"
-                "trend,sr_zone,sr_strength,pa_action,sentiment,analysis"
+                "trend,sr_zone,sr_strength,pa_action,sentiment,analysis,"
+                "strategy_version"
             )
             .in_("symbol", symbols)
         )
@@ -72,6 +73,7 @@ def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list
                 "pa_action":             r.get("pa_action"),
                 "sentiment":             r.get("sentiment"),
                 "analysis":              r.get("analysis"),
+                "strategy_version":      r.get("strategy_version", 1),
             })
         return result
     except Exception as e:
