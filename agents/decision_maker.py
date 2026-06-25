@@ -15,7 +15,7 @@ _llm = ChatAnthropic(
     api_key=ANTHROPIC_API_KEY,
     max_tokens=256,   # 120 เดิมคับ — reason ฟิลด์ free-text ถูก truncate → structured parse fail → SKIP เงียบ
     temperature=0,
-).with_structured_output(DecisionMakerOutput)
+).with_structured_output(DecisionMakerOutput, include_raw=True)
 
 # ── Order fail streak tracker ─────────────────────────────────────────────────
 _order_fail_streak: dict[str, int] = {"BUY": 0, "SELL": 0}
@@ -684,8 +684,12 @@ Account — Today: {history['today_pnl']:+.2f} USD ({history['today_trades']} tr
         {"role": "user", "content": user_message},
     ]
     try:
-        result: DecisionMakerOutput = _llm.invoke(messages)
-        _last_usage = getattr(_llm.last_response_metadata, "usage", None) if hasattr(_llm, "last_response_metadata") else None
+        raw_out = _llm.invoke(messages)
+        _raw    = raw_out.get("raw")
+        _last_usage = (getattr(_raw, "response_metadata", None) or {}).get("usage")
+        result: DecisionMakerOutput = raw_out.get("parsed")
+        if result is None:
+            raise ValueError(raw_out.get("parsing_error") or "structured parse returned None")
         decision         = result.decision
         out_direction    = result.direction
         trade_quality    = result.trade_quality

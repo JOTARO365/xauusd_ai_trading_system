@@ -11,7 +11,7 @@ _llm = ChatAnthropic(
     api_key=ANTHROPIC_API_KEY,
     max_tokens=450,
     temperature=0,
-).with_structured_output(MarketAdvisorOutput)
+).with_structured_output(MarketAdvisorOutput, include_raw=True)
 
 SYSTEM_PROMPT = json.dumps(
     json.loads(Path("agents/prompts/market_advisor.json").read_text(encoding="utf-8")),
@@ -64,7 +64,12 @@ Historical performance:
             ]},
             {"role": "user", "content": user_message},
         ]
-        result: MarketAdvisorOutput = _llm.invoke(messages)
+        raw_out = _llm.invoke(messages)
+        _raw    = raw_out.get("raw")
+        _last_usage = (getattr(_raw, "response_metadata", None) or {}).get("usage")
+        result: MarketAdvisorOutput = raw_out.get("parsed")
+        if result is None:
+            raise ValueError(raw_out.get("parsing_error") or "structured parse returned None")
         logger.info(f"Market Advisor: {result.regime} ({result.regime_confidence}%) Bias:{result.bias}")
         return {
             "regime":            result.regime,

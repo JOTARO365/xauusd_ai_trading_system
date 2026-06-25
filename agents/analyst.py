@@ -12,7 +12,7 @@ _llm = ChatAnthropic(
     api_key=ANTHROPIC_API_KEY,
     max_tokens=300,
     temperature=0,
-).with_structured_output(AnalystOutput)
+).with_structured_output(AnalystOutput, include_raw=True)
 
 SYSTEM_PROMPT = json.dumps(
     json.loads(Path("agents/prompts/analyst.json").read_text(encoding="utf-8")),
@@ -127,7 +127,12 @@ def analyze_sentiment(news_data: dict, chart_data: dict | None = None) -> dict:
         {"role": "user", "content": user_message},
     ]
     try:
-        parsed: AnalystOutput = _llm.invoke(messages)
+        raw_out = _llm.invoke(messages)
+        _raw    = raw_out.get("raw")
+        _last_usage = (getattr(_raw, "response_metadata", None) or {}).get("usage")
+        parsed: AnalystOutput = raw_out.get("parsed")
+        if parsed is None:
+            raise ValueError(raw_out.get("parsing_error") or "structured parse returned None")
         logger.info(f"Sentiment Analysis: {parsed.sentiment} ({parsed.confidence}%)")
         result = {
             "sentiment":   parsed.sentiment,
