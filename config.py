@@ -224,10 +224,10 @@ NNLB_EQUITY_PER_LOT = float(os.getenv("NNLB_EQUITY_PER_LOT", "100"))
 # ค่า 25 หมายถึง ยอมรับ loss ได้ 25% ของ equity ต่อ trade
 NNLB_MAX_LOSS_PCT = float(os.getenv("NNLB_MAX_LOSS_PCT", "25"))
 
-# ── SWING_HOLD mode (long-term/position sleeve) — SCAFFOLDING, DEFAULT OFF ─────
-# *** ยังไม่ wire เข้า pipeline — ดู .claude/context/SWING_HOLD_spec.md ***
-# inert จนครบ 3 ด่าน: equity ≥ SWING_MIN_EQUITY + SWING_ENABLED=true + ผ่าน backtest/DRY_RUN
-# ไม่มีโค้ดไหนอ่านค่าพวกนี้ตอนนี้ → เพิ่มไว้เฉยๆ ไม่กระทบ behavior live
+# ── SWING_HOLD mode (long-term/position sleeve) — DEFAULT OFF ──────────────────
+# *** wire เข้า pipeline แล้ว (agents/swing_manager.py → node_position_mgmt) แต่ inert by default ***
+# ดู .claude/context/SWING_HOLD_spec.md. manage_swing_campaign() return 0 ทันทีถ้าไม่ผ่าน gate:
+# inert จนครบ 2 ด่าน: SWING_ENABLED=true + equity ≥ SWING_MIN_EQUITY → ไม่กระทบ behavior live ตอนนี้
 SWING_ENABLED        = os.getenv("SWING_ENABLED", "false").lower() == "true"  # master switch
 SWING_MIN_CONF       = float(os.getenv("SWING_MIN_CONF") or 70)               # conf floor (สูงกว่า scalp 62)
 SWING_MAX_LEGS       = int(os.getenv("SWING_MAX_LEGS") or 3)                  # scale-in สูงสุดกี่ leg
