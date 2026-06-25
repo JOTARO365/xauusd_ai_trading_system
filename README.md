@@ -1,10 +1,10 @@
 # XAUUSD AI Trading System
 
-ระบบ AI Trading อัตโนมัติสำหรับ XAUUSD (ทองคำ) โดยใช้ Claude AI + MetaTrader 5
+Automated AI trading system for XAUUSD (Gold), powered by Claude (Anthropic) for multi-agent decision-making and MetaTrader 5 for execution.
 
 ---
 
-## สถาปัตยกรรม
+## Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -20,43 +20,52 @@
 └──────────────────────────────────────────────────────────────────┘
          ↕ PostgreSQL / Supabase
 ┌──────────────────────┐
-│  Dashboard (port 5050)│  ← รันใน Docker ได้
+│  Dashboard (port 5050)│  ← can run in Docker
 │  Flask + Waitress    │
 └──────────────────────┘
 ```
 
+Each cycle (every ~300s by default, adaptive based on signal strength):
+
+1. **ChartWatcher** — pulls H4/H1/M15 candles from MT5, scores entry setups (multi-timeframe S/R, structure, EMA pullback, breakout/retest, candlestick patterns, Fibonacci confluence), computes SL/TP.
+2. **MarketAdvisor** — analyzes market regime (trend/range/volatility) for additional context.
+3. **NewsGatherer + Analyst** — gathers tweets/ForexFactory calendar/web articles, summarizes and caches via vector search (Gemini embeddings), then asks Claude to classify sentiment (BULLISH/BEARISH/NEUTRAL) weighted toward hard calendar data over social sentiment.
+4. **DecisionMaker** — runs 12 deterministic Python gates (risk limits, slot availability, sentiment alignment, losing-streak protection, etc.) first; only a compact 8-line summary is sent to Claude to make the final EXECUTE/SKIP call. This keeps input tokens around ~150/call and benefits heavily from prompt caching.
+5. **MT5 Connector** — sizes the position (confidence-scaled risk or fixed lot), opens the order, and manages it afterward (breakeven, dynamic TP, partial close, hedge).
+6. **Reporter / Accountant** — logs the trade and per-agent token cost to PostgreSQL/Supabase (with JSON fallback if the DB is unreachable).
+
 ---
 
-## ความต้องการของระบบ
+## System Requirements
 
-| Component | ความต้องการ |
+| Component | Requirement |
 |---|---|
-| **Trading Bot** (main.py) | Windows + MetaTrader5 Terminal เปิดค้างไว้ |
+| **Trading Bot** (`main.py`) | Windows + MetaTrader 5 terminal running and logged in |
 | **Dashboard** | Windows / Linux / Docker |
 | Python | 3.11+ |
-| Node.js | 18+ (สำหรับ PM2) |
-| Database | PostgreSQL 14+ หรือ Supabase |
+| Node.js | 18+ (for PM2) |
+| Database | PostgreSQL 14+ or Supabase |
 
-> ⚠️ `MetaTrader5` Python library รองรับ **Windows เท่านั้น**
+> ⚠️ The `MetaTrader5` Python library only works on **Windows**. The trading bot itself must run on a Windows host (or Windows container); the dashboard can run anywhere.
 
 ---
 
-## ติดตั้ง
+## Installation
 
-### 1. Clone โปรเจกต์
+### 1. Clone the repository
 
 ```bash
 git clone git@github.com:JOTARO365/xauusd_ai_trading_system.git
 cd xauusd_ai_trading_system
 ```
 
-### 2. ติดตั้ง Python dependencies
+### 2. Install Python dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. ตั้งค่า .env
+### 3. Configure environment variables
 
 ```bash
 # Windows
@@ -66,70 +75,70 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-เปิด `.env` แล้วกรอกค่าที่จำเป็น (ดู [Environment Variables](#environment-variables) ด้านล่าง)
+Open `.env` and fill in the required values (see [Environment Variables](#environment-variables) below).
 
-### 4. ตั้งค่า Database
+### 4. Set up the database
 
-เลือก **1 วิธี** จาก 2 วิธีด้านล่าง:
+Pick **one** of the two options below:
 
-#### วิธี A — PostgreSQL Local (รัน Docker)
+#### Option A — Local PostgreSQL (Docker)
 
 ```bash
-# รัน PostgreSQL ผ่าน docker compose (port 5432)
+# Start PostgreSQL via docker compose (port 5432)
 docker compose up -d postgres
 
-# ใน .env ใช้ค่านี้ (default แล้ว)
+# In .env, use (this is the default):
 DATABASE_URL=postgresql://trading:trading@localhost:5432/trading
 ```
 
-สร้าง schema:
+Create the schema:
 
 ```bash
 psql $DATABASE_URL < db/schema.sql
 ```
 
-#### วิธี B — Supabase (Cloud)
+#### Option B — Supabase (Cloud)
 
-1. สร้าง project ที่ [supabase.com](https://supabase.com)
-2. ไปที่ **SQL Editor** → วาง SQL จาก `SUPABASE.md` แล้วรัน
-3. ใน `.env` เปลี่ยน DATABASE_URL:
+1. Create a project at [supabase.com](https://supabase.com)
+2. Go to **SQL Editor** → paste and run the SQL from `SUPABASE.md`
+3. In `.env`, update `DATABASE_URL`:
 
 ```env
 DATABASE_URL=postgresql://postgres:YOUR_PASS@db.xxxx.supabase.co:5432/postgres
 ```
 
-> ดูรายละเอียดเพิ่มเติมใน [SUPABASE.md](SUPABASE.md)
+> See [SUPABASE.md](SUPABASE.md) for details.
 
 ---
 
-## รันระบบ
+## Running the System
 
-### วิธีที่ 1 — PM2 (แนะนำ)
+### Option 1 — PM2 (recommended)
 
 ```bash
-# ติดตั้ง PM2
+# Install PM2
 npm install -g pm2
 
-# รัน trading bot + dashboard พร้อมกัน
+# Run the trading bot + dashboard together
 pm2 start ecosystem.config.js
 pm2 save
 
-# ดู status
+# Check status
 pm2 list
 pm2 logs main
 pm2 logs dashboard
 ```
 
-คำสั่ง PM2 ที่ใช้บ่อย:
+Common PM2 commands:
 
 ```bash
 pm2 restart main        # restart trading bot
 pm2 restart dashboard   # restart dashboard
-pm2 restart all         # restart ทั้งหมด
-pm2 stop all            # หยุดทั้งหมด
+pm2 restart all         # restart everything
+pm2 stop all            # stop everything
 ```
 
-### วิธีที่ 2 — รันตรง
+### Option 2 — Run directly
 
 ```bash
 # Terminal 1: Trading bot
@@ -139,86 +148,88 @@ python main.py
 python dashboard/app.py
 ```
 
+`main.py` also accepts CLI overrides for risk/lot/protection settings — run `python main.py --help` for the full list.
+
 ---
 
 ## Dashboard
 
-เปิดเบราว์เซอร์ไปที่ `http://localhost:5050`
+Open your browser to `http://localhost:5050`.
 
-| หน้า | รายละเอียด |
+| Page | Description |
 |---|---|
-| **Overview** | Portfolio, สถิติ, ประวัติ trade, ปฏิทินข่าว |
-| **Settings** | ปรับ config ได้ทันที — บันทึกแล้ว PM2 restart อัตโนมัติ |
+| **Overview** | Portfolio stats, trade history, economic calendar |
+| **Settings** | Edit config live — changes are saved and PM2 auto-restarts the bot |
 
 ---
 
 ## Docker
 
-มี 2 โหมด ขึ้นอยู่กับความต้องการ:
+Two modes are available depending on your needs:
 
-### โหมด A — Linux containers (Dashboard เท่านั้น)
+### Mode A — Linux containers (Dashboard only)
 
-ใช้ Docker Desktop ปกติ (Linux mode) — **ไม่ต้องสลับ mode**
+Uses standard Docker Desktop (Linux mode) — **no mode switch needed**.
 
 ```bash
-# สร้าง .env ก่อน
-cp .env.example .env   # Linux/Mac
+# Create .env first
+cp .env.example .env    # Linux/Mac
 copy .env.example .env  # Windows
 
-# รัน dashboard + postgres
+# Run dashboard + postgres
 docker compose up -d
 
-# ดู logs
+# View logs
 docker compose logs -f
 
-# หยุด
+# Stop
 docker compose down
 ```
 
-- Dashboard เปิดที่ `http://localhost:5050`
-- Trading bot (`main.py`) ต้องรันแยกบน Windows host ด้วย PM2 หรือ `python main.py`
+- Dashboard available at `http://localhost:5050`
+- The trading bot (`main.py`) must be run separately on the Windows host (via PM2 or `python main.py`), since MetaTrader5 doesn't run in a Linux container.
 
-### โหมด B — Windows containers (ระบบเต็ม — Bot + Dashboard)
+### Mode B — Windows containers (full system — Bot + Dashboard)
 
-Docker ติดตั้งทุกอย่างในตัว: **Python, Node.js, PM2** และ Python packages ทั้งหมด
+The Docker image bundles everything: **Python, Node.js, PM2**, and all Python packages.
 
-**ข้อกำหนด:**
-1. Docker Desktop บน Windows
-2. สลับเป็น Windows containers mode:
-   - right-click ไอคอน Docker ใน system tray
-   - เลือก **"Switch to Windows containers..."**
-3. MetaTrader5 terminal เปิดและ Login ไว้บน host
+**Requirements:**
+1. Docker Desktop on Windows
+2. Switch to Windows containers mode:
+   - right-click the Docker icon in the system tray
+   - select **"Switch to Windows containers..."**
+3. MetaTrader5 terminal open and logged in on the host
 
 ```bash
-# สร้าง .env ก่อน
+# Create .env first
 copy .env.example .env
 
-# Build และรัน (ครั้งแรก build นาน ~15-30 นาที เพราะ image ใหญ่)
+# Build and run (first build takes ~15-30 min due to image size)
 docker compose -f docker-compose.windows.yml up -d
 
-# ดู logs แบบ real-time
+# View logs in real-time
 docker compose -f docker-compose.windows.yml logs -f
 
-# ดูสถานะ PM2 ภายใน container
+# Check PM2 status inside the container
 docker exec xauusd-trading powershell -Command "pm2 list"
 
-# Restart process ใด process หนึ่ง
+# Restart a specific process
 docker exec xauusd-trading powershell -Command "pm2 restart main"
 docker exec xauusd-trading powershell -Command "pm2 restart dashboard"
 
-# หยุดทั้งหมด
+# Stop everything
 docker compose -f docker-compose.windows.yml down
 ```
 
-### เปรียบเทียบ 2 โหมด
+### Mode comparison
 
-| | โหมด A (Linux) | โหมด B (Windows) |
+| | Mode A (Linux) | Mode B (Windows) |
 |---|---|---|
-| **คำสั่ง** | `docker compose up -d` | `docker compose -f docker-compose.windows.yml up -d` |
-| **Trading Bot** | ต้องรันแยกบน host | รันในตัว |
+| **Command** | `docker compose up -d` | `docker compose -f docker-compose.windows.yml up -d` |
+| **Trading Bot** | Must run separately on host | Runs inside the container |
 | **Image size** | ~500 MB | ~5-7 GB |
-| **Build time** | ~2-5 นาที | ~15-30 นาที |
-| **MetaTrader5** | ไม่รองรับ | รองรับ (Windows IPC) |
+| **Build time** | ~2-5 min | ~15-30 min |
+| **MetaTrader5** | Not supported | Supported (Windows IPC) |
 | **Docker mode** | Linux (default) | Windows containers |
 
 ---
@@ -227,123 +238,123 @@ docker compose -f docker-compose.windows.yml down
 
 ### Required
 
-| Key | รายละเอียด |
+| Key | Description |
 |---|---|
 | `ANTHROPIC_API_KEY` | Claude API key — [console.anthropic.com](https://console.anthropic.com) |
 | `MT5_LOGIN` | MT5 account number |
 | `MT5_PASSWORD` | MT5 password |
-| `MT5_SERVER` | Broker server name (เช่น `ICMarketsAu-Demo`) |
+| `MT5_SERVER` | Broker server name (e.g. `ICMarketsAu-Demo`) |
 | `DATABASE_URL` | PostgreSQL connection string |
 
-### X/Twitter (ใช้สำหรับ sentiment — optional)
+### X/Twitter (used for sentiment — optional)
 
-| Key | รายละเอียด |
+| Key | Description |
 |---|---|
 | `X_USERNAME` | X (Twitter) username |
 | `X_PASSWORD` | X password |
-| `X_EMAIL` | X email (สำหรับ 2FA) |
+| `X_EMAIL` | X email (for 2FA) |
 
 ### Trading Config
 
-| Key | Default | รายละเอียด |
+| Key | Default | Description |
 |---|---|---|
-| `SYMBOL` | `XAUUSD` | Trading symbol (broker บางเจ้าใช้ `GOLD#`) |
-| `START_BALANCE` | `2000` | ทุนเริ่มต้น (สกุลเงินของ account) |
-| `LOT_MODE` | `auto` | `auto` = คำนวณตาม risk / `fixed` = ใช้ FIXED_LOT |
-| `FIXED_LOT` | `0.01` | ใช้เมื่อ LOT_MODE=fixed |
-| `MIN_LOT` | `0.01` | Lot size ต่ำสุด |
-| `MAX_LOT` | `0.01` | Lot size สูงสุด |
-| `RISK_PER_TRADE` | `0.50` | % risk ต่อ trade (0.50 = 0.5%) |
-| `MAX_DAILY_LOSS` | `1.00` | % loss สูงสุดต่อวัน |
-| `MAX_OPEN_TRADES` | `4` | จำนวน trade สูงสุดที่เปิดพร้อมกัน |
-| `DEFAULT_SL_PIPS` | `2000` | SL default (pips) — ใช้เมื่อคำนวณ SL ไม่ได้ |
-| `DEFAULT_TP_PIPS` | `5000` | TP default (pips) — ขั้นต่ำ 2.0× SL |
-| `MIN_RR_RATIO` | `2.0` | R:R ขั้นต่ำ (breakeven WR = 33%) |
-| `HEDGE_BUFFER_PIPS` | `2500` | ช่องไฟก่อนเปิด hedge order (pips) |
+| `SYMBOL` | `XAUUSD` | Trading symbol (some brokers use `GOLD#`) |
+| `START_BALANCE` | `5000` | Starting balance (account currency) |
+| `LOT_MODE` | `auto` | `auto` = risk-based sizing / `fixed` = use `FIXED_LOT` |
+| `FIXED_LOT` | `0.01` | Used when `LOT_MODE=fixed` |
+| `MIN_LOT` | `0.01` | Minimum lot size |
+| `MAX_LOT` | `0.01` | Maximum lot size |
+| `RISK_PER_TRADE` | `0.50` | % risk per trade (0.50 = 0.5%) |
+| `MAX_DAILY_LOSS` | `1.00` | Max daily loss % |
+| `MAX_OPEN_TRADES` | `4` | Max simultaneous open trades per direction |
+| `DEFAULT_SL_PIPS` | `2000` | Fallback SL (pips) when SL can't be computed |
+| `DEFAULT_TP_PIPS` | `5000` | Fallback TP (pips) — minimum 2.0× SL |
+| `MIN_RR_RATIO` | `2.0` | Minimum Risk/Reward ratio (breakeven WR = 33%) |
+| `HEDGE_BUFFER_PIPS` | `2500` | Buffer (pips) before opening a hedge order |
 
 ### Position Sizing (Confidence-based)
 
-| Key | Default | รายละเอียด |
+| Key | Default | Description |
 |---|---|---|
-| `CONF_FULL_SIZE_AT` | `80` | Confidence % ที่ได้ full position size |
-| `CONF_MIN_SCALE` | `0.5` | Scale ต่ำสุด (conf ต่ำ = ครึ่ง size) |
+| `CONF_FULL_SIZE_AT` | `80` | Confidence % required for full position size |
+| `CONF_MIN_SCALE` | `0.5` | Minimum scale (lowest confidence = half size) |
 
-ตัวอย่าง: conf=50% → 0.63× size, conf=65% → 0.81× size, conf≥80% → 1.0× size
+Example: conf=50% → 0.63× size, conf=65% → 0.81× size, conf≥80% → 1.0× size. Note: this scaling only applies in `LOT_MODE=auto` — `fixed` mode ignores confidence entirely.
 
 ### Pending Orders
 
-| Key | Default | รายละเอียด |
+| Key | Default | Description |
 |---|---|---|
-| `MAX_PENDING_BUY` | `4` | Pending buy orders สูงสุด |
-| `MAX_PENDING_SELL` | `4` | Pending sell orders สูงสุด |
-| `PENDING_EXPIRY_HOURS` | `48` | หมดอายุ pending order (ชั่วโมง) |
+| `MAX_PENDING_BUY` | `4` | Max pending buy orders |
+| `MAX_PENDING_SELL` | `4` | Max pending sell orders |
+| `PENDING_EXPIRY_HOURS` | `24` | Pending order expiry (hours) |
 
 ### Streak & Portfolio Protection
 
-| Key | Default | รายละเอียด |
+| Key | Default | Description |
 |---|---|---|
-| `PORTFOLIO_PROTECTION` | `true` | เปิด/ปิดระบบป้องกัน (daily loss limit, max trades) |
-| `STREAK_PROTECTION` | `true` | เปิด/ปิดระบบป้องกัน losing streak |
-| `MAX_LOSING_STREAK` | `5` | จำนวน loss ติดกันก่อน raise threshold |
-| `STREAK_MIN_CONFIDENCE` | `62` | Confidence ขั้นต่ำเมื่อ streak triggered |
+| `PORTFOLIO_PROTECTION` | `true` | Enable/disable daily loss limit + max trades guard |
+| `STREAK_PROTECTION` | `true` | Enable/disable losing-streak protection |
+| `MAX_LOSING_STREAK` | `5` | Consecutive losses before raising the confidence threshold |
+| `STREAK_MIN_CONFIDENCE` | `62` | Minimum confidence required once streak protection triggers |
 
 ### Dynamic Features
 
-| Key | Default | รายละเอียด |
+| Key | Default | Description |
 |---|---|---|
-| `DYNAMIC_TP` | `true` | ขยับ TP อัตโนมัติเมื่อ momentum แรงและราคาใกล้ TP |
-| `NO_TP_ON_EVENT` | `true` | เปิด order ไม่ตั้ง TP เมื่อมี high-impact event |
-| `NO_TP_EVENT_MINS` | `20` | ถ้า event อยู่ในช่วง X นาที → no TP |
-| `NO_TP_WAIT_MINUTES` | `30` | รอ X นาทีหลัง event ก่อนตั้ง TP |
+| `DYNAMIC_TP` | `true` | Automatically extend TP when momentum is strong and price nears TP |
+| `NO_TP_ON_EVENT` | `true` | Open without a TP when a high-impact news event is near |
+| `NO_TP_EVENT_MINS` | `20` | If an event is within X minutes → skip TP |
+| `NO_TP_WAIT_MINUTES` | `30` | Wait X minutes after the event before setting TP |
 
 ### X Accounts & Keywords
 
-| Key | Default | รายละเอียด |
+| Key | Default | Description |
 |---|---|---|
-| `X_ACCOUNTS_TO_FOLLOW` | `kun_purich,cnnbrk,...` | X accounts ที่ติดตามสำหรับ sentiment |
-| `X_KEYWORDS` | `XAUUSD,gold,XAU,...` | Keywords กรอง tweet |
+| `X_ACCOUNTS_TO_FOLLOW` | `kun_purich,cnnbrk,...` | X accounts followed for sentiment |
+| `X_KEYWORDS` | `XAUUSD,gold,XAU,...` | Keywords used to filter tweets |
 
-ดูทั้งหมดได้ใน [`.env.example`](.env.example)
+See the full list in [`.env.example`](.env.example).
 
 ---
 
-## โครงสร้างไฟล์
+## Project Structure
 
 ```
-├── main.py                    # Entry point — trading loop (ทุก 300s)
-├── config.py                  # โหลด config จาก .env + reload_config()
+├── main.py                    # Entry point — trading loop (every ~300s)
+├── config.py                  # Loads config from .env + reload_config()
 ├── ecosystem.config.js        # PM2 config
-├── Dockerfile                 # Linux image — dashboard เท่านั้น
+├── Dockerfile                 # Linux image — dashboard only
 ├── Dockerfile.windows         # Windows image — bot + dashboard
 ├── docker-compose.yml         # Linux mode (dashboard + postgres)
-├── docker-compose.windows.yml # Windows containers mode (ระบบเต็ม)
-├── docker-start.ps1           # Startup script สำหรับ Windows container
-├── start.bat                  # One-click startup สำหรับ Windows host
+├── docker-compose.windows.yml # Windows containers mode (full system)
+├── docker-start.ps1           # Startup script for Windows container
+├── start.bat                  # One-click startup for Windows host
 │
 ├── agents/
-│   ├── chart_watcher.py       # วิเคราะห์ H4/H1/M15, หา setup, คำนวณ SL/TP
-│   ├── market_advisor.py      # วิเคราะห์ market regime
-│   ├── analyst.py             # วิเคราะห์ sentiment จากข่าว + X
+│   ├── chart_watcher.py       # H4/H1/M15 analysis, setup detection, SL/TP
+│   ├── market_advisor.py      # Market regime analysis
+│   ├── analyst.py             # News + X sentiment analysis
 │   ├── decision_maker.py      # 12 Python gates → Claude (8-line summary)
-│   ├── pending_manager.py     # จัดการ pending orders
-│   ├── news_gatherer.py       # รวบรวมข่าว
-│   ├── reporter.py            # บันทึกผลการเทรด
-│   ├── accountant.py          # คำนวณสถิติ P&L
-│   └── news_cache.py          # Cache ข่าว
+│   ├── pending_manager.py     # Pending order management
+│   ├── news_gatherer.py       # News aggregation
+│   ├── reporter.py            # Trade result logging
+│   ├── accountant.py          # P&L stats + token cost tracking
+│   └── news_cache.py          # News cache (TTL + vector search)
 │
 ├── connectors/
 │   ├── mt5_connector.py       # MT5 order management + lot sizing
-│   ├── price_feed.py          # ดึงราคาและ indicator จาก MT5
+│   ├── price_feed.py          # Price/indicator retrieval from MT5
 │   ├── web_news.py            # ForexFactory + Investing.com
 │   └── twitter_client.py      # X/Twitter client
 │
 ├── db/
-│   ├── schema.sql             # สร้าง tables (trades, agent_usage, cycles)
-│   ├── connection.py          # สร้าง DB connection
-│   ├── writer.py              # upsert trades, insert cycles
-│   ├── reader.py              # query trades, accounting
-│   ├── sync.py                # sync JSON → DB
-│   └── migrate.py             # migrate JSON → Supabase
+│   ├── schema.sql             # Table definitions (trades, agent_usage, cycles)
+│   ├── connection.py          # DB connection factory
+│   ├── writer.py              # Upsert trades, insert cycles
+│   ├── reader.py               # Query trades, accounting stats
+│   ├── sync.py                # Sync JSON → DB
+│   └── migrate.py             # Migrate JSON → Supabase
 │
 ├── dashboard/
 │   ├── app.py                 # Flask app (port 5050)
@@ -351,7 +362,7 @@ docker compose -f docker-compose.windows.yml down
 │       └── index.html
 │
 ├── utils/
-│   ├── market_clock.py        # คำนวณ interval + market sleep
+│   ├── market_clock.py        # Interval computation + market sleep
 │   └── display.py             # Rich terminal UI
 │
 ├── agents/prompts/
@@ -361,121 +372,130 @@ docker compose -f docker-compose.windows.yml down
 │   └── analyst.md             # Prompt: sentiment analysis
 │
 ├── backtest/
-│   └── monte_carlo.py         # Monte Carlo simulation (ไม่ใช้ historical data)
+│   └── monte_carlo.py         # Monte Carlo simulation (assumption-based, not historical data)
 │
-├── .env.example               # Template config
+├── .env.example                # Config template
 ├── requirements.txt
-├── SUPABASE.md                # คู่มือ Supabase setup
+├── SUPABASE.md                 # Supabase setup guide
 └── CHANGELOG.md
 ```
 
 ---
 
-## ฟีเจอร์หลัก
+## Key Features
 
 ### Entry Signal
 
 - **Multi-timeframe analysis** — H4 (major S/R zones), H1 (minor zones + structure), M15 (entry trigger)
-- **4-component H4 trend bias** — Price vs EMA200, H4 EMA50 slope, H1 EMA stack, H4 swing structure (ต้อง ≥3/4 ตัว จึงเป็น BULLISH/BEARISH)
+- **4-component H4 trend bias** — price vs EMA200, H4 EMA50 slope, H1 EMA stack, H4 swing structure (needs ≥3/4 to confirm BULLISH/BEARISH)
 - **Signal types**: SR_ZONE, STRUCTURE_PULLBACK, EMA_PULLBACK, BREAKOUT_RETEST, ENGULFING, DOJI_AT_ZONE, MOMENTUM_BREAKOUT
-- **H1 structure confirmation** — ตรวจ higher lows / lower highs จาก swing จริง (+8-10 pts)
-- **Bollinger Band squeeze** — BB reversal signals มี edge เฉพาะเมื่อ squeeze ก่อน
-- **Fibonacci confluence** — +5–15 pts เมื่อ price อยู่ที่ key Fib + zone
+- **H1 structure confirmation** — checks real higher-low/lower-high swings (+8-10 pts)
+- **Bollinger Band squeeze** — BB reversal signals only carry an edge after a squeeze
+- **Fibonacci confluence** — +5–15 pts when price sits at a key Fib level + zone
 
 ### Risk Management
 
-- **ATR-based SL floor** — SL = max(wick distance, 1.0× H4 ATR) ป้องกัน SL โดน H4 noise
+- **ATR-based SL floor** — SL = max(wick distance, 1.0× H4 ATR) to avoid getting stopped out by H4 noise
 - **SL range**: 500–3500 pips (XAU: 1 pip = $0.01)
 - **Min R:R ratio**: 2.0 (breakeven WR = 33%)
 - **Confidence-based position sizing** — conf 50%→0.63× size, conf 65%→0.81×, conf ≥80%→1.0×
-- **Daily loss limit** — หยุดเทรดเมื่อถึง max_daily_loss %
+- **Daily loss limit** — trading halts once the max daily loss % is hit
 
 ### Decision Layer
 
-- **12 Python gates** (gate 1–12) ก่อนเรียก Claude — filter quantitative conditions ทั้งหมด
-- **Claude รับแค่ 8 บรรทัด** clean summary — ถามแค่ "setup quality ดีพอไหม?"
-- **Input tokens ~150** ต่อ call (ลดจาก ~600)
-- **Prompt caching** — ลดค่า Claude API ~80-90%
+- **12 Python gates** (gate 1–12) run before calling Claude — all quantitative filtering happens deterministically in code
+- **Claude only sees an 8-line summary** — the only question asked is "is this setup quality good enough?"
+- **~150 input tokens** per call (down from ~600)
+- **Prompt caching** — cuts Claude API cost by ~80-90%
 
 ### Trade Management
 
-- **Dynamic TP** — ขยับ TP อัตโนมัติเมื่อ momentum แรงและราคาใกล้ TP
-- **Breakeven management** — ขยับ SL to BE หลัง price เคลื่อนพอ
-- **Hedge buffer** — เปิด order ตรงข้ามได้เมื่อ price สวนทาง ≥ hedge_buffer_pips
-- **Pending orders** — BUY_STOP / SELL_STOP วาง limit order ล่วงหน้า
-- **Weekly calendar pending** — วาง pending ทุกวันจันทร์ตามปฏิทินข่าว
+- **Dynamic TP** — automatically extends TP when momentum is strong and price is near target
+- **Breakeven management** — moves SL to breakeven after price has moved favorably enough
+- **Hedge buffer** — allows opening an opposite-direction order once price moves against the position by ≥ `hedge_buffer_pips`
+- **Pending orders** — BUY_STOP / SELL_STOP limit orders placed in advance
+- **Weekly calendar pending** — places pending orders every Monday based on the economic calendar
 
 ### Infrastructure
 
-- **Market sleep** — หยุดอัตโนมัติ เสาร์-อาทิตย์ และช่วงตลาดปิด
-- **Portfolio protection** — daily loss limit, losing streak protection
-- **PostgreSQL / Supabase** — เก็บ trades, agent usage, cost tracking
-- **Strategy versioning** — trades ใหม่ทุกตัวมี `strategy_version=2` แยกจาก data เก่า
-- **Dashboard** — Flask web UI port 5050 พร้อม economic calendar
-- **PM2 process manager** — auto-restart, เปลี่ยน config ได้ live ผ่าน dashboard
+- **Market sleep** — automatically pauses on weekends and during market closures
+- **Portfolio protection** — daily loss limit, losing-streak protection
+- **PostgreSQL / Supabase** — stores trades, agent usage, and cost tracking (JSON fallback if DB unreachable)
+- **Strategy versioning** — every new trade is tagged `strategy_version=2`, kept separate from legacy data
+- **Dashboard** — Flask web UI on port 5050 with an economic calendar view
+- **PM2 process manager** — auto-restart, live config changes via the dashboard
 
 ---
 
 ## Monte Carlo Simulation
 
-ทดสอบ robustness ของ strategy โดยไม่ใช้ historical trade data (ใช้ assumed parameters แทน):
+Tests strategy robustness using assumed parameters (this is **not** a historical backtest — no tick-level OHLC data is replayed):
 
 ```bash
-# ดูผลทุก WR ในตารางเดียว (แนะนำ)
+# View results across multiple win rates in one table (recommended)
 python -m backtest.monte_carlo --sweep
 
-# ทดสอบ config เฉพาะ
+# Test a specific config
 python -m backtest.monte_carlo --wr 0.42 --rr 2.0 --trades 200
 
-# ดู options ทั้งหมด
+# See all options
 python -m backtest.monte_carlo --help
 ```
 
-ผลตัวอย่าง (R:R=2.0, risk=0.5%):
+Example output (R:R=2.0, risk=0.5%):
 
-| WR | P(ruin >10%) | สรุป |
+| WR | P(ruin >10%) | Verdict |
 |---|---|---|
-| 35% | 21% | อันตราย |
+| 35% | 21% | dangerous |
 | 38% | 6% | borderline |
-| 40% | 2.3% | ยอมรับได้ |
-| 42%+ | <1% | ปลอดภัย |
+| 40% | 2.3% | acceptable |
+| 42%+ | <1% | safe |
 
-ระบบต้องการ **WR ≥ 40%** (breakeven = 33.3% แต่ต้องการ margin เพิ่ม)
+The strategy needs **WR ≥ 40%** (breakeven is 33.3%, but a margin is needed above that).
 
 ---
 
-## Migrate ข้อมูลเก่า (JSON → Database)
+## Migrating Old Data (JSON → Database)
 
-ถ้ามีข้อมูล trade เก่าใน `logs/trades.json`:
+If you have old trade data in `logs/trades.json`:
 
 ```bash
-# sync ไป PostgreSQL local
+# Sync to local PostgreSQL
 python db/sync.py
 
-# sync ไป Supabase
+# Sync to Supabase
 python db/migrate.py
 ```
 
-### อัปเกรด DB ที่มีอยู่แล้ว (เพิ่ม strategy_version)
+### Upgrading an existing DB (adding strategy_version)
 
-ถ้ามี Supabase / PostgreSQL ที่สร้าง schema ไว้ก่อนหน้า รัน SQL นี้ครั้งเดียว:
+If you already created the schema on an existing Supabase/PostgreSQL instance, run this once:
 
 ```sql
 ALTER TABLE trades ADD COLUMN IF NOT EXISTS strategy_version SMALLINT DEFAULT 1;
 ```
 
-trades เก่าจะได้ `strategy_version=1` (legacy), trades ใหม่จะเป็น `2` โดยอัตโนมัติ
+Old trades will be tagged `strategy_version=1` (legacy); new trades are tagged `2` automatically.
 
 ---
 
-## ค่า Trading Parameters ปัจจุบัน
+## Current Trading Parameters
 
-| Parameter | ค่าปัจจุบัน | เหตุผล |
+| Parameter | Current Value | Rationale |
 |---|---|---|
-| `min_rr_ratio` | **2.0** | Breakeven WR = 33% (เพิ่มกันชนจาก 1.5) |
-| `default_tp_pips` | **5000** | TP = 2.0× SL ที่ 2500 pips SL |
-| `SL_MIN_PIPS` | **500** | รองรับ scalp setup |
-| `SL_MAX_PIPS` | **3500** | รองรับ volatile session |
-| `ATR_SL_MULT` | **1.0** | SL ไม่ต่ำกว่า 1× H4 ATR |
-| `CONF_FULL_SIZE_AT` | **80** | Full size เมื่อ confidence ≥ 80% |
-| `CONF_MIN_SCALE` | **0.5** | Half size ที่ confidence ต่ำสุด |
+| `min_rr_ratio` | **2.0** | Breakeven WR = 33% (raised from 1.5 for a larger margin) |
+| `default_tp_pips` | **5000** | TP = 2.0× SL at a 2500-pip SL |
+| `SL_MIN_PIPS` | **500** | Supports scalp setups |
+| `SL_MAX_PIPS` | **3500** | Supports volatile sessions |
+| `ATR_SL_MULT` | **1.0** | SL never tighter than 1× H4 ATR |
+| `CONF_FULL_SIZE_AT` | **80** | Full size once confidence ≥ 80% |
+| `CONF_MIN_SCALE` | **0.5** | Half size at the lowest confidence |
+
+---
+
+## Known Limitations
+
+- **Lot sizing depends on the broker's real point value** — `mt5_connector.calculate_lot_size()` uses a `pip_value` constant for `LOT_MODE=auto`; verify it against your own broker's contract spec before going live with real money (a 10x mismatch was previously found and fixed against a live account).
+- **Monte Carlo simulation is assumption-based**, not a real historical backtest — there is no tick-level OHLC replay in this repo. Treat its output as a sensitivity check on win-rate/R:R assumptions, not a performance guarantee.
+- **News sentiment is cached** (`agents/news_cache.py`, ~1 hour TTL) for cost reasons — technical signals (ChartWatcher/MarketAdvisor) are recomputed fresh every cycle, but sentiment can lag a few cycles behind a sudden price reversal.
+- This is an experimental, self-hosted trading system, not a packaged product or investment advice — use at your own risk and validate thoroughly on a demo account first.
