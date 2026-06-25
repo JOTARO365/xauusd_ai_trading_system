@@ -133,7 +133,9 @@ def record_cycle(
     """บันทึก token usage + cost ของ 1 trading cycle ลง accounting.json"""
     data = _load()
     lat  = latencies_ms or {}
-    today = date.today().isoformat()
+    # UTC canonical — cycle "at" ถูกเก็บเป็น UTC; daily bucket ต้องใช้ UTC date ให้ตรงกับ
+    # readers (get_summary_by_symbol / db.reader) ที่ bucket จาก at[:10] (UTC) อยู่แล้ว
+    today = datetime.now(timezone.utc).date().isoformat()
     symbol = _norm_symbol(symbol)
 
     cycle: dict = {
@@ -214,7 +216,7 @@ def get_summary() -> dict:
     return {
         "summary": data.get("summary", {}),
         "agents":  data.get("agents",  {}),
-        "today":   data.get("daily", {}).get(date.today().isoformat(), {}),
+        "today":   data.get("daily", {}).get(datetime.now(timezone.utc).date().isoformat(), {}),
         "daily":   data.get("daily",   {}),
     }
 
@@ -223,7 +225,7 @@ def get_summary_by_symbol(symbol: str) -> dict:
     """คืน summary filtered by symbol — ใช้สำหรับ dashboard multi-system"""
     data     = _load()
     sym_up   = _norm_symbol(symbol)
-    today_str = date.today().isoformat()
+    today_str = datetime.now(timezone.utc).date().isoformat()
 
     cycles = [c for c in data.get("cycles", [])
               if _norm_symbol(c.get("symbol", "XAUUSD")) == sym_up]

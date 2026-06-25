@@ -583,6 +583,23 @@ def log_pending_order(decision_result: dict):
 #  HISTORY SUMMARY (for Decision Maker)
 # ─────────────────────────────────────────────────────────────
 
+def _is_today(ts: str) -> bool:
+    """True ถ้า timestamp อยู่ใน 'วันนี้' (local day) — tz-robust.
+    trades.json เขียนด้วย datetime.now() (naive-local); Supabase opened_at คืน
+    เป็น tz-aware UTC. ตัวเก่าใช้ str.startswith(date.today()) → ช่วงเที่ยงคืนที่
+    local-day ≠ UTC-day จะนับผิด (กระทบ losing_streak + daily-loss gate).
+    aware → แปลงเป็น local ก่อนเทียบวัน; naive → ถือว่าเป็น local อยู่แล้ว."""
+    if not ts:
+        return False
+    try:
+        dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except ValueError:
+        return str(ts).startswith(date.today().isoformat())   # fallback แบบเดิม
+    if dt.tzinfo is not None:
+        dt = dt.astimezone()   # → local system tz
+    return dt.date() == date.today()
+
+
 def get_trade_history_summary() -> dict:
     trades: list = []
     try:
@@ -596,9 +613,8 @@ def get_trade_history_summary() -> dict:
         trades = _load_log().get("trades", [])
 
     closed = [t for t in trades if t.get("status") == "CLOSED"]
-    today_str = date.today().isoformat()
 
-    today_trades = [t for t in trades if t.get("timestamp", "").startswith(today_str)]
+    today_trades = [t for t in trades if _is_today(t.get("timestamp", ""))]
     today_pnl    = sum(t.get("pnl") or 0 for t in today_trades if t.get("pnl") is not None)
 
     # ── แยก v2 ก่อน ใช้กับทุก metric ────────────────────────────
@@ -612,7 +628,7 @@ def get_trade_history_summary() -> dict:
     last_10_winrate = round(last_10_win / len(last_10) * 100, 1) if last_10 else 0
 
     # นับ losing streak เฉพาะ v2 ของวันนี้เท่านั้น — reset ทุกวัน
-    today_closed  = [t for t in closed_v2 if t.get("timestamp", "").startswith(today_str)]
+    today_closed  = [t for t in closed_v2 if _is_today(t.get("timestamp", ""))]
     losing_streak = 0
     for t in reversed(today_closed):
         if (t.get("pnl") or 0) < 0:
@@ -752,7 +768,7 @@ def analyze_performance() -> str:
         compact_history += (
             f"  {(t.get('timestamp') or '')[:10]} {(t.get('direction') or '?'):4} "
             f"{(t.get('entry_type') or '?'):20} "
-            f"conf={str(t.get('confidence') or '?'):>3} "
+            f"conf={str(t.get('technical_confidence') or '?'):>3} "
             f"SR={(t.get('sr_zone') or '?'):12} "
             f"trend={(t.get('trend') or '?'):8} "
             f"pnl={pnl:+.2f}\n"

@@ -87,7 +87,7 @@ def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list
 def get_accounting(symbol: str | None = None, account_login: int | None = None) -> dict | None:
     use_filter   = symbol is not None and symbol.lower() != "all"
     use_acct     = account_login is not None and account_login != 0
-    today_str    = date.today().isoformat()
+    today_str    = datetime.utcnow().date().isoformat()   # UTC — ตรงกับ cycle_at[:10] ที่ bucket ด้านล่าง
     cutoff       = (datetime.utcnow() - timedelta(days=30)).isoformat()
 
     try:
