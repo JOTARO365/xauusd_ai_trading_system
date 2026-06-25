@@ -123,13 +123,13 @@ def _parse_args():
     mm.add_argument("--max-loss",    type=float, metavar="PCT",
                     help="Max daily loss %% (e.g. 0.5 = 50%%)")
     mm.add_argument("--max-trades",  type=int,   metavar="N",
-                    help="Max open trades (default 2)")
+                    help="Max open trades (default 4)")
     mm.add_argument("--sl",          type=int,   metavar="PIPS",
-                    help="Default SL pips (default 1000)")
+                    help="Default SL pips (default 2000)")
     mm.add_argument("--tp",          type=int,   metavar="PIPS",
-                    help="Default TP pips (default 1500)")
+                    help="Default TP pips (default 5000)")
     mm.add_argument("--rr",          type=float, metavar="RATIO",
-                    help="Min Risk/Reward ratio (default 1.5)")
+                    help="Min Risk/Reward ratio (default 2.0)")
 
     # ── Lot Size ──────────────────────────────────────────────
     lot = p.add_argument_group("Lot Size")
@@ -147,7 +147,7 @@ def _parse_args():
     streak.add_argument("--max-streak",  type=int, metavar="N",
                         help="แพ้ติดกันกี่ครั้งถึงเพิ่ม threshold (default 5)")
     streak.add_argument("--streak-conf", type=int, metavar="PCT",
-                        help="Confidence ขั้นต่ำเมื่อติด streak (default 75)")
+                        help="Confidence ขั้นต่ำเมื่อติด streak (default 62)")
 
     # ── Portfolio Protection ───────────────────────────────────
     prot = p.add_argument_group("Portfolio Protection")
