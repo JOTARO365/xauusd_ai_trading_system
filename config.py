@@ -151,6 +151,17 @@ def reload_config():
     NNLB_BASE_EQUITY     = float(os.getenv("NNLB_BASE_EQUITY", "100"))
     NNLB_EQUITY_PER_LOT  = float(os.getenv("NNLB_EQUITY_PER_LOT", "100"))
     NNLB_MAX_LOSS_PCT    = float(os.getenv("NNLB_MAX_LOSS_PCT", "25"))
+    global SWING_ENABLED, SWING_MIN_CONF, SWING_MAX_LEGS, SWING_TOTAL_RISK_PCT
+    global SWING_LEG_SPLIT, SWING_TF, SWING_BE_TRIGGER_R, SWING_MAX_HOLD_DAYS, SWING_MIN_EQUITY
+    SWING_ENABLED        = os.getenv("SWING_ENABLED", "false").lower() == "true"
+    SWING_MIN_CONF       = float(os.getenv("SWING_MIN_CONF") or 70)
+    SWING_MAX_LEGS       = int(os.getenv("SWING_MAX_LEGS") or 3)
+    SWING_TOTAL_RISK_PCT = float(os.getenv("SWING_TOTAL_RISK_PCT") or 20.0)
+    SWING_LEG_SPLIT      = [int(x) for x in (os.getenv("SWING_LEG_SPLIT") or "40,30,30").split(",") if x.strip()]
+    SWING_TF             = [t.strip().upper() for t in (os.getenv("SWING_TF") or "D1,W1").split(",") if t.strip()]
+    SWING_BE_TRIGGER_R   = float(os.getenv("SWING_BE_TRIGGER_R") or 3.0)
+    SWING_MAX_HOLD_DAYS  = int(os.getenv("SWING_MAX_HOLD_DAYS") or 30)
+    SWING_MIN_EQUITY     = float(os.getenv("SWING_MIN_EQUITY") or 3600)
     MONEY_MANAGEMENT.update({
         "risk_per_trade":        float(os.getenv("RISK_PER_TRADE")        or 0.50),
         "max_daily_loss":        float(os.getenv("MAX_DAILY_LOSS")        or 1.00),
@@ -212,6 +223,20 @@ NNLB_EQUITY_PER_LOT = float(os.getenv("NNLB_EQUITY_PER_LOT", "100"))
 # max loss ต่อ trade (% ของ equity) — cap lot ให้ loss ไม่เกิน X% (ไม่ขึ้นกับสกุล)
 # ค่า 25 หมายถึง ยอมรับ loss ได้ 25% ของ equity ต่อ trade
 NNLB_MAX_LOSS_PCT = float(os.getenv("NNLB_MAX_LOSS_PCT", "25"))
+
+# ── SWING_HOLD mode (long-term/position sleeve) — SCAFFOLDING, DEFAULT OFF ─────
+# *** ยังไม่ wire เข้า pipeline — ดู .claude/context/SWING_HOLD_spec.md ***
+# inert จนครบ 3 ด่าน: equity ≥ SWING_MIN_EQUITY + SWING_ENABLED=true + ผ่าน backtest/DRY_RUN
+# ไม่มีโค้ดไหนอ่านค่าพวกนี้ตอนนี้ → เพิ่มไว้เฉยๆ ไม่กระทบ behavior live
+SWING_ENABLED        = os.getenv("SWING_ENABLED", "false").lower() == "true"  # master switch
+SWING_MIN_CONF       = float(os.getenv("SWING_MIN_CONF") or 70)               # conf floor (สูงกว่า scalp 62)
+SWING_MAX_LEGS       = int(os.getenv("SWING_MAX_LEGS") or 3)                  # scale-in สูงสุดกี่ leg
+SWING_TOTAL_RISK_PCT = float(os.getenv("SWING_TOTAL_RISK_PCT") or 20.0)       # % equity ต่อ campaign (รวมทุก leg)
+SWING_LEG_SPLIT      = [int(x) for x in (os.getenv("SWING_LEG_SPLIT") or "40,30,30").split(",") if x.strip()]
+SWING_TF             = [t.strip().upper() for t in (os.getenv("SWING_TF") or "D1,W1").split(",") if t.strip()]
+SWING_BE_TRIGGER_R   = float(os.getenv("SWING_BE_TRIGGER_R") or 3.0)          # ช้ากว่า scalp มาก (ถือยาว)
+SWING_MAX_HOLD_DAYS  = int(os.getenv("SWING_MAX_HOLD_DAYS") or 30)            # 0 = ไม่จำกัด
+SWING_MIN_EQUITY     = float(os.getenv("SWING_MIN_EQUITY") or 3600)           # THB — ต่ำกว่านี้ไม่เปิด campaign (@20%)
 
 # ── X accounts to follow ──────────────────────────────────────
 _accounts_raw = os.getenv("X_ACCOUNTS_TO_FOLLOW", "")
