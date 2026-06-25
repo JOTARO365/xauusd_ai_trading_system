@@ -196,6 +196,7 @@ def node_position_mgmt(state: TradingState) -> dict:
         manage_momentum_exit, manage_zone_break_close, manage_partial_close,
         manage_breakeven, manage_dynamic_tp, manage_post_event_tp, manage_trailing_stop,
     )
+    from agents.swing_manager import manage_swing_campaign   # inert จน SWING_ENABLED=true + equity≥min
     from agents.reporter import scan_manual_orders
     from utils.display import print_warning
     chart = state.get("chart_data") or {}
@@ -215,6 +216,7 @@ def node_position_mgmt(state: TradingState) -> dict:
         (manage_dynamic_tp,      (),        "Dynamic TP: ขยับ TP ออก {} position (momentum แรง)"),
         (manage_post_event_tp,   (chart,),  "Post-event TP: ตั้ง TP {} position (momentum สงบแล้ว)"),
         (manage_trailing_stop,   (),        "Trailing Stop: ขยับ SL {} position"),
+        (manage_swing_campaign,  (chart,),  "SWING: {} action(s) (long-term campaign)"),
     )
     for _fn, _args, _msg in _mgmt:
         try:

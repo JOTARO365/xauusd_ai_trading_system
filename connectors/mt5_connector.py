@@ -33,6 +33,14 @@ def _safe_comment(text: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9 _.!\-/]", "", text)
     return cleaned[:31]
 
+
+def _is_swing_comment(pos) -> bool:
+    """True ถ้า position เป็นของ swing sleeve (comment ขึ้นต้น SWG-).
+    scalp guards ที่ขยับ SL / ปิดไม้ ต้อง skip ไม้พวกนี้ — ไม่งั้นจะทำลาย structural SL ร่วม
+    ของ campaign (swing_manager จัดการ SL/exit เอง). สำหรับไม้ scalp ปกติ = False เสมอ
+    (ไม่มี SWG- comment) → guard นี้เป็น dead code กับ scalp = ไม่เปลี่ยน behavior เดิม"""
+    return str(getattr(pos, "comment", "") or "").startswith("SWG-")
+
 # ── Order retry config ───────────────────────────────────────────────────────
 _RETRYABLE_RETCODES = frozenset({
     10004,   # REQUOTE
@@ -247,6 +255,8 @@ def manage_trailing_stop() -> int:
     moved = 0
 
     for pos in positions:
+        if _is_swing_comment(pos):
+            continue   # swing legs ใช้ structural SL คงที่ — ห้าม trail (จะพัง circuit breaker)
         is_buy       = pos.type == 0
         cur_sl       = pos.sl
         current      = tick.bid if is_buy else tick.ask
@@ -903,6 +913,8 @@ def manage_breakeven() -> int:
 
     modified = 0
     for pos in positions:
+        if _is_swing_comment(pos):
+            continue   # swing legs ใช้ structural SL ของตัวเอง — ห้ามขยับ BE (จะพัง circuit breaker)
         entry  = pos.price_open
         is_buy = pos.type == 0
 
@@ -1080,6 +1092,8 @@ def manage_partial_close() -> int:
     for pos in positions:
         if pos.magic != SYSTEM_MAGIC:
             continue
+        if _is_swing_comment(pos):
+            continue   # swing legs scale-out เองใน swing_manager — ไม่ partial ที่นี่
 
         ticket  = pos.ticket
         active.add(ticket)
@@ -1369,6 +1383,8 @@ def manage_momentum_exit() -> int:
         if pos.magic != SYSTEM_MAGIC:
             continue
 
+        if _is_swing_comment(pos):
+            continue   # swing legs ถือยาว — ไม่ตัดด้วย momentum-exit
         is_buy       = pos.type == 0
         current      = tick.bid if is_buy else tick.ask
         profit_pips  = ((current - pos.price_open) if is_buy else (pos.price_open - current)) / point
@@ -1457,6 +1473,8 @@ def manage_zone_break_close(chart_data: dict) -> int:
     for pos in positions:
         if pos.magic != SYSTEM_MAGIC:
             continue
+        if _is_swing_comment(pos):
+            continue   # swing legs ตั้งใจถือผ่าน zone break (structural SL ลึกกว่า) — ไม่ปิด
         is_buy = pos.type == 0
 
         # Auto-register: ใช้ htf_zone ใน chart_data ถ้าใกล้ entry price (< 0.8%)
@@ -1595,6 +1613,8 @@ def manage_dynamic_tp() -> int:
 
     extended = 0
     for pos in positions:
+        if _is_swing_comment(pos):
+            continue   # swing legs TP = opposite zone คงที่ — ไม่ขยาย dynamic TP
         if pos.tp == 0:
             continue
 
