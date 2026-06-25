@@ -204,23 +204,25 @@ def node_position_mgmt(state: TradingState) -> dict:
         scan_manual_orders(chart or None)
     except Exception as e:
         logger.error(f"[GRAPH:position_mgmt] scan_manual_orders: {e}")
-    try:
-        mex = manage_momentum_exit()
-        if mex: print_warning(f"Momentum Exit: ปิดเร็ว {mex} position (momentum สวนทางแรง)")
-        zbc = manage_zone_break_close(chart)
-        if zbc: print_warning(f"Zone Break: ปิด/re-enter {zbc} position (HTF zone ถูกทะลุ)")
-        pc = manage_partial_close()
-        if pc: print_warning(f"Partial close: scale out {pc} position(s)")
-        be = manage_breakeven()
-        if be: print_warning(f"Breakeven: ขยับ SL หน้าทุน {be} position")
-        dtp = manage_dynamic_tp()
-        if dtp: print_warning(f"Dynamic TP: ขยับ TP ออก {dtp} position (momentum แรง)")
-        ptp = manage_post_event_tp(chart)
-        if ptp: print_warning(f"Post-event TP: ตั้ง TP {ptp} position (momentum สงบแล้ว)")
-        tsl = manage_trailing_stop()
-        if tsl: print_warning(f"Trailing Stop: ขยับ SL {tsl} position")
-    except Exception as e:
-        logger.error(f"[GRAPH:position_mgmt] {e}")
+    # แต่ละ management แยก try/except — failure ตัวเดียวต้องไม่ข้าม protective ตัวที่เหลือในรอบนั้น
+    # (เดิม try ก้อนเดียว: NameError/exception ที่ momentum_exit จะข้าม breakeven/zone-break/trailing หมด
+    #  พอดีจังหวะที่ราคาวิ่งสวนแรง = ตอนที่ protective สำคัญที่สุด). ลำดับคงเดิม: momentum-exit ก่อน
+    _mgmt = (
+        (manage_momentum_exit,   (),        "Momentum Exit: ปิดเร็ว {} position (momentum สวนทางแรง)"),
+        (manage_zone_break_close, (chart,),  "Zone Break: ปิด/re-enter {} position (HTF zone ถูกทะลุ)"),
+        (manage_partial_close,   (),        "Partial close: scale out {} position(s)"),
+        (manage_breakeven,       (),        "Breakeven: ขยับ SL หน้าทุน {} position"),
+        (manage_dynamic_tp,      (),        "Dynamic TP: ขยับ TP ออก {} position (momentum แรง)"),
+        (manage_post_event_tp,   (chart,),  "Post-event TP: ตั้ง TP {} position (momentum สงบแล้ว)"),
+        (manage_trailing_stop,   (),        "Trailing Stop: ขยับ SL {} position"),
+    )
+    for _fn, _args, _msg in _mgmt:
+        try:
+            _n = _fn(*_args)
+            if _n:
+                print_warning(_msg.format(_n))
+        except Exception as e:
+            logger.error(f"[GRAPH:position_mgmt] {_fn.__name__}: {e}")
     return {}
 
 

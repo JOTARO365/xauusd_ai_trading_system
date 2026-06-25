@@ -1391,20 +1391,22 @@ def manage_momentum_exit() -> int:
             f"(threshold={threshold:.0f}p) [{reason}]"
         )
 
-        if DRY_RUN:
+        if _cfg.DRY_RUN:
             logger.info(f"[DRY_RUN] Momentum exit would close: {tag}")
             continue
 
         req = {
-            "action":    mt5.TRADE_ACTION_DEAL,
-            "symbol":    SYMBOL,
-            "volume":    pos.volume,
-            "type":      mt5.ORDER_TYPE_SELL if is_buy else mt5.ORDER_TYPE_BUY,
-            "position":  pos.ticket,
-            "price":     tick.bid if is_buy else tick.ask,
-            "deviation": 20,
-            "magic":     SYSTEM_MAGIC,
-            "comment":   "MOMENTUM_EXIT",
+            "action":       mt5.TRADE_ACTION_DEAL,
+            "symbol":       SYMBOL,
+            "volume":       pos.volume,
+            "type":         mt5.ORDER_TYPE_SELL if is_buy else mt5.ORDER_TYPE_BUY,
+            "position":     pos.ticket,
+            "price":        tick.bid if is_buy else tick.ask,
+            "deviation":    20,
+            "magic":        SYSTEM_MAGIC,
+            "comment":      _safe_comment("MOMENTUM_EXIT"),
+            "type_time":    mt5.ORDER_TIME_GTC,
+            "type_filling": mt5.ORDER_FILLING_IOC,
         }
         result = mt5.order_send(req)
         if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
