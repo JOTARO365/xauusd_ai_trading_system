@@ -414,10 +414,15 @@ async def main():
     if is_available():
         console.print(f"  [green]✓[/green]  Database: {get_url()}\n")
         # sync MT5 history → DB ตอน startup (เฉพาะ trades ที่ยังไม่มีใน DB)
-        from db.sync import sync_mt5_history_to_db
+        from db.sync import sync_mt5_history_to_db, reconcile_open_trades
         n = sync_mt5_history_to_db(days=365)
         if n:
             console.print(f"  [green]✓[/green]  Synced {n} trade(s) from MT5 → Database\n")
+        # ปิด orphan OPEN ของบัญชีนี้ที่ broker ปิดไปแล้ว (scope = บัญชีที่ต่ออยู่เท่านั้น)
+        rc = reconcile_open_trades(dry_run=False)
+        if rc.get("reconciled") or rc.get("stale"):
+            console.print(f"  [green]✓[/green]  Reconciled {rc['reconciled']} closed + "
+                          f"{rc['stale']} stale orphan trade(s)\n")
     else:
         console.print(f"  [yellow]⚠[/yellow]  Database ต่อไม่ได้ ({get_url()}) — บันทึกลง JSON อย่างเดียว\n")
 

@@ -106,6 +106,96 @@ def sync_mt5_history_to_db(days: int = 365) -> int:
     return synced
 
 
+def reconcile_open_trades(account_login: int | None = None, days: int = 365,
+                          dry_run: bool = False) -> dict:
+    """ปิด orphan: row ที่ DB ยัง status='OPEN' แต่ broker ปิดไปแล้ว.
+
+    Scope **เฉพาะบัญชีที่ MT5 ต่ออยู่ + SYMBOL เสมอ** → เป็นไปไม่ได้ที่จะแตะไม้
+    ของบัญชีอื่น (ไม้บัญชีอื่นไม่มี ground truth จากเครื่องนี้ ต้องใช้ manual cleanup).
+
+    เทียบ DB-open กับความจริงจาก MT5:
+      - ticket ยังอยู่ใน positions_get()          → OPEN ตามเดิม
+      - ปิดแล้ว + เจอใน MT5 history (pnl ได้)      → CLOSED + pnl + closed_at  (close_reason=RECONCILED)
+      - ปิดแล้ว + เกิน history window (pnl ไม่ได้)  → CLOSED + pnl=None          (close_reason=RECONCILED_STALE)
+
+    UPDATE เฉพาะ 4 ฟิลด์ (status/pnl/closed_at/close_reason) — ไม่ทับ AI context อื่น.
+    dry_run=True → ไม่เขียน DB, แค่คืน actions ที่ "จะ" ทำ.
+    """
+    from collections import defaultdict
+    from db.connection import is_available, get_client
+    from config import SYMBOL
+
+    result = {"login": None, "db_open": 0, "still_open": 0,
+              "reconciled": 0, "stale": 0, "dry_run": dry_run, "actions": []}
+
+    if not is_available():
+        logger.debug("reconcile_open_trades: DB ไม่พร้อม — ข้าม")
+        return result
+
+    info = mt5.account_info()
+    if info is None:
+        logger.warning("reconcile_open_trades: ไม่ได้เชื่อมต่อ MT5 — ข้าม (กันแตะผิดบัญชี)")
+        return result
+    login = int(account_login) if account_login else int(info.login)
+    result["login"] = login
+
+    # ── ground truth จาก MT5 (บัญชีที่ต่ออยู่) ────────────────────
+    live = {int(p.ticket) for p in (mt5.positions_get(symbol=SYMBOL) or [])}
+
+    deals = mt5.history_deals_get(datetime.now() - timedelta(days=days), datetime.now()) or []
+    grp: dict[int, list] = defaultdict(list)
+    for d in deals:
+        if d.symbol == SYMBOL:
+            grp[d.position_id].append(d)
+    hist: dict[int, tuple] = {}
+    for pid, dl in grp.items():
+        if any(d.entry == 1 for d in dl):   # มี closing deal = ปิดจริง
+            last_exit = max((d for d in dl if d.entry in (1, 2)), key=lambda d: d.time)
+            pnl = round(sum(d.profit + d.swap + d.commission for d in dl), 2)
+            hist[int(pid)] = (pnl, datetime.utcfromtimestamp(last_exit.time).isoformat())
+
+    # ── DB rows ที่ยัง OPEN ของบัญชี + symbol นี้ ──────────────────
+    try:
+        rows = (get_client().table("trades")
+                .select("ticket")
+                .eq("status", "OPEN").eq("account_login", login).eq("symbol", SYMBOL)
+                .execute().data) or []
+    except Exception as e:
+        logger.debug(f"reconcile_open_trades: query error: {e}")
+        return result
+    result["db_open"] = len(rows)
+
+    for r in rows:
+        if not r.get("ticket"):
+            continue
+        tk = int(r["ticket"])
+        if tk in live:
+            result["still_open"] += 1
+            continue
+        if tk in hist:
+            pnl, closed_at = hist[tk]
+            patch = {"status": "CLOSED", "pnl": pnl,
+                     "closed_at": closed_at, "close_reason": "RECONCILED"}
+            result["reconciled"] += 1
+        else:
+            patch = {"status": "CLOSED", "pnl": None, "close_reason": "RECONCILED_STALE"}
+            result["stale"] += 1
+        result["actions"].append({"ticket": tk, "reason": patch["close_reason"],
+                                  "pnl": patch.get("pnl")})
+        if not dry_run:
+            try:
+                (get_client().table("trades").update(patch)
+                 .eq("ticket", tk).eq("account_login", login).execute())
+            except Exception as e:
+                logger.debug(f"reconcile_open_trades: update ticket {tk} failed: {e}")
+
+    tag = "DRY-RUN" if dry_run else "applied"
+    logger.info(f"reconcile_open_trades[{login}] ({tag}): db_open={result['db_open']} "
+                f"still_open={result['still_open']} reconciled={result['reconciled']} "
+                f"stale={result['stale']}")
+    return result
+
+
 def _get_existing_tickets(account_login: int) -> set[int]:
     """ดึง tickets ที่มีใน DB สำหรับ account นี้แล้ว"""
     try:
