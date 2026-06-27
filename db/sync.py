@@ -49,6 +49,7 @@ def sync_mt5_history_to_db(days: int = 365) -> int:
             continue
         pos_deals[d.position_id].append(d)
 
+    meta_map = _trade_meta_from_logs()   # Fix 1: กู้ decision context จาก trades.json
     synced = 0
     for pos_id, dlist in pos_deals.items():
         entry_deal = next((d for d in dlist if d.entry == 0), None)
@@ -94,6 +95,12 @@ def sync_mt5_history_to_db(days: int = 365) -> int:
             "timestamp":     opened_at,
             "close_time":    closed_at,
         }
+
+        # Fix 1: เติม decision metadata จาก trades.json (กู้ถ้า open-time DB write fail)
+        _extra = meta_map.get(int(ticket))
+        if _extra:
+            for _k, _v in _extra.items():
+                trade.setdefault(_k, _v)
 
         if write_trade(trade):
             synced += 1
@@ -195,6 +202,102 @@ def reconcile_open_trades(account_login: int | None = None, days: int = 365,
     logger.info(f"reconcile_open_trades[{login}] ({tag}): db_open={result['db_open']} "
                 f"still_open={result['still_open']} reconciled={result['reconciled']} "
                 f"stale={result['stale']} failed={result['failed']}")
+    return result
+
+
+_META_FIELDS = (
+    "technical_signal", "technical_confidence", "trend", "entry_type",
+    "sr_zone", "sr_strength", "pa_action", "sentiment", "analysis",
+    "planned_sl_pips", "entry_score", "atr_h4", "momentum", "htf_zone_tf",
+    "strategy_version",
+)
+
+
+def _trade_meta_from_logs() -> dict:
+    """อ่าน decision metadata จาก logs/<symbol>_trades.json → {ticket: {field: value}}.
+
+    log_trade() เขียน JSON ก่อน DB เสมอ → ไฟล์นี้มี trend/conf/entry_type แม้ DB write
+    ตอนเปิดไม้จะ fail เงียบ. ใช้กู้คืน metadata ตอน sync/backfill.
+    """
+    import json
+    from config import SYMBOL
+    sym  = SYMBOL.upper().replace("/", "")
+    path = "logs/trades.json" if sym == "XAUUSD" else f"logs/{sym.lower()}_trades.json"
+    out: dict = {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return out
+    for t in data.get("trades", []):
+        tk = t.get("ticket")
+        if tk is None:
+            continue
+        meta = {k: t.get(k) for k in _META_FIELDS if t.get(k) is not None}
+        if meta:
+            out[int(tk)] = meta
+    return out
+
+
+def backfill_metadata_from_logs(account_login: int | None = None,
+                                dry_run: bool = False) -> dict:
+    """เติม decision metadata ให้ row ใน DB ที่ trend=None (มาจาก MT5-sync ไม่มี context).
+
+    ดึงจาก trades.json → UPDATE เฉพาะ field ที่ขาด, scope account ปัจจุบัน + SYMBOL.
+    ไม่ทับค่าที่มีอยู่ (อัปเดตเฉพาะ row ที่ trend ว่าง). dry_run=True → ไม่เขียน.
+    """
+    from db.connection import is_available, get_client
+    from config import SYMBOL
+
+    result = {"login": None, "db_missing": 0, "backfilled": 0, "no_log": 0,
+              "failed": 0, "dry_run": dry_run}
+    if not is_available():
+        logger.debug("backfill_metadata: DB ไม่พร้อม — ข้าม")
+        return result
+
+    info = mt5.account_info()
+    if info is None:
+        logger.warning("backfill_metadata: ไม่ได้เชื่อมต่อ MT5 — ข้าม")
+        return result
+    login = int(account_login) if account_login else int(info.login)
+    result["login"] = login
+
+    meta_map = _trade_meta_from_logs()
+    if not meta_map:
+        logger.debug("backfill_metadata: trades.json ไม่มี metadata — ข้าม")
+        return result
+
+    try:
+        rows = (get_client().table("trades")
+                .select("ticket")
+                .is_("trend", "null").eq("account_login", login).eq("symbol", SYMBOL)
+                .execute().data) or []
+    except Exception as e:
+        logger.debug(f"backfill_metadata: query error: {e}")
+        return result
+    result["db_missing"] = len(rows)
+
+    for r in rows:
+        tk = r.get("ticket")
+        if tk is None:
+            continue
+        meta = meta_map.get(int(tk))
+        if not meta:
+            result["no_log"] += 1
+            continue
+        if not dry_run:
+            try:
+                (get_client().table("trades").update(meta)
+                 .eq("ticket", int(tk)).eq("account_login", login).execute())
+            except Exception as e:
+                result["failed"] += 1
+                logger.warning(f"backfill_metadata: update ticket {tk} failed: {e}")
+                continue
+        result["backfilled"] += 1
+
+    tag = "DRY-RUN" if dry_run else "applied"
+    logger.info(f"backfill_metadata[{login}] ({tag}): db_missing={result['db_missing']} "
+                f"backfilled={result['backfilled']} no_log={result['no_log']} failed={result['failed']}")
     return result
 
 

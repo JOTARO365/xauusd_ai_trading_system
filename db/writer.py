@@ -102,7 +102,8 @@ def write_trade(trade: dict) -> bool:
         get_client().table("trades").upsert(row, on_conflict="ticket,account_login").execute()
         return True
     except Exception as e:
-        logger.debug(f"DB write_trade: {e}")
+        # WARNING (ไม่ใช่ debug) — open-time write ที่ fail เงียบทำให้ trade ขาด metadata ใน DB
+        logger.warning(f"DB write_trade FAILED ticket={ticket}: {e}")
         return False
 
 

@@ -512,7 +512,7 @@ def _db_write_trade(trade: dict) -> None:
         from db.writer import write_trade
         write_trade(trade)
     except Exception as e:
-        logger.debug(f"DB trade write skipped: {e}")
+        logger.warning(f"DB trade write skipped (ticket={trade.get('ticket')}): {e}")
 
 
 def _trigger_lesson_learning(trade: dict) -> None:

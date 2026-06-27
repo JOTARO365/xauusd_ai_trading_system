@@ -414,7 +414,7 @@ async def main():
     if is_available():
         console.print(f"  [green]✓[/green]  Database: {get_url()}\n")
         # sync MT5 history → DB ตอน startup (เฉพาะ trades ที่ยังไม่มีใน DB)
-        from db.sync import sync_mt5_history_to_db, reconcile_open_trades
+        from db.sync import sync_mt5_history_to_db, reconcile_open_trades, backfill_metadata_from_logs
         n = sync_mt5_history_to_db(days=365)
         if n:
             console.print(f"  [green]✓[/green]  Synced {n} trade(s) from MT5 → Database\n")
@@ -423,6 +423,11 @@ async def main():
         if rc.get("reconciled") or rc.get("stale"):
             console.print(f"  [green]✓[/green]  Reconciled {rc['reconciled']} closed + "
                           f"{rc['stale']} stale orphan trade(s)\n")
+        # เติม decision metadata ให้ row ที่ขาด (มาจาก MT5-sync) จาก trades.json
+        bf = backfill_metadata_from_logs(dry_run=False)
+        if bf.get("db_missing"):
+            console.print(f"  [green]✓[/green]  Metadata backfill: {bf['backfilled']}/{bf['db_missing']} "
+                          f"trade(s) enriched from logs (no_log={bf['no_log']})\n")
     else:
         console.print(f"  [yellow]⚠[/yellow]  Database ต่อไม่ได้ ({get_url()}) — บันทึกลง JSON อย่างเดียว\n")
 
