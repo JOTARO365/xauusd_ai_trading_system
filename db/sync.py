@@ -126,7 +126,7 @@ def reconcile_open_trades(account_login: int | None = None, days: int = 365,
     from config import SYMBOL
 
     result = {"login": None, "db_open": 0, "still_open": 0,
-              "reconciled": 0, "stale": 0, "dry_run": dry_run, "actions": []}
+              "reconciled": 0, "stale": 0, "failed": 0, "dry_run": dry_run, "actions": []}
 
     if not is_available():
         logger.debug("reconcile_open_trades: DB ไม่พร้อม — ข้าม")
@@ -174,25 +174,27 @@ def reconcile_open_trades(account_login: int | None = None, days: int = 365,
             continue
         if tk in hist:
             pnl, closed_at = hist[tk]
-            patch = {"status": "CLOSED", "pnl": pnl,
-                     "closed_at": closed_at, "close_reason": "RECONCILED"}
-            result["reconciled"] += 1
+            patch = {"status": "CLOSED", "pnl": pnl, "closed_at": closed_at}
+            kind, reason = "reconciled", "RECONCILED"   # closed normally, late-synced
         else:
-            patch = {"status": "CLOSED", "pnl": None, "close_reason": "RECONCILED_STALE"}
-            result["stale"] += 1
-        result["actions"].append({"ticket": tk, "reason": patch["close_reason"],
-                                  "pnl": patch.get("pnl")})
+            patch = {"status": "CLOSED", "pnl": None}    # pnl=None = STALE marker (no history)
+            kind, reason = "stale", "RECONCILED_STALE"
+
         if not dry_run:
             try:
                 (get_client().table("trades").update(patch)
                  .eq("ticket", tk).eq("account_login", login).execute())
             except Exception as e:
+                result["failed"] += 1
                 logger.debug(f"reconcile_open_trades: update ticket {tk} failed: {e}")
+                continue   # นับ/แสดงเฉพาะที่เขียนสำเร็จ
+        result[kind] += 1
+        result["actions"].append({"ticket": tk, "reason": reason, "pnl": patch.get("pnl")})
 
     tag = "DRY-RUN" if dry_run else "applied"
     logger.info(f"reconcile_open_trades[{login}] ({tag}): db_open={result['db_open']} "
                 f"still_open={result['still_open']} reconciled={result['reconciled']} "
-                f"stale={result['stale']}")
+                f"stale={result['stale']} failed={result['failed']}")
     return result
 
 

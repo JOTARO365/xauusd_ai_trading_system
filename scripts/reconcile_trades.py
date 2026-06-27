@@ -50,6 +50,8 @@ def main():
     print(f"  still open    : {rc.get('still_open')}")
     print(f"  -> CLOSED     : {rc.get('reconciled')}  (pnl from MT5 history)")
     print(f"  -> STALE      : {rc.get('stale')}  (beyond history window, pnl=null)")
+    if rc.get("failed"):
+        print(f"  -> FAILED     : {rc.get('failed')}  (DB write error — see log)")
     for a in rc.get("actions", []):
         print(f"     ticket {a['ticket']:<12}  {a['reason']:<18}  pnl={a['pnl']}")
     if dry and rc.get("actions"):
