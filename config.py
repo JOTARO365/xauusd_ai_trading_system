@@ -72,6 +72,9 @@ MONEY_MANAGEMENT = {
 # Replay over 514 historical AI trades: removes 7 toxic trades, +$2,981, 0 collateral.
 EMA_PULLBACK_MAX_SL   = int(os.getenv("EMA_PULLBACK_MAX_SL")   or 1500)  # SL pips ≥ this → block
 EMA_PULLBACK_MIN_CONF = int(os.getenv("EMA_PULLBACK_MIN_CONF") or 70)    # confidence < this → block
+# Hard-block EMA_PULLBACK ทั้ง type (2026-06-28): ไม้ที่ผ่าน gate conf≥75 ยัง WR 31%/−594 (n=13)
+# → confidence filter EMA_PULLBACK ไม่ได้. ตั้ง false เพื่อกลับไปใช้แค่ sl/conf limits ด้านบน
+EMA_PULLBACK_BLOCK    = (os.getenv("EMA_PULLBACK_BLOCK") or "true").lower() != "false"
 
 # ── Decision gates & anti-fade guards ─────────────────────────
 # Replay 489 ไม้ (2026-06-10): conf 50-59 = WR 23.5% / −3,807; Asian 0-7 UTC = −115/ไม้
@@ -144,6 +147,8 @@ def reload_config():
     TREND_CONT_MAX_DIST_PCT  = float(os.getenv("TREND_CONT_MAX_DIST_PCT") or 0.3)
     NNLB_FASTPATH            = os.getenv("NNLB_FASTPATH", "true").lower() != "false"
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
+    global EMA_PULLBACK_BLOCK
+    EMA_PULLBACK_BLOCK       = (os.getenv("EMA_PULLBACK_BLOCK") or "true").lower() != "false"
     global LESSON_LEARNING, DRY_RUN, NNLB_MODE, NNLB_BASE_EQUITY, NNLB_EQUITY_PER_LOT, NNLB_MAX_LOSS_PCT
     LESSON_LEARNING      = os.getenv("LESSON_LEARNING", "true").lower() != "false"
     DRY_RUN              = os.getenv("DRY_RUN", "false").lower() == "true"

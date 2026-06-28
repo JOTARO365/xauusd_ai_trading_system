@@ -458,8 +458,11 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         return _fail(f"Confidence {conf}% < {_min_conf}% (HTF={htf_zone['tf'] if htf_zone else 'none'})")
 
     # 6. Entry-type gates
-    if entry_type == "EMA_PULLBACK" and conf < 75:
-        return _fail(f"EMA_PULLBACK requires conf ≥75% (got {conf}%)  [WR 26% historical]")
+    if entry_type == "EMA_PULLBACK":
+        if getattr(_cfg, "EMA_PULLBACK_BLOCK", True):
+            return _fail("EMA_PULLBACK hard-blocked — conf≥75 ยัง WR31%/−594 (n=13)  [EMA_PULLBACK_BLOCK]")
+        if conf < 75:
+            return _fail(f"EMA_PULLBACK requires conf ≥75% (got {conf}%)  [WR 26% historical]")
     if entry_type == "ENGULFING" and conf < 75:
         return _fail(f"ENGULFING requires conf ≥75% (got {conf}%)")
 
@@ -708,14 +711,15 @@ Account — Today: {history['today_pnl']:+.2f} USD ({history['today_trades']} tr
         sl_key = "buy_sl_pips" if out_direction == "BUY" else "sell_sl_pips"
         sl_pips = chart_data.get(sl_key, sl_pips)
 
-        # ── Confidence-based position sizing ─────────────────────
-        _conf_full   = MONEY_MANAGEMENT["conf_full_size_at"]
-        _conf_min_s  = MONEY_MANAGEMENT["conf_min_scale"]
+        # ── Position sizing: streak protection only ──────────────
+        # ตัด confidence-based lot scaling ออก (2026-06-28): replay พิสูจน์ว่าการ scale lot
+        # ตาม confidence ทำลาย ~7,500฿ บน acct 381706956 เพราะ conf ไม่ correlate WR
+        # (conf 80-89 แพ้ / 50-59 ชนะ) → scale ตาม conf = อัดเงินหนักในไม้ที่ดันแพ้.
+        # คง streak_scale ไว้ (ลด size ตอนแพ้ติดกัน = ป้องกันที่พิสูจน์ได้).
         streak_scale = gate.get("streak_scale", 1.0)
-        conf_scale   = max(_conf_min_s, min(1.0, conf / _conf_full)) * streak_scale
-        conf_scale   = round(max(0.10, conf_scale), 2)   # floor 10% ไม่ให้ size เป็น 0
+        conf_scale   = round(max(0.10, streak_scale), 2)   # floor 10% ไม่ให้ size เป็น 0
         logger.info(
-            f"Position sizing: conf={conf}% → scale={conf_scale:.2f}"
+            f"Position sizing: conf={conf}% (conf-scaling OFF) → scale={conf_scale:.2f}"
             + (f" (streak×{streak_scale})" if streak_scale < 1.0 else "")
         )
 
