@@ -21,6 +21,56 @@ _llm = ChatAnthropic(
 _order_fail_streak: dict[str, int] = {"BUY": 0, "SELL": 0}
 _FAIL_STREAK_WARN = 3   # warning เมื่อ fail ≥ N ครั้งติดกัน
 
+# ── Gate-block observability (audit 2026-06-28) ───────────────────────────────
+# log ทุก gate ที่ block ลง logs/gate_blocks.jsonl (append). จำเป็นเพราะไม้ที่ถูก
+# block ไม่มี row ใน trades → guard หลายตัว (news-first/HTF-fade/counter-spike)
+# วัดผลไม่ได้เลย. สะสม log 1-2 สัปดาห์เพื่อพิสูจน์ว่า guard ตัวไหน block ไม้ดีทิ้ง.
+_GATE_LOG = Path("logs") / "gate_blocks.jsonl"
+
+_GATE_CATEGORIES = [
+    ("news-first", "news_first"), ("news_first", "news_first"),
+    ("htf", "htf_fade"), ("spike", "counter_spike"), ("counter-trend", "counter_trend"),
+    ("ema_pullback", "ema_pullback"), ("engulfing", "engulfing"), ("sideways", "sideways"),
+    ("asian", "session"), ("quiet", "session"), ("ny close", "session"),
+    ("unknown trend", "unknown_trend"), ("daily loss", "daily_loss"), ("streak", "streak"),
+    ("resistance", "sell_resistance"), ("sr zone", "no_zone"), ("atr", "atr"),
+    ("confidence", "min_conf"), ("conf ", "min_conf"), ("slot", "slot"),
+    ("sl ", "sl_range"), ("no_trade", "no_trade"), ("no trade", "no_trade"),
+    ("ทิศทางไม่ชัด", "no_direction"),
+]
+
+
+def _gate_category(reason: str) -> str:
+    r = reason.lower()
+    for k, v in _GATE_CATEGORIES:
+        if k in r:
+            return v
+    return "other"
+
+
+def _log_gate_block(reason: str, chart_data: dict, sentiment_data: dict | None = None) -> None:
+    """append 1 บรรทัด JSONL ต่อ 1 block — best-effort, ไม่ขวาง decision flow"""
+    try:
+        h1 = (chart_data.get("indicators") or {}).get("h1") or {}
+        rec = {
+            "at": datetime.now(_tz.utc).isoformat(),
+            "gate": _gate_category(reason),
+            "reason": reason,
+            "signal": chart_data.get("signal"),
+            "trend": chart_data.get("trend"),
+            "sr_zone": chart_data.get("sr_zone"),
+            "sr_strength": chart_data.get("sr_strength"),
+            "conf": chart_data.get("confidence"),
+            "entry_type": chart_data.get("entry_type"),
+            "price": h1.get("close"),
+            "sentiment_bias": (sentiment_data or {}).get("bias"),
+        }
+        _GATE_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with _GATE_LOG.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception as e:
+        logger.debug(f"gate_block log failed: {e}")
+
 SYSTEM_PROMPT = json.dumps(
     json.loads(Path("agents/prompts/decision_maker.json").read_text(encoding="utf-8")),
     separators=(",", ":"),  # minified — saves ~15% tokens vs pretty-printed
@@ -189,6 +239,7 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     entry_type  = chart_data.get("entry_type", "NONE")
 
     def _fail(reason: str) -> dict:
+        _log_gate_block(reason, chart_data, sentiment_data)
         return {"pass": False, "reason": reason}
 
     _utc_hour = datetime.now(_tz.utc).hour   # คำนวณครั้งเดียว — ใช้ใน NNLB Asian / gate 5b / LN-NY overlap
