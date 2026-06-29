@@ -134,6 +134,35 @@ def _parse_sentiment(sentiment_data: dict) -> tuple[str, int]:
 #  AUTO PENDING PLACEMENT
 # ─────────────────────────────────────────────────────────────
 
+_SL_FLOOR_PENDING     = 600     # SL ขั้นต่ำของ pending (pips)
+_PENDING_SL_ZONE_PCT  = 0.003   # 0.3% beyond zone = breakdown ยืนยัน → cut (แทน default 2000 คงที่)
+
+
+def _structural_sl_pips(entry: float, same_side_levels: list, is_sell: bool,
+                        point: float, fallback_pips: int) -> int:
+    """A (2026-06-30): SL structural — วาง beyond zone ที่ pending วาง (ทะลุ = setup ผิด → cut เร็ว)
+    แทน default 2000 คงที่ (ทำให้ไม้แพ้แพ้เต็ม = R:R พัง ทั้งที่ WR สูง).
+    BUY@support → SL ใต้ zone; SELL@resistance → SL เหนือ zone; ถ้ามี S/R ถัดไปใกล้กว่า ใช้ตัวนั้น.
+    clamp [_SL_FLOOR_PENDING, fallback_pips]."""
+    if not point:
+        return fallback_pips
+    buf = entry * _PENDING_SL_ZONE_PCT
+    if is_sell:                                   # SELL@resistance: SL เหนือ entry
+        sl_price = entry + buf
+        higher = [l for l in same_side_levels if entry < l < sl_price]
+        if higher:
+            sl_price = min(higher) + entry * 0.0008
+        dist = sl_price - entry
+    else:                                         # BUY@support: SL ใต้ entry
+        sl_price = entry - buf
+        lower = [l for l in same_side_levels if sl_price < l < entry]
+        if lower:
+            sl_price = max(lower) - entry * 0.0008
+        dist = entry - sl_price
+    sl = round(dist / point)
+    return max(_SL_FLOOR_PENDING, min(sl, fallback_pips))
+
+
 def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = None) -> int:
     """
     วาง pending orders อัตโนมัติที่ key S/R (H4 + Daily) ตาม Sentiment
@@ -148,6 +177,13 @@ def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = No
 
     Returns: จำนวน pending orders ที่วางใหม่
     """
+    # ── C (2026-06-30): parser-alive guard — ไม่วาง pending ถ้า chart วิเคราะห์ไม่ได้ ──
+    # conf<=0 = parser fail/data invalid (เคยวาง pending มั่ว conf=0/zone=NONE → fill → โดน SL)
+    _chart_conf = chart_data.get("confidence", 0) or 0
+    if _chart_conf <= 0:
+        logger.info(f"Auto-pending: chart confidence={_chart_conf} (parser ไม่ให้ค่า/data invalid) — skip")
+        return 0
+
     # ── นับ pending ที่มีอยู่แล้วแยก BUY/SELL ─────────────────
     pending_counts = count_pending_by_direction()
     max_buy  = MONEY_MANAGEMENT["max_pending_buy"]
@@ -233,7 +269,7 @@ def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = No
 
     info  = mt5.symbol_info(SYMBOL)
     point = info.point if info else 0.01
-    sl_pips = MONEY_MANAGEMENT["default_sl_pips"]
+    _default_sl = MONEY_MANAGEMENT["default_sl_pips"]   # fallback/clamp; SL จริง = structural ต่อ level (A)
 
     # ── จัดลำดับ tasks ตาม sentiment ─────────────────────────
     buy_task  = ("BUY_LIMIT",  sup_levels, res_levels)
@@ -264,6 +300,8 @@ def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = No
                 logger.info(f"{pending_type} @ {level:.2f} มี pending อยู่แล้ว — ข้าม")
                 continue
 
+            # A: structural SL ต่อ level (beyond zone) แทน 2000 คงที่
+            sl_pips = _structural_sl_pips(level, levels, is_sell, point, _default_sl)
             tp_pips = _calc_tp_pips(level, opposing, point,
                                     MONEY_MANAGEMENT["default_tp_pips"], is_sell=is_sell)
             rr = (tp_pips / sl_pips if sl_pips > 0 else 0) if sl_pips > 0 else 0
