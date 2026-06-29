@@ -123,10 +123,14 @@ def _htf_fade_reason(direction: str, chart_data: dict) -> str | None:
     if not z:
         return None
     zt, tf, lvl = z.get("zone_type"), z.get("tf"), z.get("level")
-    if zt == "SUPPORT" and direction == "SELL":
-        return f"HTF-fade: SELL ที่ {tf} SUPPORT ({lvl}) — แนวรับใหญ่ มักเด้ง โอกาสพลาดสูง"
-    if zt == "RESISTANCE" and direction == "BUY":
-        return f"HTF-fade: BUY ที่ {tf} RESISTANCE ({lvl}) — แนวต้านใหญ่ มักย่อ โอกาสพลาดสูง"
+    trend = (chart_data.get("trend") or "").upper()
+    # block เฉพาะ 'fade' (เด้ง) ไม่ block 'breakdown' (ทะลุตามเทรนด์):
+    # SUPPORT+BEARISH = แนวรับใน downtrend มักแตก → SELL breakdown valid → ไม่ block
+    # RESISTANCE+BULLISH = แนวต้านใน uptrend มักทะลุ → BUY breakout valid → ไม่ block
+    if zt == "SUPPORT" and direction == "SELL" and trend != "BEARISH":
+        return f"HTF-fade: SELL ที่ {tf} SUPPORT ({lvl}) ใน trend {trend or '?'} — แนวรับมักเด้ง (ไม่ใช่ breakdown) โอกาสพลาดสูง"
+    if zt == "RESISTANCE" and direction == "BUY" and trend != "BULLISH":
+        return f"HTF-fade: BUY ที่ {tf} RESISTANCE ({lvl}) ใน trend {trend or '?'} — แนวต้านมักย่อ (ไม่ใช่ breakout) โอกาสพลาดสูง"
     return None
 
 
