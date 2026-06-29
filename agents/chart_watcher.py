@@ -1,4 +1,5 @@
 import os
+import re
 import anthropic
 import json
 from datetime import datetime
@@ -1210,12 +1211,21 @@ RSI:{h1['rsi']} MACD Hist:{h1['macd_hist']}
 Close:{m15['close']} EMA20:{m15['ema20']} EMA50:{m15['ema50']}
 RSI:{m15['rsi']} MACD Hist:{m15['macd_hist']}
 
-วิเคราะห์ตามกฎที่กำหนดและตอบในรูปแบบที่ระบุไว้"""
+วิเคราะห์ตามกฎที่กำหนด แล้ว **ขึ้นต้นคำตอบด้วยบล็อกสรุปนี้ก่อนเป็นอันดับแรกสุด** (plain text เท่านั้น —
+ห้าม markdown, ห้ามใส่ ** หรือ #, ห้ามตาราง, ห้าม code fence — ระบบอ่านบล็อกนี้ด้วยเครื่อง ต้องมีครบทุกบรรทัด)
+จากนั้นจะอธิบายเหตุผลสั้นๆ (ไม่เกิน 6 บรรทัด) ต่อท้ายก็ได้:
+
+SIGNAL: BUY หรือ SELL หรือ NO_TRADE
+CONFIDENCE: จำนวนเต็ม 0-100 (= FINAL SCORE)
+TREND: BULLISH หรือ BEARISH หรือ SIDEWAYS
+SR_ZONE: SUPPORT หรือ RESISTANCE หรือ NONE
+SR_STRENGTH: STRONG หรือ NORMAL
+ENTRY_TYPE: SR_ZONE หรือ ENGULFING หรือ STRUCTURE_PULLBACK หรือ BREAKOUT_RETEST หรือ EMA_PULLBACK หรือ MOMENTUM_BREAKOUT หรือ DOJI_AT_ZONE หรือ NONE"""
 
     global _last_usage
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=800,
+        max_tokens=1000,   # block-first summary + เหตุผลสั้น (เดิม 800 → report markdown ยาวถูก truncate ก่อนถึงสรุป → parse fail)
         system=[{"type": "text", "text": SYSTEM_PROMPT,
                  "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user", "content": user_message}],
@@ -1271,25 +1281,27 @@ RSI:{m15['rsi']} MACD Hist:{m15['macd_hist']}
     for line in analysis_text.splitlines():
         if ":" not in line:
             continue
-        key = line.split(":")[0].strip()
-        val = line.split(":", 1)[1].strip()
+        raw_key, val = line.split(":", 1)
+        # ทน markdown drift: LLM อาจตอบ "**SIGNAL:**" / "## SIGNAL" / "- SIGNAL"
+        # → strip ตัวอักษร markdown ออกจาก key+val ก่อนเทียบ (เดิม exact match จึง parse fail = conf 0)
+        key = raw_key.strip().strip("*#|>-•\t ").upper()
+        val = val.strip().strip("*`").strip()
         if key == "SIGNAL":
-            _sig = val.strip().upper().split()[0] if val.strip() else ""
+            _sig = val.upper().split()[0] if val else ""
             if _sig in ("BUY", "SELL", "NO_TRADE"):
                 result["signal"] = _sig
         elif key == "CONFIDENCE":
-            try:
-                result["confidence"] = int(val)
-            except Exception:
-                pass
+            m = re.search(r"\d+", val)   # รองรับ "93", "93/100", "93%"
+            if m:
+                result["confidence"] = int(m.group())
         elif key == "TREND":
-            result["trend"] = val
+            result["trend"] = val.split("—")[0].split("(")[0].split("|")[0].strip().upper()
         elif key == "SR_ZONE":
-            result["sr_zone"] = val.split("—")[0].strip()
+            result["sr_zone"] = val.split("—")[0].split("@")[0].strip().upper()
         elif key == "SR_STRENGTH":
-            result["sr_strength"] = val.split("—")[0].strip()
+            result["sr_strength"] = val.split("—")[0].strip().upper()
         elif key == "ENTRY_TYPE":
-            result["entry_type"] = val
+            result["entry_type"] = val.split("—")[0].split("(")[0].strip().upper()
         elif key == "MOMENTUM":
             result["momentum"] = val
         elif key == "FIB_LEVEL":
