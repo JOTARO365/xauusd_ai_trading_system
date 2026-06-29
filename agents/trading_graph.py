@@ -230,7 +230,7 @@ def node_position_mgmt(state: TradingState) -> dict:
 
 def node_reporter(state: TradingState) -> dict:
     from agents.reporter import log_trade, print_summary, scan_manual_orders
-    from agents.pending_manager import auto_place_pending_orders, manage_range_pending, manage_sl_reentry
+    from agents.pending_manager import auto_place_pending_orders, manage_range_pending, manage_sl_reentry, cancel_pending_on_breakdown
     from utils.display import print_step, print_warning
     print_step(5, "running", "กำลังบันทึกผล...")
     chart     = state.get("chart_data") or {}
@@ -242,6 +242,8 @@ def node_reporter(state: TradingState) -> dict:
         print_step(5, "done", "done" + (f" (+{n} manual)" if n else ""))
         if n: print_warning(f"พบ manual order {n} รายการ — บันทึก context แล้ว")
         try:
+            cb = cancel_pending_on_breakdown(chart)
+            if cb: print_warning(f"Breakdown: ยกเลิก {cb} AP pending ที่จะ fill สวน momentum")
             p = auto_place_pending_orders(chart, sentiment)
             if p: print_warning(f"Auto-pending: วาง {p} order ที่ key S/R levels (H4+Daily)")
         except Exception as e:

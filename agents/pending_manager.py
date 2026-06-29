@@ -12,6 +12,7 @@ from connectors.price_feed import get_account_info, get_ohlcv
 from connectors.mt5_connector import place_pending_order, get_pending_orders, calculate_lot_size, cancel_pending_order
 from agents.reporter import log_pending_order, count_pending_by_direction
 from config import SYMBOL, MONEY_MANAGEMENT
+import config as _cfg
 
 _MANUAL_RANGE_FILE = os.path.join(os.path.dirname(__file__), "../logs/manual_range.json")
 
@@ -344,6 +345,35 @@ def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = No
 # ─────────────────────────────────────────────────────────────
 
 _WEEKLY_TAG = "WK-"
+
+
+def cancel_pending_on_breakdown(chart_data: dict) -> int:
+    """B (2026-06-30): ยกเลิก AP pending fade ที่กำลังจะ fill 'สวน' fast move (zone กำลังแตก).
+    ดิ่งลงแรง (fast<0) → ยก BUY_LIMIT (รอ fill ตอนราคาดิ่งต่อ = สวน momentum → ติดลบ);
+    พุ่งขึ้นแรง (fast>0) → ยก SELL_LIMIT. ใช้ fast_move_pips + COUNTER_SPIKE_PIPS (เกณฑ์เดียวกับ counter-spike).
+    เฉพาะ AP pending (ไม่แตะ RNG-/WK-/manual). คืนจำนวนที่ยกเลิก."""
+    thr = _cfg.COUNTER_SPIKE_PIPS
+    if thr <= 0:
+        return 0
+    fast = float(chart_data.get("fast_move_pips", 0) or 0)
+    if abs(fast) < thr:
+        return 0
+    target = "BUY_LIMIT" if fast < 0 else "SELL_LIMIT"
+    cancelled = 0
+    for o in get_pending_orders():
+        if o.get("source") != "SYSTEM":
+            continue
+        if not str(o.get("comment", "")).startswith("AP "):   # เฉพาะ auto-pending
+            continue
+        if o.get("pending_type") == target:
+            if cancel_pending_order(o["ticket"]):
+                cancelled += 1
+    if cancelled:
+        logger.warning(
+            f"[BREAKDOWN] fast_move {fast:+.0f}p ≥ {thr} — ยกเลิก {cancelled} {target} AP pending "
+            f"(กัน fill สวน momentum / zone แตก)"
+        )
+    return cancelled
 
 
 def _has_weekly_pending() -> bool:
