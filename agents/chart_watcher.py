@@ -647,13 +647,13 @@ def _count_zone_touches(df: pd.DataFrame, level: float, zone_pct: float = 0.003)
 
 
 def _touch_score_bonus(touches: int) -> int:
-    """แปลง touch count → score bonus
-    2-4 touches = zone แข็งแกร่ง (ราคากลับมาหลายรอบ)
-    5+ touches  = zone อ่อนแอ ใกล้แตก → penalty"""
+    """แปลง touch count → score bonus (2026-06-30: เพิ่มน้ำหนัก multi-touch zone)
+    2-4 touches = zone แข็งแกร่ง (ราคากลับมาหลายรอบ) → bonus มากขึ้น
+    5+ touches  = zone อ่อนแอ ใกล้แตก → penalty (คงไว้ — worn zone มักทะลุ = fade เสี่ยง)"""
     if touches <= 1:  return 0    # fresh — ยังไม่ proven
-    if touches <= 4:  return 10   # 2-4 touches = sweet spot
-    if touches <= 6:  return 5    # 5-6 = ยังดีแต่เริ่มอ่อน
-    return -10                    # 7+ = worn zone, risk of break
+    if touches <= 4:  return 15   # 2-4 touches = sweet spot (เดิม 10 → 15)
+    if touches <= 6:  return 8    # 5-6 = ยังดีแต่เริ่มอ่อน (เดิม 5 → 8)
+    return -10                    # 7+ = worn zone, risk of break (คงเดิม)
 
 
 def _check_bb_squeeze(df: pd.DataFrame, lookback: int = 10) -> bool:
