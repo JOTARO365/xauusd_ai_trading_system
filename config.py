@@ -76,6 +76,11 @@ EMA_PULLBACK_MIN_CONF = int(os.getenv("EMA_PULLBACK_MIN_CONF") or 70)    # confi
 # → confidence filter EMA_PULLBACK ไม่ได้. ตั้ง false เพื่อกลับไปใช้แค่ sl/conf limits ด้านบน
 EMA_PULLBACK_BLOCK    = (os.getenv("EMA_PULLBACK_BLOCK") or "true").lower() != "false"
 
+# AUTO_SL_PROTECT: ทุก cycle ถ้าเจอ open position ที่ไม่มี SL (sl==0) → ตั้ง SL ให้อัตโนมัติ
+# ที่ DEFAULT_SL_PIPS จากราคาปัจจุบัน (กันรู: ทุก manage_* เดิม continue ข้าม sl==0 → ไม่มีใครตั้งให้)
+# ครอบทั้ง SYSTEM + MANUAL. ตั้ง false เพื่อปิด (ไม่ยุ่งไม้ที่ไม่มี SL)
+AUTO_SL_PROTECT       = (os.getenv("AUTO_SL_PROTECT") or "true").lower() != "false"
+
 # ── Decision gates & anti-fade guards ─────────────────────────
 # Replay 489 ไม้ (2026-06-10): conf 50-59 = WR 23.5% / −3,807; Asian 0-7 UTC = −115/ไม้
 MIN_TECHNICAL_CONFIDENCE = int(os.getenv("MIN_TECH_CONF") or 62)      # floor ทุก entry (HTF zone ไม่ลดแล้ว)
@@ -128,6 +133,8 @@ def reload_config():
     BE_CONFIRM_CYCLES  = int(os.getenv("BE_CONFIRM_CYCLES",  "2"))
     HTF_BE_TRIGGER_R   = float(os.getenv("HTF_BE_TRIGGER_R",  "2.0"))
     HTF_BE_BUFFER_PIPS = int(os.getenv("HTF_BE_BUFFER_PIPS", "1000"))
+    global BE_MAX_TRIGGER_PIPS
+    BE_MAX_TRIGGER_PIPS = int(os.getenv("BE_MAX_TRIGGER_PIPS", "1500"))
     TRAILING_STOP        = os.getenv("TRAILING_STOP",           "false").lower() == "true"
     TRAILING_ATR_TF      = os.getenv("TRAILING_ATR_TF",         "D1")
     TRAILING_ATR_MULT    = float(os.getenv("TRAILING_ATR_MULT",  "1.5"))
@@ -151,8 +158,9 @@ def reload_config():
     TREND_CONT_MAX_DIST_PCT  = float(os.getenv("TREND_CONT_MAX_DIST_PCT") or 0.3)
     NNLB_FASTPATH            = os.getenv("NNLB_FASTPATH", "true").lower() != "false"
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
-    global EMA_PULLBACK_BLOCK
+    global EMA_PULLBACK_BLOCK, AUTO_SL_PROTECT
     EMA_PULLBACK_BLOCK       = (os.getenv("EMA_PULLBACK_BLOCK") or "true").lower() != "false"
+    AUTO_SL_PROTECT          = (os.getenv("AUTO_SL_PROTECT") or "true").lower() != "false"
     global LESSON_LEARNING, DRY_RUN, NNLB_MODE, NNLB_BASE_EQUITY, NNLB_EQUITY_PER_LOT, NNLB_MAX_LOSS_PCT
     LESSON_LEARNING      = os.getenv("LESSON_LEARNING", "true").lower() != "false"
     DRY_RUN              = os.getenv("DRY_RUN", "false").lower() == "true"
@@ -199,6 +207,9 @@ BE_CONFIRM_CYCLES  = int(os.getenv("BE_CONFIRM_CYCLES",  "2"))
 # HTF zone (D1/W1/MN): ให้วิ่งได้ไกลกว่าก่อน BE
 HTF_BE_TRIGGER_R   = float(os.getenv("HTF_BE_TRIGGER_R",  "2.0"))
 HTF_BE_BUFFER_PIPS = int(os.getenv("HTF_BE_BUFFER_PIPS", "1000"))
+# BE_MAX_TRIGGER_PIPS: เพดาน trigger (pips) — ไม้ SL กว้าง (เช่น 3500p×2.0R=7000p) จะ
+# lock กำไรไม่ทันเพราะ trigger ไกลเกิน → cap ไว้ให้ขยับ SL หน้าทุนเมื่อกำไรถึง X pips ไม่ว่า R เท่าไร
+BE_MAX_TRIGGER_PIPS = int(os.getenv("BE_MAX_TRIGGER_PIPS", "1500"))
 
 # ── Trailing Stop (Swing Low/High Higher TF) ──────────────────
 TRAILING_STOP         = os.getenv("TRAILING_STOP",      "false").lower() == "true"

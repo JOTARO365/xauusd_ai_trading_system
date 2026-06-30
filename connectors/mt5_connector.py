@@ -933,7 +933,10 @@ def manage_breakeven() -> int:
 
         current      = tick.bid if is_buy else tick.ask
         profit_pips  = ((current - entry) if is_buy else (entry - current)) / point
-        trigger_pips = sl_dist_pips * trigger_r
+        # cap trigger ด้วยเพดาน absolute — ไม้ SL กว้าง (HTF 3500p × 2.0R = 7000p) จะ lock กำไรไม่ทัน
+        # → ขยับ SL หน้าทุนเมื่อกำไรถึง BE_MAX_TRIGGER_PIPS ไม่ว่า R-multiple จะเท่าไร
+        _be_cap      = getattr(_cfg, "BE_MAX_TRIGGER_PIPS", 1500)
+        trigger_pips = min(sl_dist_pips * trigger_r, _be_cap)
 
         # Proportional buffer: lock 30% of current profit, minimum = default_buf_pips
         # ป้องกัน lock กำไรน้อยเกินไปเมื่อ position วิ่งไกลแล้ว
@@ -1059,6 +1062,55 @@ def _set_sl_tp(ticket: int, new_sl: float, tp: float) -> bool:
         logger.error(f"Set SL failed ticket={ticket}: {err}")
         return False
     return True
+
+
+def ensure_sl_protection() -> int:
+    """อุดรู: ตั้ง SL ให้ open position ที่ไม่มี SL (sl==0).
+    ทุก manage_* (breakeven/trailing/partial/count_protected) เดิม `continue` ข้าม sl==0
+    → ไม้ manual / orphan / SL-ถูกถอด จะไม่มีใครตั้ง SL ให้เลยตลอดกาล = พอร์ตเสี่ยงขาดทุนไม่จำกัด.
+    ตั้ง SL ที่ DEFAULT_SL_PIPS จาก 'ราคาปัจจุบัน' (ไม่ใช่ entry — ไม้ที่ลอยไกล entry แล้ว
+    จะได้จำกัดขาดทุน 'ต่อจากนี้' ไม่ใช่ตั้ง SL ผิดฝั่ง). ครอบทั้ง SYSTEM + MANUAL.
+    ปิดด้วย AUTO_SL_PROTECT=false. เรียกเป็นตัวแรกใน node_position_mgmt → manage_* ตัวอื่นดูแลต่อได้."""
+    if not getattr(_cfg, "AUTO_SL_PROTECT", True):
+        return 0
+    info = mt5.symbol_info(SYMBOL)
+    if info is None:
+        return 0
+    positions = mt5.positions_get(symbol=SYMBOL)
+    if not positions:
+        return 0
+    tick = mt5.symbol_info_tick(SYMBOL)
+    if tick is None:
+        return 0
+
+    point     = info.point
+    stops_min = (info.trade_stops_level or 0) * point
+    sl_pips   = float(MONEY_MANAGEMENT["default_sl_pips"])
+    protected = 0
+
+    for pos in positions:
+        if pos.sl != 0:
+            continue
+        is_buy = pos.type == 0
+        if is_buy:
+            ref    = tick.bid
+            new_sl = ref - sl_pips * point
+            if stops_min > 0 and ref - new_sl < stops_min:
+                new_sl = ref - stops_min
+        else:
+            ref    = tick.ask
+            new_sl = ref + sl_pips * point
+            if stops_min > 0 and new_sl - ref < stops_min:
+                new_sl = ref + stops_min
+
+        if _set_sl_tp(pos.ticket, round(new_sl, 2), pos.tp):
+            protected += 1
+            logger.warning(
+                f"AUTO-SL: ไม้ไม่มี SL ticket={pos.ticket} "
+                f"{'BUY' if is_buy else 'SELL'} magic={pos.magic} "
+                f"→ ตั้ง SL={new_sl:.2f} ({sl_pips:.0f}p จากราคา {ref:.2f})"
+            )
+    return protected
 
 
 def manage_partial_close() -> int:

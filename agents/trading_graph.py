@@ -195,6 +195,7 @@ def node_position_mgmt(state: TradingState) -> dict:
     from connectors.mt5_connector import (
         manage_momentum_exit, manage_zone_break_close, manage_partial_close,
         manage_breakeven, manage_dynamic_tp, manage_post_event_tp, manage_trailing_stop,
+        ensure_sl_protection,
     )
     from agents.swing_manager import manage_swing_campaign   # inert จน SWING_ENABLED=true + equity≥min
     from agents.reporter import scan_manual_orders
@@ -209,6 +210,7 @@ def node_position_mgmt(state: TradingState) -> dict:
     # (เดิม try ก้อนเดียว: NameError/exception ที่ momentum_exit จะข้าม breakeven/zone-break/trailing หมด
     #  พอดีจังหวะที่ราคาวิ่งสวนแรง = ตอนที่ protective สำคัญที่สุด). ลำดับคงเดิม: momentum-exit ก่อน
     _mgmt = (
+        (ensure_sl_protection,   (),        "AUTO-SL: ตั้ง SL ให้ {} ไม้ที่ไม่มี SL (อุดรู no-SL)"),
         (manage_momentum_exit,   (),        "Momentum Exit: ปิดเร็ว {} position (momentum สวนทางแรง)"),
         (manage_zone_break_close, (chart,),  "Zone Break: ปิด/re-enter {} position (HTF zone ถูกทะลุ)"),
         (manage_partial_close,   (),        "Partial close: scale out {} position(s)"),
