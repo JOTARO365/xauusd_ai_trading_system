@@ -510,17 +510,17 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         if sr_zone == "NONE" and conf < _q_min:
             return _fail(f"{_sess_lbl}: no-zone entries blocked — conf {conf}% < {_q_min:.0f}%")
 
-    # 5c. SELL at RESISTANCE in BEARISH trend — momentum-aware (2026-06-30)
-    # เดิม require STRONG+conf>=80 เสมอ (WR=39% เก่า, tuned จากยุค parser พัง conf=0) → block SELL
-    # ตามเทรนด์ลงต่อ (counterfactual 06-30: 8 WIN/0 lose, ราคาลงต่อ +1562). แยก 2 กรณี:
-    #  - ราคาเด้งขึ้นแตะ resistance (fast_move > 0) = fade เสี่ยงเด้ง → คงเข้ม STRONG+80
-    #  - ราคาไม่เด้งขึ้น (fast_move <= 0) = SELL continuation ตามเทรนด์ → allow ที่ floor ปกติ
-    # counter-spike (gate 2b) กรอง SELL สวน up-spike ออกก่อนแล้ว
+    # 5c. SELL at RESISTANCE in BEARISH trend — momentum-aware (แก้ 2026-06-30 รอบ 2)
+    # SELL@resistance = fade โดยธรรมชาติ = ราคาเด้งขึ้นแตะ resistance (fast_move > 0) เสมอ
+    # → เงื่อนไขเดิม (_fast<=0) ไม่เคยจริงที่ resistance → block fade ปกติทั้งหมด (รวม 8 WIN counterfactual 06-30)
+    # แก้: allow ถ้าเด้งขึ้น 'ไม่แรง' (< COUNTER_SPIKE_PIPS = pullback/fade ตามเทรนด์ลง) + conf>=floor
+    #  - counter-spike (gate 2b) block SELL สวน up-spike แรง (>=500) ออกก่อนแล้ว → ที่ถึงนี่ = fade ปกติ
+    #  - block เฉพาะ breakout แรงจริง (fast>=COUNTER_SPIKE, ปกติ counter-spike จับ) หรือ conf<floor
     if direction == "SELL" and trend == "BEARISH" and sr_zone == "RESISTANCE":
         _fast = float(chart_data.get("fast_move_pips", 0) or 0)
-        _continuation = _fast <= 0 and conf >= _cfg.MIN_TECHNICAL_CONFIDENCE
-        if not _continuation and not (sr_str == "STRONG" and conf >= 80):
-            return _fail(f"SELL+RESISTANCE in BEARISH (เด้งขึ้น fast={_fast:+.0f}p): WR=39% — requires STRONG + conf>=80 (got {sr_str}/{conf}%)")
+        _ok = _fast < _cfg.COUNTER_SPIKE_PIPS and conf >= _cfg.MIN_TECHNICAL_CONFIDENCE
+        if not _ok and not (sr_str == "STRONG" and conf >= 80):
+            return _fail(f"SELL+RESISTANCE in BEARISH (breakout fast={_fast:+.0f}p / conf {conf}): requires STRONG + conf>=80 (got {sr_str}/{conf}%)")
 
     # 6. Min confidence — floor เดียวทุกกรณี (replay 489 ไม้: การลด floor ที่ HTF zone
     #    เหลือ 42/45 คือประตูให้ไม้ conf 50-59 ที่ WR 23.5% / −3,807 เข้ามา — เลิกลด)
