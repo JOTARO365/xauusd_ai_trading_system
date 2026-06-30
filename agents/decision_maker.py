@@ -449,8 +449,18 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     if is_counter:
         # Option C — news ลากเข้า: ตรงข่าว + price action ยืนยัน → ข่าวมีอำนาจเหนือเทรนด์ H4
         _ovr_ok, _ovr_why = _news_override_ok(direction, chart_data, _ndir, conf)
+        # HTF-reversal override (2026-06-30): ราคาที่ D1/W1 zone หนุนทิศไม้ = reversal มีน้ำหนักกว่า H4 ที่ lag
+        # counter-spike (gate 2b) กรอง breakdown-spike ออกก่อนแล้ว → ที่ถึงตรงนี้ = ไม่ดิ่งแรง = reversal-ish
+        _htf = chart_data.get("htf_zone")
+        _htf_reversal = bool(_htf) and conf >= getattr(_cfg, "HTF_REVERSAL_MIN_CONF", 70) and (
+            (direction == "BUY"  and _htf.get("zone_type") == "SUPPORT") or
+            (direction == "SELL" and _htf.get("zone_type") == "RESISTANCE")
+        )
         if _ovr_ok:
             logger.warning(f"[News-override] {direction} สวนเทรนด์ H4={trend} แต่ {_ovr_why} → อนุญาต")
+        elif _htf_reversal:
+            logger.warning(f"[HTF-reversal] {direction} สวนเทรนด์ H4={trend} ที่ {_htf.get('tf')} "
+                           f"{_htf.get('zone_type')} ({_htf.get('level')}) conf={conf} → อนุญาต (HTF zone > H4 lag)")
         else:
             at_strong = sr_str == "STRONG" and sr_zone in ("RESISTANCE", "SUPPORT")
             if not (at_strong and conf >= 80):

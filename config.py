@@ -87,6 +87,9 @@ HTF_FADE_BLOCK           = os.getenv("HTF_FADE_BLOCK", "true").lower() != "false
 NEWS_OVERRIDE_TREND      = os.getenv("NEWS_OVERRIDE_TREND", "true").lower() != "false"  # option C: ข่าว+PA ยืนยัน → เข้าสวน H4 ได้
 NEWS_CONFIRM_PIPS        = float(os.getenv("NEWS_CONFIRM_PIPS") or 500)
 NEWS_OVERRIDE_MIN_CONF   = float(os.getenv("NEWS_OVERRIDE_MIN_CONF") or 50)
+# counter-H4 ที่ D1/W1 zone หนุนทิศไม้ (BUY@SUPPORT / SELL@RESISTANCE) = reversal → allow ถ้า conf ≥ นี้
+# (gate 4 exception; HTF major zone มีน้ำหนักกว่า H4 ที่ lag; ตั้งสูงมากเช่น 999 = ปิด)
+HTF_REVERSAL_MIN_CONF    = float(os.getenv("HTF_REVERSAL_MIN_CONF") or 70)
 TREND_CONT_CONF          = float(os.getenv("TREND_CONT_CONF") or 65)      # conf สังเคราะห์ TREND_CONT/HTF override
 TREND_CONT_MAX_DIST_PCT  = float(os.getenv("TREND_CONT_MAX_DIST_PCT") or 0.3)  # % ห่าง H1 EMA20 (pullback จริง)
 NNLB_FASTPATH            = os.getenv("NNLB_FASTPATH", "true").lower() != "false"   # false = NNLB ผ่าน Claude เสมอ
@@ -132,7 +135,7 @@ def reload_config():
     TRAILING_LOOKBACK    = int(os.getenv("TRAILING_LOOKBACK",    "6"))
     global MIN_TECHNICAL_CONFIDENCE, ASIAN_MIN_CONF, COUNTER_SPIKE_PIPS
     global NEWS_FIRST, NEWS_BIAS_MIN_CONF, HTF_FADE_BLOCK
-    global NEWS_OVERRIDE_TREND, NEWS_CONFIRM_PIPS, NEWS_OVERRIDE_MIN_CONF
+    global NEWS_OVERRIDE_TREND, NEWS_CONFIRM_PIPS, NEWS_OVERRIDE_MIN_CONF, HTF_REVERSAL_MIN_CONF
     global TREND_CONT_CONF, TREND_CONT_MAX_DIST_PCT, NNLB_FASTPATH, MIN_AI_EQUITY
     MIN_TECHNICAL_CONFIDENCE = int(os.getenv("MIN_TECH_CONF") or 62)
     ASIAN_MIN_CONF           = float(os.getenv("ASIAN_MIN_CONF") or 72)
@@ -143,6 +146,7 @@ def reload_config():
     NEWS_OVERRIDE_TREND      = os.getenv("NEWS_OVERRIDE_TREND", "true").lower() != "false"
     NEWS_CONFIRM_PIPS        = float(os.getenv("NEWS_CONFIRM_PIPS") or 500)
     NEWS_OVERRIDE_MIN_CONF   = float(os.getenv("NEWS_OVERRIDE_MIN_CONF") or 50)
+    HTF_REVERSAL_MIN_CONF    = float(os.getenv("HTF_REVERSAL_MIN_CONF") or 70)
     TREND_CONT_CONF          = float(os.getenv("TREND_CONT_CONF") or 65)
     TREND_CONT_MAX_DIST_PCT  = float(os.getenv("TREND_CONT_MAX_DIST_PCT") or 0.3)
     NNLB_FASTPATH            = os.getenv("NNLB_FASTPATH", "true").lower() != "false"
