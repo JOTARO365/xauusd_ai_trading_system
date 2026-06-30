@@ -162,7 +162,17 @@ def _get_close_times(days: int = 7) -> dict[str, dict]:
     """
     import MetaTrader5 as mt5
     from datetime import timedelta
-    _REASON = {0: "MANUAL", 1: "SL_HIT", 2: "TP_HIT", 6: "EA_CLOSE"}
+    # MT5 DEAL_REASON → ชื่อ semantic. เดิม map ผิด (1/2/6 = MOBILE/WEB/SO ไม่ใช่ SL/TP/EA;
+    # SL=4 TP=5 EXPERT=3 ขาดหมด → close_reason ออกมาเป็น REASON_4/5/3). ใช้ mt5 constants กัน hardcode เพี้ยน
+    _REASON = {
+        mt5.DEAL_REASON_CLIENT: "MANUAL",    # 0 desktop
+        mt5.DEAL_REASON_MOBILE: "MANUAL",    # 1
+        mt5.DEAL_REASON_WEB:    "MANUAL",    # 2
+        mt5.DEAL_REASON_EXPERT: "EA_CLOSE",  # 3 bot/EA close
+        mt5.DEAL_REASON_SL:     "SL_HIT",    # 4
+        mt5.DEAL_REASON_TP:     "TP_HIT",    # 5
+        mt5.DEAL_REASON_SO:     "SO",        # 6 stop out (margin)
+    }
     date_from = datetime.now() - timedelta(days=days)
     close_map: dict[str, dict] = {}
     try:
