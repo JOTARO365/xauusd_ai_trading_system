@@ -510,10 +510,17 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         if sr_zone == "NONE" and conf < _q_min:
             return _fail(f"{_sess_lbl}: no-zone entries blocked — conf {conf}% < {_q_min:.0f}%")
 
-    # 5c. SELL at RESISTANCE in BEARISH trend — WR=39% historically, require STRONG zone + high conf
+    # 5c. SELL at RESISTANCE in BEARISH trend — momentum-aware (2026-06-30)
+    # เดิม require STRONG+conf>=80 เสมอ (WR=39% เก่า, tuned จากยุค parser พัง conf=0) → block SELL
+    # ตามเทรนด์ลงต่อ (counterfactual 06-30: 8 WIN/0 lose, ราคาลงต่อ +1562). แยก 2 กรณี:
+    #  - ราคาเด้งขึ้นแตะ resistance (fast_move > 0) = fade เสี่ยงเด้ง → คงเข้ม STRONG+80
+    #  - ราคาไม่เด้งขึ้น (fast_move <= 0) = SELL continuation ตามเทรนด์ → allow ที่ floor ปกติ
+    # counter-spike (gate 2b) กรอง SELL สวน up-spike ออกก่อนแล้ว
     if direction == "SELL" and trend == "BEARISH" and sr_zone == "RESISTANCE":
-        if not (sr_str == "STRONG" and conf >= 80):
-            return _fail(f"SELL+RESISTANCE in BEARISH: WR=39% — requires STRONG zone + conf >=80% (got {sr_str}/{conf}%)")
+        _fast = float(chart_data.get("fast_move_pips", 0) or 0)
+        _continuation = _fast <= 0 and conf >= _cfg.MIN_TECHNICAL_CONFIDENCE
+        if not _continuation and not (sr_str == "STRONG" and conf >= 80):
+            return _fail(f"SELL+RESISTANCE in BEARISH (เด้งขึ้น fast={_fast:+.0f}p): WR=39% — requires STRONG + conf>=80 (got {sr_str}/{conf}%)")
 
     # 6. Min confidence — floor เดียวทุกกรณี (replay 489 ไม้: การลด floor ที่ HTF zone
     #    เหลือ 42/45 คือประตูให้ไม้ conf 50-59 ที่ WR 23.5% / −3,807 เข้ามา — เลิกลด)
