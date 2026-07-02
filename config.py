@@ -88,6 +88,13 @@ MAX_TRADES_PER_DAY    = int(os.getenv("MAX_TRADES_PER_DAY") or 6)
 AUTO_SL_PROTECT       = (os.getenv("AUTO_SL_PROTECT") or "true").lower() != "false"
 AUTO_SL_PIPS          = int(os.getenv("AUTO_SL_PIPS") or 0)   # ความกว้าง AUTO-SL แยกจาก SL บอท
 
+# MOMENTUM_RIDE: พอร์ต "โหมดชนะ" ของระบบยุคทอง (พ.ค. W18-19) เข้าระบบปัจจุบัน —
+# เมื่อ momentum 3 ชั้นเรียงแถว (M15 STRONG + H1 ทิศเดียวกัน + H4 trend ตรงทิศไม้)
+# → ยกเว้น counter-spike + HTF-direction ให้ไม้นั้น (dip-entry/reversal ตามเทรนด์เข้าได้)
+# เกราะอื่นทำงานครบ: conf floor, trade cap, daily loss, streak, SL_MIN_GAP, exit mgmt
+# ไม้ที่เข้าทางนี้ติด tag RIDE ใน comment → วัดผลแยกได้ (score_trend_mode/DB)
+MOMENTUM_RIDE         = os.getenv("MOMENTUM_RIDE", "true").lower() != "false"
+
 # SL_MIN_GAP_PIPS: ทุกกลไกที่ "เลื่อน" SL (breakeven/force-BE/dynamic-TP lock) ห้ามวาง SL
 # ใกล้ราคาปัจจุบันกว่านี้ — user report 07-03: SL โดนดันชิด bid/ask (force-BE เหลือ gap 10p,
 # dynamic-TP lock 200p, BE-cap×HTF-buffer เหลือ 500p) ขณะทองวัน event วิ่ง ~3,200p
@@ -184,6 +191,8 @@ def reload_config():
     MAX_TRADES_PER_DAY       = int(os.getenv("MAX_TRADES_PER_DAY") or 6)
     AUTO_SL_PIPS             = int(os.getenv("AUTO_SL_PIPS") or 0)
     SL_MIN_GAP_PIPS          = int(os.getenv("SL_MIN_GAP_PIPS") or 800)
+    global MOMENTUM_RIDE
+    MOMENTUM_RIDE            = os.getenv("MOMENTUM_RIDE", "true").lower() != "false"
     global LESSON_LEARNING, DRY_RUN, NNLB_MODE, NNLB_BASE_EQUITY, NNLB_EQUITY_PER_LOT, NNLB_MAX_LOSS_PCT
     LESSON_LEARNING      = os.getenv("LESSON_LEARNING", "true").lower() != "false"
     DRY_RUN              = os.getenv("DRY_RUN", "false").lower() == "true"

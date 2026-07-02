@@ -2021,6 +2021,17 @@
             </div>
             <div class="toggle-row">
               <div>
+                <div class="toggle-label-text">Momentum Ride</div>
+                <div class="toggle-label-sub">โหมดชนะยุคทอง: M15-STRONG+H1+H4 เรียงแถว → ยกเว้น counter-spike/HTF-direction (ไม้ติด tag RIDE)</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="cfg-MOMENTUM_RIDE">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
                 <div class="toggle-label-text">Auto SL Protect</div>
                 <div class="toggle-label-sub">ตั้ง SL ให้ไม้ที่ไม่มี SL อัตโนมัติทุก cycle (SYSTEM+MANUAL)</div>
               </div>
@@ -3102,7 +3113,7 @@ const _TXT_KEYS  = ['SYMBOL','LOT_MODE','X_ACCOUNTS_TO_FOLLOW','X_KEYWORDS','TRA
 const _BOOL_KEYS = ['PORTFOLIO_PROTECTION','STREAK_PROTECTION','DYNAMIC_TP',
   'LESSON_LEARNING','DRY_RUN','NNLB_MODE','TRAILING_STOP',
   'HTF_DIRECTION_BLOCK','AUTO_SL_PROTECT','EMA_PULLBACK_BLOCK',
-  'NEWS_FIRST','HTF_FADE_BLOCK','NEWS_OVERRIDE_TREND','NNLB_FASTPATH'];
+  'NEWS_FIRST','HTF_FADE_BLOCK','NEWS_OVERRIDE_TREND','NNLB_FASTPATH','MOMENTUM_RIDE'];
 
 async function loadConfig() {
   document.getElementById('cfg-status').textContent = '';

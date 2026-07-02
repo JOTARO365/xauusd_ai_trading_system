@@ -66,6 +66,12 @@ def _log_gate_block(reason: str, chart_data: dict, sentiment_data: dict | None =
             "entry_type": chart_data.get("entry_type"),
             "price": h1.get("close"),
             "sentiment_bias": (sentiment_data or {}).get("bias"),
+            # TREND-MODE shadow experiment (07-03): เก็บสภาพ momentum/D1 ตอน block
+            # เพื่อ score ย้อนหลังด้วย scripts/score_trend_mode.py (เงื่อนไขจริง ไม่ใช่ H4 proxy)
+            "fast_move": chart_data.get("fast_move_pips"),
+            "d1_trend": chart_data.get("d1_trend"),
+            "mom_h1": ((chart_data.get("momentum_tf") or {}).get("h1") or {}).get("direction"),
+            "mom_m15": ((chart_data.get("momentum_tf") or {}).get("m15") or {}).get("direction"),
         }
         _GATE_LOG.parent.mkdir(parents=True, exist_ok=True)
         with _GATE_LOG.open("a", encoding="utf-8") as f:
@@ -82,12 +88,38 @@ SYSTEM_PROMPT = json.dumps(
 # จาก dashboard เห็นผลทันที ไม่ต้อง restart) — replay 489 ไม้หนุนค่า default ดู config.py
 
 
+def _momentum_ride_active(direction: str, chart_data: dict) -> bool:
+    """MOMENTUM_RIDE — เงื่อนไข "โหมดชนะ" ของระบบยุคทอง (04-06 พ.ค. +24.9k):
+    momentum 3 ชั้นเรียงแถวตรงทิศไม้: M15 STRONG + H1 ทิศเดียวกัน + H4 trend ตรง.
+    active → ยกเว้น counter-spike + HTF-direction ให้ไม้นั้น (dip/reversal ตามเทรนด์เข้าได้
+    เหมือนยุคเดิม) แต่เกราะยุคใหม่ทำงานครบ (conf floor/trade cap/daily loss/streak/SL gap).
+    SIDEWAYS ไม่มีวัน ride (h4 ต้อง BULLISH/BEARISH ตรงทิศ). fail-open = False (ตึงตามปกติ)"""
+    if not getattr(_cfg, "MOMENTUM_RIDE", True):
+        return False
+    trend = (chart_data.get("trend") or "").upper()
+    h4_ok = (direction == "BUY" and trend == "BULLISH") or \
+            (direction == "SELL" and trend == "BEARISH")
+    if not h4_ok:
+        return False
+    mom  = chart_data.get("momentum_tf") or {}
+    m15  = mom.get("m15") or {}
+    h1   = mom.get("h1") or {}
+    want = "UP" if direction == "BUY" else "DOWN"
+    return (m15.get("direction") == want and m15.get("strength") == "STRONG"
+            and h1.get("direction") == want)
+
+
 def _counter_spike_reason(direction: str, chart_data: dict) -> str | None:
     """News-first guard: ราคาที่สไปก์แรงคือผลของข่าวทันที → ห้ามเข้าสวนทาง.
     fast_move_pips (จาก chart_watcher, net M15 ~45min, + = ขึ้น):
       พุ่งขึ้นแรง → ห้าม SELL (สวนการเด้ง);  ดิ่งลงแรง → ห้าม BUY (สวนการร่วง).
+    ยกเว้น: MOMENTUM_RIDE active — dip ระหว่างเทรนด์ที่ momentum กลับตัวแล้ว = จุดเข้า ไม่ใช่ข่าวร้าย
     """
     if _cfg.COUNTER_SPIKE_PIPS <= 0:
+        return None
+    if _momentum_ride_active(direction, chart_data):
+        _f = chart_data.get("fast_move_pips", 0)
+        logger.info(f"[RIDE] counter-spike waived: {direction} fast={_f:+.0f}p แต่ M15-STRONG+H1+H4 เรียงแถว")
         return None
     fast = float(chart_data.get("fast_move_pips", 0) or 0)
     if abs(fast) < _cfg.COUNTER_SPIKE_PIPS:
@@ -143,6 +175,9 @@ def _htf_direction_reason(direction: str, chart_data: dict) -> str | None:
     = −242 WR21% ≈ การเลือดทั้งเดือน (market conf 78-82 ก็แพ้ยกชุด → ไม่มี conf exception;
     ทดสอบ exception htf_zone+conf≥70 แล้ว 'แย่ลง' −84). d1_trend ไม่มี/NEUTRAL = ไม่ block"""
     if not getattr(_cfg, "HTF_DIRECTION_BLOCK", True):
+        return None
+    if _momentum_ride_active(direction, chart_data):
+        logger.info(f"[RIDE] HTF-direction waived: {direction} (D1 lag) — M15-STRONG+H1+H4 เรียงแถว")
         return None
     d1 = (chart_data.get("d1_trend") or "NEUTRAL").upper()
     if d1 == "BEARISH" and direction == "BUY":
@@ -864,7 +899,9 @@ Account — Today: {history['today_pnl']:+.2f} USD ({history['today_trades']} tr
         sr_actions  = chart_data.get("sr_actions", [])
         pa_tag      = sr_actions[0]["action"] if sr_actions else "NOPA"
         sentiment   = sentiment_data.get("sentiment", "NEUTRAL")
-        comment_tag = f"AI:{tech_signal}|PA:{pa_tag}|{sentiment}"
+        # RIDE นำหน้า — comment โดนตัด 31 ตัว tag ต้องรอด เพื่อ segment ผล ride แยกใน MT5/DB
+        _ride_tag   = "RIDE " if _momentum_ride_active(out_direction, chart_data) else ""
+        comment_tag = f"{_ride_tag}AI:{tech_signal}|PA:{pa_tag}|{sentiment}"
         if notp_tag:
             comment_tag += f"|NOTP:{notp_tag}"
 
