@@ -951,6 +951,18 @@ def api_modify_position():
     return jsonify({"ok": True, "ticket": ticket, "sl": sl, "tp": tp})
 
 
+@app.route("/api/event-stats")
+def api_event_stats():
+    """สถิติ event-reaction จาก data/event_stats.json (สร้างโดย scripts/event_reaction_stats.py)
+    — ใช้โดย Event Radar บน Live tab (prior + forward projection)"""
+    try:
+        p = os.path.join(_BASE, "../data/event_stats.json")
+        with open(p, "r", encoding="utf-8") as f:
+            return jsonify({"ok": True, **json.load(f)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "events": {}})
+
+
 @app.route("/api/calendar")
 def api_calendar():
     """ดึง economic calendar สัปดาห์นี้ (High + Medium impact events)"""

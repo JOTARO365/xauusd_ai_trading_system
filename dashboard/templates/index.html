@@ -1504,6 +1504,14 @@
       </div>
     </section>
 
+    <!-- EVENT RADAR — prior + forward projection (UHAS-style ชิ้น 3, 07-03) -->
+    <section>
+      <div class="section-title">Event Radar &mdash; Priors &amp; Projection</div>
+      <div class="chart-card" style="padding:14px 18px">
+        <div id="event-radar" style="font-family:var(--mono);font-size:12px">Loading…</div>
+      </div>
+    </section>
+
     <!-- LAST DECISION DETAIL -->
     <section>
       <div class="section-title">Last Decision &mdash; Detail</div>
@@ -3180,10 +3188,21 @@ function toggleAccordion(headerEl) {
 /* ════════════════════════════════════════════════════════════
    ECONOMIC CALENDAR
    ════════════════════════════════════════════════════════════ */
+let _calEvents  = [];    // ใช้ร่วมโดย Event Radar (Live tab)
+let _eventStats = null;  // สถิติ event-reaction 15 ปี จาก /api/event-stats
+
+async function loadEventStats() {
+  try {
+    const r = await fetch('/api/event-stats');
+    _eventStats = await r.json();
+  } catch (e) { _eventStats = null; }
+}
+
 async function fetchCalendar() {
   try {
     const res  = await fetch('/api/calendar');
     const data = await res.json();
+    _calEvents = data.events || [];
     renderCalendar(data.events || []);
   } catch(e) {
     const el = document.getElementById('cal-container');
@@ -3344,6 +3363,8 @@ async function loadMonitor() {
 
     renderVerdict(bs);
     renderZones(bs);
+    if (!_calEvents.length) fetchCalendar();   // เผื่อเปิด Live tab ก่อน calendar โหลดรอบแรก
+    renderEventCard(bs);
 
     const orders  = data.pending_orders || [];
     const grouped = data.pending_grouped || {};
@@ -3444,6 +3465,52 @@ function renderZones(bs) {
     (res.map(l => row(l, 'R')).join('') || '<div class="no-data">no resistance data</div>')
     + priceRow
     + (sup.map(l => row(l, 'S')).join('') || '<div class="no-data">no support data</div>');
+}
+
+/* ── Event Radar (07-03 ชิ้น 3): upcoming events + prior 15 ปี + กรอบราคาคาด ── */
+function renderEventCard(bs) {
+  const el = document.getElementById('event-radar');
+  if (!el) return;
+  const px  = (bs.price_info || {}).bid;
+  const now = Date.now();
+  const upcoming = (_calEvents || [])
+    .filter(ev => String(ev.actual || 'pending').toLowerCase() === 'pending' && ev.timestamp_iso)
+    .map(ev => ({ ...ev, t: Date.parse(ev.timestamp_iso) }))
+    .filter(ev => ev.t > now - 30 * 60000 && ev.t < now + 48 * 3600000)
+    .sort((a, b) => a.t - b.t).slice(0, 3);
+  if (!upcoming.length) {
+    el.innerHTML = '<div class="no-data">ไม่มี high-impact event ใน 48 ชม.</div>';
+    return;
+  }
+  // ต้อง sync กับ _EVENT_TITLE_KEYS ใน agents/analyst.py เมื่อเพิ่ม event ใหม่
+  const NEEDLES = { NFP: ['non-farm', 'nonfarm', 'non farm'] };
+  const statsEv = (_eventStats && _eventStats.events) || {};
+  el.innerHTML = upcoming.map(ev => {
+    const mins = Math.round((ev.t - now) / 60000);
+    const cd = mins <= 0 ? 'NOW' : mins < 60 ? mins + 'm' : Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
+    const cdColor = mins < 60 ? 'var(--red)' : mins < 360 ? 'var(--gold)' : 'var(--muted)';
+    let extra = '';
+    const tl = (ev.title || '').toLowerCase();
+    for (const [key, needles] of Object.entries(NEEDLES)) {
+      const s = statsEv[key];
+      if (s && needles.some(n => tl.includes(n))) {
+        const range = px
+          ? `${(px * (1 - s.avg_abs_d0_pct / 100)).toFixed(0)} – ${(px * (1 + s.avg_abs_d0_pct / 100)).toFixed(0)}`
+          : '—';
+        extra = `<div style="margin-top:4px;font-size:10px;color:var(--muted)">
+          prior ${s.n} ครั้ง (15 ปี): ขึ้น ${s.up_pct}% / ลง ${s.down_pct}% · move เฉลี่ย ${s.avg_abs_d0_pct}% = ${s.vs_baseline_x}× วันปกติ
+          <span style="color:var(--gold)">· กรอบคาด ${range}</span></div>`;
+        break;
+      }
+    }
+    return `<div style="padding:7px 0;border-bottom:1px solid var(--border2,#2a3142)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="width:64px;color:${cdColor};font-weight:800">${cd}</span>
+        <span style="width:36px;color:var(--gold);font-size:10px;font-weight:700">${ev.currency || ''}</span>
+        <span style="flex:1">${ev.title || ''}</span>
+        <span style="color:var(--muted);font-size:10px">F:${ev.forecast || '—'} P:${ev.previous || '—'}</span>
+      </div>${extra}</div>`;
+  }).join('');
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -3564,8 +3631,10 @@ function _bootstrap() {
   fetchData();
   fetchCalendar();
   loadLivePrice();
+  loadEventStats();
   setInterval(fetchData, 10000);
   setInterval(fetchCalendar, 1800000);
+  setInterval(loadEventStats, 3600000);
   setInterval(loadLivePrice, 5000);
   // Live tab panels (verdict/zones/pending) — refresh เฉพาะตอน tab เปิดอยู่
   setInterval(() => {
