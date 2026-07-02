@@ -308,14 +308,18 @@ def route_entry(state: TradingState) -> str:
 
 def route_after_advisor(state: TradingState) -> str:
     if state.get("net_degraded"):
-        logger.warning("[GRAPH] Network degraded (CW+MA fail) — skip to accounting")
-        return "accounting"
+        # เดิมข้ามไป accounting เลย = cycle นี้ไม่มี BE/trailing/momentum-exit/AUTO-SL ดูแลไม้
+        # แล้ว main loop รอต่ออีก 600s — จังหวะ API ล่มคือจังหวะที่ protective สำคัญที่สุด
+        logger.warning("[GRAPH] Network degraded (CW+MA fail) — รัน position_mgmt ก่อนจบ cycle")
+        return "position_mgmt"
     return "news"
 
 
 def route_after_position_mgmt(state: TradingState) -> str:
     if state.get("skip_ai"):
-        return "done"   # skip_ai path: position mgmt only → END
+        return "done"        # skip_ai path: position mgmt only → END
+    if state.get("net_degraded"):
+        return "accounting"  # degraded: ไม่วิ่ง reporter/pending ด้วยข้อมูลพัง แต่ยังบันทึก usage
     return "reporter"
 
 
@@ -341,15 +345,16 @@ def build_trading_graph():
     })
     g.add_edge("chart",    "advisor")
     g.add_conditional_edges("advisor", route_after_advisor, {
-        "news":       "news",
-        "accounting": "accounting",
+        "news":          "news",
+        "position_mgmt": "position_mgmt",   # net_degraded: ยังต้องดูแลไม้ก่อนจบ cycle
     })
     g.add_edge("news",     "analyst")
     g.add_edge("analyst",  "decision")
     g.add_edge("decision", "position_mgmt")
     g.add_conditional_edges("position_mgmt", route_after_position_mgmt, {
-        "reporter": "reporter",
-        "done":     END,
+        "reporter":   "reporter",
+        "accounting": "accounting",         # net_degraded path
+        "done":       END,
     })
     g.add_edge("reporter",   "accounting")
     g.add_edge("accounting", END)

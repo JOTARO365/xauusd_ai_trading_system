@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from langchain_anthropic import ChatAnthropic
+import config as _cfg
 from config import ANTHROPIC_API_KEY
 from agents.news_cache import get_news_context
 from agents.schemas import AnalystOutput
@@ -70,7 +71,11 @@ def analyze_sentiment(news_data: dict, chart_data: dict | None = None) -> dict:
 
     # ── News Cache: Haiku summary + vector search ──────────────
     market_ctx   = _build_market_context(chart_data) if chart_data else ""
-    news_context = get_news_context(news_data, market_context=market_ctx)
+    # ราคาวิ่งแรง (≥ counter-spike threshold) = ข่าวใหม่น่าจะเป็นตัวขับราคา
+    # → force summary สด ห้าม reuse cache (sentiment ต้องตามเหตุการณ์ทัน)
+    _fast  = abs(float((chart_data or {}).get("fast_move_pips", 0) or 0))
+    _force = _fast >= float(getattr(_cfg, "COUNTER_SPIKE_PIPS", 500) or 500)
+    news_context = get_news_context(news_data, market_context=market_ctx, force_fresh=_force)
 
     summary       = news_context["summary"]
     relevant      = news_context["relevant_items"]

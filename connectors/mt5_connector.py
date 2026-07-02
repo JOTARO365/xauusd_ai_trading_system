@@ -73,17 +73,20 @@ def calculate_lot_size(account_balance: float, sl_pips: float,
     """คำนวณ lot size โดยปรับตาม confidence_scale (0.5–1.0)
     confidence_scale < 1.0 → risk น้อยลงตามสัดส่วน confidence
     """
-    pip_value = 0.1  # XAU/USD: $0.1 per pip per 0.01 lot
+    # pip value ต่อ 1 pip ต่อ 1 lot จาก broker จริง (order_calc_profit — ตัวเดียวกับ NNLB)
+    # ห้าม hardcode: ค่าเดิม 0.1 ผิด 10 เท่า (broker จริง $1/pip/lot) — postmortem บัค #1
+    # เคยแก้เฉพาะ NNLB path (f8a1050) ตัวนี้หลุด → auto-lot เล็กกว่าที่ตั้งใจ 10 เท่า
+    pip_value_lot = _calc_pip_value(_cfg.SYMBOL)   # fallback 1.0 = gold USD standard
     if _cfg.LOT_MODE == "fixed":
         lot = _cfg.FIXED_LOT
         logger.info(f"Lot mode: fixed → {lot}")
     else:
         scale = max(0.0, min(1.0, confidence_scale))
         risk_amount = account_balance * MONEY_MANAGEMENT["risk_per_trade"] * scale
-        lot = round(risk_amount / (sl_pips * pip_value * 100), 2)
+        lot = round(risk_amount / (sl_pips * pip_value_lot), 2)
 
     clamped = max(_cfg.MIN_LOT, min(lot, _cfg.MAX_LOT))
-    actual_risk = clamped * sl_pips * pip_value * 100 if _cfg.LOT_MODE != "fixed" else 0
+    actual_risk = clamped * sl_pips * pip_value_lot if _cfg.LOT_MODE != "fixed" else 0
     if _cfg.LOT_MODE != "fixed":
         scale_note  = f" scale={confidence_scale:.2f}" if confidence_scale < 1.0 else ""
         clamp_note  = f" → clamped={clamped}" if clamped != lot else ""

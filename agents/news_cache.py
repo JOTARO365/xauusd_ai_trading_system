@@ -72,14 +72,30 @@ def _get_cache_by_hash(content_hash: str) -> dict | None:
         return None
 
 
-def _get_latest_valid_cache() -> dict | None:
-    """ดึง cache ล่าสุดที่ยังไม่หมดอายุ (fallback เมื่อข่าวเปลี่ยนแต่ยังอยู่ใน TTL)"""
+def _get_latest_valid_cache(max_age_min: int | None = None) -> dict | None:
+    """ดึง cache ล่าสุดที่ยังไม่หมดอายุ.
+    max_age_min: จำกัดอายุ (นาที) — ใช้ตอน hash MISS เพื่อ reuse ได้เฉพาะ cache สดจริง
+    (กัน Haiku ยิงถี่จาก tweet สลับเล็กน้อย) โดยไม่ปล่อยให้ summary ค้างทั้ง TTL 1 ชม.
+    None = ไม่จำกัดอายุ (ใช้เป็น error-fallback ตอน Haiku fail เท่านั้น)"""
     try:
-        now = datetime.now(timezone.utc).isoformat()
-        res = _get_db().table("news_cache").select("id,summary").gt(
-            "expires_at", now
+        now = datetime.now(timezone.utc)
+        res = _get_db().table("news_cache").select("id,summary,created_at").gt(
+            "expires_at", now.isoformat()
         ).order("created_at", desc=True).limit(1).execute()
-        return res.data[0] if res.data else None
+        if not res.data:
+            return None
+        row = res.data[0]
+        if max_age_min is not None:
+            try:
+                created = datetime.fromisoformat(
+                    str(row.get("created_at", "")).replace("Z", "+00:00"))
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                if (now - created).total_seconds() > max_age_min * 60:
+                    return None   # cache สดไม่พอสำหรับ reuse — ให้ summarize ใหม่
+            except ValueError:
+                return None
+        return row
     except Exception as e:
         logger.warning(f"News cache latest read error: {e}")
         return None
@@ -250,20 +266,31 @@ def vector_search(query: str, top_n: int = 3) -> list[str]:
 #  MAIN ENTRY POINT
 # ─────────────────────────────────────────────────────────────
 
-def get_news_context(news_data: dict, market_context: str = "") -> dict:
+# hash MISS แต่ cache ล่าสุดอายุ ≤ นาทีนี้ → reuse ได้ (tweet มัก shuffle เล็กน้อยทุก cycle
+# — summarize ใหม่ทุกครั้งเปลือง Haiku) เกินนี้ = ข่าวใหม่ต้องเห็นจริง ไม่ค้างทั้ง TTL 1 ชม.
+_STALE_REUSE_MIN = 10
+
+
+def get_news_context(news_data: dict, market_context: str = "",
+                     force_fresh: bool = False) -> dict:
     """
     Main function — เรียกจาก analyst.py แทนการส่ง raw news ทั้งหมด
 
     Flow:
-      1. ตรวจ cache (by hash → by latest valid)
-      2. MISS → Haiku สรุป + Gemini embed + store
-      3. vector_search หา top-3 items ที่ match กับ market context
-      4. return {summary, relevant_items, from_cache, token_estimate}
+      1. ตรวจ cache: hash ตรง → ใช้เลย; hash ใหม่ → reuse ได้เฉพาะ cache อายุ ≤ 10 นาที
+         (เดิม fallback ไป cache เก่าทั้ง TTL 1 ชม. = ข่าวใหม่ล่องหน — root ของ
+         "sentiment ตามราคาไม่ทันตอน reversal")
+      2. force_fresh=True (ราคาวิ่งแรง) → ข้าม reuse, summarize ใหม่เสมอ (hash ตรงยังใช้ได้)
+      3. MISS → Haiku สรุป + Gemini embed + store; Haiku fail → fallback cache เก่า (resilience)
+      4. vector_search หา top-3 items ที่ match กับ market context
+      5. return {summary, relevant_items, from_cache, token_estimate}
     """
     content_hash = _hash_news(news_data)
 
     # ── ลอง cache ──────────────────────────────────────────────
-    cached = _get_cache_by_hash(content_hash) or _get_latest_valid_cache()
+    cached = _get_cache_by_hash(content_hash)
+    if not cached and not force_fresh:
+        cached = _get_latest_valid_cache(max_age_min=_STALE_REUSE_MIN)
 
     if cached:
         logger.info(f"News cache: HIT (id={cached['id']}) — ข้าม Haiku call")
@@ -271,10 +298,21 @@ def get_news_context(news_data: dict, market_context: str = "") -> dict:
         summary    = cached["summary"]
         from_cache = True
     else:
-        logger.info("News cache: MISS — เรียก Haiku สรุปข่าว")
-        summary    = _summarize_with_haiku(news_data)
-        cache_id   = _store_cache(content_hash, summary, news_data)
-        from_cache = False
+        logger.info("News cache: MISS — เรียก Haiku สรุปข่าว"
+                    + (" [force_fresh: ราคาวิ่งแรง]" if force_fresh else ""))
+        try:
+            summary    = _summarize_with_haiku(news_data)
+            cache_id   = _store_cache(content_hash, summary, news_data)
+            from_cache = False
+        except Exception as e:
+            # Haiku fail → fallback cache เก่าที่ยังไม่หมดอายุ (ไม่จำกัดอายุ) ดีกว่าไม่มีข่าวเลย
+            logger.warning(f"News summarize failed: {e} — ลอง fallback cache เก่า")
+            stale = _get_latest_valid_cache()
+            if stale is None:
+                raise
+            cache_id   = stale["id"]
+            summary    = stale["summary"]
+            from_cache = True
 
     # ── Vector search (ถ้ามี GEMINI_API_KEY) ───────────────────
     relevant: list[str] = []
