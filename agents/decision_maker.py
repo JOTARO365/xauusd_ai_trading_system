@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone as _tz
 from pathlib import Path
 from langchain_anthropic import ChatAnthropic
-from connectors.mt5_connector import open_order, get_open_positions, count_protected_slots, check_open_slot, _is_momentum_strong
+from connectors.mt5_connector import open_order, get_open_positions, count_protected_slots, check_open_slot, _is_momentum_strong, daily_trade_cap_reached
 from connectors.price_feed import get_account_info
 from agents.reporter import get_trade_history_summary
 from agents.schemas import DecisionMakerOutput
@@ -32,7 +32,8 @@ _GATE_CATEGORIES = [
     ("htf", "htf_fade"), ("spike", "counter_spike"), ("counter-trend", "counter_trend"),
     ("ema_pullback", "ema_pullback"), ("engulfing", "engulfing"), ("sideways", "sideways"),
     ("asian", "session"), ("quiet", "session"), ("ny close", "session"),
-    ("unknown trend", "unknown_trend"), ("daily loss", "daily_loss"), ("streak", "streak"),
+    ("unknown trend", "unknown_trend"), ("daily loss", "daily_loss"), ("trade cap", "trade_cap"),
+    ("streak", "streak"),
     ("resistance", "sell_resistance"), ("sr zone", "no_zone"), ("atr", "atr"),
     ("confidence", "min_conf"), ("conf ", "min_conf"), ("slot", "slot"),
     ("sl ", "sl_range"), ("no_trade", "no_trade"), ("no trade", "no_trade"),
@@ -247,6 +248,12 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         return {"pass": False, "reason": reason}
 
     _utc_hour = datetime.now(_tz.utc).hour   # คำนวณครั้งเดียว — ใช้ใน NNLB Asian / gate 5b / LN-NY overlap
+
+    # 0. Daily trade cap — เบรกกันวันพายุ ครอบทั้ง NNLB/ปกติ (ตัดก่อนเรียก Claude = ประหยัด token)
+    #    replay 247 ไม้: ไม้ #7+ ของวัน = −411 (n=155) vs ไม้ 1-6 = +139.88; มิ.ย.+ block แต่ไม้แพ้
+    _capped, _cap_reason = daily_trade_cap_reached()
+    if _capped:
+        return _fail(_cap_reason)
 
     # ── NNLB mode: ข้าม gates ทั้งหมดยกเว้นทิศทาง ────────────────
     if _cfg.NNLB_MODE:

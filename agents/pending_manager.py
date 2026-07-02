@@ -9,7 +9,7 @@ import pandas as pd
 from datetime import datetime, timedelta, timezone
 from loguru import logger
 from connectors.price_feed import get_account_info, get_ohlcv
-from connectors.mt5_connector import place_pending_order, get_pending_orders, calculate_lot_size, cancel_pending_order
+from connectors.mt5_connector import place_pending_order, get_pending_orders, calculate_lot_size, cancel_pending_order, daily_trade_cap_reached
 from agents.reporter import log_pending_order, count_pending_by_direction
 from config import SYMBOL, MONEY_MANAGEMENT
 import config as _cfg
@@ -183,6 +183,12 @@ def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = No
     _chart_conf = chart_data.get("confidence", 0) or 0
     if _chart_conf <= 0:
         logger.info(f"Auto-pending: chart confidence={_chart_conf} (parser ไม่ให้ค่า/data invalid) — skip")
+        return 0
+
+    # Daily trade cap — วันพายุห้าม replenish pending เพิ่ม (fill = ไม้ #N+1 ของวัน)
+    _capped, _cap_reason = daily_trade_cap_reached()
+    if _capped:
+        logger.info(f"Auto-pending: {_cap_reason} — skip")
         return 0
 
     # ── นับ pending ที่มีอยู่แล้วแยก BUY/SELL ─────────────────
@@ -623,6 +629,12 @@ def manage_range_pending(chart_data: dict) -> int:
     if trend != "SIDEWAYS":
         return 0
 
+    # Daily trade cap — cancel-stale ด้านบนยังทำงาน แต่ห้ามวางไม้ range เพิ่มในวันพายุ
+    _capped, _cap_reason = daily_trade_cap_reached()
+    if _capped:
+        logger.info(f"Range pending: {_cap_reason} — skip")
+        return 0
+
     # ── ราคาปัจจุบัน ──────────────────────────────────────────────
     current = chart_data.get("indicators", {}).get("h4", {}).get("close", 0)
     if not current:
@@ -801,6 +813,12 @@ def manage_sl_reentry(chart_data: dict) -> int:
     """
     sl_closes = _get_recent_sl_closes()
     if not sl_closes:
+        return 0
+
+    # Daily trade cap — SL-RE คือ path คลาสสิกของ revenge-trade storm (โดน SL → วางใหม่ → โดนอีก)
+    _capped, _cap_reason = daily_trade_cap_reached()
+    if _capped:
+        logger.info(f"Post-SL re-entry: {_cap_reason} — skip")
         return 0
 
     logger.info(f"Post-SL: พบ {len(sl_closes)} SL close(s) ใน {_SLRE_WINDOW_MIN} นาที")

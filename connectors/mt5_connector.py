@@ -482,6 +482,13 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         return {"success": True, "ticket": 0, "direction": direction,
                 "lot": 0.0, "price": price, "sl": 0.0, "tp": 0.0, "dry_run": True}
 
+    # Daily trade cap — safety net จุดเดียวคุมทุก market entry รวม path ที่ข้าม gates
+    # (zone-break re-entry เรียก open_order ตรง) — gate ใน _run_gates ตัดก่อนถึงนี่อยู่แล้ว
+    _capped, _cap_reason = daily_trade_cap_reached()
+    if _capped:
+        logger.warning(f"[TRADE_CAP] {_cap_reason} — block {direction}")
+        return {"success": False, "error": _cap_reason}
+
     account = mt5.account_info()
     if account is None:
         logger.error("Cannot get account info")
@@ -713,6 +720,38 @@ def get_mt5_history(days: int = 60) -> list:
             "tp":        tp,
         })
     return results
+
+
+def count_trades_opened_today() -> int:
+    """นับไม้ SYSTEM ที่ 'เปิดจริง' วันนี้จาก MT5 entry deals (market + pending ที่ fill แล้ว).
+    ใช้เป็นฐานของ MAX_TRADES_PER_DAY (เบรกกันวันพายุ — replay: ไม้ #7+ ของวัน = −411).
+    ขอบวันใช้ local midnight (convention เดียวกับ get_mt5_history/daily-loss ในระบบ) —
+    deal.time เป็น server-time epoch อาจ drift 2-5 ชม.ที่ขอบวัน: ยอมรับได้สำหรับ storm cap
+    (ไม่ใช่ accounting เป๊ะ). fail → คืน 0 = ไม่ block (fail-open: cap เป็น insurance ไม่ใช่ SL)"""
+    from datetime import datetime
+    try:
+        midnight = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        deals = mt5.history_deals_get(midnight, datetime.now())
+        if deals is None:
+            return 0
+        return sum(
+            1 for d in deals
+            if d.symbol == SYMBOL and d.entry == 0 and d.magic == SYSTEM_MAGIC
+        )
+    except Exception as e:
+        logger.debug(f"count_trades_opened_today failed (fail-open): {e}")
+        return 0
+
+
+def daily_trade_cap_reached() -> tuple[bool, str]:
+    """(reached, reason) — True เมื่อไม้ที่เปิดวันนี้ ≥ MAX_TRADES_PER_DAY (0 = ปิดใช้งาน)"""
+    cap = int(getattr(_cfg, "MAX_TRADES_PER_DAY", 0) or 0)
+    if cap <= 0:
+        return False, ""
+    n = count_trades_opened_today()
+    if n >= cap:
+        return True, f"Daily trade cap: เปิดแล้ว {n}/{cap} ไม้วันนี้ — หยุดเปิดเพิ่ม (กัน over-trade)"
+    return False, ""
 
 
 def place_pending_order(pending_type: str, price: float, sl_pips: float, tp_pips: float,

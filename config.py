@@ -76,6 +76,12 @@ EMA_PULLBACK_MIN_CONF = int(os.getenv("EMA_PULLBACK_MIN_CONF") or 70)    # confi
 # → confidence filter EMA_PULLBACK ไม่ได้. ตั้ง false เพื่อกลับไปใช้แค่ sl/conf limits ด้านบน
 EMA_PULLBACK_BLOCK    = (os.getenv("EMA_PULLBACK_BLOCK") or "true").lower() != "false"
 
+# MAX_TRADES_PER_DAY: เพดานจำนวนไม้ SYSTEM ที่เปิดได้ต่อวัน (0=ปิด) — เบรกกันวันพายุ
+# replay 247 ไม้ (110465856): ไม้ที่ #7+ ของวัน = −411 (n=155) ขณะไม้ 1-6 แรก = +139.88;
+# ยุค gates ปัจจุบัน (มิ.ย.+) cap แทบไม่ยิง (block 1 ไม้ = ไม้แพ้) = insurance เกือบฟรี
+# นับจาก MT5 entry deals จริงวันนี้ (count_trades_opened_today) — market + pending fills
+MAX_TRADES_PER_DAY    = int(os.getenv("MAX_TRADES_PER_DAY") or 6)
+
 # AUTO_SL_PROTECT: ทุก cycle ถ้าเจอ open position ที่ไม่มี SL (sl==0) → ตั้ง SL ให้อัตโนมัติ
 # ที่ DEFAULT_SL_PIPS จากราคาปัจจุบัน (กันรู: ทุก manage_* เดิม continue ข้าม sl==0 → ไม่มีใครตั้งให้)
 # ครอบทั้ง SYSTEM + MANUAL. ตั้ง false เพื่อปิด (ไม่ยุ่งไม้ที่ไม่มี SL)
@@ -158,9 +164,10 @@ def reload_config():
     TREND_CONT_MAX_DIST_PCT  = float(os.getenv("TREND_CONT_MAX_DIST_PCT") or 0.3)
     NNLB_FASTPATH            = os.getenv("NNLB_FASTPATH", "true").lower() != "false"
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
-    global EMA_PULLBACK_BLOCK, AUTO_SL_PROTECT
+    global EMA_PULLBACK_BLOCK, AUTO_SL_PROTECT, MAX_TRADES_PER_DAY
     EMA_PULLBACK_BLOCK       = (os.getenv("EMA_PULLBACK_BLOCK") or "true").lower() != "false"
     AUTO_SL_PROTECT          = (os.getenv("AUTO_SL_PROTECT") or "true").lower() != "false"
+    MAX_TRADES_PER_DAY       = int(os.getenv("MAX_TRADES_PER_DAY") or 6)
     global LESSON_LEARNING, DRY_RUN, NNLB_MODE, NNLB_BASE_EQUITY, NNLB_EQUITY_PER_LOT, NNLB_MAX_LOSS_PCT
     LESSON_LEARNING      = os.getenv("LESSON_LEARNING", "true").lower() != "false"
     DRY_RUN              = os.getenv("DRY_RUN", "false").lower() == "true"
