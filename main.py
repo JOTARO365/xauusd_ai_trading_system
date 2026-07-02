@@ -9,7 +9,12 @@ from loguru import logger
 from connectors.price_feed import connect_mt5, disconnect_mt5, is_mt5_connected, recent_movement, get_account_info
 from connectors.mt5_connector import get_open_positions, get_current_price, is_hedge_active, check_open_slot, is_algo_trading_enabled
 from agents.chart_watcher import analyze_m5_pa
-from agents.pending_manager import place_weekly_calendar_pending
+from agents.pending_manager import (
+    place_weekly_calendar_pending,
+    # 3 ตัวล่างถูกเรียกใน slots-full branch (main loop) — เดิมไม่ได้ import ที่นี่
+    # (มีแค่ใน trading_graph.node_reporter) → NameError โดน except กลืนทุกรอบที่ slots เต็ม
+    auto_place_pending_orders, manage_range_pending, manage_sl_reentry,
+)
 from agents.trading_graph import TRADING_APP, GRAPH_CONFIG, EMPTY_STATE, TradingState
 from utils.display import (
     console, print_header, print_cycle_start, print_cycle_end,

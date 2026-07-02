@@ -38,7 +38,7 @@ def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list
             .select(
                 "ticket,account_login,symbol,source,direction,entry_type,status,"
                 "lot,entry_price,sl,tp,pnl,"
-                "opened_at,closed_at,"
+                "opened_at,closed_at,close_reason,close_price,"
                 "technical_signal,technical_confidence,"
                 "trend,sr_zone,sr_strength,pa_action,sentiment,analysis,"
                 "strategy_version"
@@ -64,6 +64,7 @@ def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list
                 "timestamp":             r.get("opened_at"),
                 "close_time":            r.get("closed_at"),
                 "close_reason":          r.get("close_reason"),
+                "close_price":           r.get("close_price"),
                 "technical_signal":      r.get("technical_signal"),
                 "technical_confidence":  r.get("technical_confidence"),
                 "trend":                 r.get("trend"),
@@ -77,7 +78,11 @@ def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list
                 "manual_analysis":       r.get("manual_analysis", ""),
                 "strategy_version":      r.get("strategy_version", 1),
             })
-        # Return newest first (desc order from DB, keep as-is)
+        # CONTRACT: คืน chronological (เก่า→ใหม่) เหมือน logs/trades.json — ทุก consumer
+        # (reporter closed[-10:]/losing-streak, dashboard list(reversed(trades))) เขียนกับ
+        # convention นี้. DB query เป็น desc+limit เพื่อให้ได้ "500 ไม้ล่าสุด" แล้วกลับด้าน
+        # ที่นี่จุดเดียว. ห้ามเปลี่ยนกลับเป็น newest-first — จะทำ streak protection ผิดฝั่งอีก
+        result.reverse()
         return result
     except Exception as e:
         logger.debug(f"get_trades DB error: {e}")

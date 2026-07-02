@@ -1170,7 +1170,9 @@ def manage_partial_close() -> int:
         # ── 1R: ปิด 50% ──────────────────────────────────────────────
         if "1R" not in done and profit_pips >= r_pips:
             lot = round(pos.volume * 0.50, 2)
-            if lot >= info.volume_min:
+            # ต้องเหลือ runner ≥ volume_min เสมอ — float 0.01×0.5=0.005 ปัดขึ้นเป็น 0.01
+            # → ไม้ min-lot เคยโดนปิด "เต็มไม้" ในนาม PARTIAL ที่ 1R (winner ไม่เคยถึง TP)
+            if lot >= info.volume_min and pos.volume - lot >= info.volume_min:
                 if _partial_close_pos(pos, lot, tick):
                     done.add("1R")
                     closed += 1
@@ -1190,7 +1192,9 @@ def manage_partial_close() -> int:
         # ── 2R: ปิด 60% ของที่เหลือ (=30% original) ─────────────────
         elif "1R" in done and "2R" not in done and profit_pips >= r_pips * 2:
             lot = round(pos.volume * 0.60, 2)
-            if lot >= info.volume_min:
+            # guard เดียวกับ 1R: ถ้าเหลือ 0.01 (round(0.006)=0.01) จะปิดหมด → ไม่เหลือ
+            # runner วิ่งไป TP 3R — skip แล้วปล่อยให้ BE/trailing/dynamic-TP ดูแลต่อ
+            if lot >= info.volume_min and pos.volume - lot >= info.volume_min:
                 if _partial_close_pos(pos, lot, tick):
                     done.add("2R")
                     closed += 1

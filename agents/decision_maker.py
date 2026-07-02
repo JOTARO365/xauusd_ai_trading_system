@@ -611,6 +611,12 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
 def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | None = None) -> dict:
     logger.info("Agent 4 (ผู้ตัดสินใจ): รัน gates และตัดสินใจ...")
 
+    # reset ก่อน early-return ทุกทาง (gate block = ส่วนใหญ่ของ cycles) — ไม่งั้น usage ของ
+    # Claude call ครั้งก่อนค้างให้ accounting นับซ้ำทุกรอบ → cost decision_maker เฟ้อใน DB
+    # (บัคชนิดเดียวกับที่แก้แล้วใน reporter.analyze_performance)
+    global _last_usage
+    _last_usage = None
+
     account = get_account_info()
     history = get_trade_history_summary()
 
@@ -750,7 +756,6 @@ SL: {sl_pips:.0f}p | TP: {tp_pips:.0f}p | R:R: {tp_pips/sl_pips:.1f} (min {eff_r
 History — {entry_wr}
 Account — Today: {history['today_pnl']:+.2f} USD ({history['today_trades']} trades) | WR10: {history['last_10_winrate']}% | Streak: {history['losing_streak']}L{chr(10) + lesson_block if lesson_block else ""}"""
 
-    global _last_usage
     messages = [
         {"role": "system", "content": [
             {"type": "text", "text": SYSTEM_PROMPT,

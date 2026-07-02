@@ -1093,6 +1093,11 @@ def analyze_m5_pa() -> dict:
 def analyze_chart() -> dict:
     logger.info("Agent 1: กำลังวิเคราะห์กราฟ...")
 
+    # reset ก่อนทุก early-return/exception — ถ้า cycle นี้ fail ก่อนถึง API call
+    # usage เก่าจะค้างให้ accounting นับซ้ำ (บัคเดียวกับ decision_maker/reporter)
+    global _last_usage
+    _last_usage = None
+
     h4_rates  = get_ohlcv(timeframe=mt5.TIMEFRAME_H4,  count=200)
     h1_rates  = get_ohlcv(timeframe=mt5.TIMEFRAME_H1,  count=100)
     m15_rates = get_ohlcv(timeframe=mt5.TIMEFRAME_M15, count=100)
@@ -1222,7 +1227,6 @@ SR_ZONE: SUPPORT หรือ RESISTANCE หรือ NONE
 SR_STRENGTH: STRONG หรือ NORMAL
 ENTRY_TYPE: SR_ZONE หรือ ENGULFING หรือ STRUCTURE_PULLBACK หรือ BREAKOUT_RETEST หรือ EMA_PULLBACK หรือ MOMENTUM_BREAKOUT หรือ DOJI_AT_ZONE หรือ NONE"""
 
-    global _last_usage
     response = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=1000,   # block-first summary + เหตุผลสั้น (เดิม 800 → report markdown ยาวถูก truncate ก่อนถึงสรุป → parse fail)
