@@ -30,6 +30,17 @@ def _get_manual_range() -> tuple[float, float] | tuple[None, None]:
         pass
     return None, None
 
+def _d1_counter(direction: str, chart_data: dict) -> bool:
+    """True = direction สวนเทรนด์ D1 (HTF_DIRECTION_BLOCK) — ใช้คุม pending ทุกระบบ.
+    มิ.ย.: ไม้เลือด counter-D1 เป็น pending fill 19/24 ไม้ (−137.68) → คุมแค่ decision gate
+    ไม่พอ ต้องคุมที่จุดวางด้วย. d1_trend ไม่มี/NEUTRAL = ไม่ block (fail-open)"""
+    if not getattr(_cfg, "HTF_DIRECTION_BLOCK", True):
+        return False
+    d1 = ((chart_data or {}).get("d1_trend") or "NEUTRAL").upper()
+    return (d1 == "BEARISH" and direction.upper().startswith("BUY")) or \
+           (d1 == "BULLISH" and direction.upper().startswith("SELL"))
+
+
 DUPLICATE_ZONE_PCT = 0.003   # 0.3% — ถือว่า level เดียวกัน, ไม่วางซ้ำ
 MIN_DIST_FROM_PRICE = 0.003  # 0.3% — ห่างจากราคาปัจจุบันขั้นต่ำ (ไม่วาง pending ติดราคาเกินไป)
 COUNTER_TREND_DIST  = 0.015  # 1.5% — ระยะขั้นต่ำสำหรับ counter-trend pending (extreme S/R เท่านั้น)
@@ -228,6 +239,15 @@ def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = No
         sell_slots    = min(sell_slots, 1)
         _counter_sell = True
         logger.info("Auto-pending: BULLISH trend — SELL_LIMIT จำกัด 1 slot ที่ extreme resistance (≥1.5%) เท่านั้น")
+
+    # ── HTF-direction: งด pending ฝั่งที่สวน D1 ทั้งหมด (เข้มกว่า H4 filter ด้านบน
+    #    ที่ยังให้ 1 slot extreme — replay: pending fill สวน D1 คือท่อเลือดหลัก มิ.ย.) ──
+    if _d1_counter("BUY", chart_data) and buy_slots > 0:
+        buy_slots = 0
+        logger.info("Auto-pending: D1 BEARISH — งด BUY_LIMIT ทุก slot (counter-D1)")
+    if _d1_counter("SELL", chart_data) and sell_slots > 0:
+        sell_slots = 0
+        logger.info("Auto-pending: D1 BULLISH — งด SELL_LIMIT ทุก slot (counter-D1)")
 
     if buy_slots <= 0 and sell_slots <= 0:
         logger.info("Auto-pending: ไม่มี slots ที่เปิดได้ (หลัง trend filter) — ข้าม")
@@ -715,7 +735,9 @@ def manage_range_pending(chart_data: dict) -> int:
     placed   = 0
 
     # ── BUY_LIMIT @ lower ─────────────────────────────────────────
-    if lower < current - min_dist:
+    if _d1_counter("BUY", chart_data):
+        logger.info("Range pending: D1 BEARISH — งดฝั่ง BUY_LIMIT (counter-D1)")
+    elif lower < current - min_dist:
         if _has_range_pending("BUY"):
             logger.info(f"Range BUY_LIMIT @ {lower:.2f} — มีอยู่แล้ว ข้าม")
         else:
@@ -738,7 +760,9 @@ def manage_range_pending(chart_data: dict) -> int:
                 logger.warning(f"Range BUY_LIMIT failed: {res.get('error')}")
 
     # ── SELL_LIMIT @ upper ────────────────────────────────────────
-    if upper > current + min_dist:
+    if _d1_counter("SELL", chart_data):
+        logger.info("Range pending: D1 BULLISH — งดฝั่ง SELL_LIMIT (counter-D1)")
+    elif upper > current + min_dist:
         if _has_range_pending("SELL"):
             logger.info(f"Range SELL_LIMIT @ {upper:.2f} — มีอยู่แล้ว ข้าม")
         else:
@@ -870,6 +894,9 @@ def manage_sl_reentry(chart_data: dict) -> int:
             if trend == "BEARISH":
                 logger.info("Post-SL BUY: ข้ามเพราะ trend=BEARISH (counter-trend)")
                 continue
+            if _d1_counter("BUY", chart_data):
+                logger.info("Post-SL BUY: ข้าม — D1 BEARISH (counter-D1; re-entry สวนเทรนด์ใหญ่ = revenge)")
+                continue
             if _has_slre_pending("BUY"):
                 logger.info("Post-SL BUY: มี SL-RE-BUY อยู่แล้ว — ข้าม")
                 continue
@@ -910,6 +937,9 @@ def manage_sl_reentry(chart_data: dict) -> int:
         else:   # SELL
             if trend == "BULLISH":
                 logger.info("Post-SL SELL: ข้ามเพราะ trend=BULLISH (counter-trend)")
+                continue
+            if _d1_counter("SELL", chart_data):
+                logger.info("Post-SL SELL: ข้าม — D1 BULLISH (counter-D1)")
                 continue
             if _has_slre_pending("SELL"):
                 logger.info("Post-SL SELL: มี SL-RE-SELL อยู่แล้ว — ข้าม")

@@ -29,6 +29,7 @@ _GATE_LOG = Path("logs") / "gate_blocks.jsonl"
 
 _GATE_CATEGORIES = [
     ("news-first", "news_first"), ("news_first", "news_first"),
+    ("htf-direction", "htf_direction"),   # ต้องมาก่อน "htf" (first match wins)
     ("htf", "htf_fade"), ("spike", "counter_spike"), ("counter-trend", "counter_trend"),
     ("ema_pullback", "ema_pullback"), ("engulfing", "engulfing"), ("sideways", "sideways"),
     ("asian", "session"), ("quiet", "session"), ("ny close", "session"),
@@ -132,6 +133,22 @@ def _htf_fade_reason(direction: str, chart_data: dict) -> str | None:
         return f"HTF-fade: SELL ที่ {tf} SUPPORT ({lvl}) ใน trend {trend or '?'} — แนวรับมักเด้ง (ไม่ใช่ breakdown) โอกาสพลาดสูง"
     if zt == "RESISTANCE" and direction == "BUY" and trend != "BULLISH":
         return f"HTF-fade: BUY ที่ {tf} RESISTANCE ({lvl}) ใน trend {trend or '?'} — แนวต้านมักย่อ (ไม่ใช่ breakout) โอกาสพลาดสูง"
+    return None
+
+
+def _htf_direction_reason(direction: str, chart_data: dict) -> str | None:
+    """HTF-direction block (NEXT STEP #4 — anchor D1, ไม่ซ้ำ gate 4 ที่ดู H4):
+    ห้ามเข้าสวนเทรนด์ D1 (calc_d1_trend: EMA20+slope จากแท่งปิดแล้ว) แบบ hard.
+    replay 251 ไม้ no-lookahead: counter-D1 = −248/134ไม้; มิ.ย. BUY สวน D1-BEARISH
+    = −242 WR21% ≈ การเลือดทั้งเดือน (market conf 78-82 ก็แพ้ยกชุด → ไม่มี conf exception;
+    ทดสอบ exception htf_zone+conf≥70 แล้ว 'แย่ลง' −84). d1_trend ไม่มี/NEUTRAL = ไม่ block"""
+    if not getattr(_cfg, "HTF_DIRECTION_BLOCK", True):
+        return None
+    d1 = (chart_data.get("d1_trend") or "NEUTRAL").upper()
+    if d1 == "BEARISH" and direction == "BUY":
+        return "HTF-direction: BUY สวน D1 BEARISH — counter-D1 replay −248 (มิ.ย. −242, conf สูงก็แพ้)"
+    if d1 == "BULLISH" and direction == "SELL":
+        return "HTF-direction: SELL สวน D1 BULLISH — counter-D1 replay −248"
     return None
 
 
@@ -377,6 +394,9 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         _hf = _htf_fade_reason(direction, chart_data)
         if _hf:
             return _fail(f"NNLB: {_hf}")
+        _hd = _htf_direction_reason(direction, chart_data)
+        if _hd:
+            return _fail(f"NNLB: {_hd}")
 
         logger.warning(f"[NNLB] ข้าม gates ทั้งหมด — {direction} SL={sl_pips:.0f}p TP={tp_pips:.0f}p conf={conf}%")
         return {
@@ -445,6 +465,12 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     _hf = _htf_fade_reason(direction, chart_data)
     if _hf:
         return _fail(_hf)
+
+    # 2e. HTF-direction — ห้ามเข้าสวนเทรนด์ D1 (hard, ไม่มี exception — วางก่อน gate 4
+    #     เพื่อไม่ให้ news-override/HTF-reversal ปล่อยไม้สวน D1 ผ่าน: replay พิสูจน์แล้วว่าแพ้)
+    _hd = _htf_direction_reason(direction, chart_data)
+    if _hd:
+        return _fail(_hd)
 
     # 3. UNKNOWN trend — ไม่เทรดเมื่อ trend ไม่ชัดเจน (WR 32% ใน historical data)
     if not trend or trend.upper() in ("UNKNOWN", "?", ""):
