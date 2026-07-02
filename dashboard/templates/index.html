@@ -1201,6 +1201,13 @@
 <div class="container">
 
   <!-- TABS -->
+  <!-- REGIME STRIP (UHAS-style ชิ้น 4, 07-03) — จาก macro_regime.md ตัวเดียวกับที่ analyst ใช้ -->
+  <div id="regime-strip" title="" style="display:none;margin:0 0 10px;padding:7px 14px;border:1px solid var(--border2,#2a3142);border-left:3px solid var(--gold,#D4AC0D);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--text-dim,#9aa3b8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+    <span style="color:var(--gold,#D4AC0D);font-weight:700;letter-spacing:1px">REGIME</span>
+    <span id="regime-text" style="margin-left:8px">—</span>
+    <span id="regime-updated" style="margin-left:8px;color:var(--muted)"></span>
+  </div>
+
   <div class="tab-nav">
     <button class="tab-btn active" data-tab="overview"    onclick="switchTab('overview')">Dashboard</button>
     <button class="tab-btn"        data-tab="monitor"     onclick="switchTab('monitor')">Live</button>
@@ -3198,6 +3205,19 @@ async function loadEventStats() {
   } catch (e) { _eventStats = null; }
 }
 
+async function loadRegime() {
+  try {
+    const r = await fetch('/api/regime');
+    const d = await r.json();
+    const strip = document.getElementById('regime-strip');
+    if (!strip || !d.ok || !d.phase) return;
+    strip.style.display = 'block';
+    strip.title = d.phase + (d.updated ? '\n\nUPDATED: ' + d.updated : '');   // hover = อ่านเต็ม
+    document.getElementById('regime-text').textContent = d.phase;
+    document.getElementById('regime-updated').textContent = d.updated ? '· ' + d.updated.slice(0, 10) : '';
+  } catch (e) { /* strip ซ่อนอยู่แล้ว */ }
+}
+
 async function fetchCalendar() {
   try {
     const res  = await fetch('/api/calendar');
@@ -3632,9 +3652,11 @@ function _bootstrap() {
   fetchCalendar();
   loadLivePrice();
   loadEventStats();
+  loadRegime();
   setInterval(fetchData, 10000);
   setInterval(fetchCalendar, 1800000);
   setInterval(loadEventStats, 3600000);
+  setInterval(loadRegime, 3600000);
   setInterval(loadLivePrice, 5000);
   // Live tab panels (verdict/zones/pending) — refresh เฉพาะตอน tab เปิดอยู่
   setInterval(() => {

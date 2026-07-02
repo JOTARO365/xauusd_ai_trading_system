@@ -951,6 +951,28 @@ def api_modify_position():
     return jsonify({"ok": True, "ticket": ticket, "sl": sl, "tp": tp})
 
 
+@app.route("/api/regime")
+def api_regime():
+    """สรุป macro regime จาก agents/prompts/macro_regime.md (ไฟล์เดียวกับที่ analyst อ่าน)
+    — คืน PHASE line + UPDATED line สำหรับ Regime Strip บนหัว dashboard"""
+    try:
+        p = os.path.join(_BASE, "../agents/prompts/macro_regime.md")
+        with open(p, "r", encoding="utf-8") as f:
+            txt = f.read()
+        marker = "<!-- REGIME_START -->"
+        body = txt.split(marker, 1)[1] if marker in txt else txt
+        phase, updated = "", ""
+        for line in body.splitlines():
+            s = line.strip()
+            if s.startswith("PHASE:") and not phase:
+                phase = s[len("PHASE:"):].strip()
+            elif s.startswith("UPDATED:") and not updated:
+                updated = s[len("UPDATED:"):].strip()
+        return jsonify({"ok": True, "phase": phase, "updated": updated})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "phase": "", "updated": ""})
+
+
 @app.route("/api/event-stats")
 def api_event_stats():
     """สถิติ event-reaction จาก data/event_stats.json (สร้างโดย scripts/event_reaction_stats.py)
