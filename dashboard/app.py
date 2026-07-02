@@ -95,21 +95,49 @@ LOG_FILE     = _SYSTEM_LOGS["xauusd"]   # backward-compat alias
 SYSTEM_MAGIC = 20260429                 # ต้องตรงกับ mt5_connector.py
 ENV_FILE     = os.path.join(_BASE, "../.env")
 
-# Keys ที่อนุญาตให้แก้ไขผ่าน dashboard (ไม่รวม credentials)
-_EDITABLE_KEYS = {
-    "SYMBOL", "START_BALANCE",
-    "LOT_MODE", "FIXED_LOT", "MIN_LOT", "MAX_LOT",
-    "RISK_PER_TRADE", "MAX_DAILY_LOSS", "MAX_OPEN_TRADES",
-    "DEFAULT_SL_PIPS", "DEFAULT_TP_PIPS", "MIN_RR_RATIO", "HEDGE_BUFFER_PIPS",
-    "MAX_PENDING_BUY", "MAX_PENDING_SELL", "PENDING_EXPIRY_HOURS",
-    "MAX_LOSING_STREAK", "STREAK_MIN_CONFIDENCE",
-    "PORTFOLIO_PROTECTION", "STREAK_PROTECTION", "DYNAMIC_TP",
-    "LESSON_LEARNING", "DRY_RUN",
-    "BE_TRIGGER_R", "BE_BUFFER_PIPS", "BE_CONFIRM_CYCLES",
-    "NNLB_MODE", "NNLB_BASE_EQUITY", "NNLB_EQUITY_PER_LOT", "NNLB_MAX_LOSS_PCT",
-    "TRAILING_STOP", "TRAILING_ATR_TF", "TRAILING_ATR_MULT",
-    "X_ACCOUNTS_TO_FOLLOW", "X_KEYWORDS",
+# ── CONFIG SPEC: single source of truth (fix 07-02) ──────────────────────────
+# เดิมมี 3 ลิสต์แยกกัน (_EDITABLE_KEYS / GET defaults / UI fields) ไม่ sync:
+# UI มีช่อง HTF_BE_* แต่ POST โดน filter ทิ้งเงียบ + GET defaults ไม่ตรง config.py
+# (เช่น MIN_RR 1.5 vs จริง 2.0) → user กด Save = เขียนค่าปลอมทับของจริง.
+# spec เดียว: key → default string ที่ "ตรงกับ config.py" — GET/editable สร้างจากตัวนี้
+# ⚠️ แก้ default ใน config.py ต้องแก้ที่นี่ด้วย (และ UI ใน index.html ถ้าเพิ่ม key)
+_CONFIG_SPEC: dict[str, str] = {
+    # ── Core / Money management ──
+    "SYMBOL": "XAUUSD", "START_BALANCE": "5000",
+    "LOT_MODE": "auto", "FIXED_LOT": "0.01", "MIN_LOT": "0.01", "MAX_LOT": "0.01",
+    "RISK_PER_TRADE": "0.50", "MAX_DAILY_LOSS": "1.00", "MAX_OPEN_TRADES": "4",
+    "DEFAULT_SL_PIPS": "2000", "DEFAULT_TP_PIPS": "5000", "MIN_RR_RATIO": "2.0",
+    "HEDGE_BUFFER_PIPS": "2500",
+    "MAX_PENDING_BUY": "4", "MAX_PENDING_SELL": "4", "PENDING_EXPIRY_HOURS": "24",
+    "MAX_LOSING_STREAK": "5", "STREAK_MIN_CONFIDENCE": "62",
+    "PORTFOLIO_PROTECTION": "true", "STREAK_PROTECTION": "true", "DYNAMIC_TP": "true",
+    "LESSON_LEARNING": "true", "DRY_RUN": "false",
+    # ── Breakeven / Trailing ──
+    "BE_TRIGGER_R": "1.2", "BE_BUFFER_PIPS": "300", "BE_CONFIRM_CYCLES": "2",
+    "HTF_BE_TRIGGER_R": "2.0", "HTF_BE_BUFFER_PIPS": "1000",
+    "BE_MAX_TRIGGER_PIPS": "1500",
+    "TRAILING_STOP": "false", "TRAILING_ATR_TF": "D1", "TRAILING_ATR_MULT": "1.5",
+    "TRAILING_MIN_PROFIT_R": "1.5", "TRAILING_LOOKBACK": "6",
+    # ── Protection (v0.4) ──
+    "MAX_TRADES_PER_DAY": "6", "AUTO_SL_PROTECT": "true",
+    # ── Decision gates & anti-fade guards (live-reload ทุกตัว) ──
+    "MIN_TECH_CONF": "62", "ASIAN_MIN_CONF": "72", "MIN_AI_EQUITY": "150",
+    "COUNTER_SPIKE_PIPS": "500",
+    "NEWS_FIRST": "true", "NEWS_BIAS_MIN_CONF": "55",
+    "HTF_FADE_BLOCK": "true", "HTF_DIRECTION_BLOCK": "true",
+    "NEWS_OVERRIDE_TREND": "true", "NEWS_CONFIRM_PIPS": "500",
+    "NEWS_OVERRIDE_MIN_CONF": "50", "HTF_REVERSAL_MIN_CONF": "70",
+    "EMA_PULLBACK_BLOCK": "true",
+    "TREND_CONT_CONF": "65", "TREND_CONT_MAX_DIST_PCT": "0.3", "NNLB_FASTPATH": "true",
+    # ── NNLB ──
+    "NNLB_MODE": "false", "NNLB_BASE_EQUITY": "100",
+    "NNLB_EQUITY_PER_LOT": "100", "NNLB_MAX_LOSS_PCT": "25",
+    # ── News/Twitter — default ว่าง = ใช้ default ในโค้ด (ค่าใน .env จะ OVERRIDE
+    #    ทั้งชุด ไม่ merge! default ปลอมตัวเดิมทำ keyword geopolitics/CPI หายเมื่อกด Save) ──
+    "X_ACCOUNTS_TO_FOLLOW": "", "X_KEYWORDS": "",
 }
+# Keys ที่อนุญาตให้แก้ไขผ่าน dashboard (ไม่รวม credentials) — จาก spec เสมอ
+_EDITABLE_KEYS = set(_CONFIG_SPEC)
 
 _usd_thb_cache = {"rate": 33.0, "fetched_at": None}
 _login_cache = {"login": None, "fetched_at": None}
@@ -476,34 +504,23 @@ def _read_env_file() -> dict[str, str]:
 
 @app.route("/api/config", methods=["GET"])
 def api_get_config():
-    """คืน trading config ปัจจุบัน — อ่านจาก .env file โดยตรง (ไม่ใช่ runtime env vars)"""
-    defaults = {
-        "SYMBOL": "XAUUSD", "START_BALANCE": "2000",
-        "LOT_MODE": "auto", "FIXED_LOT": "0.01", "MIN_LOT": "0.01", "MAX_LOT": "0.01",
-        "RISK_PER_TRADE": "0.50", "MAX_DAILY_LOSS": "1.00", "MAX_OPEN_TRADES": "4",
-        "DEFAULT_SL_PIPS": "1000", "DEFAULT_TP_PIPS": "3000", "MIN_RR_RATIO": "1.5",
-        "MAX_PENDING_BUY": "3", "MAX_PENDING_SELL": "3", "PENDING_EXPIRY_HOURS": "48",
-        "MAX_LOSING_STREAK": "5", "STREAK_MIN_CONFIDENCE": "62",
-        "PORTFOLIO_PROTECTION": "true", "STREAK_PROTECTION": "true", "DYNAMIC_TP": "true",
-        "LESSON_LEARNING": "true", "DRY_RUN": "false",
-        "BE_TRIGGER_R": "0.8", "BE_BUFFER_PIPS": "200", "BE_CONFIRM_CYCLES": "2",
-        "NNLB_MODE": "false", "NNLB_BASE_EQUITY": "100",
-        "NNLB_EQUITY_PER_LOT": "100", "NNLB_MAX_LOSS_PCT": "25",
-        "TRAILING_STOP": "false", "TRAILING_ATR_TF": "D1", "TRAILING_ATR_MULT": "1.5",
-        "X_ACCOUNTS_TO_FOLLOW": "kun_purich,cnnbrk,BBCBreaking,ZeroHedge,markets",
-        "X_KEYWORDS": "XAUUSD,gold,XAU,bullion,Fed,inflation",
-    }
+    """คืน trading config ปัจจุบัน — อ่านจาก .env file โดยตรง (ไม่ใช่ runtime env vars)
+    fallback = _CONFIG_SPEC (ตรง config.py) — ไม่มีลิสต์ default แยกอีกแล้ว"""
     env = _read_env_file()
-    return jsonify({k: env.get(k, v) for k, v in defaults.items()})
+    return jsonify({k: env.get(k, v) for k, v in _CONFIG_SPEC.items()})
 
 
 @app.route("/api/config", methods=["POST"])
 def api_set_config():
-    """รับ JSON → อัปเดต .env เฉพาะ trading keys → เขียนคืน"""
+    """รับ JSON → อัปเดต .env เฉพาะ trading keys → เขียนคืน
+    `_restart: true` = สั่ง pm2 restart ด้วย (default ไม่ restart — knobs ทั้งหมดใน
+    _CONFIG_SPEC live-reload ผ่าน reload_config() ทุกต้น cycle อยู่แล้ว; restart ฟรีๆ
+    จะล้าง in-memory state เช่น BE confirm counters / partial state โดยไม่จำเป็น)"""
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "no JSON body"}), 400
 
+    want_restart = str(data.pop("_restart", "")).lower() in ("1", "true", "yes")
     updates = {k.upper(): str(v) for k, v in data.items() if k.upper() in _EDITABLE_KEYS}
     if not updates:
         return jsonify({"error": "no editable keys found"}), 400
@@ -541,10 +558,13 @@ def api_set_config():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    # ── PM2 restart (ถ้ามี) ───────────────────────────────────────
-    pm2_ok, pm2_msg = _pm2_restart()
+    # ── PM2 restart เฉพาะเมื่อขอ (_restart=true) ─────────────────────
+    if want_restart:
+        pm2_ok, pm2_msg = _pm2_restart()
+    else:
+        pm2_ok, pm2_msg = True, "no restart — live-reload ภายใน 1 cycle"
     return jsonify({"ok": True, "updated": sorted(updates.keys()),
-                    "pm2_ok": pm2_ok, "pm2_msg": pm2_msg})
+                    "restarted": want_restart, "pm2_ok": pm2_ok, "pm2_msg": pm2_msg})
 
 
 def _pm2_restart() -> tuple[bool, str]:

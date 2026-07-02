@@ -1937,6 +1937,11 @@
               <input type="number" id="cfg-HTF_BE_BUFFER_PIPS" step="50" min="0" max="2000">
               <div class="field-help">Wider buffer for HTF entries (e.g. 500 = entry + $5)</div>
             </div>
+            <div class="field">
+              <label>BE Max Trigger (pips)</label>
+              <input type="number" id="cfg-BE_MAX_TRIGGER_PIPS" step="100" min="0" max="10000">
+              <div class="field-help">เพดาน trigger — ไม้ SL กว้างจะ lock กำไรเมื่อถึง X pips ไม่ว่า R เท่าไร (1500)</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1990,6 +1995,152 @@
       </div>
 
       <!-- Feature Toggles -->
+      <!-- Guards & Gates (v0.4 — 2026-07-02) -->
+      <div class="accordion-section" data-section="guards">
+        <div class="accordion-header" onclick="toggleAccordion(this)">
+          <h3>Guards &amp; Gates <span class="hint">Anti-fade &middot; direction &middot; daily limits (live-reload)</span></h3>
+          <div class="accordion-icon">&rsaquo;</div>
+        </div>
+        <div class="accordion-body">
+          <div class="field-group">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label-text">HTF Direction Block (D1)</div>
+                <div class="toggle-label-sub">ห้ามเข้าสวนเทรนด์ D1 — replay: มิ.ย. พลิก −220→+22 (ปิดเมื่อ regime เด้งแรง)</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="cfg-HTF_DIRECTION_BLOCK">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label-text">Auto SL Protect</div>
+                <div class="toggle-label-sub">ตั้ง SL ให้ไม้ที่ไม่มี SL อัตโนมัติทุก cycle (SYSTEM+MANUAL)</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="cfg-AUTO_SL_PROTECT">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label-text">EMA Pullback Block</div>
+                <div class="toggle-label-sub">Hard-block EMA_PULLBACK entries (WR31% even at conf≥75)</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="cfg-EMA_PULLBACK_BLOCK">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label-text">News-first Block</div>
+                <div class="toggle-label-sub">บล็อกเข้าสวนทิศข่าวที่ชัด (analyst bias)</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="cfg-NEWS_FIRST">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label-text">HTF Fade Block</div>
+                <div class="toggle-label-sub">ห้าม SELL ที่ D1/W1 support / BUY ที่ resistance</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="cfg-HTF_FADE_BLOCK">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label-text">News Override Trend</div>
+                <div class="toggle-label-sub">Option C — เข้าสวน H4 ได้ถ้าตรงข่าว + PA ยืนยัน</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="cfg-NEWS_OVERRIDE_TREND">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label-text">NNLB Fast-path</div>
+                <div class="toggle-label-sub">TREND_CONT/HTF override ข้าม Claude (NNLB mode เท่านั้น)</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="cfg-NNLB_FASTPATH">
+                <span class="toggle-track"></span>
+                <span class="toggle-thumb"></span>
+              </label>
+            </div>
+            <div class="accordion-grid">
+              <div class="field">
+                <label>Max Trades / Day</label>
+                <input type="number" id="cfg-MAX_TRADES_PER_DAY" step="1" min="0" max="50">
+                <div class="field-help">เบรกวันพายุ — ไม้ #7+ ของวัน replay −411 (0 = ปิด)</div>
+              </div>
+              <div class="field">
+                <label>Min Tech Confidence (%)</label>
+                <input type="number" id="cfg-MIN_TECH_CONF" step="1" min="0" max="100">
+                <div class="field-help">floor ทุก entry (62 — band 50-59 = WR 23.5%)</div>
+              </div>
+              <div class="field">
+                <label>Asian Min Conf (%)</label>
+                <input type="number" id="cfg-ASIAN_MIN_CONF" step="1" min="0" max="100">
+                <div class="field-help">0-7 UTC ต้อง conf สูงขึ้น (72)</div>
+              </div>
+              <div class="field">
+                <label>Min AI Equity</label>
+                <input type="number" id="cfg-MIN_AI_EQUITY" step="10" min="0">
+                <div class="field-help">equity ต่ำกว่านี้ไม่เรียก AI เลย (150, 0 = ปิด)</div>
+              </div>
+              <div class="field">
+                <label>Counter-spike (pips)</label>
+                <input type="number" id="cfg-COUNTER_SPIKE_PIPS" step="50" min="0" max="5000">
+                <div class="field-help">ห้ามเข้าสวน fast move ≥ นี้ (500, 0 = ปิด)</div>
+              </div>
+              <div class="field">
+                <label>News Bias Min Conf (%)</label>
+                <input type="number" id="cfg-NEWS_BIAS_MIN_CONF" step="1" min="0" max="100">
+                <div class="field-help">news-first ทำงานเมื่อ analyst conf ≥ นี้ (55)</div>
+              </div>
+              <div class="field">
+                <label>News Confirm (pips)</label>
+                <input type="number" id="cfg-NEWS_CONFIRM_PIPS" step="50" min="0" max="5000">
+                <div class="field-help">option C ต้องสไปก์ตามทิศ ≥ นี้ (500)</div>
+              </div>
+              <div class="field">
+                <label>News Override Min Conf (%)</label>
+                <input type="number" id="cfg-NEWS_OVERRIDE_MIN_CONF" step="1" min="0" max="100">
+                <div class="field-help">conf ขั้นต่ำของ option C (50)</div>
+              </div>
+              <div class="field">
+                <label>HTF Reversal Min Conf (%)</label>
+                <input type="number" id="cfg-HTF_REVERSAL_MIN_CONF" step="1" min="0" max="999">
+                <div class="field-help">gate 4 exception ที่ D1/W1 zone (70, 999 = ปิด)</div>
+              </div>
+              <div class="field">
+                <label>Trend-cont Conf</label>
+                <input type="number" id="cfg-TREND_CONT_CONF" step="1" min="0" max="100">
+                <div class="field-help">conf สังเคราะห์ TREND_CONT/HTF override (65)</div>
+              </div>
+              <div class="field">
+                <label>Trend-cont Max Dist (%)</label>
+                <input type="number" id="cfg-TREND_CONT_MAX_DIST_PCT" step="0.05" min="0" max="5">
+                <div class="field-help">ห่าง H1 EMA20 เกินนี้ = ไม่ใช่ pullback (0.3)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="accordion-section" data-section="features">
         <div class="accordion-header" onclick="toggleAccordion(this)">
           <h3>Feature Toggles <span class="hint">High-level engine switches</span></h3>
@@ -2119,8 +2270,12 @@
 
     </div><!-- /accordion -->
 
-    <div style="margin-top:18px;display:flex;align-items:center;gap:14px">
+    <div style="margin-top:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <button class="save-btn" onclick="saveConfig()">Save Configuration</button>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);font-family:var(--mono);cursor:pointer">
+        <input type="checkbox" id="cfg-restart-pm2" style="cursor:pointer">
+        restart bot ด้วย (ปกติไม่ต้อง — ค่า config live-reload ทุก cycle)
+      </label>
       <span id="cfg-status" style="font-size:11px;color:var(--muted);font-family:var(--mono);letter-spacing:0.5px"></span>
     </div>
 
@@ -2919,17 +3074,25 @@ async function loadAccounting() {
 /* ════════════════════════════════════════════════════════════
    CONFIG
    ════════════════════════════════════════════════════════════ */
+/* ⚠️ ทั้ง 3 arrays ต้อง sync กับ _CONFIG_SPEC ใน dashboard/app.py — key ที่ไม่อยู่ใน
+   spec จะโดน backend ทิ้งเงียบตอน Save (เคยเกิดกับ HTF_BE_* มาแล้ว) */
 const _NUM_KEYS  = ['START_BALANCE','RISK_PER_TRADE','MAX_DAILY_LOSS','MAX_OPEN_TRADES',
   'DEFAULT_SL_PIPS','DEFAULT_TP_PIPS','MIN_RR_RATIO','FIXED_LOT','MIN_LOT','MAX_LOT',
   'MAX_LOSING_STREAK','STREAK_MIN_CONFIDENCE','MAX_PENDING_BUY','MAX_PENDING_SELL',
   'PENDING_EXPIRY_HOURS','HEDGE_BUFFER_PIPS',
   'BE_TRIGGER_R','BE_BUFFER_PIPS','BE_CONFIRM_CYCLES',
-  'HTF_BE_TRIGGER_R','HTF_BE_BUFFER_PIPS',
+  'HTF_BE_TRIGGER_R','HTF_BE_BUFFER_PIPS','BE_MAX_TRIGGER_PIPS',
   'NNLB_BASE_EQUITY','NNLB_EQUITY_PER_LOT','NNLB_MAX_LOSS_PCT',
-  'TRAILING_ATR_MULT','TRAILING_MIN_PROFIT_R','TRAILING_LOOKBACK'];
+  'TRAILING_ATR_MULT','TRAILING_MIN_PROFIT_R','TRAILING_LOOKBACK',
+  'MAX_TRADES_PER_DAY','MIN_TECH_CONF','ASIAN_MIN_CONF','MIN_AI_EQUITY',
+  'COUNTER_SPIKE_PIPS','NEWS_BIAS_MIN_CONF','NEWS_CONFIRM_PIPS',
+  'NEWS_OVERRIDE_MIN_CONF','HTF_REVERSAL_MIN_CONF','TREND_CONT_CONF',
+  'TREND_CONT_MAX_DIST_PCT'];
 const _TXT_KEYS  = ['SYMBOL','LOT_MODE','X_ACCOUNTS_TO_FOLLOW','X_KEYWORDS','TRAILING_ATR_TF'];
 const _BOOL_KEYS = ['PORTFOLIO_PROTECTION','STREAK_PROTECTION','DYNAMIC_TP',
-  'LESSON_LEARNING','DRY_RUN','NNLB_MODE','TRAILING_STOP'];
+  'LESSON_LEARNING','DRY_RUN','NNLB_MODE','TRAILING_STOP',
+  'HTF_DIRECTION_BLOCK','AUTO_SL_PROTECT','EMA_PULLBACK_BLOCK',
+  'NEWS_FIRST','HTF_FADE_BLOCK','NEWS_OVERRIDE_TREND','NNLB_FASTPATH'];
 
 async function loadConfig() {
   document.getElementById('cfg-status').textContent = '';
@@ -2979,6 +3142,7 @@ async function saveConfig() {
     const el = document.getElementById('cfg-' + k);
     if (el) payload[k] = el.checked ? 'true' : 'false';
   });
+  payload._restart = document.getElementById('cfg-restart-pm2')?.checked ? 'true' : 'false';
 
   try {
     const res  = await fetch('/api/config', {
@@ -2988,14 +3152,19 @@ async function saveConfig() {
     });
     const data = await res.json();
     if (data.ok) {
-      if (data.pm2_ok) {
+      if (!data.restarted) {
+        status.textContent = '✓ Saved — live-reload ภายใน 1 cycle (ไม่ restart)';
+        status.style.color = 'var(--green)';
+      } else if (data.pm2_ok) {
         status.textContent = '✓ Saved — ' + data.pm2_msg;
+        status.style.color = 'var(--green)';
       } else if (data.pm2_msg && data.pm2_msg.includes('not found')) {
         status.textContent = '✓ Saved — restart main.py manually (pm2 not found)';
+        status.style.color = 'var(--gold)';
       } else {
         status.textContent = '✓ Saved — PM2: ' + (data.pm2_msg || 'no response');
+        status.style.color = 'var(--gold)';
       }
-      status.style.color = data.pm2_ok ? 'var(--green)' : 'var(--gold)';
     } else {
       status.textContent = 'Error: ' + (data.error || 'unknown');
       status.style.color = 'var(--red)';
