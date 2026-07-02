@@ -89,6 +89,34 @@ def _write_bot_status(chart_data: dict, sentiment_data: dict, decision: dict, sk
             "set_at":  ready.get("since").isoformat() if ready.get("since") else None,
         }
 
+        # ── UHAS-style panels (07-03): zone/verdict data ที่ chart_watcher คำนวณอยู่แล้ว ──
+        _mom_raw = chart_data.get("momentum_tf") or {}
+        market = {
+            "trend":          chart_data.get("trend"),
+            "d1_trend":       chart_data.get("d1_trend"),
+            "fast_move_pips": chart_data.get("fast_move_pips"),
+            "momentum_tf": {
+                tf: {"direction": (m or {}).get("direction"), "strength": (m or {}).get("strength")}
+                for tf, m in _mom_raw.items()
+            },
+        }
+        _sr = chart_data.get("sr_zones") or {}
+        zones = {
+            "htf_zone":   chart_data.get("htf_zone"),
+            "resistance": (_sr.get("resistance") or [])[:6],
+            "support":    (_sr.get("support") or [])[:6],
+            "key_levels": chart_data.get("key_levels"),
+            "setups": [
+                {k: s.get(k) for k in ("type", "tf", "direction", "score", "level")}
+                for s in ((chart_data.get("scan") or {}).get("setups") or [])[:8]
+            ],
+        }
+        plan = {
+            "buy_sl_pips":  chart_data.get("buy_sl_pips"),
+            "sell_sl_pips": chart_data.get("sell_sl_pips"),
+            "tp_pips":      chart_data.get("tp_pips"),
+        }
+
         status = {
             "updated_at":   _dt.now().isoformat(timespec="seconds"),
             "cycle":        _cycle,
@@ -108,6 +136,9 @@ def _write_bot_status(chart_data: dict, sentiment_data: dict, decision: dict, sk
             "sent_conf":    sentiment_data.get("confidence", 0),
             "price_info":   price_info,
             "ready_mode":   ready_mode,
+            "market":       market,
+            "zones":        zones,
+            "plan":         plan,
         }
         with open(_BOT_STATUS_FILE, "w", encoding="utf-8") as f:
             json.dump(status, f, ensure_ascii=False, indent=2)
@@ -387,10 +418,12 @@ async def run_cycle() -> tuple[dict, dict]:
         global _last_ai_mono, _last_ai_price
         _last_ai_mono  = time.monotonic()
         _last_ai_price = get_current_price()
-        try:
-            _write_bot_status(chart_data, sentiment_data, result.get("decision") or {}, skip_ai=_skip_ai)
-        except Exception as e:
-            logger.warning(f"bot_status write error: {e}")
+    # เขียน bot_status ทุก cycle (07-03) — เดิมเขียนเฉพาะ cycle ที่รัน AI ทำ Monitor tab
+    # ดูค้างช่วง skip; skip cycle ใช้ chart ล่าสุด + ราคาสดจาก tick (price_info ดึงใหม่เสมอ)
+    try:
+        _write_bot_status(chart_data, sentiment_data, result.get("decision") or {}, skip_ai=_skip_ai)
+    except Exception as e:
+        logger.warning(f"bot_status write error: {e}")
 
     _cycle_secs = time.monotonic() - _cycle_start_t
     _level = "WARNING" if _cycle_secs > 30 else "INFO"

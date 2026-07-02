@@ -738,36 +738,6 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* ─── SYSTEM SWITCHER ───────────────────────────── */
-    .sys-switcher {
-      display: flex;
-      align-items: center;
-      gap: 2px;
-      padding: 2px;
-      background: var(--surface2);
-      border: 1px solid var(--border2);
-      border-radius: 6px;
-    }
-    .sys-btn {
-      background: transparent;
-      border: none;
-      border-radius: 4px;
-      color: var(--muted);
-      font-size: 11px;
-      font-weight: 700;
-      padding: 4px 12px;
-      cursor: pointer;
-      letter-spacing: 1px;
-      transition: all 0.15s;
-      font-family: var(--mono);
-    }
-    .sys-btn:hover { color: var(--text); }
-    .sys-btn.active {
-      background: var(--gold-dim);
-      color: var(--gold);
-      box-shadow: inset 0 0 0 1px rgba(212,172,13,0.3);
-    }
-
     /* ─── SETTINGS (Accordion) ─────────────────────────── */
     .settings-notice {
       background: rgba(212,172,13,0.05);
@@ -1224,14 +1194,6 @@
         <span class="ticker-val" id="px-change">—</span>
       </div>
     </div>
-    <div class="sys-switcher">
-      <button class="sys-btn active" data-system="xauusd" onclick="switchSystem('xauusd')">XAUUSD</button>
-      <button class="sys-btn"        data-system="btcusd"  onclick="switchSystem('btcusd')">BTC</button>
-    </div>
-    <a href="/3d" target="_blank" title="Open 3D Control Room"
-       style="display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid var(--border2,#2a3142);border-radius:8px;color:var(--gold,#D4AC0D);text-decoration:none;font-size:12px;font-weight:600;letter-spacing:.05em;white-space:nowrap;transition:border-color .2s,box-shadow .2s"
-       onmouseover="this.style.borderColor='var(--gold,#D4AC0D)';this.style.boxShadow='0 0 12px var(--gold-glow,rgba(212,172,13,0.35))'"
-       onmouseout="this.style.borderColor='var(--border2,#2a3142)';this.style.boxShadow='none'">&#9638; 3D</a>
     <span id="last-update">Loading…</span>
   </div>
 </header>
@@ -1517,6 +1479,28 @@
           <div class="value" id="mon-sentiment">—</div>
           <div class="sub" id="mon-sent-conf">—</div>
         </div>
+      </div>
+    </section>
+
+    <!-- AI VERDICT — multi-TF (UHAS-style ชิ้น 2, 07-03) -->
+    <section>
+      <div class="section-title">AI Verdict &mdash; Multi-Timeframe</div>
+      <div class="chart-card">
+        <div id="verdict-tf-strip" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
+        <div class="detail-grid">
+          <div class="detail-cell"><div class="detail-label">Plan SL (BUY/SELL)</div><span id="verdict-sl" class="detail-value">—</span></div>
+          <div class="detail-cell"><div class="detail-label">Plan TP</div><span id="verdict-tp" class="detail-value">—</span></div>
+          <div class="detail-cell"><div class="detail-label">R:R</div><span id="verdict-rr" class="detail-value">—</span></div>
+          <div class="detail-cell"><div class="detail-label">Ride Mode</div><span id="verdict-ride" class="detail-value">—</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- KEY LEVELS — AI zones ladder (UHAS-style ชิ้น 1, 07-03) -->
+    <section>
+      <div class="section-title">Key Levels &mdash; AI Zones</div>
+      <div class="chart-card" style="padding:14px 18px">
+        <div id="zone-ladder" style="font-family:var(--mono);font-size:12px">Loading…</div>
       </div>
     </section>
 
@@ -2713,20 +2697,8 @@ function updatePortfolio(account, usd_thb) {
 }
 
 /* ════════════════════════════════════════════════════════════
-   SYSTEM / TAB SWITCHING
+   TAB SWITCHING  (BTC switcher ตัดออก 07-03 — backend multi-system คงไว้)
    ════════════════════════════════════════════════════════════ */
-function switchSystem(sys) {
-  activeSystem = sys;
-  document.querySelectorAll('.sys-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.system === sys));
-  const titles = { xauusd: 'XAUUSD · Trading Terminal', btcusd: 'BTC · Trading Terminal' };
-  document.getElementById('dashboard-title').textContent = titles[sys] || sys.toUpperCase() + ' · Trading Terminal';
-  fetchData();
-  loadLivePrice();
-  const activeTab = document.querySelector('.tab-btn.active');
-  if (activeTab && activeTab.dataset.tab === 'accounting') loadAccounting();
-}
-
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.tab === name));
@@ -3370,6 +3342,9 @@ async function loadMonitor() {
     document.getElementById('mon-conf').textContent       = conf + '%';
     document.getElementById('mon-reason').textContent     = ls.reason     || '—';
 
+    renderVerdict(bs);
+    renderZones(bs);
+
     const orders  = data.pending_orders || [];
     const grouped = data.pending_grouped || {};
     const tagCounts = Object.entries(grouped).map(([k, v]) => `${k}: ${v.length}`).join('  ·  ');
@@ -3397,6 +3372,78 @@ async function loadMonitor() {
   } catch(e) {
     console.error('loadMonitor error:', e);
   }
+}
+
+/* ── UHAS-style panels (07-03): verdict strip + zone ladder — data จาก bot_status ── */
+function _tfBadge(name, dir, strength) {
+  const up = dir === 'UP' || dir === 'BULLISH';
+  const dn = dir === 'DOWN' || dir === 'BEARISH';
+  const color = up ? 'var(--green)' : dn ? 'var(--red)' : 'var(--gold)';
+  const sub = strength ? `<div style="font-size:9px;color:var(--muted)">${strength}</div>` : '';
+  return `<div style="flex:1;min-width:90px;text-align:center;padding:8px 6px;border:1px solid var(--border2,#2a3142);border-radius:8px">
+    <div style="font-size:9px;color:var(--muted);letter-spacing:1.5px">${name}</div>
+    <div style="font-weight:700;color:${color}">${dir || '—'}</div>${sub}</div>`;
+}
+
+function renderVerdict(bs) {
+  const strip = document.getElementById('verdict-tf-strip');
+  if (!strip) return;
+  const mk = bs.market || {}, mom = mk.momentum_tf || {}, plan = bs.plan || {};
+  const m15 = mom.m15 || {}, h1 = mom.h1 || {};
+  strip.innerHTML =
+    _tfBadge('M15', m15.direction, m15.strength) +
+    _tfBadge('H1',  h1.direction,  h1.strength) +
+    _tfBadge('H4',  mk.trend, null) +
+    _tfBadge('D1',  mk.d1_trend, null);
+  document.getElementById('verdict-sl').textContent =
+    (plan.buy_sl_pips || plan.sell_sl_pips) ? `${plan.buy_sl_pips ?? '—'} / ${plan.sell_sl_pips ?? '—'}p` : '—';
+  document.getElementById('verdict-tp').textContent = plan.tp_pips ? plan.tp_pips + 'p' : '—';
+  const ls = bs.last_signal || {};
+  const slDir = ls.direction === 'SELL' ? plan.sell_sl_pips : plan.buy_sl_pips;
+  document.getElementById('verdict-rr').textContent =
+    (plan.tp_pips && slDir) ? (plan.tp_pips / slDir).toFixed(2) : '—';
+  // RIDE badge — เงื่อนไขเดียวกับบอท (M15 STRONG + H1 ทิศเดียว + H4 ตรง) derive ฝั่งเว็บ
+  const rideDir = (m15.strength === 'STRONG' && m15.direction && m15.direction === h1.direction)
+    ? (m15.direction === 'UP' && mk.trend === 'BULLISH' ? 'BUY'
+       : m15.direction === 'DOWN' && mk.trend === 'BEARISH' ? 'SELL' : null)
+    : null;
+  const rideEl = document.getElementById('verdict-ride');
+  rideEl.textContent = rideDir ? `⚡ RIDE ${rideDir}` : 'off';
+  rideEl.style.color = rideDir ? 'var(--gold)' : 'var(--muted)';
+}
+
+function renderZones(bs) {
+  const el = document.getElementById('zone-ladder');
+  if (!el) return;
+  const z = bs.zones || {}, px = (bs.price_info || {}).bid;
+  const setups = z.setups || [];
+  const htf = z.htf_zone || null;
+  const scoreFor = lv => {
+    const hits = setups.filter(s => s.level && Math.abs(s.level - lv) / lv < 0.003);
+    return hits.length ? Math.max(...hits.map(x => x.score || 0)) : null;
+  };
+  const row = (lv, kind) => {
+    const color = kind === 'R' ? 'var(--red)' : 'var(--green)';
+    const dist = px ? Math.round(Math.abs(lv - px) / 0.01) + 'p' : '';
+    const sc = scoreFor(lv);
+    const bar = sc ? `<div style="height:4px;width:${Math.min(sc, 100)}%;background:${color};border-radius:2px;opacity:.7"></div>` : '';
+    const htfTag = (htf && htf.level && Math.abs(htf.level - lv) / lv < 0.003)
+      ? ` <span style="color:var(--gold);font-size:9px;font-weight:700">★${htf.tf}</span>` : '';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:3px 0">
+      <span style="width:72px;color:${color};font-weight:700">${lv.toFixed(2)}</span>
+      <span style="width:52px;color:var(--muted);font-size:10px">${dist}</span>
+      <span style="width:40px;color:var(--muted);font-size:10px">${sc ? sc + '%' : ''}</span>
+      <div style="flex:1">${bar}</div>${htfTag}</div>`;
+  };
+  const res = (z.resistance || []).slice().sort((a, b) => b - a);
+  const sup = (z.support || []).slice().sort((a, b) => b - a);
+  const priceRow = px ? `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;margin:4px 0;border-top:1px dashed var(--border2,#2a3142);border-bottom:1px dashed var(--border2,#2a3142)">
+      <span style="width:72px;color:var(--gold);font-weight:800">${px.toFixed(2)}</span>
+      <span style="color:var(--gold);font-size:10px;letter-spacing:1.5px">◄ PRICE</span></div>` : '';
+  el.innerHTML =
+    (res.map(l => row(l, 'R')).join('') || '<div class="no-data">no resistance data</div>')
+    + priceRow
+    + (sup.map(l => row(l, 'S')).join('') || '<div class="no-data">no support data</div>');
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -3520,6 +3567,11 @@ function _bootstrap() {
   setInterval(fetchData, 10000);
   setInterval(fetchCalendar, 1800000);
   setInterval(loadLivePrice, 5000);
+  // Live tab panels (verdict/zones/pending) — refresh เฉพาะตอน tab เปิดอยู่
+  setInterval(() => {
+    const t = document.querySelector('.tab-btn.active');
+    if (t && t.dataset.tab === 'monitor') loadMonitor();
+  }, 15000);
 }
 
 if (document.readyState === 'loading') {
