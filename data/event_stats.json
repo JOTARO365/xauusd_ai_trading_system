@@ -1,0 +1,23 @@
+{
+ "updated": "2026-07-02",
+ "source": "data/xau_daily.json (AlphaVantage daily)",
+ "baseline_avg_abs_pct": 0.56,
+ "events": {
+  "NFP": {
+   "n": 179,
+   "window": "2011-08-05 .. 2026-06-05",
+   "up_pct": 46.9,
+   "down_pct": 43.0,
+   "flat_pct": 10.1,
+   "avg_d0_pct": 0.012,
+   "median_d0_pct": 0.01,
+   "avg_abs_d0_pct": 0.806,
+   "avg_up_pct": 0.87,
+   "avg_down_pct": -0.92,
+   "d2_extends_pct": 49.1,
+   "basis": "daily close, base = close วันเทรดก่อนประกาศ; วันประกาศ rule-based (first-Friday)",
+   "flat_threshold_pct": 0.05,
+   "vs_baseline_x": 1.44
+  }
+ }
+}

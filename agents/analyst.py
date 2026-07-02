@@ -47,6 +47,40 @@ def _regime_context() -> str:
 
 _last_usage = None   # set after each API call — read by accountant
 
+# ── Event-reaction priors (Tier-1, 2026-07-02) ────────────────────────────────
+# สถิติจริงจาก scripts/event_reaction_stats.py (daily gold 15 ปี) — ฉีด 1-2 บรรทัด
+# เข้า calendar context เฉพาะวันที่มี event ที่เรามีสถิติ (ตอนนี้: NFP)
+_EVENT_STATS_PATH = Path("data/event_stats.json")
+_EVENT_TITLE_KEYS = {"NFP": ("non-farm", "nonfarm", "non farm")}
+
+
+def _event_prior_lines(calendar: list) -> str:
+    """คืนบรรทัด prior เชิงสถิติของ event ใน calendar ที่มีใน data/event_stats.json
+    fail-open: ไฟล์ไม่มี/พัง → คืน "" (analyst ทำงานเหมือนเดิม)"""
+    try:
+        stats = json.loads(_EVENT_STATS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return ""
+    events = stats.get("events", {})
+    seen: set[str] = set()
+    lines: list[str] = []
+    for ev in calendar:
+        title = str(ev.get("title", "")).lower()
+        for key, needles in _EVENT_TITLE_KEYS.items():
+            if key in seen or key not in events:
+                continue
+            if any(n in title for n in needles):
+                s = events[key]
+                lines.append(
+                    f"  {key} prior (n={s['n']} releases, daily-close 15y): "
+                    f"วันประกาศ up {s['up_pct']}% / down {s['down_pct']}% / flat {s['flat_pct']}% "
+                    f"(ทิศ ~ เหรียญ — direction มาจาก 'ตัวเลข vs consensus' ไม่ใช่ตัว event) | "
+                    f"avg |move| {s['avg_abs_d0_pct']}% = {s.get('vs_baseline_x', '?')}x วันปกติ | "
+                    f"D+2 ไปต่อทิศเดิมแค่ {s['d2_extends_pct']}% (อย่า assume follow-through)"
+                )
+                seen.add(key)
+    return "\n".join(lines)
+
 
 def _build_market_context(chart_data: dict) -> str:
     """สร้าง query string สำหรับ vector search จาก chart context"""
@@ -95,6 +129,9 @@ def analyze_sentiment(news_data: dict, chart_data: dict | None = None) -> dict:
             for ev in calendar[:8]
         )
         cal_section = f"=== ForexFactory Calendar ===\n{cal_lines}"
+        _priors = _event_prior_lines(calendar)
+        if _priors:
+            cal_section += f"\n=== Event Priors (สถิติจริงจากราคา 15 ปี) ===\n{_priors}"
     else:
         cal_section = "=== ForexFactory Calendar ===\nไม่มี high-impact event ใน 24h"
 
