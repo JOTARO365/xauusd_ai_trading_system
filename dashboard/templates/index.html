@@ -1201,11 +1201,30 @@
 <div class="container">
 
   <!-- TABS -->
-  <!-- REGIME STRIP (UHAS-style ชิ้น 4, 07-03) — จาก macro_regime.md ตัวเดียวกับที่ analyst ใช้ -->
-  <div id="regime-strip" title="" style="display:none;margin:0 0 10px;padding:7px 14px;border:1px solid var(--border2,#2a3142);border-left:3px solid var(--gold,#D4AC0D);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--text-dim,#9aa3b8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-    <span style="color:var(--gold,#D4AC0D);font-weight:700;letter-spacing:1px">REGIME</span>
-    <span id="regime-text" style="margin-left:8px">—</span>
-    <span id="regime-updated" style="margin-left:8px;color:var(--muted)"></span>
+  <!-- REGIME STRIP (UHAS-style ชิ้น 4, 07-03) — news ticker เลื่อนต่อเนื่อง โชว์บทวิเคราะห์ครบ -->
+  <style>
+    .regime-marquee {
+      display: inline-flex;
+      white-space: nowrap;
+      will-change: transform;
+      animation: regime-scroll var(--regime-dur, 60s) linear infinite;
+    }
+    .regime-marquee > span { padding-right: 80px; }  /* ช่องไฟระหว่างรอบ — copy ละครึ่งพอดี */
+    #regime-strip:hover .regime-marquee { animation-play-state: paused; }  /* hover = หยุดอ่าน */
+    @keyframes regime-scroll {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+    .regime-k { color: var(--gold, #D4AC0D); font-weight: 700; letter-spacing: 1px; }
+  </style>
+  <div id="regime-strip" title="" style="display:none;margin:0 0 10px;padding:7px 14px;border:1px solid var(--border2,#2a3142);border-left:3px solid var(--gold,#D4AC0D);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--text-dim,#9aa3b8);align-items:center;gap:12px;overflow:hidden">
+    <span class="regime-k" style="flex-shrink:0">REGIME</span>
+    <div style="flex:1;overflow:hidden">
+      <div class="regime-marquee" id="regime-marquee">
+        <span id="regime-text-a">—</span>
+        <span id="regime-text-b" aria-hidden="true"></span>
+      </div>
+    </div>
   </div>
 
   <div class="tab-nav">
@@ -3211,10 +3230,21 @@ async function loadRegime() {
     const d = await r.json();
     const strip = document.getElementById('regime-strip');
     if (!strip || !d.ok || !d.phase) return;
-    strip.style.display = 'block';
-    strip.title = d.phase + (d.updated ? '\n\nUPDATED: ' + d.updated : '');   // hover = อ่านเต็ม
-    document.getElementById('regime-text').textContent = d.phase;
-    document.getElementById('regime-updated').textContent = d.updated ? '· ' + d.updated.slice(0, 10) : '';
+    // ticker = บทวิเคราะห์ครบทุกส่วน วนลูปต่อเนื่อง (hover เพื่อหยุดอ่าน)
+    const parts = [['PHASE', d.phase], ['DRIVERS', d.drivers], ['FILTER', d.filter],
+                   ['CATALYSTS', d.catalysts], ['UPDATED', d.updated]]
+      .filter(([, v]) => v);
+    const html = parts.map(([k, v]) =>
+      `<span class="regime-k">${k}</span>&nbsp; ${v.replace(/</g, '&lt;')}`
+    ).join(' &nbsp;&nbsp;▮&nbsp;&nbsp; ');
+    const a = document.getElementById('regime-text-a');
+    const b = document.getElementById('regime-text-b');
+    a.innerHTML = html;
+    b.innerHTML = html;   // สำเนาชุดสองให้ลูปไร้รอยต่อ (เลื่อนครบ -50% = เริ่มชุดใหม่พอดี)
+    const totalLen = parts.reduce((s, [, v]) => s + v.length, 0);
+    document.getElementById('regime-marquee').style.setProperty(
+      '--regime-dur', Math.max(40, Math.round(totalLen * 0.11)) + 's');   // ~9 ตัวอักษร/วิ
+    strip.style.display = 'flex';
   } catch (e) { /* strip ซ่อนอยู่แล้ว */ }
 }
 

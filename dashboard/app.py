@@ -961,14 +961,19 @@ def api_regime():
             txt = f.read()
         marker = "<!-- REGIME_START -->"
         body = txt.split(marker, 1)[1] if marker in txt else txt
-        phase, updated = "", ""
+        # ดึงทุกบรรทัดสรุป (PHASE/DRIVERS/FILTER/CATALYSTS/UPDATED) — ticker โชว์ครบทั้งชุด
+        fields = {"PHASE": "", "DRIVERS": "", "FILTER": "", "CATALYSTS": "", "UPDATED": ""}
         for line in body.splitlines():
             s = line.strip()
-            if s.startswith("PHASE:") and not phase:
-                phase = s[len("PHASE:"):].strip()
-            elif s.startswith("UPDATED:") and not updated:
-                updated = s[len("UPDATED:"):].strip()
-        return jsonify({"ok": True, "phase": phase, "updated": updated})
+            for key in fields:
+                if s.startswith(key + ":") and not fields[key]:
+                    fields[key] = s[len(key) + 1:].strip()
+        return jsonify({"ok": True,
+                        "phase":     fields["PHASE"],
+                        "drivers":   fields["DRIVERS"],
+                        "filter":    fields["FILTER"],
+                        "catalysts": fields["CATALYSTS"],
+                        "updated":   fields["UPDATED"]})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e), "phase": "", "updated": ""})
 
