@@ -120,6 +120,7 @@ _CONFIG_SPEC: dict[str, str] = {
     "TRAILING_MIN_PROFIT_R": "1.5", "TRAILING_LOOKBACK": "6",
     # ── Protection (v0.4) ──
     "MAX_TRADES_PER_DAY": "6", "AUTO_SL_PROTECT": "true",
+    "AUTO_SL_PIPS": "0", "SL_MIN_GAP_PIPS": "800",
     # ── Decision gates & anti-fade guards (live-reload ทุกตัว) ──
     "MIN_TECH_CONF": "62", "ASIAN_MIN_CONF": "72", "MIN_AI_EQUITY": "150",
     "COUNTER_SPIKE_PIPS": "500",

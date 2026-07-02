@@ -83,9 +83,16 @@ EMA_PULLBACK_BLOCK    = (os.getenv("EMA_PULLBACK_BLOCK") or "true").lower() != "
 MAX_TRADES_PER_DAY    = int(os.getenv("MAX_TRADES_PER_DAY") or 6)
 
 # AUTO_SL_PROTECT: ทุก cycle ถ้าเจอ open position ที่ไม่มี SL (sl==0) → ตั้ง SL ให้อัตโนมัติ
-# ที่ DEFAULT_SL_PIPS จากราคาปัจจุบัน (กันรู: ทุก manage_* เดิม continue ข้าม sl==0 → ไม่มีใครตั้งให้)
+# ที่ AUTO_SL_PIPS (0 = ใช้ DEFAULT_SL_PIPS) จากราคาปัจจุบัน (กันรู: manage_* ข้าม sl==0)
 # ครอบทั้ง SYSTEM + MANUAL. ตั้ง false เพื่อปิด (ไม่ยุ่งไม้ที่ไม่มี SL)
 AUTO_SL_PROTECT       = (os.getenv("AUTO_SL_PROTECT") or "true").lower() != "false"
+AUTO_SL_PIPS          = int(os.getenv("AUTO_SL_PIPS") or 0)   # ความกว้าง AUTO-SL แยกจาก SL บอท
+
+# SL_MIN_GAP_PIPS: ทุกกลไกที่ "เลื่อน" SL (breakeven/force-BE/dynamic-TP lock) ห้ามวาง SL
+# ใกล้ราคาปัจจุบันกว่านี้ — user report 07-03: SL โดนดันชิด bid/ask (force-BE เหลือ gap 10p,
+# dynamic-TP lock 200p, BE-cap×HTF-buffer เหลือ 500p) ขณะทองวัน event วิ่ง ~3,200p
+# → โดนกวาดด้วย noise. 0 = ปิด guard (พฤติกรรมเดิม)
+SL_MIN_GAP_PIPS       = int(os.getenv("SL_MIN_GAP_PIPS") or 800)
 
 # ── Decision gates & anti-fade guards ─────────────────────────
 # Replay 489 ไม้ (2026-06-10): conf 50-59 = WR 23.5% / −3,807; Asian 0-7 UTC = −115/ไม้
@@ -171,10 +178,12 @@ def reload_config():
     TREND_CONT_MAX_DIST_PCT  = float(os.getenv("TREND_CONT_MAX_DIST_PCT") or 0.3)
     NNLB_FASTPATH            = os.getenv("NNLB_FASTPATH", "true").lower() != "false"
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
-    global EMA_PULLBACK_BLOCK, AUTO_SL_PROTECT, MAX_TRADES_PER_DAY
+    global EMA_PULLBACK_BLOCK, AUTO_SL_PROTECT, MAX_TRADES_PER_DAY, AUTO_SL_PIPS, SL_MIN_GAP_PIPS
     EMA_PULLBACK_BLOCK       = (os.getenv("EMA_PULLBACK_BLOCK") or "true").lower() != "false"
     AUTO_SL_PROTECT          = (os.getenv("AUTO_SL_PROTECT") or "true").lower() != "false"
     MAX_TRADES_PER_DAY       = int(os.getenv("MAX_TRADES_PER_DAY") or 6)
+    AUTO_SL_PIPS             = int(os.getenv("AUTO_SL_PIPS") or 0)
+    SL_MIN_GAP_PIPS          = int(os.getenv("SL_MIN_GAP_PIPS") or 800)
     global LESSON_LEARNING, DRY_RUN, NNLB_MODE, NNLB_BASE_EQUITY, NNLB_EQUITY_PER_LOT, NNLB_MAX_LOSS_PCT
     LESSON_LEARNING      = os.getenv("LESSON_LEARNING", "true").lower() != "false"
     DRY_RUN              = os.getenv("DRY_RUN", "false").lower() == "true"

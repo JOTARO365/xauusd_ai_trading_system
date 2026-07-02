@@ -1942,6 +1942,11 @@
               <input type="number" id="cfg-BE_MAX_TRIGGER_PIPS" step="100" min="0" max="10000">
               <div class="field-help">เพดาน trigger — ไม้ SL กว้างจะ lock กำไรเมื่อถึง X pips ไม่ว่า R เท่าไร (1500)</div>
             </div>
+            <div class="field">
+              <label>SL Min Gap (pips)</label>
+              <input type="number" id="cfg-SL_MIN_GAP_PIPS" step="100" min="0" max="5000">
+              <div class="field-help">ทุกการเลื่อน SL (BE/force-BE/dyn-TP) ห้ามชิดราคากว่านี้ (800 = $8, 0 = ปิด)</div>
+            </div>
           </div>
         </div>
       </div>
@@ -2085,6 +2090,11 @@
                 <label>Max Trades / Day</label>
                 <input type="number" id="cfg-MAX_TRADES_PER_DAY" step="1" min="0" max="50">
                 <div class="field-help">เบรกวันพายุ — ไม้ #7+ ของวัน replay −411 (0 = ปิด)</div>
+              </div>
+              <div class="field">
+                <label>Auto-SL Width (pips)</label>
+                <input type="number" id="cfg-AUTO_SL_PIPS" step="100" min="0" max="10000">
+                <div class="field-help">ความกว้าง SL ที่ตั้งให้ไม้ไร้ SL — 0 = ใช้ Default SL; เทรดมือแล้วรู้สึกชิด → เพิ่มเป็น 2000-3000</div>
               </div>
               <div class="field">
                 <label>Min Tech Confidence (%)</label>
@@ -3081,7 +3091,7 @@ const _NUM_KEYS  = ['START_BALANCE','RISK_PER_TRADE','MAX_DAILY_LOSS','MAX_OPEN_
   'MAX_LOSING_STREAK','STREAK_MIN_CONFIDENCE','MAX_PENDING_BUY','MAX_PENDING_SELL',
   'PENDING_EXPIRY_HOURS','HEDGE_BUFFER_PIPS',
   'BE_TRIGGER_R','BE_BUFFER_PIPS','BE_CONFIRM_CYCLES',
-  'HTF_BE_TRIGGER_R','HTF_BE_BUFFER_PIPS','BE_MAX_TRIGGER_PIPS',
+  'HTF_BE_TRIGGER_R','HTF_BE_BUFFER_PIPS','BE_MAX_TRIGGER_PIPS','SL_MIN_GAP_PIPS','AUTO_SL_PIPS',
   'NNLB_BASE_EQUITY','NNLB_EQUITY_PER_LOT','NNLB_MAX_LOSS_PCT',
   'TRAILING_ATR_MULT','TRAILING_MIN_PROFIT_R','TRAILING_LOOKBACK',
   'MAX_TRADES_PER_DAY','MIN_TECH_CONF','ASIAN_MIN_CONF','MIN_AI_EQUITY',

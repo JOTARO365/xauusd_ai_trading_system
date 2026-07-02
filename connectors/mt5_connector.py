@@ -987,6 +987,19 @@ def manage_breakeven() -> int:
         else:
             buf_pips = max(default_buf_pips, int(profit_pips * 0.30))
 
+        # SL_MIN_GAP: SL ใหม่ต้องห่างราคาปัจจุบัน ≥ gap — เดิม BE-cap (trigger 1500p) ชน
+        # HTF buffer (1000p) เหลือ gap แค่ 500p = noise ทองวัน event → โดนกวาด
+        # clamp buffer ลงแทน (lock น้อยลงแต่ SL ไม่ชิดราคา); ถ้ากำไรยังไม่พอเว้น gap → รอ
+        _gap = int(getattr(_cfg, "SL_MIN_GAP_PIPS", 800) or 0)
+        if _gap > 0:
+            buf_pips = min(buf_pips, int(profit_pips) - _gap)
+            if buf_pips < 0:
+                logger.debug(
+                    f"BE wait ticket={pos.ticket}: profit {profit_pips:.0f}p − gap {_gap}p "
+                    f"ไม่พอ lock — รอกำไรเพิ่ม"
+                )
+                continue
+
         if is_htf and zone_tf:
             logger.debug(
                 f"BE [{zone_tf} zone] ticket={pos.ticket}: "
@@ -1127,7 +1140,10 @@ def ensure_sl_protection() -> int:
 
     point     = info.point
     stops_min = (info.trade_stops_level or 0) * point
-    sl_pips   = float(MONEY_MANAGEMENT["default_sl_pips"])
+    # AUTO_SL_PIPS แยกจาก SL บอท — user เทรดมือรู้สึก 1000p ($10) จากราคาชิดไป
+    # ตั้งกว้างขึ้นได้ (เช่น 2000-3000) โดยไม่กระทบ DEFAULT_SL_PIPS ของไม้ SYSTEM
+    sl_pips   = float(getattr(_cfg, "AUTO_SL_PIPS", 0) or 0) \
+                or float(MONEY_MANAGEMENT["default_sl_pips"])
     protected = 0
 
     for pos in positions:
@@ -1299,12 +1315,14 @@ def _force_breakeven_opposing(new_direction: str) -> int:
             logger.debug(f"Force-BE skip {tag}: in loss ({profit_pips:.0f}pips)")
             continue
 
-        # ลด buffer ถ้ากำไรน้อยกว่า BE_BUFFER_PIPS
+        # ลด buffer ถ้ากำไรไม่พอ — ต้องเว้น SL_MIN_GAP จากราคาปัจจุบันเสมอ
+        # (เดิม profit−10 → SL ห่างราคาแค่ 10p = $0.10 โดนกวาดทันที; user report 07-03)
         _buf = getattr(_cfg, "BE_BUFFER_PIPS", BREAKEVEN_BUFFER_PIPS)
-        safe_buffer = min(_buf, profit_pips - 10)
+        _gap = int(getattr(_cfg, "SL_MIN_GAP_PIPS", 800) or 0) or 10
+        safe_buffer = min(_buf, profit_pips - _gap)
         if safe_buffer < 0:
             logger.debug(
-                f"Force-BE skip {tag}: profit {profit_pips:.0f}pips too small (need >10 pips)"
+                f"Force-BE skip {tag}: profit {profit_pips:.0f}p ไม่พอเว้น gap {_gap}p — ข้าม"
             )
             continue
 
@@ -1749,8 +1767,10 @@ def manage_dynamic_tp() -> int:
             else round(pos.tp - TP_EXT_PIPS * point, 2)
 
         # trail SL มาล็อคกำไรเมื่อ extend TP — SL ไม่ถอยหลัง
-        lock_sl = round(current - TP_EXT_SL_LOCK_PIPS * point, 2) if is_buy \
-            else round(current + TP_EXT_SL_LOCK_PIPS * point, 2)
+        # ระยะ lock ต้อง ≥ SL_MIN_GAP (เดิม 200p = $2 ชิดเกิน โดน noise กวาดก่อนถึง TP ใหม่)
+        _lock_dist = max(TP_EXT_SL_LOCK_PIPS, int(getattr(_cfg, "SL_MIN_GAP_PIPS", 800) or 0))
+        lock_sl = round(current - _lock_dist * point, 2) if is_buy \
+            else round(current + _lock_dist * point, 2)
         if is_buy:
             new_sl = max(pos.sl, lock_sl)   # SL เลื่อนขึ้นเท่านั้น
         else:
