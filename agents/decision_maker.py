@@ -569,6 +569,12 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     if _in_quiet_session:
         _sess_lbl = "Asian (quiet)" if _utc_hour < 7 else "NY Close (quiet)"
         _q_min = _cfg.ASIAN_MIN_CONF
+        # RIDE: momentum 3 ชั้นเรียงแถว = confirmation แรงกว่า conf เดี่ยว → ใช้ floor ปกติ
+        # (Asian gate เกิดจาก "ไม้ Asian conf ต่ำ = noise" — แต่คืน event/trend จริง เช่น
+        # NFP follow-through 07-02 ตลาด Asian วิ่งเป็นเทรนด์ ไม้ RIDE conf 62 โดนกันไว้)
+        if _momentum_ride_active(direction, chart_data):
+            logger.info(f"[RIDE] session floor ผ่อน: {_q_min:.0f}→{_cfg.MIN_TECHNICAL_CONFIDENCE} ({_sess_lbl})")
+            _q_min = float(_cfg.MIN_TECHNICAL_CONFIDENCE)
         # Asian 0-7 UTC: ทุก entry ต้อง conf ≥ ASIAN_MIN_CONF — replay 489 ไม้:
         # Asian = −4,380 (avg −115/ไม้); บล็อก conf<72 ตัด −4,506 เสียกำไรดีแค่ +57
         if _utc_hour < 7 and conf < _q_min:
