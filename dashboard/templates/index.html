@@ -3686,7 +3686,9 @@ function renderEventCard(bs) {
     return;
   }
   // ต้อง sync กับ _EVENT_TITLE_KEYS ใน agents/analyst.py เมื่อเพิ่ม event ใหม่
-  const NEEDLES = { NFP: ['non-farm', 'nonfarm', 'non farm'] };
+  const NEEDLES = { NFP: ['non-farm', 'nonfarm', 'non farm'],
+                    CPI: ['cpi'],
+                    FOMC: ['fomc', 'federal funds rate'] };
   const statsEv = (_eventStats && _eventStats.events) || {};
   el.innerHTML = upcoming.map(ev => {
     const mins = Math.round((ev.t - now) / 60000);

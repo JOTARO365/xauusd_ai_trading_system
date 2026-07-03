@@ -75,6 +75,20 @@ def compute_nfp(dates: list[str], prices: dict[str, float]) -> dict:
     start = date.fromisoformat(dates[0]) + timedelta(days=35)
     end   = date.fromisoformat(dates[-1])
     releases = nfp_release_dates(start, end)
+    return _aggregate(dates, prices, releases,
+                      basis="daily close, base = close วันเทรดก่อนประกาศ; วันประกาศ rule-based (first-Friday)")
+
+
+def compute_from_dates(dates: list[str], prices: dict[str, float],
+                       release_isos: list[str], basis: str) -> dict:
+    """สถิติจากรายการวันประกาศจริง (CPI/FOMC จาก official schedule ใน data/event_dates.json)"""
+    lo, hi = dates[0], dates[-1]
+    releases = [date.fromisoformat(d) for d in sorted(release_isos) if lo <= d <= hi]
+    return _aggregate(dates, prices, releases, basis=basis)
+
+
+def _aggregate(dates: list[str], prices: dict[str, float], releases: list[date],
+               basis: str) -> dict:
     rows = []
     for rel in releases:
         r = _reaction(dates, prices, rel)
@@ -101,7 +115,7 @@ def compute_nfp(dates: list[str], prices: dict[str, float]) -> dict:
         "avg_up_pct":   round(statistics.mean(r["d0"] for r in ups), 3) if ups else 0,
         "avg_down_pct": round(statistics.mean(r["d0"] for r in downs), 3) if downs else 0,
         "d2_extends_pct": round(len(cont) / directional * 100, 1) if directional else 0,
-        "basis": "daily close, base = close วันเทรดก่อนประกาศ; วันประกาศ rule-based (first-Friday)",
+        "basis": basis,
         "flat_threshold_pct": FLAT_PCT,
     }
 
@@ -116,21 +130,40 @@ def _baseline_avg_abs(dates: list[str], prices: dict[str, float]) -> float:
     return round(statistics.mean(rets), 3) if rets else 0.0
 
 
+DATES_PATH = ROOT / "data" / "event_dates.json"
+
+
 def main():
     dates, prices = _load_daily()
     baseline = _baseline_avg_abs(dates, prices)
-    nfp = compute_nfp(dates, prices)
-    nfp["vs_baseline_x"] = round(nfp["avg_abs_d0_pct"] / baseline, 2) if baseline else 0
+    events = {"NFP": compute_nfp(dates, prices)}
+
+    # CPI/FOMC จากวันประกาศจริง (official schedule) — data/event_dates.json
+    if DATES_PATH.exists():
+        edates = json.loads(DATES_PATH.read_text(encoding="utf-8"))
+        for key, info in edates.get("events", {}).items():
+            release_isos = info.get("dates") or []
+            if release_isos:
+                events[key] = compute_from_dates(
+                    dates, prices, release_isos,
+                    basis=f"daily close; วันประกาศจริงจาก {info.get('source', 'official schedule')}")
+
+    for ev in events.values():
+        ev["vs_baseline_x"] = round(ev["avg_abs_d0_pct"] / baseline, 2) if baseline else 0
+
     stats = {
         "updated": date.today().isoformat(),
         "source": "data/xau_daily.json (AlphaVantage daily)",
         "baseline_avg_abs_pct": baseline,
-        "events": {"NFP": nfp},
+        "events": events,
     }
     OUT_PATH.write_text(json.dumps(stats, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"baseline avg|daily move| = {baseline:.3f}% | NFP day = {nfp['vs_baseline_x']}x ของวันปกติ")
-    print(f"NFP: n={nfp['n']} ({nfp['window']})")
-    print(f"  release day: up {nfp['up_pct']}% / down {nfp['down_pct']}% / flat {nfp['flat_pct']}%")
+    print(f"baseline avg|daily move| = {baseline:.3f}%")
+    for key, ev in events.items():
+        print(f"{key}: n={ev['n']} ({ev['window']}) | up {ev['up_pct']}%/down {ev['down_pct']}%"
+              f"/flat {ev['flat_pct']}% | avg|move| {ev['avg_abs_d0_pct']}% = {ev['vs_baseline_x']}x")
+    nfp = events["NFP"]
+    print(f"\nNFP detail: release day up {nfp['up_pct']}% / down {nfp['down_pct']}% / flat {nfp['flat_pct']}%")
     print(f"  avg {nfp['avg_d0_pct']:+.3f}% | avg|move| {nfp['avg_abs_d0_pct']:.3f}% "
           f"| avg up {nfp['avg_up_pct']:+.3f}% / down {nfp['avg_down_pct']:+.3f}%")
     print(f"  D+2 extends direction: {nfp['d2_extends_pct']}% of directional days")

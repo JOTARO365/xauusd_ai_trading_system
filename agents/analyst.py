@@ -51,7 +51,12 @@ _last_usage = None   # set after each API call — read by accountant
 # สถิติจริงจาก scripts/event_reaction_stats.py (daily gold 15 ปี) — ฉีด 1-2 บรรทัด
 # เข้า calendar context เฉพาะวันที่มี event ที่เรามีสถิติ (ตอนนี้: NFP)
 _EVENT_STATS_PATH = Path("data/event_stats.json")
-_EVENT_TITLE_KEYS = {"NFP": ("non-farm", "nonfarm", "non farm")}
+# needle ต้อง sync กับ NEEDLES ใน dashboard index.html เมื่อเพิ่ม event
+_EVENT_TITLE_KEYS = {
+    "NFP":  ("non-farm", "nonfarm", "non farm"),
+    "CPI":  ("cpi",),                              # จับทั้ง CPI m/m / Core CPI (วันเดียวกัน dedupe แล้ว)
+    "FOMC": ("fomc", "federal funds rate"),
+}
 
 
 def _event_prior_lines(calendar: list) -> str:
