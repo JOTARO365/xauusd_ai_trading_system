@@ -3462,7 +3462,7 @@ async function loadMonitor() {
     renderZones(bs);
     if (!_calEvents.length) fetchCalendar();   // เผื่อเปิด Live tab ก่อน calendar โหลดรอบแรก
     renderEventCard(bs);
-    loadCandles();          // init/refresh กราฟ (throttle ในตัว)
+    await loadCandles();    // init/refresh กราฟ (throttle ในตัว) — await กัน race ตอนวาดเส้นโซนครั้งแรก
     drawZoneLines(bs);      // ทับโซน AI ลงบนกราฟ
     loadGateBlocks();
     loadRideStats();
@@ -3613,14 +3613,34 @@ function drawZoneLines(bs) {
   _zoneLines.forEach(l => { try { _candleSeries.removePriceLine(l); } catch (e) {} });
   _zoneLines = [];
   const z = bs.zones || {};
-  const add = (price, color, title, width) => _zoneLines.push(_candleSeries.createPriceLine({
-    price, color, lineWidth: width || 1,
-    lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: false, title,
-  }));
-  (z.resistance || []).forEach(lv => add(lv, 'rgba(239,68,68,0.55)', 'R'));
-  (z.support || []).forEach(lv => add(lv, 'rgba(34,197,94,0.55)', 'S'));
+  const setups = z.setups || [];
+  // strength% จาก setup score (เกณฑ์เดียวกับ Key Levels ladder) → เส้นหนา+label
+  const scoreFor = lv => {
+    const hits = setups.filter(s => s.level && Math.abs(s.level - lv) / lv < 0.003);
+    return hits.length ? Math.max(...hits.map(x => x.score || 0)) : null;
+  };
+  const add = (price, color, title, width, style, label) => _zoneLines.push(
+    _candleSeries.createPriceLine({
+      price, color, lineWidth: width || 1,
+      lineStyle: style !== undefined ? style : LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible: !!label, title,
+    }));
+  (z.resistance || []).forEach(lv => {
+    const sc = scoreFor(lv);
+    add(lv, sc ? 'rgba(239,68,68,0.9)' : 'rgba(239,68,68,0.45)',
+        sc ? `R ${sc}%` : 'R', sc >= 80 ? 3 : sc ? 2 : 1, undefined, !!sc);
+  });
+  (z.support || []).forEach(lv => {
+    const sc = scoreFor(lv);
+    add(lv, sc ? 'rgba(34,197,94,0.9)' : 'rgba(34,197,94,0.45)',
+        sc ? `S ${sc}%` : 'S', sc >= 80 ? 3 : sc ? 2 : 1, undefined, !!sc);
+  });
+  // PDH/PDL — key levels เมื่อวาน (เดิมไม่ถูกวาดเลย)
+  const kl = z.key_levels || {};
+  if (kl.pdh) add(kl.pdh, 'rgba(245,158,11,0.85)', 'PDH', 1, LightweightCharts.LineStyle.Dotted, true);
+  if (kl.pdl) add(kl.pdl, 'rgba(245,158,11,0.85)', 'PDL', 1, LightweightCharts.LineStyle.Dotted, true);
   const htf = z.htf_zone;
-  if (htf && htf.level) add(htf.level, '#D4AC0D', '★' + htf.tf, 2);
+  if (htf && htf.level) add(htf.level, '#D4AC0D', '★' + htf.tf, 3, LightweightCharts.LineStyle.Solid, true);
 }
 
 /* ── Why No Entry — gate blocks สด (07-03) ── */
