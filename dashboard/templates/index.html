@@ -8,7 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="/static/lightweight-charts.standalone.production.js"></script><!-- vendored 07-03: VM/offline ใช้ได้ -->
+
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -1216,6 +1217,12 @@
       to   { transform: translateX(-50%); }
     }
     .regime-k { color: var(--gold, #D4AC0D); font-weight: 700; letter-spacing: 1px; }
+    .tf-btn {
+      background: transparent; border: 1px solid var(--border2, #2a3142); border-radius: 5px;
+      color: var(--muted); font-size: 10px; font-weight: 700; padding: 3px 10px;
+      cursor: pointer; font-family: var(--mono); letter-spacing: 1px;
+    }
+    .tf-btn.active { color: var(--gold, #D4AC0D); border-color: var(--gold, #D4AC0D); }
   </style>
   <div id="regime-strip" title="" style="display:none;margin:0 0 10px;padding:7px 14px;border:1px solid var(--border2,#2a3142);border-left:3px solid var(--gold,#D4AC0D);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--text-dim,#9aa3b8);align-items:center;gap:12px;overflow:hidden">
     <span class="regime-k" style="flex-shrink:0">REGIME</span>
@@ -1480,6 +1487,46 @@
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-monitor">
+
+    <!-- PRICE CHART + AI ZONES OVERLAY (07-03) -->
+    <section>
+      <div class="section-title" style="display:flex;align-items:center">
+        <span>Price Chart &mdash; AI Zones Overlay</span>
+        <span style="margin-left:auto;display:flex;gap:4px">
+          <button class="tf-btn active" data-tf="M15" onclick="setChartTf('M15')">M15</button>
+          <button class="tf-btn" data-tf="H1"  onclick="setChartTf('H1')">H1</button>
+          <button class="tf-btn" data-tf="H4"  onclick="setChartTf('H4')">H4</button>
+          <button class="tf-btn" data-tf="D1"  onclick="setChartTf('D1')">D1</button>
+        </span>
+      </div>
+      <div class="chart-card" style="padding:8px 8px 4px">
+        <div id="price-chart" style="width:100%;min-height:380px"></div>
+      </div>
+    </section>
+
+    <!-- RIDE COHORT — หน้าปัดการทดลอง MOMENTUM_RIDE (07-03) -->
+    <section>
+      <div class="section-title">Ride Cohort &mdash; ผลการทดลอง MOMENTUM_RIDE</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card"><div class="label">Closed / Open</div><div class="value gold" id="ride-n">—</div></div>
+        <div class="card"><div class="label">Win Rate</div><div class="value" id="ride-wr">—</div></div>
+        <div class="card"><div class="label">P&amp;L รวม</div><div class="value" id="ride-pnl">—</div></div>
+        <div class="card"><div class="label">ล่าสุด</div><div class="sub" id="ride-recent" style="font-size:10px;line-height:1.6">—</div></div>
+      </div>
+    </section>
+
+    <!-- WHY NO ENTRY — gate blocks สด (07-03) -->
+    <section>
+      <div class="section-title">Why No Entry &mdash; Gate Blocks ล่าสุด</div>
+      <div class="table-card">
+        <div class="table-wrap" style="max-height:260px;overflow-y:auto">
+          <table>
+            <thead><tr><th>เวลา (UTC)</th><th>Signal</th><th class="center">Conf</th><th>Momentum</th><th>D1</th><th>Gate</th><th>เหตุผล</th></tr></thead>
+            <tbody id="gate-blocks-tbody"><tr><td colspan="7" class="no-data">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
     <!-- BOT STATUS -->
     <section>
@@ -3415,6 +3462,10 @@ async function loadMonitor() {
     renderZones(bs);
     if (!_calEvents.length) fetchCalendar();   // เผื่อเปิด Live tab ก่อน calendar โหลดรอบแรก
     renderEventCard(bs);
+    loadCandles();          // init/refresh กราฟ (throttle ในตัว)
+    drawZoneLines(bs);      // ทับโซน AI ลงบนกราฟ
+    loadGateBlocks();
+    loadRideStats();
 
     const orders  = data.pending_orders || [];
     const grouped = data.pending_grouped || {};
@@ -3515,6 +3566,108 @@ function renderZones(bs) {
     (res.map(l => row(l, 'R')).join('') || '<div class="no-data">no resistance data</div>')
     + priceRow
     + (sup.map(l => row(l, 'S')).join('') || '<div class="no-data">no support data</div>');
+}
+
+/* ── Price Chart + AI Zones overlay (07-03) — lightweight-charts, data จาก MT5 ── */
+let _chart = null, _candleSeries = null, _zoneLines = [], _chartTf = 'M15', _lastCandleLoad = 0;
+
+function initChart() {
+  if (_chart || !window.LightweightCharts) return;
+  const el = document.getElementById('price-chart');
+  if (!el) return;
+  _chart = LightweightCharts.createChart(el, {
+    height: 380,
+    layout: { background: { color: 'transparent' }, textColor: '#9aa3b8', fontFamily: 'JetBrains Mono, monospace' },
+    grid: { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
+    timeScale: { timeVisible: true, secondsVisible: false, borderColor: '#2a3142' },
+    rightPriceScale: { borderColor: '#2a3142' },
+  });
+  _candleSeries = _chart.addCandlestickSeries({
+    upColor: '#22c55e', downColor: '#ef4444',
+    wickUpColor: '#22c55e', wickDownColor: '#ef4444', borderVisible: false,
+  });
+  new ResizeObserver(() => { if (el.clientWidth) _chart.applyOptions({ width: el.clientWidth }); }).observe(el);
+}
+
+async function loadCandles(force) {
+  initChart();
+  if (!_candleSeries) return;
+  const now = Date.now();
+  if (!force && now - _lastCandleLoad < 25000) return;   // throttle 25s (backend cache 10s)
+  _lastCandleLoad = now;
+  try {
+    const r = await fetch('/api/candles?tf=' + _chartTf + '&count=250');
+    const d = await r.json();
+    if (d.ok && d.candles.length) _candleSeries.setData(d.candles);
+  } catch (e) {}
+}
+
+function setChartTf(tf) {
+  _chartTf = tf;
+  document.querySelectorAll('.tf-btn').forEach(b => b.classList.toggle('active', b.dataset.tf === tf));
+  loadCandles(true);
+}
+
+function drawZoneLines(bs) {
+  if (!_candleSeries) return;
+  _zoneLines.forEach(l => { try { _candleSeries.removePriceLine(l); } catch (e) {} });
+  _zoneLines = [];
+  const z = bs.zones || {};
+  const add = (price, color, title, width) => _zoneLines.push(_candleSeries.createPriceLine({
+    price, color, lineWidth: width || 1,
+    lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: false, title,
+  }));
+  (z.resistance || []).forEach(lv => add(lv, 'rgba(239,68,68,0.55)', 'R'));
+  (z.support || []).forEach(lv => add(lv, 'rgba(34,197,94,0.55)', 'S'));
+  const htf = z.htf_zone;
+  if (htf && htf.level) add(htf.level, '#D4AC0D', '★' + htf.tf, 2);
+}
+
+/* ── Why No Entry — gate blocks สด (07-03) ── */
+async function loadGateBlocks() {
+  try {
+    const r = await fetch('/api/gate-blocks');
+    const d = await r.json();
+    const tbody = document.getElementById('gate-blocks-tbody');
+    if (!tbody) return;
+    const rows = d.blocks || [];
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="no-data">ไม่มี block — บอทยังไม่เจอ setup</td></tr>'; return; }
+    const gateColors = { htf_direction: 'var(--violet,#8b5cf6)', counter_spike: 'var(--red)', session: 'var(--amber,#f59e0b)',
+                         counter_trend: 'var(--red)', sideways: 'var(--muted)', trade_cap: 'var(--gold)', no_trade: 'var(--muted)' };
+    tbody.innerHTML = rows.map(b => {
+      const sig = b.signal || '—';
+      const sigCls = String(sig).includes('BUY') ? 'green' : String(sig).includes('SELL') ? 'red' : '';
+      const mom = (b.mom_m15 || b.mom_h1) ? `${b.mom_m15 || '?'} / ${b.mom_h1 || '?'}` : '—';
+      return `<tr>
+        <td style="font-size:10px;color:var(--muted);font-family:var(--mono)">${(b.at || '').slice(5, 16).replace('T', ' ')}</td>
+        <td><span class="badge badge-${sigCls}" style="font-size:9px">${sig}</span></td>
+        <td class="center">${b.conf ?? '—'}</td>
+        <td style="font-size:10px;font-family:var(--mono)">${mom}</td>
+        <td style="font-size:10px;font-family:var(--mono)">${b.d1_trend || '—'}</td>
+        <td><span style="color:${gateColors[b.gate] || 'var(--muted)'};font-weight:700;font-size:10px;font-family:var(--mono)">${b.gate || '—'}</span></td>
+        <td style="font-size:10px;color:var(--muted)">${(b.reason || '').slice(0, 70)}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {}
+}
+
+/* ── RIDE cohort — หน้าปัดการทดลอง (07-03) ── */
+async function loadRideStats() {
+  try {
+    const r = await fetch('/api/ride-stats');
+    const d = await r.json();
+    if (!d.ok) return;
+    document.getElementById('ride-n').textContent = `${d.n_closed} / ${d.n_open}`;
+    const wrEl = document.getElementById('ride-wr');
+    wrEl.textContent = d.wr === null ? 'รอไม้แรก' : d.wr + '%';
+    wrEl.className = 'value ' + (d.wr === null ? '' : d.wr >= 50 ? 'green' : 'red');
+    const pnlEl = document.getElementById('ride-pnl');
+    pnlEl.textContent = (d.pnl >= 0 ? '+' : '') + d.pnl.toFixed(2);
+    pnlEl.className = 'value ' + (d.pnl > 0 ? 'green' : d.pnl < 0 ? 'red' : 'gold');
+    document.getElementById('ride-recent').innerHTML = (d.recent || []).length
+      ? d.recent.map(t => `${t.time.slice(5)} ${t.dir} ${t.pnl >= 0 ? '+' : ''}${t.pnl}${t.closed ? '' : ' (open)'}`).join('<br>')
+      : 'ยังไม่มีไม้ RIDE — รอ setup แรก';
+  } catch (e) {}
 }
 
 /* ── Event Radar (07-03 ชิ้น 3): upcoming events + prior 15 ปี + กรอบราคาคาด ── */

@@ -951,6 +951,90 @@ def api_modify_position():
     return jsonify({"ok": True, "ticket": ticket, "sl": sl, "tp": tp})
 
 
+@app.route("/api/gate-blocks")
+def api_gate_blocks():
+    """block ล่าสุดจาก logs/gate_blocks.jsonl — Why-No-Entry panel (Live tab)
+    ตอบคำถาม 'ทำไมบอทไม่เข้า order' ได้จากหน้าจอ ไม่ต้องไล่ log"""
+    try:
+        p = os.path.join(_BASE, "../logs/gate_blocks.jsonl")
+        with open(p, "r", encoding="utf-8") as f:
+            lines = f.read().splitlines()
+        rows = [json.loads(l) for l in lines[-120:] if l.strip()]
+        rows = rows[-25:]
+        rows.reverse()   # ใหม่สุดก่อน
+        return jsonify({"ok": True, "blocks": rows})
+    except FileNotFoundError:
+        return jsonify({"ok": True, "blocks": []})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "blocks": []})
+
+
+@app.route("/api/ride-stats")
+def api_ride_stats():
+    """ผล cohort ไม้ MOMENTUM_RIDE (entry comment ขึ้นต้น 'RIDE') จาก MT5 —
+    หน้าปัดการทดลอง: cohort นี้แพ้เมื่อไหร่ = ปิด MOMENTUM_RIDE knob"""
+    def _compute():
+        if not _MT5_AVAILABLE or not _ensure_mt5():
+            return {"ok": False, "error": "MT5 not connected"}
+        from collections import defaultdict
+        deals = mt5.history_deals_get(datetime.now() - timedelta(days=90), datetime.now()) or []
+        pos = defaultdict(lambda: {"in": None, "pnl": 0.0, "closed": False})
+        for d in deals:
+            if d.symbol != SYMBOL:
+                continue
+            p = pos[d.position_id]
+            p["pnl"] += d.profit + d.swap + d.commission
+            if d.entry == 0 and p["in"] is None:
+                p["in"] = d
+            elif d.entry in (1, 2):
+                p["closed"] = True
+        rides = []
+        for pid, p in pos.items():
+            e = p["in"]
+            if e is None or not str(e.comment or "").startswith("RIDE"):
+                continue
+            rides.append({"time": datetime.fromtimestamp(e.time).isoformat()[:16],
+                          "dir": "BUY" if e.type == 0 else "SELL",
+                          "pnl": round(p["pnl"], 2), "closed": p["closed"]})
+        n_open  = sum(1 for r in rides if not r["closed"])
+        closed  = [r for r in rides if r["closed"]]
+        wins    = sum(1 for r in closed if r["pnl"] > 0)
+        return {"ok": True, "n_closed": len(closed), "n_open": n_open,
+                "wr": round(wins / len(closed) * 100, 1) if closed else None,
+                "pnl": round(sum(r["pnl"] for r in closed), 2),
+                "recent": sorted(rides, key=lambda r: r["time"], reverse=True)[:5]}
+    return jsonify(_cached("ride-stats", _compute, ttl=60))
+
+
+_TF_MAP = {}
+if _MT5_AVAILABLE:
+    _TF_MAP = {"M15": mt5.TIMEFRAME_M15, "H1": mt5.TIMEFRAME_H1,
+               "H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1}
+
+
+@app.route("/api/candles")
+def api_candles():
+    """แท่งเทียนจาก MT5 สำหรับ price chart (lightweight-charts) — cache 10s"""
+    tf = request.args.get("tf", "M15").upper()
+    try:
+        count = min(int(request.args.get("count", 250)), 500)
+    except ValueError:
+        count = 250
+    if tf not in ("M15", "H1", "H4", "D1"):
+        return jsonify({"ok": False, "error": "bad tf", "candles": []}), 400
+
+    def _fetch():
+        if not _MT5_AVAILABLE or not _ensure_mt5():
+            return {"ok": False, "error": "MT5 not connected", "candles": []}
+        rates = mt5.copy_rates_from_pos(SYMBOL, _TF_MAP[tf], 0, count)
+        if rates is None:
+            return {"ok": False, "error": str(mt5.last_error()), "candles": []}
+        return {"ok": True, "tf": tf, "candles": [
+            {"time": int(r["time"]), "open": float(r["open"]), "high": float(r["high"]),
+             "low": float(r["low"]), "close": float(r["close"])} for r in rates]}
+    return jsonify(_cached(f"candles:{tf}:{count}", _fetch, ttl=10))
+
+
 @app.route("/api/regime")
 def api_regime():
     """สรุป macro regime จาก agents/prompts/macro_regime.md (ไฟล์เดียวกับที่ analyst อ่าน)
