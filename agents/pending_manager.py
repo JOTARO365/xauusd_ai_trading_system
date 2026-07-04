@@ -17,16 +17,51 @@ import config as _cfg
 _MANUAL_RANGE_FILE = os.path.join(os.path.dirname(__file__), "../logs/manual_range.json")
 
 
-def _get_manual_range() -> tuple[float, float] | tuple[None, None]:
-    """อ่าน manual range จาก logs/manual_range.json — คืน (high, low) หรือ (None, None)"""
+# Manual range เก่าค้างเคยทำให้บอทวางออเดอร์ที่กรอบที่ราคาทะลุไปแล้ว (มิ.ย. '26 range
+# 3980-4100 ค้าง 8 วันจนราคาไป 4180). Guard: หมดอายุตามเวลา หรือราคาออกนอกกรอบ → ทิ้งไฟล์
+# กลับไป auto-detect เอง.
+_MANUAL_RANGE_MAX_AGE_DAYS = int(os.getenv("MANUAL_RANGE_MAX_AGE_DAYS") or 5)
+
+
+def _expire_manual_range(reason: str) -> None:
+    """ลบไฟล์ manual range ที่หมดอายุครั้งเดียว (กัน log ซ้ำทุก cycle) แล้วปล่อยให้ตกไป auto-detect."""
+    logger.warning(f"Manual Range หมดอายุ ({reason}) — ลบไฟล์ กลับไปใช้ auto-detect")
+    try:
+        os.remove(_MANUAL_RANGE_FILE)
+    except OSError:
+        pass
+
+
+def _get_manual_range(current: float | None = None) -> tuple[float, float] | tuple[None, None]:
+    """อ่าน manual range จาก logs/manual_range.json — คืน (high, low) หรือ (None, None).
+    Auto-expire: ถ้าตั้งไว้เกิน MANUAL_RANGE_MAX_AGE_DAYS วัน หรือราคาปัจจุบันออกนอกกรอบ
+    → ถือว่าค้าง ลบทิ้ง คืน (None, None) ให้ caller ตกไป auto-detect."""
     try:
         with open(_MANUAL_RANGE_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
         high = float(data.get("high", 0))
         low  = float(data.get("low",  0))
-        if high > 0 and low > 0 and high > low:
-            return high, low
-    except (FileNotFoundError, Exception):
+        if not (high > 0 and low > 0 and high > low):
+            return None, None
+
+        # หมดอายุตามเวลา
+        set_at = data.get("set_at")
+        if set_at:
+            try:
+                age_days = (datetime.now() - datetime.fromisoformat(set_at)).total_seconds() / 86400
+                if age_days > _MANUAL_RANGE_MAX_AGE_DAYS:
+                    _expire_manual_range(f"อายุ {age_days:.1f} วัน > {_MANUAL_RANGE_MAX_AGE_DAYS}")
+                    return None, None
+            except (ValueError, TypeError):
+                pass  # set_at เพี้ยน — ไม่ถือว่าหมดอายุด้วยเหตุนี้
+
+        # ราคาออกนอกกรอบ = range แตกแล้ว
+        if current and (current > high or current < low):
+            _expire_manual_range(f"ราคา {current:.2f} ออกนอกกรอบ [{low:.2f}-{high:.2f}]")
+            return None, None
+
+        return high, low
+    except (FileNotFoundError, json.JSONDecodeError, ValueError, OSError):
         pass
     return None, None
 
@@ -668,8 +703,8 @@ def manage_range_pending(chart_data: dict) -> int:
     point = info.point if info else 0.01
     h4_atr = chart_data.get("indicators", {}).get("h4", {}).get("atr", 0)
 
-    # ── Manual Range Override — ถ้ามีค่าจาก Dashboard ใช้เลย ────
-    _manual_high, _manual_low = _get_manual_range()
+    # ── Manual Range Override — ถ้ามีค่าจาก Dashboard ใช้เลย (auto-expire ตามอายุ/ราคา) ────
+    _manual_high, _manual_low = _get_manual_range(current)
     if _manual_high and _manual_low:
         upper = _manual_high
         lower = _manual_low
