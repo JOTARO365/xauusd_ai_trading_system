@@ -1214,6 +1214,35 @@ def api_news_impact():
         return jsonify(_empty)
 
 
+@app.route("/api/impact-calibration")
+def api_impact_calibration():
+    """News-impact calibration: per-tier hit-rate (predicted magnitude vs realized move).
+    Data from data/impact_calibration.json (written by scripts/review_calibration.py — ARCHITECTURE §4.3, M6).
+    — display-only, pass-through serve; file missing → empty payload, never 500 (ARCHITECTURE §D7)."""
+    _empty = {
+        "ok": True,
+        "updated": None,
+        "min_n": 30,
+        "tiers": {
+            "1": {"assumed_band_pct": [0.0, 0.4], "hit_rate_pct": None, "n": 0,
+                  "mean_realized_abs_move_pct": None},
+            "2": {"assumed_band_pct": [0.4, 0.9], "hit_rate_pct": None, "n": 0,
+                  "mean_realized_abs_move_pct": None},
+            "3": {"assumed_band_pct": [0.9, 9.9], "hit_rate_pct": None, "n": 0,
+                  "mean_realized_abs_move_pct": None},
+        },
+        "status": "collecting",
+    }
+    try:
+        p = os.path.join(_BASE, "../data/impact_calibration.json")
+        with open(p, "r", encoding="utf-8") as f:
+            return jsonify(json.load(f))
+    except FileNotFoundError:
+        return jsonify(_empty)
+    except Exception:
+        return jsonify(_empty)
+
+
 @app.route("/api/calibration")
 def api_calibration():
     """Confidence calibration: predicted conf bin -> realized WR/PnL

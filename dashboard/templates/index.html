@@ -1848,6 +1848,36 @@
       </div>
     </section>
 
+    <!-- IMPACT CALIBRATION CARD — §4.3 impact_calibration.json (M6, review_calibration.py) -->
+    <section id="impact-calibration-section">
+      <div class="section-title">Impact Calibration — Predicted Magnitude vs Realized Move</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="card">
+          <div class="label">Tier 1 &mdash; Minor <span style="font-size:10px;color:var(--muted)">[0–0.4%]</span></div>
+          <div class="value" id="ic-hr-1" style="font-family:var(--mono)">—</div>
+          <div class="sub" id="ic-n-1">—</div>
+        </div>
+        <div class="card">
+          <div class="label">Tier 2 &mdash; Moderate <span style="font-size:10px;color:var(--muted)">[0.4–0.9%]</span></div>
+          <div class="value" id="ic-hr-2" style="font-family:var(--mono)">—</div>
+          <div class="sub" id="ic-n-2">—</div>
+        </div>
+        <div class="card">
+          <div class="label">Tier 3 &mdash; Major <span style="font-size:10px;color:var(--muted)">[0.9%+]</span></div>
+          <div class="value" id="ic-hr-3" style="font-family:var(--mono)">—</div>
+          <div class="sub" id="ic-n-3">—</div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="label">Overall Status</div>
+          <div id="ic-status" style="font-size:11px;color:var(--muted);font-family:var(--mono)">—</div>
+        </div>
+        <div id="ic-detail" style="margin-top:8px;font-size:11px;font-family:var(--mono);color:var(--muted)">No data — run scripts/review_calibration.py first</div>
+        <div id="ic-updated" style="font-size:10px;color:var(--muted);margin-top:6px">—</div>
+      </div>
+    </section>
+
     <!-- CALIBRATION CARD — §3.5 calibration.json -->
     <section id="calibration-section">
       <div class="section-title">Confidence Calibration (Predicted vs Realized Win-Rate)</div>
@@ -3244,10 +3274,11 @@ async function loadAccounting() {
       },
     });
 
-    // load burn + calibration + news-impact cards alongside accounting data
+    // load burn + calibration + news-impact + impact-calibration cards alongside accounting data
     loadBurn();
     loadCalibration();
     loadNewsImpact();
+    loadImpactCalibration();
 
   } catch (e) {
     console.error('loadAccounting error:', e);
@@ -3458,6 +3489,98 @@ async function loadNewsImpact() {
     }).join('');
   } catch (e) {
     console.error('loadNewsImpact error:', e);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   IMPACT CALIBRATION CARD — §4.3 /api/impact-calibration  (M6)
+   ════════════════════════════════════════════════════════════ */
+async function loadImpactCalibration() {
+  try {
+    const res  = await fetch('/api/impact-calibration');
+    const data = await res.json();
+    if (!data.ok) return;
+
+    const tiers  = data.tiers  || {};
+    const status = data.status || 'collecting';
+    const minN   = data.min_n  || 30;
+
+    const tierNames = { '1': 'minor', '2': 'moderate', '3': 'major' };
+
+    // Per-tier stat tiles
+    ['1', '2', '3'].forEach(t => {
+      const info   = tiers[t] || {};
+      const n      = info.n || 0;
+      const hr     = info.hit_rate_pct;
+      const hrEl   = document.getElementById('ic-hr-' + t);
+      const nEl    = document.getElementById('ic-n-' + t);
+
+      if (hrEl) {
+        if (hr !== null && hr !== undefined) {
+          hrEl.textContent = hr.toFixed(1) + '%';
+          hrEl.className = 'value';
+        } else {
+          hrEl.textContent = '—';
+          hrEl.className = 'value';
+          hrEl.title = 'collecting data (n<' + minN + ')';
+        }
+      }
+      if (nEl) {
+        nEl.textContent = n < minN
+          ? 'collecting (n=' + n + ')'
+          : 'calibrated · n=' + n;
+      }
+    });
+
+    // Status badge
+    const statusEl = document.getElementById('ic-status');
+    if (statusEl) {
+      if (status === 'calibrated') {
+        statusEl.textContent = 'calibrated';
+        statusEl.style.color = 'var(--green)';
+      } else {
+        statusEl.textContent = 'rubric — ยังไม่ validate (collecting)';
+        statusEl.style.color = 'var(--muted)';
+      }
+    }
+
+    // Detail rows
+    const detailEl = document.getElementById('ic-detail');
+    if (detailEl) {
+      const rows = ['1', '2', '3'].map(t => {
+        const info  = tiers[t] || {};
+        const n     = info.n || 0;
+        const hr    = info.hit_rate_pct;
+        const band  = (info.assumed_band_pct || []).join('–');
+        const mean  = info.mean_realized_abs_move_pct;
+        const hrStr = hr !== null && hr !== undefined
+          ? hr.toFixed(1) + '% hit'
+          : 'collecting data (n<' + minN + ')';
+        const meanStr = mean !== null && mean !== undefined
+          ? '  mean=|' + mean.toFixed(3) + '%|'
+          : '';
+        return (
+          '<div style="margin-bottom:3px">' +
+            '<span style="color:var(--fg)">T' + t + ' ' + (tierNames[t] || '') + '</span>' +
+            '  [' + band + '%]' +
+            '  <span style="color:var(--muted)">n=' + n + '</span>' +
+            '  ' + hrStr + meanStr +
+          '</div>'
+        );
+      });
+      detailEl.innerHTML = rows.join('');
+    }
+
+    // Updated timestamp
+    const updatedEl = document.getElementById('ic-updated');
+    if (updatedEl) {
+      updatedEl.textContent = data.updated
+        ? 'Updated: ' + data.updated + '  (min n=' + minN + ' for verdict)'
+        : 'No data — run scripts/review_calibration.py first';
+    }
+
+  } catch (e) {
+    console.error('loadImpactCalibration error:', e);
   }
 }
 

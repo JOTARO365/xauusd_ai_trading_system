@@ -10,7 +10,7 @@
         "dir": "down",
         "magnitude_pct": 0.699,
         "provenance": "rubric",
-        "n": 173
+        "n": 1
       },
       "cool": {
         "dir": "up",
@@ -18,7 +18,13 @@
         "provenance": "rubric",
         "n": 173
       },
-      "surprise_curve": null
+      "surprise_curve": [
+        {
+          "surprise_bucket": "medium",
+          "avg_abs_move_pct": 4.0411,
+          "n": 1
+        }
+      ]
     },
     "NFP": {
       "sign": "hot_gold_down",
@@ -32,9 +38,15 @@
         "dir": "up",
         "magnitude_pct": 0.87,
         "provenance": "rubric",
-        "n": 179
+        "n": 1
       },
-      "surprise_curve": null
+      "surprise_curve": [
+        {
+          "surprise_bucket": "medium",
+          "avg_abs_move_pct": 2.8517,
+          "n": 1
+        }
+      ]
     },
     "FOMC": {
       "sign": "hawkish_gold_down",
@@ -42,7 +54,7 @@
         "dir": "down",
         "magnitude_pct": 0.814,
         "provenance": "rubric",
-        "n": 115
+        "n": 1
       },
       "cool": {
         "dir": "up",
@@ -50,7 +62,13 @@
         "provenance": "rubric",
         "n": 115
       },
-      "surprise_curve": null
+      "surprise_curve": [
+        {
+          "surprise_bucket": "hawkish_surprise",
+          "avg_abs_move_pct": 0.9702,
+          "n": 1
+        }
+      ]
     }
   }
 }

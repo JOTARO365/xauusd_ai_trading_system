@@ -1,0 +1,42 @@
+{
+  "note": "Hand-maintained historical consensus vs actual for CPI + NFP + FOMC only. NO scraping, NO AlphaVantage. YOU (the user) must populate this file with real release data — the builder (build_event_scenarios.py) reads it to compute surprise-conditioned magnitude curves. Provenance flips from 'rubric' to 'calibrated' only after a cell reaches n>=30 records. See ARCHITECTURE §4.6 + §8.",
+  "_schema": {
+    "CPI_row":  "{ event:'CPI',  date:'YYYY-MM-DD', consensus:<float %yoy>, actual:<float %yoy>, unit:'%yoy' }",
+    "NFP_row":  "{ event:'NFP',  date:'YYYY-MM-DD', consensus:<float k>,    actual:<float k>,    unit:'k'    }",
+    "FOMC_row": "{ event:'FOMC', date:'YYYY-MM-DD', stance:<hawkish|neutral|dovish>, consensus_stance:<hawkish|neutral|dovish> }",
+    "notes": [
+      "date = the release date (YYYY-MM-DD, UTC). CPI typically 2nd Wed of month at 12:30 UTC; NFP first Fri at 12:30 UTC; FOMC varies.",
+      "consensus = market median forecast from Bloomberg/Reuters/ForexFactory BEFORE the release.",
+      "actual = the officially released figure. For FOMC: stance = post-meeting statement tone.",
+      "is_hot: CPI/NFP → actual > consensus. FOMC → stance rank(hawkish=2,neutral=1,dovish=0) > consensus_stance rank.",
+      "Realized move is looked up from data/realized_moves.json (60-min move) or data/xau_daily.json (daily proxy).",
+      "Add real verified rows below — do NOT guess values. A wrong row is worse than no row (it silently biases the curve)."
+    ]
+  },
+  "updated": "2026-07-05",
+  "records": [
+    {
+      "_note": "EXAMPLE ROW — verify this against the actual June 2026 CPI release before relying on it.",
+      "event": "CPI",
+      "date": "2026-06-11",
+      "consensus": 3.2,
+      "actual": 3.4,
+      "unit": "%yoy"
+    },
+    {
+      "_note": "EXAMPLE ROW — verify this against the actual June 2026 NFP release before relying on it.",
+      "event": "NFP",
+      "date": "2026-06-06",
+      "consensus": 190,
+      "actual": 145,
+      "unit": "k"
+    },
+    {
+      "_note": "EXAMPLE ROW — verify this against the actual June 2026 FOMC statement before relying on it.",
+      "event": "FOMC",
+      "date": "2026-06-18",
+      "stance": "hawkish",
+      "consensus_stance": "neutral"
+    }
+  ]
+}

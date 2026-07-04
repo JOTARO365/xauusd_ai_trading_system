@@ -1,0 +1,35 @@
+{
+  "ok": true,
+  "updated": "2026-07-04",
+  "min_n": 30,
+  "tiers": {
+    "1": {
+      "assumed_band_pct": [
+        0.0,
+        0.4
+      ],
+      "hit_rate_pct": null,
+      "n": 0,
+      "mean_realized_abs_move_pct": null
+    },
+    "2": {
+      "assumed_band_pct": [
+        0.4,
+        0.9
+      ],
+      "hit_rate_pct": null,
+      "n": 0,
+      "mean_realized_abs_move_pct": null
+    },
+    "3": {
+      "assumed_band_pct": [
+        0.9,
+        9.9
+      ],
+      "hit_rate_pct": null,
+      "n": 0,
+      "mean_realized_abs_move_pct": null
+    }
+  },
+  "status": "collecting"
+}

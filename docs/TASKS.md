@@ -165,7 +165,7 @@ fan-out — so the sub-agent delegation format is not used. Each task = one work
 
 ## Batch F — M5: Feature B surprise-magnitude from real data  · deps: C, E
 
-### F1 — Consensus seed + calibrated scenario magnitudes
+### F1 [DONE] — Consensus seed + calibrated scenario magnitudes
 - **agent:** worker (single)
 - **scope (whitelist):** `data/consensus_seed.json` (NEW, hand-maintained), `scripts/build_event_scenarios.py`
   (extend — same file as C1), `data/event_scenarios.json` (regenerated)
@@ -184,7 +184,7 @@ fan-out — so the sub-agent delegation format is not used. Each task = one work
 
 ## Batch G — M6: Calibration review  · deps: D, E
 
-### G1 — `scripts/review_calibration.py` + endpoint + card badge
+### G1 [DONE] — `scripts/review_calibration.py` + endpoint + card badge
 - **agent:** worker (single)
 - **scope (whitelist):** `scripts/review_calibration.py` (NEW), `data/impact_calibration.json` (NEW,
   generated), `dashboard/app.py` (add `/api/impact-calibration` only), `dashboard/templates/index.html`
