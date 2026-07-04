@@ -1488,6 +1488,31 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-monitor">
 
+    <!-- MACRO STRIP — §3.5 macro_strip.json (display-only, daily via scripts/fetch_macro_strip.py) -->
+    <section id="macro-strip-section" style="margin-bottom:10px">
+      <div id="macro-strip" style="display:flex;align-items:center;gap:16px;padding:7px 14px;border:1px solid var(--border2,#2a3142);border-left:3px solid var(--cyan,#00B4D8);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--text-dim,#9aa3b8);flex-wrap:wrap">
+        <span style="color:var(--cyan,#00B4D8);font-weight:700;letter-spacing:1px;flex-shrink:0">MACRO</span>
+        <span style="display:flex;align-items:center;gap:5px">
+          <span style="color:var(--muted,#6B7488);text-transform:uppercase;font-size:10px;letter-spacing:0.5px">DXY</span>
+          <span id="macro-dxy-val" style="font-weight:600;color:var(--text,#DDE2EC)">—</span>
+          <span id="macro-dxy-chg" style="font-size:10px">—</span>
+        </span>
+        <span style="color:var(--muted2,#3D4456)">|</span>
+        <span style="display:flex;align-items:center;gap:5px">
+          <span style="color:var(--muted,#6B7488);text-transform:uppercase;font-size:10px;letter-spacing:0.5px">10Y</span>
+          <span id="macro-y10-val" style="font-weight:600;color:var(--text,#DDE2EC)">—</span>
+          <span id="macro-y10-chg" style="font-size:10px">—</span>
+        </span>
+        <span style="color:var(--muted2,#3D4456)">|</span>
+        <span style="display:flex;align-items:center;gap:5px">
+          <span style="color:var(--muted,#6B7488);text-transform:uppercase;font-size:10px;letter-spacing:0.5px">REAL</span>
+          <span id="macro-real-val" style="font-weight:600;color:var(--text,#DDE2EC)">—</span>
+          <span id="macro-real-chg" style="font-size:10px">—</span>
+        </span>
+        <span id="macro-updated" style="margin-left:auto;color:var(--muted,#6B7488);font-size:10px">No data — run scripts/fetch_macro_strip.py</span>
+      </div>
+    </section>
+
     <!-- PRICE CHART + AI ZONES OVERLAY (07-03) -->
     <section>
       <div class="section-title" style="display:flex;align-items:center">
@@ -1788,6 +1813,38 @@
         <div class="card" style="grid-column:span 3">
           <div class="label">14-Day History</div>
           <div id="burn-history" style="font-size:10px;color:var(--muted);font-family:var(--mono);line-height:1.8;margin-top:4px">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CALIBRATION CARD — §3.5 calibration.json -->
+    <section id="calibration-section">
+      <div class="section-title">Confidence Calibration (Predicted vs Realized Win-Rate)</div>
+      <div class="card" style="overflow-x:auto">
+        <div class="label" style="margin-bottom:8px">Per-bin: n trades / realized WR% / total PnL &mdash; bar = realized, line = predicted midpoint</div>
+        <div id="calib-table" style="font-family:var(--mono);font-size:11px">&#8212;</div>
+        <div id="calib-updated" style="font-size:10px;color:var(--muted);margin-top:8px">&#8212;</div>
+      </div>
+    </section>
+
+    <!-- COT CARD — §3.5 cot.json (CFTC non-commercial gold futures, weekly via scripts/fetch_cot.py) -->
+    <section id="cot-section">
+      <div class="section-title">CFTC COT &mdash; Non-Commercial Gold Futures Positioning</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="card">
+          <div class="label">Net Position</div>
+          <div class="value" id="cot-net" style="font-family:var(--mono)">&#8212;</div>
+          <div class="sub" style="font-family:var(--mono);font-size:10px">Long &minus; Short contracts</div>
+        </div>
+        <div class="card">
+          <div class="label">Weekly Change</div>
+          <div class="value" id="cot-chg" style="font-family:var(--mono)">&#8212;</div>
+          <div class="sub" id="cot-report-date" style="font-family:var(--mono);font-size:10px">&#8212;</div>
+        </div>
+        <div class="card">
+          <div class="label">Long / Short Split</div>
+          <div id="cot-bar" style="margin-top:6px">&#8212;</div>
+          <div id="cot-bar-nums" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px">&#8212;</div>
         </div>
       </div>
     </section>
@@ -3156,8 +3213,9 @@ async function loadAccounting() {
       },
     });
 
-    // load burn card alongside accounting data
+    // load burn + calibration cards alongside accounting data
     loadBurn();
+    loadCalibration();
 
   } catch (e) {
     console.error('loadAccounting error:', e);
@@ -3217,6 +3275,63 @@ async function loadBurn() {
     }
   } catch (e) {
     console.error('loadBurn error:', e);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   CALIBRATION CARD — §3.5 /api/calibration
+   ════════════════════════════════════════════════════════════ */
+async function loadCalibration() {
+  try {
+    const res  = await fetch('/api/calibration');
+    const data = await res.json();
+    if (!data.ok) return;
+
+    const bins    = data.bins || [];
+    const tableEl = document.getElementById('calib-table');
+    const updEl   = document.getElementById('calib-updated');
+
+    if (updEl) {
+      if (data.updated) {
+        updEl.textContent = 'Updated: ' + data.updated.slice(0, 16).replace('T', ' ') + ' UTC';
+      } else {
+        updEl.textContent = 'No data — run scripts/report_calibration.py first';
+      }
+    }
+
+    if (!tableEl) return;
+
+    if (!bins.length) {
+      tableEl.textContent = 'No data — run scripts/report_calibration.py first';
+      return;
+    }
+
+    // Each bin: bar = realized WR, tick line = predicted midpoint WR
+    const rows = bins.map(b => {
+      const predicted = (b.conf_lo + b.conf_hi) / 2;   // e.g. 72 for 70-74 bin
+      const realPct   = (b.wr * 100);
+      const barW      = Math.max(1, Math.min(100, Math.round(realPct)));
+      const predW     = Math.max(1, Math.min(100, Math.round(predicted)));
+      const col       = realPct >= predicted ? 'var(--green)' : 'var(--red)';
+      const pnlCol    = b.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+      const pnlStr    = (b.pnl >= 0 ? '+' : '') + b.pnl.toFixed(0);
+
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">` +
+        `<span style="width:54px;text-align:right;color:var(--muted)">${b.conf_lo}&ndash;${b.conf_hi}</span>` +
+        `<span style="width:40px;text-align:right;color:var(--muted)">n=${b.n}</span>` +
+        `<div style="position:relative;width:100px;height:12px;background:rgba(255,255,255,0.06);border-radius:2px;flex-shrink:0">` +
+          `<div style="position:absolute;left:0;top:0;height:12px;width:${barW}px;background:${col};border-radius:2px;opacity:0.75"></div>` +
+          `<div style="position:absolute;left:${predW}px;top:0;height:12px;width:2px;background:rgba(255,255,255,0.35)"></div>` +
+        `</div>` +
+        `<span style="width:46px;color:${col};font-weight:600">${realPct.toFixed(1)}%</span>` +
+        `<span style="color:var(--muted);font-size:10px;width:56px">pred ${predicted.toFixed(0)}%</span>` +
+        `<span style="width:60px;text-align:right;color:${pnlCol}">${pnlStr}</span>` +
+      `</div>`;
+    });
+
+    tableEl.innerHTML = rows.join('');
+  } catch (e) {
+    console.error('loadCalibration error:', e);
   }
 }
 
@@ -3944,6 +4059,126 @@ function _initNnlbModal() {
 }
 
 /* ════════════════════════════════════════════════════════════
+   MACRO STRIP — §3.5 /api/macro-strip
+   ════════════════════════════════════════════════════════════ */
+async function loadMacroStrip() {
+  try {
+    const res  = await fetch('/api/macro-strip');
+    const data = await res.json();
+    if (!data.ok) return;
+
+    function _fmtChg(chg, decimals) {
+      if (chg === null || chg === undefined) return '<span style="color:var(--muted)">—</span>';
+      const sign  = chg >= 0 ? '+' : '';
+      const arrow = chg > 0.0001 ? '▲' : chg < -0.0001 ? '▼' : '→';
+      const color = chg > 0.0001 ? 'var(--green,#26C281)' : chg < -0.0001 ? 'var(--red,#E94560)' : 'var(--muted,#6B7488)';
+      return `<span style="color:${color}">${arrow} ${sign}${chg.toFixed(decimals)}</span>`;
+    }
+
+    const dxy = data.dxy;
+    if (dxy && dxy.val !== null && dxy.val !== undefined) {
+      const el = document.getElementById('macro-dxy-val');
+      if (el) el.textContent = dxy.val.toFixed(2);
+      const chEl = document.getElementById('macro-dxy-chg');
+      if (chEl) chEl.innerHTML = _fmtChg(dxy.chg, 2);
+    }
+
+    const y10 = data.y10;
+    if (y10 && y10.val !== null && y10.val !== undefined) {
+      const el = document.getElementById('macro-y10-val');
+      if (el) el.textContent = y10.val.toFixed(2) + '%';
+      const chEl = document.getElementById('macro-y10-chg');
+      if (chEl) chEl.innerHTML = _fmtChg(y10.chg, 2);
+    }
+
+    const ry = data.real_yield;
+    if (ry && ry.val !== null && ry.val !== undefined) {
+      const el = document.getElementById('macro-real-val');
+      if (el) el.textContent = ry.val.toFixed(2) + '%';
+      const chEl = document.getElementById('macro-real-chg');
+      if (chEl) chEl.innerHTML = _fmtChg(ry.chg, 2);
+    }
+
+    const updEl = document.getElementById('macro-updated');
+    if (updEl) {
+      updEl.textContent = data.updated
+        ? 'Updated: ' + data.updated.slice(0, 10)
+        : 'No data — run scripts/fetch_macro_strip.py';
+    }
+  } catch (e) {
+    console.error('loadMacroStrip error:', e);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   COT CARD — §3.5 /api/cot  (CFTC non-commercial gold positioning)
+   ════════════════════════════════════════════════════════════ */
+async function loadCotCard() {
+  try {
+    const res  = await fetch('/api/cot');
+    const data = await res.json();
+    if (!data.ok) return;
+
+    const netEl     = document.getElementById('cot-net');
+    const chgEl     = document.getElementById('cot-chg');
+    const dateEl    = document.getElementById('cot-report-date');
+    const barEl     = document.getElementById('cot-bar');
+    const barNumsEl = document.getElementById('cot-bar-nums');
+
+    if (data.net === null || data.net === undefined) {
+      if (dateEl) dateEl.textContent = 'No data — run scripts/fetch_cot.py';
+      return;
+    }
+
+    // Net position
+    if (netEl) {
+      const sign = data.net >= 0 ? '+' : '';
+      netEl.textContent = sign + data.net.toLocaleString();
+      netEl.style.color = data.net >= 0 ? 'var(--gold,#D4AC0D)' : 'var(--red,#E94560)';
+    }
+
+    // Weekly change
+    if (chgEl) {
+      if (data.net_chg !== null && data.net_chg !== undefined) {
+        const sign  = data.net_chg >= 0 ? '+' : '';
+        const arrow = data.net_chg > 0 ? '▲' : data.net_chg < 0 ? '▼' : '→';
+        const color = data.net_chg > 0 ? 'var(--green,#26C281)' : data.net_chg < 0 ? 'var(--red,#E94560)' : 'var(--muted,#6B7488)';
+        chgEl.innerHTML = `<span style="color:${color}">${arrow} ${sign}${data.net_chg.toLocaleString()}</span>`;
+      } else {
+        chgEl.textContent = '—';
+      }
+    }
+
+    // Report date
+    if (dateEl) {
+      dateEl.textContent = data.report_date ? 'Report: ' + data.report_date : '—';
+    }
+
+    // Long / short bar
+    if (barEl && data.noncomm_long !== null && data.noncomm_short !== null) {
+      const total    = data.noncomm_long + data.noncomm_short;
+      const longPct  = total > 0 ? (data.noncomm_long  / total * 100).toFixed(1) : '50.0';
+      const shortPct = total > 0 ? (data.noncomm_short / total * 100).toFixed(1) : '50.0';
+      barEl.innerHTML =
+        `<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--bg2,#1A2035)">` +
+          `<div style="width:${longPct}%;background:var(--green,#26C281);transition:width 0.5s"></div>` +
+          `<div style="width:${shortPct}%;background:var(--red,#E94560);transition:width 0.5s"></div>` +
+        `</div>` +
+        `<div style="display:flex;justify-content:space-between;margin-top:3px;font-size:9px">` +
+          `<span style="color:var(--green,#26C281)">L ${longPct}%</span>` +
+          `<span style="color:var(--red,#E94560)">S ${shortPct}%</span>` +
+        `</div>`;
+      if (barNumsEl) {
+        barNumsEl.textContent =
+          data.noncomm_long.toLocaleString() + ' / ' + data.noncomm_short.toLocaleString();
+      }
+    }
+  } catch (e) {
+    console.error('loadCotCard error:', e);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
    BOOTSTRAP — run after the full DOM (incl. NNLB modal markup that
    lives after this <script>) is parsed. Wiring the modal before its
    elements existed used to throw and halt the entire bootstrap, so the
@@ -3957,11 +4192,15 @@ function _bootstrap() {
   loadLivePrice();
   loadEventStats();
   loadRegime();
+  loadMacroStrip();
+  loadCotCard();
   setInterval(fetchData, 10000);
   setInterval(fetchCalendar, 1800000);
   setInterval(loadEventStats, 3600000);
   setInterval(loadRegime, 3600000);
   setInterval(loadLivePrice, 5000);
+  setInterval(loadMacroStrip, 3600000);  // macro data is daily — refresh hourly is sufficient
+  setInterval(loadCotCard, 3600000);     // COT data is weekly — hourly poll is sufficient
   // Live tab panels (verdict/zones/pending) — refresh เฉพาะตอน tab เปิดอยู่
   setInterval(() => {
     const t = document.querySelector('.tab-btn.active');

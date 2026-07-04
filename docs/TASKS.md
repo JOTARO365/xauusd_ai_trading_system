@@ -72,17 +72,17 @@ Gate: auditor รวบ M5 reports → เริ่ม Batch 4
 > 2. **T-09 macro strip** — reuse pattern `update_regime.py` ที่พิสูจน์แล้ว, effort ต่ำ, คุณค่ารายวันสูง.
 > 3. **T-10 COT ท้ายสุด** — แหล่งใหม่ (CFTC), รายสัปดาห์, integration risk สูงสุด → ทำหลังของที่ชัวร์.
 
-- [ ] **T-08** | agent: worker | scope: `scripts/report_calibration.py` (new) + `dashboard/app.py` (`/api/calibration`) + `index.html` (view) + `data/calibration.json` | deps: T-02, T-04 |
+- [DONE] **T-08** | agent: worker | scope: `scripts/report_calibration.py` (new) + `dashboard/app.py` (`/api/calibration`) + `index.html` (view) + `data/calibration.json` | deps: T-02, T-04 |
       input: ARCHITECTURE §3.5, §3.6 |
       output: confidence calibration view (predicted conf bin → realized WR)
       acceptance: bin ตาม `technical_confidence`, realized WR/pnl ต่อ bin จาก DB; computed-in-code, **token burn รายวันไม่ขยับ**; ไฟล์หาย → endpoint คืน empty ไม่ 500 (§5 #6).
 
-- [ ] **T-09** | agent: worker | scope: `scripts/fetch_macro_strip.py` (new) + `dashboard/app.py` (`/api/macro-strip`) + `index.html` (strip) + `data/macro_strip.json` | deps: T-08 |
+- [DONE] **T-09** | agent: worker | scope: `scripts/fetch_macro_strip.py` (new) + `dashboard/app.py` (`/api/macro-strip`) + `index.html` (strip) + `data/macro_strip.json` | deps: T-08 |
       input: ARCHITECTURE §3.5, §3.6, §5 #5 |
       output: macro strip DXY / 10Y / real yield
       acceptance: fetch ผ่าน **scheduled script + AlphaVantage REST** (ไม่ใช่ MCP, §5 #5), วันละครั้ง อยู่ในโควตา; endpoint serve `data/macro_strip.json`; burn รายวันไม่ขยับ; ไฟล์หาย → empty ไม่ 500.
 
-- [ ] **T-10** | agent: worker | scope: `scripts/fetch_cot.py` (new) + `dashboard/app.py` (`/api/cot`) + `index.html` (card) + `data/cot.json` | deps: T-09 |
+- [DONE] **T-10** | agent: worker | scope: `scripts/fetch_cot.py` (new) + `dashboard/app.py` (`/api/cot`) + `index.html` (card) + `data/cot.json` | deps: T-09 |
       input: ARCHITECTURE §3.5, §3.6 |
       output: COT รายสัปดาห์ (non-commercial net positioning gold)
       acceptance: fetch จาก CFTC public data รายสัปดาห์ (scheduled); endpoint serve `data/cot.json`; ไม่แตะโควตา AlphaVantage; burn ไม่ขยับ; ไฟล์หาย → empty ไม่ 500.
