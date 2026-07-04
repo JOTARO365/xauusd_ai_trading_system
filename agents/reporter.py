@@ -13,8 +13,13 @@ from loguru import logger
 
 
 def _log_file() -> str:
+    # Key off the SYSTEM, not the broker's symbol spelling: brokers name gold
+    # XAUUSD / GOLD# / GOLDmicro etc., but they are all the xauusd system whose
+    # log the dashboard reads at logs/trades.json (F-04 fix, 2026-07-04).
     sym = _cfg.SYMBOL.upper().replace("/", "")
-    return "logs/trades.json" if sym == "XAUUSD" else f"logs/{sym.lower()}_trades.json"
+    if "XAU" in sym or "GOLD" in sym:
+        return "logs/trades.json"
+    return f"logs/{sym.lower()}_trades.json"
 _REPORTER_PROMPT   = Path("agents/prompts/reporter.md").read_text(encoding="utf-8")
 _ANALYSIS_COOLDOWN = int(os.getenv("REPORTER_COOLDOWN_SEC") or 14400)  # 4h — perf report ไม่ต้องถี่ (Track-1 07-03: 1h→4h ลด token)
 _COOLDOWN_FILE     = "logs/reporter_last_run.txt"
