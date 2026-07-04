@@ -93,6 +93,37 @@ def _log_file(system: str = "xauusd") -> str:
 
 LOG_FILE     = _SYSTEM_LOGS["xauusd"]   # backward-compat alias
 SYSTEM_MAGIC = 20260429                 # ต้องตรงกับ mt5_connector.py
+
+# ── §3.2 Atomic JSON I/O helpers (local — no shared module per §5 #4) ─────────
+_LOG_DECODE_ERROR = object()  # sentinel: read failed due to JSONDecodeError/ValueError
+_LOG_EMPTY = {"trades": [], "summary": {"total": 0, "win": 0, "loss": 0, "total_pnl": 0.0}}
+
+
+def _read_log_json(path: str):
+    """Read trades JSON file safely.
+    Returns parsed dict on success, _LOG_DECODE_ERROR on JSONDecodeError/ValueError,
+    _LOG_EMPTY on any other read error (e.g. FileNotFoundError)."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        return _LOG_DECODE_ERROR
+    except Exception:
+        return _LOG_EMPTY
+
+
+def _write_log_json(path: str, data: dict) -> None:
+    """Atomic write: write to .tmp then os.replace (atomic on NTFS, same-dir)."""
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+# ── §3.3 Accounting TTL cache (in-memory, keyed (system, account)) ─────────────
+_acct_cache: dict = {}  # (system, account) → (timestamp, payload_dict)
 ENV_FILE     = os.path.join(_BASE, "../.env")
 
 # ── CONFIG SPEC: single source of truth (fix 07-02) ──────────────────────────
@@ -311,9 +342,13 @@ def _sync_from_mt5(data: dict) -> bool:
         "loss":      sum(1 for t in closed if (t.get("pnl") or 0) < 0),
         "total_pnl": round(sum(t.get("pnl") or 0 for t in closed), 2),
     }
+    # §3.2 guard: pre-read existing file — if it's corrupt (decode error),
+    # do NOT overwrite (safety net; keeps potentially-recoverable data intact).
+    existing = _read_log_json(LOG_FILE)
+    if existing is _LOG_DECODE_ERROR:
+        return True  # changes detected but not persisted this round
     try:
-        with open(LOG_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        _write_log_json(LOG_FILE, data)
     except Exception:
         pass
     return True
@@ -637,12 +672,9 @@ def api_data():
     return resp
 
 
-@app.route("/api/accounting")
-def api_accounting():
-    """ค่าใช้จ่าย AI — รองรับ ?system=xauusd|btcusd|all (default=all) และ ?account=all|own"""
-    system  = request.args.get("system", "all").lower()
-    account = request.args.get("account", "all").lower()
-    login   = None if account == "all" else _get_actual_mt5_login()
+def _compute_accounting(system: str, login) -> dict:
+    """Compute accounting payload — called at most once per TTL (§3.3).
+    Response shape frozen: {ok, system, source, summary, agents, today, daily}."""
     try:
         from db.reader import get_accounting
         data = get_accounting(None if system == "all" else system, account_login=login)
@@ -653,7 +685,7 @@ def api_accounting():
                           + info.get("total_cache_write_tokens", 0))
                 cr = info.get("total_cache_read_tokens", 0)
                 info["avg_cache_hit_rate"] = round(cr / total_in * 100, 1) if total_in > 0 else 0.0
-            return jsonify({**data, "ok": True, "system": system, "source": "db"})
+            return {**data, "ok": True, "system": system, "source": "db"}
     except Exception:
         pass
     try:
@@ -665,10 +697,30 @@ def api_accounting():
                       + info.get("total_cache_write_tokens", 0))
             cr = info.get("total_cache_read_tokens", 0)
             info["avg_cache_hit_rate"] = round(cr / total_in * 100, 1) if total_in > 0 else 0.0
-        return jsonify({**data, "ok": True, "system": system, "source": "json"})
+        return {**data, "ok": True, "system": system, "source": "json"}
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e), "system": system,
-                        "summary": {}, "agents": {}, "today": {}, "daily": {}})
+        return {"ok": False, "error": str(e), "system": system,
+                "summary": {}, "agents": {}, "today": {}, "daily": {}}
+
+
+@app.route("/api/accounting")
+def api_accounting():
+    """ค่าใช้จ่าย AI — รองรับ ?system=xauusd|btcusd|all (default=all) และ ?account=all|own
+    §3.3: in-memory TTL cache keyed (system, account); response shape unchanged."""
+    system  = request.args.get("system", "all").lower()
+    account = request.args.get("account", "all").lower()
+    login   = None if account == "all" else _get_actual_mt5_login()
+    ttl     = int(os.getenv("ACCOUNTING_CACHE_TTL_SEC") or 60)
+    now     = _time_mod.time()
+    cache_key = (system, account)
+    entry = _acct_cache.get(cache_key)
+    if entry is not None:
+        ts, payload = entry
+        if now - ts < ttl:
+            return jsonify(payload)
+    payload = _compute_accounting(system, login)
+    _acct_cache[cache_key] = (now, payload)
+    return jsonify(payload)
 
 
 @app.route("/api/monitor")
@@ -870,6 +922,25 @@ def _ticket_from_body() -> tuple[int | None, object]:
     return (ticket or None), body
 
 
+def _filling_modes_for(symbol: str) -> list:
+    """Return list of ORDER_FILLING_* constants in preference order for symbol.
+    Preference: IOC (bit 1 of bitmask) → FOK (bit 0) → RETURN (fallback).
+    §3.1 frozen contract: bit0=FOK, bit1=IOC."""
+    info = mt5.symbol_info(symbol)
+    bm   = int(getattr(info, "filling_mode", 0) or 0) if info is not None else 0
+    _FOK    = getattr(mt5, "ORDER_FILLING_FOK",    0)  # MT5 constant = 0
+    _IOC    = getattr(mt5, "ORDER_FILLING_IOC",    1)  # MT5 constant = 1
+    _RETURN = getattr(mt5, "ORDER_FILLING_RETURN", 2)  # MT5 constant = 2
+    modes: list = []
+    if bm & 2:       # bit 1 → IOC supported
+        modes.append(_IOC)
+    if bm & 1:       # bit 0 → FOK supported
+        modes.append(_FOK)
+    if not modes:    # neither IOC nor FOK → use RETURN
+        modes.append(_RETURN)
+    return modes
+
+
 @app.route("/api/close", methods=["POST"])
 def api_close_position():
     """ปิด position ตาม ticket (market close) — ใช้ได้ทั้ง SYSTEM และ MANUAL"""
@@ -888,20 +959,32 @@ def api_close_position():
         return jsonify({"ok": False, "error": "ดึงราคาไม่ได้"}), 503
 
     is_buy = pos.type == 0
-    result = mt5.order_send({
-        "action":    mt5.TRADE_ACTION_DEAL,
-        "symbol":    pos.symbol,
-        "volume":    pos.volume,
-        "type":      mt5.ORDER_TYPE_SELL if is_buy else mt5.ORDER_TYPE_BUY,
-        "position":  pos.ticket,
-        "price":     tick.bid if is_buy else tick.ask,
-        "deviation": 20,
-        "comment":   "DASHBOARD_CLOSE",
-    })
-    if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
-        err = mt5.last_error() if result is None else f"retcode={result.retcode} {result.comment}"
-        return jsonify({"ok": False, "error": str(err)}), 500
-    return jsonify({"ok": True, "ticket": ticket, "closed_pnl": round(pos.profit, 2)})
+    modes  = _filling_modes_for(pos.symbol)
+    last_err = "no filling mode available"
+    for mode in modes:
+        result = mt5.order_send({
+            "action":       mt5.TRADE_ACTION_DEAL,
+            "symbol":       pos.symbol,
+            "volume":       pos.volume,
+            "type":         mt5.ORDER_TYPE_SELL if is_buy else mt5.ORDER_TYPE_BUY,
+            "position":     pos.ticket,
+            "price":        tick.bid if is_buy else tick.ask,
+            "deviation":    20,
+            "comment":      "DASHBOARD_CLOSE",
+            "type_filling": mode,
+        })
+        if result is None:
+            last_err = str(mt5.last_error())
+            continue
+        if result.retcode == mt5.TRADE_RETCODE_DONE:
+            return jsonify({"ok": True, "ticket": ticket, "closed_pnl": round(pos.profit, 2)})
+        if result.retcode == 10030:   # TRADE_RETCODE_INVALID_FILL → try next mode
+            last_err = f"retcode=10030 filling_mode={mode} rejected, trying next"
+            continue
+        # Other error — do not retry
+        last_err = f"retcode={result.retcode} {result.comment}"
+        return jsonify({"ok": False, "error": last_err}), 500
+    return jsonify({"ok": False, "error": last_err}), 500
 
 
 @app.route("/api/cancel-pending", methods=["POST"])

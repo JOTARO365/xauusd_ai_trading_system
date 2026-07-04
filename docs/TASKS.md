@@ -23,13 +23,13 @@ Gate: auditor ยืนยัน tree สะอาด → เริ่ม Batch 
 
 ## Batch 2 — parallel (M4 audit fixes B/C — สองงานคนละไฟล์/process)
 
-- [ ] **T-02** | agent: worker | scope: `dashboard/app.py` **เท่านั้น** | deps: T-01 |
+- [DONE] **T-02** | agent: worker | scope: `dashboard/app.py` **เท่านั้น** | deps: T-01 | (demo-close verify: DEFERRED to user — logic mock-tested)
       input: ARCHITECTURE §3.1, §3.2 (ฝั่ง dashboard), §3.3 |
       output: 3 fix ใน dashboard/app.py (รวมเป็นงานเดียวเพราะไฟล์เดียว — §5 #3)
       งาน: (a) `api_close_position` เลือก `type_filling` จาก `symbol_info().filling_mode` bitmask + retry บน retcode 10030 (§3.1) — **response shape เดิม**; (b) การเขียน `logs/trades.json` ในฟังก์ชัน MT5-sync (บรรทัด ~314) เปลี่ยนเป็น temp+`os.replace`, และ read ที่ decode fail ห้ามเขียนทับ (§3.2); (c) `api_accounting` เพิ่ม in-memory TTL cache keyed (system,account), TTL=`ACCOUNTING_CACHE_TTL_SEC` default 60 (§3.3) — **response shape เดิม**.
       acceptance: ปิดไม้บน **demo** สำเร็จกับ broker (retcode DONE) — ผู้ทดสอบ/ผู้ใช้ยืนยัน; `/api/accounting` เรียกซ้ำเร็วขึ้น (cache hit) และ payload keys ไม่เปลี่ยน; `& $PY tests\test_all.py` ไม่มี fail ใหม่ **เทียบ baseline** (git stash) — ไม่ assume 0 fail (§5 #8).
 
-- [ ] **T-03** | agent: worker | scope: `agents/reporter.py` **เท่านั้น** | deps: T-01 |
+- [DONE] **T-03** | agent: worker | scope: `agents/reporter.py` **เท่านั้น** | deps: T-01 |
       input: ARCHITECTURE §3.2 |
       output: atomic write + decode-safe read ฝั่ง bot
       งาน: `_save_log` เขียน `logs/trades.json.tmp` แล้ว `os.replace` (§3.2); `_load_log` decode fail คืน `_empty` sentinel และ caller ต้องไม่เข้าเส้นทางที่ `_save_log` ทับ log เดิมในรอบนั้น. helper local — ไม่สร้าง shared module (§5 #4). **ห้ามแตะ decision/gate logic ในไฟล์นี้** (แตะเฉพาะ `_save_log`/`_load_log`/จุดเรียก).

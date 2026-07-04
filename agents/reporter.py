@@ -38,6 +38,13 @@ def _write_cooldown_ts(dt: datetime):
         logger.warning(f"[REPORTER] cooldown write failed: {e} — next cycle will retry LLM call")
 
 
+class _DecodeErrorDict(dict):
+    """Sentinel returned by _load_log when the on-disk JSON is corrupt/truncated.
+    _save_log refuses to write when handed this type — prevents an empty
+    structure from overwriting a merely-corrupted file (ARCHITECTURE §3.2 safety
+    net layer two).  The corrupt file is preserved for manual recovery."""
+
+
 def _load_log() -> dict:
     _empty = {"trades": [], "summary": {"total": 0, "win": 0, "loss": 0, "total_pnl": 0.0}}
     path = _log_file()
@@ -47,13 +54,34 @@ def _load_log() -> dict:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, ValueError):
-        return _empty
+        logger.warning(
+            "[REPORTER] _load_log: JSON decode error in %s — "
+            "returning empty sentinel. File preserved for manual recovery.", path
+        )
+        return _DecodeErrorDict(_empty)
 
 
 def _save_log(data: dict):
+    # Safety net: never overwrite the file with empty history when the previous
+    # load failed due to corruption.  The caller received a _DecodeErrorDict
+    # sentinel; refuse to persist it so the corrupt file stays recoverable.
+    if isinstance(data, _DecodeErrorDict):
+        logger.warning(
+            "[REPORTER] _save_log: write blocked — data originates from a "
+            "corrupt JSON read. Inspect %s before the next write.", _log_file()
+        )
+        return
+    # Atomic write: write to .tmp then os.replace onto the real file.
+    # os.replace is atomic on NTFS (same directory) so readers never see a
+    # half-written file (ARCHITECTURE §3.2).
+    path = _log_file()
+    tmp  = path + ".tmp"
     os.makedirs("logs", exist_ok=True)
-    with open(_log_file(), "w", encoding="utf-8") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
 
 
 def _known_tickets(log: dict) -> set:
