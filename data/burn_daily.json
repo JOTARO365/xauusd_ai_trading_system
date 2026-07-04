@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "target_min": 150.0,
+  "target_max": 250.0,
+  "days": [
+    {
+      "date": "2026-07-02",
+      "thb": 376.93,
+      "vs_target": "over"
+    },
+    {
+      "date": "2026-07-03",
+      "thb": 15.39,
+      "vs_target": "under"
+    }
+  ],
+  "today_thb": 0.0
+}

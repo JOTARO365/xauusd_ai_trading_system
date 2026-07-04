@@ -1157,6 +1157,21 @@ def api_event_stats():
         return jsonify({"ok": False, "error": str(e), "events": {}})
 
 
+@app.route("/api/burn")
+def api_burn():
+    """AI burn ฿/วัน จาก data/burn_daily.json (สร้างโดย scripts/report_burn.py)
+    — display-only, pass-through serve; ถ้าไฟล์หาย → empty payload ไม่ 500 (§3.4, §5 #6)"""
+    _empty = {"ok": True, "days": [], "today_thb": 0, "target_min": 150, "target_max": 250}
+    try:
+        p = os.path.join(_BASE, "../data/burn_daily.json")
+        with open(p, "r", encoding="utf-8") as f:
+            return jsonify(json.load(f))
+    except FileNotFoundError:
+        return jsonify(_empty)
+    except Exception:
+        return jsonify(_empty)
+
+
 @app.route("/api/calendar")
 def api_calendar():
     """ดึง economic calendar สัปดาห์นี้ (High + Medium impact events)"""

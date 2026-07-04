@@ -109,6 +109,7 @@ def main():
     tm_mom = [c for c in tm if c["mom_ok"]]   # เงื่อนไขจริง (rows ใหม่เท่านั้น)
     print(f"blocks {len(rows)} → conf≥{CONF_MIN} {len(cand)} → dedupe {len(ops)} โอกาส "
           f"| TREND-MODE target {len(tm)} (momentum-confirmed {len(tm_mom)})")
+    ns = []        # n per SL/TP combo — used by n-guard below
     verdict = []
     for sl_p, tp_p in ((1000, 2000), (1500, 3000)):
         print(f"\n── SL{sl_p}/TP{tp_p} ──")
@@ -117,14 +118,19 @@ def main():
             seg(tm_mom, "  เฉพาะ momentum-confirmed", sl_p, tp_p)
         seg([c for c in ops if not c["align"]], "control: H4 ไม่หนุน", sl_p, tp_p)
         if s:
+            ns.append(s["n"])
             verdict.append(s["n"] >= CRITERIA["min_n"] and s["pnl"] > 0
                            and s["wr"] > CRITERIA["min_wr"])
 
     print(f"\n{'='*60}")
-    if verdict and all(verdict):
+    # n-guard: ห้ามออก verdict ถ้า sample ยังไม่ถึง 30 (pre-registered)
+    if not ns or min(ns) < CRITERIA["min_n"]:
+        print(f"⛔ sample ไม่พอตัดสิน (n={min(ns) if ns else 0}, "
+              f"ต้อง≥{CRITERIA['min_n']}) — เก็บข้อมูลต่อ")
+    elif verdict and all(verdict):
         print("✅ ผ่านเกณฑ์ pre-registered — พิจารณาเปิด TREND MODE จริงได้")
     else:
-        print(f"⏳ ยังไม่ผ่านเกณฑ์ (ต้อง n≥{CRITERIA['min_n']} + pnl บวกทั้ง 2 ค่า SL + "
+        print(f"⏳ ยังไม่ผ่านเกณฑ์ (ต้อง pnl บวกทั้ง 2 ค่า SL + "
               f"WR>{CRITERIA['min_wr']:.0f}%) — คง gates เดิม เก็บข้อมูลต่อ")
 
     if not already:

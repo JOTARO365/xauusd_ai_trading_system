@@ -41,22 +41,22 @@ Gate: auditor integration check (ปิดไม้ demo OK, ไม่มี tra
 
 ## Batch 3 — parallel (M5 measurement checkpoints — คนละ script/endpoint)
 
-- [ ] **T-04** | agent: worker | scope: `scripts/report_burn.py` (new) + `dashboard/app.py` (`/api/burn`) + `dashboard/templates/index.html` (card) | deps: T-02 (แตะ app.py ต่อจาก T-02) |
+- [DONE] **T-04** | agent: worker | scope: `scripts/report_burn.py` (new) + `dashboard/app.py` (`/api/burn`) + `dashboard/templates/index.html` (card) | deps: T-02 (แตะ app.py ต่อจาก T-02) |
       input: ARCHITECTURE §3.4, §3.6 |
       output: burn ฿/วัน เทียบเป้า 150–250฿ ขึ้นจอ
       acceptance: `/api/burn` คืน shape §3.4 จาก `agent_usage`; แสดงวันนี้ + N วันย้อนหลัง + สถานะ under/in/over; ไม่มี AI call.
 
-- [ ] **T-05** | agent: worker | scope: `scripts/report_ride_cohort.py` (new) + `data/ride_cohort.json` | deps: T-01 |
+- [DONE] **T-05** | agent: worker | scope: `scripts/report_ride_cohort.py` (new) + `data/ride_cohort.json` | deps: T-01 |
       input: ARCHITECTURE §3.4, §3.6 |
       output: สรุป RIDE cohort (segment comment ขึ้นต้น `RIDE `) win/loss/pnl/n
       acceptance: อ่าน DB ผ่าน `db/reader.py`; นับเฉพาะไม้ tag RIDE; รายงานตัวเลขให้ user ตัดสิน knob (ไม่ตัดสินเอง, ไม่แตะ RIDE logic). *(ถ้าจะขึ้น card ใช้ endpoint pass-through data/—ตัดสินตอน impl; ถ้า card แตะ app.py ให้ dep T-04)*
 
-- [ ] **T-06** | agent: worker | scope: `scripts/score_trend_mode.py` (verify/extend) | deps: T-01 |
+- [DONE] **T-06** | agent: worker | scope: `scripts/score_trend_mode.py` (verify/extend) | deps: T-01 |
       input: PLAN M5 (n≥30 pre-registered), QUICKREF |
       output: สกอร์ trend-mode รายสัปดาห์ + D1 flip watch report
       acceptance: รายงานมี gate n≥30 (ไม่รายงานถ้า sample ไม่พอ); ไม่แก้ scoring logic เว้นแต่ n-guard ขาดหาย (ถ้าแก้ต้อง explain-before-acting).
 
-- [ ] **T-07** | agent: worker | scope: read-only verification (ไม่แก้ source) | deps: T-01 |
+- [DONE] **T-07** | agent: worker | scope: read-only verification (ไม่แก้ source) | deps: T-01 |
       input: PLAN M5 (CPI 07-14 readiness, ก่อน 07-12) |
       output: checklist ยืนยัน Event Radar + prior แสดงบนจอจริงก่อน CPI
       acceptance: รายงาน pass/fail ว่า dashboard แสดง event radar + prior 1 บรรทัดสำหรับ CPI; ถ้า fail → file เป็น fix task (ไม่แก้เองใน T-07).

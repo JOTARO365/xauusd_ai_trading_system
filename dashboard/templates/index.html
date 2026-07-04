@@ -1776,6 +1776,22 @@
       </div>
     </section>
 
+    <!-- BURN CARD — §3.4 burn_daily.json -->
+    <section id="burn-section">
+      <div class="section-title">Daily Burn vs Target (฿150–250/day)</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card">
+          <div class="label">Today Burn</div>
+          <div class="value" id="burn-today">—</div>
+          <div class="sub" id="burn-today-status">target 150–250 ฿</div>
+        </div>
+        <div class="card" style="grid-column:span 3">
+          <div class="label">14-Day History</div>
+          <div id="burn-history" style="font-size:10px;color:var(--muted);font-family:var(--mono);line-height:1.8;margin-top:4px">—</div>
+        </div>
+      </div>
+    </section>
+
     <section>
       <div class="section-title">Daily AI Cost (Last 30 Days)</div>
       <div class="chart-card">
@@ -3140,8 +3156,67 @@ async function loadAccounting() {
       },
     });
 
+    // load burn card alongside accounting data
+    loadBurn();
+
   } catch (e) {
     console.error('loadAccounting error:', e);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   BURN CARD — §3.4 /api/burn
+   ════════════════════════════════════════════════════════════ */
+async function loadBurn() {
+  try {
+    const res  = await fetch('/api/burn');
+    const data = await res.json();
+    if (!data.ok) return;
+
+    const todayThb = data.today_thb || 0;
+    const tMin     = data.target_min || 150;
+    const tMax     = data.target_max || 250;
+    const days     = data.days || [];
+
+    // Today value + colour
+    const todayEl  = document.getElementById('burn-today');
+    const statusEl = document.getElementById('burn-today-status');
+    if (todayEl) {
+      todayEl.textContent = todayThb.toFixed(0) + ' ฿';
+      if (todayThb === 0) {
+        todayEl.className = 'value';
+        if (statusEl) statusEl.textContent = 'target ' + tMin + '–' + tMax + ' ฿';
+      } else if (todayThb < tMin) {
+        todayEl.className = 'value cyan';
+        if (statusEl) statusEl.textContent = 'under target';
+      } else if (todayThb > tMax) {
+        todayEl.className = 'value red';
+        if (statusEl) statusEl.textContent = 'over target';
+      } else {
+        todayEl.className = 'value green';
+        if (statusEl) statusEl.textContent = 'in target band';
+      }
+    }
+
+    // Mini history — last 14 days, newest last
+    const histEl = document.getElementById('burn-history');
+    if (histEl && days.length) {
+      const recent = days.slice(-14);
+      histEl.innerHTML = recent.map(d => {
+        const thb  = (d.thb || 0).toFixed(0);
+        const date = d.date ? d.date.slice(5) : '';
+        let col = 'var(--muted)';
+        let tag = '';
+        if (d.vs_target === 'in')   { col = 'var(--green)'; tag = '●'; }
+        else if (d.vs_target === 'over') { col = 'var(--red)';   tag = '▲'; }
+        else                         { tag = '○'; }
+        return `<span style="color:${col};margin-right:14px">${tag} ${date} <strong>${thb}฿</strong></span>`;
+      }).join('');
+    } else if (histEl) {
+      histEl.textContent = 'No data — run scripts/report_burn.py first';
+    }
+  } catch (e) {
+    console.error('loadBurn error:', e);
   }
 }
 
