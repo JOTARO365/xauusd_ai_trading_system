@@ -11,5 +11,4 @@ node_modules/
 accounts.txt
 accounts.db
 .claude/
-tests/
 .playwright-mcp/

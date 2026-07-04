@@ -126,7 +126,11 @@ Gate: auditor final — ทุก acceptance ผ่าน + burn รายวั
       AI log ของ bot ไม่เห็นกัน; premise §2 ("ทั้งสองเขียนไฟล์เดียว") เป็นจริงเฉพาะ SYMBOL=XAUUSD.
       งาน: user/architect ตัดสินว่า split นี้ตั้งใจหรือไม่ ก่อน file งานแก้ใดๆ.
 
-- [ ] **F-05** | agent: worker (advisory — pre-existing) |
+- [DONE 2026-07-04 — ทาง (a) ตาม user] **F-05** | agent: worker (advisory — pre-existing) |
+      ทำ: sys.path bootstrap 1 บรรทัดใน tests/test_all.py (test_db.py มีอยู่แล้ว) + ถอด `tests/`
+      ออกจาก .gitignore → suite เข้า git; verify: รันจาก repo root โดยไม่ตั้ง PYTHONPATH ผ่าน
+      (29 tests, fail set เดิม). หมายเหตุ: ต้องรันจาก repo root อยู่ดี (โค้ดทั้งระบบใช้ relative
+      path เช่น agents/prompts, logs/ — เหมือน main.py) |
       finding: `& $PY tests\test_all.py` ตามที่ ./CLAUDE.md ระบุ ล้มที่ `import config`
       (test_all.py ไม่มี sys.path bootstrap — ต้องตั้ง PYTHONPATH=repo root ถึงรันได้) และ
       `.gitignore:14` ignore ทั้ง `tests/` → suite + tests/test_db.py (ย้ายมาใน T-01) untracked.
