@@ -105,6 +105,7 @@ def _write_bot_status(chart_data: dict, sentiment_data: dict, decision: dict, sk
             "htf_zone":   chart_data.get("htf_zone"),
             "resistance": (_sr.get("resistance") or [])[:6],
             "support":    (_sr.get("support") or [])[:6],
+            "sr_meta":    (chart_data.get("sr_meta") or [])[:16],
             "key_levels": chart_data.get("key_levels"),
             "setups": [
                 {k: s.get(k) for k in ("type", "tf", "direction", "score", "level")}

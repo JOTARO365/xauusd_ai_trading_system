@@ -3539,23 +3539,31 @@ function renderZones(bs) {
   if (!el) return;
   const z = bs.zones || {}, px = (bs.price_info || {}).bid;
   const setups = z.setups || [];
+  const srMeta = z.sr_meta || [];
   const htf = z.htf_zone || null;
   const scoreFor = lv => {
     const hits = setups.filter(s => s.level && Math.abs(s.level - lv) / lv < 0.003);
     return hits.length ? Math.max(...hits.map(x => x.score || 0)) : null;
   };
+  const metaFor = lv => {
+    const hits = srMeta.filter(m => m.level && Math.abs(m.level - lv) / lv < 0.0008);
+    return hits.length ? hits.reduce((a, b) => ((b.strength || 0) > (a.strength || 0) ? b : a)) : null;
+  };
   const row = (lv, kind) => {
     const color = kind === 'R' ? 'var(--red)' : 'var(--green)';
     const dist = px ? Math.round(Math.abs(lv - px) / 0.01) + 'p' : '';
-    const sc = scoreFor(lv);
-    const bar = sc ? `<div style="height:4px;width:${Math.min(sc, 100)}%;background:${color};border-radius:2px;opacity:.7"></div>` : '';
+    const sc = scoreFor(lv), m = metaFor(lv);
+    const st = Math.max(sc || 0, (m && m.strength) || 0) || null;
+    const bar = st ? `<div style="height:4px;width:${Math.min(st, 100)}%;background:${color};border-radius:2px;opacity:.7"></div>` : '';
     const htfTag = (htf && htf.level && Math.abs(htf.level - lv) / lv < 0.003)
       ? ` <span style="color:var(--gold);font-size:9px;font-weight:700">★${htf.tf}</span>` : '';
+    // ทำไมวาง level นี้ — จาก sr_meta (chart_watcher): TF + touches + confluence
+    const whyLine = m ? `<div style="padding:0 0 2px 82px;font-size:9px;color:var(--muted);opacity:.8">${m.why || ''}</div>` : '';
     return `<div style="display:flex;align-items:center;gap:10px;padding:3px 0">
       <span style="width:72px;color:${color};font-weight:700">${lv.toFixed(2)}</span>
       <span style="width:52px;color:var(--muted);font-size:10px">${dist}</span>
-      <span style="width:40px;color:var(--muted);font-size:10px">${sc ? sc + '%' : ''}</span>
-      <div style="flex:1">${bar}</div>${htfTag}</div>`;
+      <span style="width:40px;color:var(--muted);font-size:10px">${st ? st + '%' : ''}</span>
+      <div style="flex:1">${bar}</div>${htfTag}</div>${whyLine}`;
   };
   const res = (z.resistance || []).slice().sort((a, b) => b - a);
   const sup = (z.support || []).slice().sort((a, b) => b - a);
@@ -3614,10 +3622,16 @@ function drawZoneLines(bs) {
   _zoneLines = [];
   const z = bs.zones || {};
   const setups = z.setups || [];
-  // strength% จาก setup score (เกณฑ์เดียวกับ Key Levels ladder) → เส้นหนา+label
+  const srMeta = z.sr_meta || [];
+  // strength% จาก setup score (live reaction) — เกณฑ์เดียวกับ Key Levels ladder
   const scoreFor = lv => {
     const hits = setups.filter(s => s.level && Math.abs(s.level - lv) / lv < 0.003);
     return hits.length ? Math.max(...hits.map(x => x.score || 0)) : null;
+  };
+  // strength% เชิงโครงสร้างจาก sr_meta (touches/HTF/PDH — คำนวณใน chart_watcher, 07-03)
+  const metaFor = lv => {
+    const hits = srMeta.filter(m => m.level && Math.abs(m.level - lv) / lv < 0.0008);
+    return hits.length ? hits.reduce((a, b) => ((b.strength || 0) > (a.strength || 0) ? b : a)) : null;
   };
   const add = (price, color, title, width, style, label) => _zoneLines.push(
     _candleSeries.createPriceLine({
@@ -3626,14 +3640,16 @@ function drawZoneLines(bs) {
       axisLabelVisible: !!label, title,
     }));
   (z.resistance || []).forEach(lv => {
-    const sc = scoreFor(lv);
-    add(lv, sc ? 'rgba(239,68,68,0.9)' : 'rgba(239,68,68,0.45)',
-        sc ? `R ${sc}%` : 'R', sc >= 80 ? 3 : sc ? 2 : 1, undefined, !!sc);
+    const sc = scoreFor(lv), m = metaFor(lv);
+    const st = Math.max(sc || 0, (m && m.strength) || 0) || null;   // % = max(live setup, โครงสร้าง)
+    add(lv, st >= 65 ? 'rgba(239,68,68,0.9)' : 'rgba(239,68,68,0.45)',
+        st ? `R ${st}%` : 'R', st >= 80 ? 3 : st >= 65 ? 2 : 1, undefined, st >= 75 || !!sc);
   });
   (z.support || []).forEach(lv => {
-    const sc = scoreFor(lv);
-    add(lv, sc ? 'rgba(34,197,94,0.9)' : 'rgba(34,197,94,0.45)',
-        sc ? `S ${sc}%` : 'S', sc >= 80 ? 3 : sc ? 2 : 1, undefined, !!sc);
+    const sc = scoreFor(lv), m = metaFor(lv);
+    const st = Math.max(sc || 0, (m && m.strength) || 0) || null;
+    add(lv, st >= 65 ? 'rgba(34,197,94,0.9)' : 'rgba(34,197,94,0.45)',
+        st ? `S ${st}%` : 'S', st >= 80 ? 3 : st >= 65 ? 2 : 1, undefined, st >= 75 || !!sc);
   });
   // PDH/PDL — key levels เมื่อวาน (เดิมไม่ถูกวาดเลย)
   const kl = z.key_levels || {};
@@ -3722,9 +3738,17 @@ function renderEventCard(bs) {
         const range = px
           ? `${(px * (1 - s.avg_abs_d0_pct / 100)).toFixed(0)} – ${(px * (1 + s.avg_abs_d0_pct / 100)).toFixed(0)}`
           : '—';
+        // เป้าราคาแยกทิศ: avg_up_pct/avg_down_pct = move เฉลี่ยจริงของวันที่ปิดขึ้น/ลง (15 ปี)
+        const upTarget = (px && s.avg_up_pct != null) ? '~' + (px * (1 + s.avg_up_pct / 100)).toFixed(0) : '—';
+        const dnTarget = (px && s.avg_down_pct != null) ? '~' + (px * (1 + s.avg_down_pct / 100)).toFixed(0) : '—';
         extra = `<div style="margin-top:4px;font-size:10px;color:var(--muted)">
-          prior ${s.n} ครั้ง (15 ปี): ขึ้น ${s.up_pct}% / ลง ${s.down_pct}% · move เฉลี่ย ${s.avg_abs_d0_pct}% = ${s.vs_baseline_x}× วันปกติ
-          <span style="color:var(--gold)">· กรอบคาด ${range}</span></div>`;
+          prior ${s.n} ครั้ง (15 ปี) · move เฉลี่ย ${s.avg_abs_d0_pct}% = ${s.vs_baseline_x}× วันปกติ
+          <span style="color:var(--gold)">· กรอบคาด ${range}</span><br>
+          <span style="color:var(--green);font-weight:700">▲ ขึ้น ${s.up_pct}% → เป้า ${upTarget}</span>
+          <span style="margin:0 4px">·</span>
+          <span style="color:var(--red);font-weight:700">▼ ลง ${s.down_pct}% → เป้า ${dnTarget}</span>
+          <span style="margin:0 4px">·</span>
+          <span>ทะลุต่อ D+2: ${s.d2_extends_pct != null ? s.d2_extends_pct + '%' : '—'}</span></div>`;
         break;
       }
     }
