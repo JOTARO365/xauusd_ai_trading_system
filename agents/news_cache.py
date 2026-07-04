@@ -272,7 +272,9 @@ Scoring rules (GOLD only): bull=gold price up, bear=gold price down; magnitude_t
     raw = resp.content[0].text.strip()
 
     # ── Extract summary (5 bullets) ──────────────────────────────
-    if have_scored and "SUMMARY:" in raw:
+    # F-09: split on SCORES: whenever present (independent of a SUMMARY: header) so a
+    # format-drift response can never leak the JSON scores block into the analyst summary.
+    if have_scored and "SCORES:" in raw:
         # Take everything before SCORES: marker, extract bullet lines
         summary_section = raw.split("SCORES:")[0]
         bullets = [

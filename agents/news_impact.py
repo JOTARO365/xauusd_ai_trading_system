@@ -474,6 +474,18 @@ def write_snapshot(
     if filter_stats is None:
         filter_stats = {"raw": 0, "kept": 0, "filter_rate_pct": 0.0}
 
+    # F-10: on a no-scores round (cache HIT with pruned/lost scores-cache), don't
+    # overwrite a previously populated snapshot with an empty one — keep the last
+    # real display. Still write when there is genuinely nothing yet (fresh install).
+    if not scored_posts:
+        try:
+            with open(_SNAPSHOT_PATH, "r", encoding="utf-8") as f:
+                if (json.load(f) or {}).get("posts"):
+                    log.debug("[news_impact] no scores this round — keeping existing snapshot")
+                    return
+        except (FileNotFoundError, json.JSONDecodeError, ValueError, OSError):
+            pass  # no usable existing snapshot → fall through and write the empty one
+
     now = datetime.now(timezone.utc)
     now_iso = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 

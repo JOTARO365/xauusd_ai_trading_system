@@ -118,6 +118,15 @@ def price_at(ts_utc: datetime, symbol: str = MT5_SYMBOL) -> "float | None":
         utcnow_epoch      = int(_time.time())
         broker_offset_sec = int(tick.time) - utcnow_epoch
 
+        # F-06 guard: tick.time is FROZEN at the last quote, so when the market is
+        # closed (weekend/holiday) this offset is garbage (large negative). MT5 gold
+        # brokers sit at UTC+2/+3. Reject anything outside a sane tz band and leave
+        # the anchor pending — never freeze a wrong price into calibration ground truth.
+        if not (0 <= broker_offset_sec <= 4 * 3600):
+            logger.debug(f"price_at: implausible broker offset {broker_offset_sec}s "
+                         "(stale tick / market closed) — skip, retry next run")
+            return None
+
         # Normalise ts_utc to UTC epoch
         if ts_utc.tzinfo is not None:
             ts_epoch = int(ts_utc.timestamp())
@@ -142,8 +151,11 @@ def price_at(ts_utc: datetime, symbol: str = MT5_SYMBOL) -> "float | None":
         # bisect_right gives the first index strictly after target_broker_epoch
         # (first bar that opened after the target moment — per ARCHITECTURE §3.4)
         i = bisect.bisect_right(bar_times, target_broker_epoch)
+        # F-06: if no bar opened AT/AFTER the target within the ±2-min window, the
+        # moment isn't covered (gap/closed) — return None and retry, do NOT clamp to
+        # an earlier bar (that would freeze a stale price as the realized anchor).
         if i >= len(bars):
-            i = len(bars) - 1  # target is past last available bar — use last
+            return None
 
         return float(bars[i]["open"])
 

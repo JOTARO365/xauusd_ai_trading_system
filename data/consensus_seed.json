@@ -14,29 +14,11 @@
     ]
   },
   "updated": "2026-07-05",
-  "records": [
-    {
-      "_note": "EXAMPLE ROW — verify this against the actual June 2026 CPI release before relying on it.",
-      "event": "CPI",
-      "date": "2026-06-11",
-      "consensus": 3.2,
-      "actual": 3.4,
-      "unit": "%yoy"
-    },
-    {
-      "_note": "EXAMPLE ROW — verify this against the actual June 2026 NFP release before relying on it.",
-      "event": "NFP",
-      "date": "2026-06-06",
-      "consensus": 190,
-      "actual": 145,
-      "unit": "k"
-    },
-    {
-      "_note": "EXAMPLE ROW — verify this against the actual June 2026 FOMC statement before relying on it.",
-      "event": "FOMC",
-      "date": "2026-06-18",
-      "stance": "hawkish",
-      "consensus_stance": "neutral"
-    }
-  ]
+  "_example": {
+    "_comment": "รูปแบบแถวจริง (ก็อปไปใส่ใน records แล้วแก้ค่าให้ตรงการประกาศจริง) — F-07: ลบ example ที่เดาค่าออกแล้ว เพราะ 'แถวผิดแย่กว่าไม่มีแถว'",
+    "CPI":  { "event": "CPI",  "date": "YYYY-MM-DD", "consensus": 0.0, "actual": 0.0, "unit": "%yoy" },
+    "NFP":  { "event": "NFP",  "date": "YYYY-MM-DD", "consensus": 0,   "actual": 0,   "unit": "k" },
+    "FOMC": { "event": "FOMC", "date": "YYYY-MM-DD", "stance": "neutral", "consensus_stance": "neutral" }
+  },
+  "records": []
 }

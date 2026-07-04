@@ -146,7 +146,7 @@ fan-out — so the sub-agent delegation format is not used. Each task = one work
 
 ## Batch E — M4: Realized-move logger  · deps: D (high-tier post feed); economic-event side is independent
 
-### E1 [DONE] — `scripts/realized_move_logger.py` (+ `price_at` helper)
+### E1 [DONE — ⚠️ AUDIT 2026-07-05: F-06 must be fixed BEFORE this script is scheduled] — `scripts/realized_move_logger.py` (+ `price_at` helper)
 - **agent:** worker (single)
 - **scope (whitelist):** `scripts/realized_move_logger.py` (NEW), `data/realized_moves.json` (NEW, generated)
 - **input contract:** high-tier posts (`magnitude_tier ≥ 2`) from `data/news_impact.json`; released
@@ -165,7 +165,7 @@ fan-out — so the sub-agent delegation format is not used. Each task = one work
 
 ## Batch F — M5: Feature B surprise-magnitude from real data  · deps: C, E
 
-### F1 [DONE] — Consensus seed + calibrated scenario magnitudes
+### F1 [DONE — ⚠️ AUDIT 2026-07-05: seed rows are unverified EXAMPLEs → F-07] — Consensus seed + calibrated scenario magnitudes
 - **agent:** worker (single)
 - **scope (whitelist):** `data/consensus_seed.json` (NEW, hand-maintained), `scripts/build_event_scenarios.py`
   (extend — same file as C1), `data/event_scenarios.json` (regenerated)
@@ -197,6 +197,80 @@ fan-out — so the sub-agent delegation format is not used. Each task = one work
 - **acceptance:** with realized data present, report shows hit-rate per tier + n; below n=30 the badge
   stays "rubric — ยังไม่ validate"; endpoint empty-safe (delete file → `_empty`, no 500); numbers
   reproduce from the one script.
+
+---
+
+## Fix tasks — filed by auditor 2026-07-05 (see docs/AUDIT.md for full evidence)
+
+### F-06 [DONE 2026-07-05] — price_at can permanently log a wrong price (HIGH — blocks scheduling the M4 logger)
+- **agent:** worker (single) · **scope (whitelist):** `scripts/realized_move_logger.py` only
+- **root cause (two independent holes, same symptom):**
+  1. `price_at` (`realized_move_logger.py:145-146`) clamps `i = len(bars)-1` when the target
+     is past the last available bar, returning an EARLIER bar's price instead of `None`.
+     ARCHITECTURE §3.4 mandates `None → horizon stays unfilled, retried next run`. Because
+     `resolve_pending` is idempotent (`:371-373` never overwrites a filled horizon), the
+     too-early price is frozen into `data/realized_moves.json` forever.
+  2. The broker-time offset (`:118-119`, `tick.time − time.time()`) is computed from the
+     live tick with NO staleness guard. When the market is closed (weekend/holiday — exactly
+     when Friday-evening +60m horizons mature) the last tick is hours-to-days old, the offset
+     is off by that amount, `copy_rates_range` queries the wrong window, and hole 1 converts
+     that into a silently wrong permanent record.
+- **fix contract:** (a) delete the clamp — if `bisect` lands past the last bar, return `None`;
+  (b) skip the entire run (or at least all `price_at` calls) when the tick is stale, e.g.
+  `abs(time.time() − tick.time − cached_offset)` heuristic or simply
+  `tick.time` older than N minutes vs a *previously persisted* offset — simplest honest rule:
+  if `now_utc − tick_time_utc_estimate > 5 min`, log "market closed — deferring" and return.
+  (c) escalate to architect: §3.4's pseudocode uses `bisect_right` but its comment says
+  "first bar at/after target" — `bisect_left` matches the comment (bar opening exactly at the
+  anchor second is currently skipped). Do not change without an architect ruling since §3.4 is frozen.
+- **acceptance:** on a trading day, `price_at` spot-check vs a known MT5 minute matches;
+  a run while the market is closed fills NOTHING (no record gains a price); re-run after
+  reopen fills the deferred horizons correctly; no existing filled horizon changes.
+
+### F-07 [DONE 2026-07-05] — consensus_seed.json contains guessed EXAMPLE rows feeding the displayed surprise_curve (MED)
+- **agent:** user + worker · **scope:** `data/consensus_seed.json`, then re-run `scripts/build_event_scenarios.py`
+- **root cause:** the F1 worker planted 3 rows marked `"_note": "EXAMPLE ROW — verify"` with
+  guessed values, violating the file's own rule (`consensus_seed.json` notes: "do NOT guess
+  values. A wrong row is worse than no row"). Magnitudes are NOT affected (audit verified all
+  cells kept the rubric prior), but the rows produce the on-card `surprise_curve` points
+  (n=1, e.g. CPI medium 4.04%) and the misleading n=1 cell counts.
+- **fix contract:** user verifies each row against the real June 2026 releases (or empties
+  `records` to `[]`); worker re-runs the builder; card then shows `surprise_curve: null`
+  (or verified points) — no other change.
+- **acceptance:** every record in `consensus_seed.json` is user-verified (no `_note` EXAMPLE
+  markers remain); `data/event_scenarios.json` regenerated and reproducible.
+
+### F-08 [DONE 2026-07-05] — continue.md has zero entries for the entire M0-M6 cycle (MED — process, CLAUDE.md Override #2)
+- **agent:** worker (single) · **scope:** `.claude/context/continue.md` only
+- **root cause:** all five implementation commits (df8cd6d, c0a9dc5, 65055e4, 27eba74,
+  248272d — 2026-07-04 21:52 → 2026-07-05 06:36) skipped the mandatory continue.md log; the
+  D1 (live Haiku prompt) approval also has no written record.
+- **fix contract:** backfill one dated entry per batch in the prescribed format (files
+  changed, what changed, issues), and record when/how the user approved D1 + the D2 bundling
+  instruction.
+- **acceptance:** continue.md contains entries covering every cycle commit + the D1 approval note.
+
+### F-09 [DONE 2026-07-05] — Haiku response without `SUMMARY:` header leaks the SCORES JSON into the analyst summary (LOW)
+- **agent:** worker (single) · **scope:** `agents/news_cache.py` (`_summarize_with_haiku` extraction only)
+- **root cause:** `news_cache.py:275` requires BOTH `have_scored` AND `"SUMMARY:" in raw` to
+  strip the scores block; if Haiku emits bullets without the header (format drift), the whole
+  raw response — including the ```json scores array — becomes `summary` and flows into the
+  Sonnet analyst prompt (token noise; no crash, shape unchanged).
+- **fix contract:** split on `"SCORES:"` whenever it is present in `raw`, independent of the
+  `SUMMARY:` header; keep all other behavior identical.
+- **acceptance:** unit check — raw with SCORES but no SUMMARY header yields a summary that
+  contains no `SCORES:`/JSON text; existing paths byte-identical.
+
+### F-10 [DONE 2026-07-05] — cache HIT with a pruned scores-cache overwrites a populated snapshot with an empty one (LOW)
+- **agent:** worker (single) · **scope:** `agents/news_cache.py` (snapshot block `:486-508`) or `agents/news_impact.py write_snapshot`
+- **root cause:** on a cache HIT whose scores-cache entry has been pruned (>2 h) or lost
+  (restart), `scores=[]` → `rolling_aggregate` returns the empty aggregate and
+  `write_snapshot` replaces a previously populated `data/news_impact.json` with a neutral,
+  post-less one. ARCHITECTURE §3.1 says on a no-data path the stale snapshot should remain.
+- **fix contract:** skip `write_snapshot` when `scores` is empty AND the existing snapshot
+  file has `posts` (preserve stale display); still write when there is genuinely nothing yet.
+- **acceptance:** simulate HIT-with-no-scores after a populated snapshot → file unchanged;
+  MISS path still refreshes normally.
 
 ---
 
