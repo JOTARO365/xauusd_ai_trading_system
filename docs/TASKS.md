@@ -11,7 +11,7 @@
 
 ## Batch 1 — sequential (M1 ก่อนทุกอย่าง)
 
-- [WIP] **T-01** | agent: worker | scope: git ops + ลบ/ย้ายไฟล์ที่ระบุ (ไม่แก้ source) | deps: — |
+- [DONE] **T-01** | agent: worker | scope: git ops + ลบ/ย้ายไฟล์ที่ระบุ (ไม่แก้ source) | deps: — |
       input: PLAN Open-Q (commit policy = "commit เลย + เก็บกวาด") |
       output: working tree สะอาด, งานค้างเข้า commit
       งาน: (1) commit dashboard feature set ที่ค้าง (`agents/chart_watcher.py`, `dashboard/templates/index.html`, `main.py`) + pipeline docs (`docs/*.md`, root `CLAUDE.md`) — commit as-is ไม่แก้เนื้อ; (2) **ลบ** `azure-signup.png`, `gcp-signin.png` (screenshot สมัคร cloud); (3) `db/test_db.py` — ย้ายเข้า `tests/` หรือลบถ้าเป็น throwaway (worker ถาม/ตัดสินตามเนื้อไฟล์); (4) `scripts/analyze_losses.py`, `scripts/auto_resume_claude.ps1`, `scripts/delete_bad_pending.py` อยู่ใน `scripts/` แล้ว → commit; (5) ยืนยันว่า process ที่รันอยู่เป็นโค้ดล่าสุด — **user เป็นคน restart** (worker ห้าม restart), แค่รายงานว่าต้อง restart อะไรบ้าง.
