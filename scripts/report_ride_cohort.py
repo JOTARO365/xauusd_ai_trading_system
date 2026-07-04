@@ -13,8 +13,6 @@ Why MT5 deal history (not DB alone):
     only stored in the MT5 order comment field and was designed
     specifically to survive MT5's 31-char truncation so the tag
     stays at the front (decision_maker.py line ~908-910).
-    DB reader.py get_trades() is still called to cross-check open
-    positions when available.
 
 Read-only.  Does NOT touch RIDE/gate logic or knob settings.
 Does NOT make or suggest knob decisions — numbers only.

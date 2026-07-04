@@ -46,7 +46,7 @@ Gate: auditor integration check (ปิดไม้ demo OK, ไม่มี tra
       output: burn ฿/วัน เทียบเป้า 150–250฿ ขึ้นจอ
       acceptance: `/api/burn` คืน shape §3.4 จาก `agent_usage`; แสดงวันนี้ + N วันย้อนหลัง + สถานะ under/in/over; ไม่มี AI call.
 
-- [DONE] **T-05** | agent: worker | scope: `scripts/report_ride_cohort.py` (new) + `data/ride_cohort.json` | deps: T-01 |
+- [DONE — deviation, ดู F-01] **T-05** | agent: worker | scope: `scripts/report_ride_cohort.py` (new) + `data/ride_cohort.json` | deps: T-01 |
       input: ARCHITECTURE §3.4, §3.6 |
       output: สรุป RIDE cohort (segment comment ขึ้นต้น `RIDE `) win/loss/pnl/n
       acceptance: อ่าน DB ผ่าน `db/reader.py`; นับเฉพาะไม้ tag RIDE; รายงานตัวเลขให้ user ตัดสิน knob (ไม่ตัดสินเอง, ไม่แตะ RIDE logic). *(ถ้าจะขึ้น card ใช้ endpoint pass-through data/—ตัดสินตอน impl; ถ้า card แตะ app.py ให้ dep T-04)*
@@ -91,5 +91,41 @@ Gate: auditor final — ทุก acceptance ผ่าน + burn รายวั
 
 ---
 
-## Fix Tasks (filed by auditor)
+## Fix Tasks (filed by auditor — 2026-07-04 final audit)
 <!-- - [ ] F-01 | root cause: ... | from AUDIT.md item #N | scope: ... -->
+
+- [DONE 2026-07-04] **F-01** | agent: architect (amendment) + worker (docstring) | from AUDIT.md T-05 |
+      root cause: ARCHITECTURE/T-05 สั่งอ่าน RIDE cohort "จาก DB ผ่าน db/reader.py" แต่ตาราง `trades`
+      ไม่มีคอลัมน์ `comment` — tag RIDE อยู่ใน MT5 order comment เท่านั้น และ §4 ห้ามแก้ schema
+      → spec เป็นไปไม่ได้ตามตัวอักษร; worker ใช้ MT5 deal history (ถูกทางเดียวที่ทำได้).
+      งาน: (1) architect log §6 amendment: T-05 data source = MT5 deal history + ปลดคำว่า
+      `/api/ride-cohort` ใน §1 (card ใช้ `/api/ride-stats` เดิม, shape §3.4 คงไว้ใน data/ride_cohort.json);
+      (2) ลบ claim เท็จ "DB reader.py get_trades() is still called to cross-check" ใน
+      `scripts/report_ride_cohort.py:16-17` (ไม่มี import db.reader จริง). scope: docs + docstring เท่านั้น.
+
+- [DONE 2026-07-04] **F-02** | agent: worker | from AUDIT.md (process) |
+      root cause: worker ของ Batch 2-4 อัปเดต TASKS.md + commit message แต่ข้ามกฎบังคับ
+      continue.md (root CLAUDE.md Override #2 + หัว TASKS.md ข้อ ⚠️ แรก).
+      งาน: backfill `.claude/context/continue.md` — 1 entry ต่อ batch (T-02/T-03, T-04..T-07,
+      T-08..T-10) ตาม format ใน .claude/CLAUDE.md จาก commit 7cd9586 / 13d116e / 5d9a979 + AUDIT.md.
+      scope: `.claude/context/continue.md` เท่านั้น.
+
+- [DONE 2026-07-04] **F-03** | agent: worker | from AUDIT.md T-03 |
+      root cause: log call ใหม่ใน `agents/reporter.py:57-60,69-72` ใช้ printf-style
+      `logger.warning("... %s ...", path)` — loguru ใช้ `{}` format จึงพิมพ์ `%s` ตรงๆ และ path หาย
+      (พิสูจน์จาก audit run). งาน: เปลี่ยนเป็น f-string 2 จุด — ห้ามแตะ logic guard/atomic.
+      scope: `agents/reporter.py` (2 บรรทัด log เท่านั้น).
+
+- [ ] **F-04** | agent: architect/user review (advisory — pre-existing, ไม่ใช่ผลงาน pipeline) |
+      finding: `.env SYMBOL=GOLD#` ทำให้ bot เขียน `logs/gold#_trades.json`
+      (`agents/reporter.py:15-17` — โค้ดเดิม) แต่ dashboard ใช้ `logs/trades.json` เสมอ
+      (`dashboard/app.py:86-94`) → สองโปรเซสเขียนคนละไฟล์: MANUAL merge ของ dashboard กับ
+      AI log ของ bot ไม่เห็นกัน; premise §2 ("ทั้งสองเขียนไฟล์เดียว") เป็นจริงเฉพาะ SYMBOL=XAUUSD.
+      งาน: user/architect ตัดสินว่า split นี้ตั้งใจหรือไม่ ก่อน file งานแก้ใดๆ.
+
+- [ ] **F-05** | agent: worker (advisory — pre-existing) |
+      finding: `& $PY tests\test_all.py` ตามที่ ./CLAUDE.md ระบุ ล้มที่ `import config`
+      (test_all.py ไม่มี sys.path bootstrap — ต้องตั้ง PYTHONPATH=repo root ถึงรันได้) และ
+      `.gitignore:14` ignore ทั้ง `tests/` → suite + tests/test_db.py (ย้ายมาใน T-01) untracked.
+      งาน: เลือกทาง (a) เพิ่ม bootstrap 2 บรรทัด + เลิก ignore tests/ หรือ (b) บันทึก PYTHONPATH
+      requirement ลง ./CLAUDE.md. ต้องให้ user เลือกก่อนทำ (แตะ .gitignore = นโยบาย repo).

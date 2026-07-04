@@ -55,8 +55,8 @@ def _load_log() -> dict:
             return json.load(f)
     except (json.JSONDecodeError, ValueError):
         logger.warning(
-            "[REPORTER] _load_log: JSON decode error in %s — "
-            "returning empty sentinel. File preserved for manual recovery.", path
+            f"[REPORTER] _load_log: JSON decode error in {path} — "
+            "returning empty sentinel. File preserved for manual recovery."
         )
         return _DecodeErrorDict(_empty)
 
@@ -68,7 +68,7 @@ def _save_log(data: dict):
     if isinstance(data, _DecodeErrorDict):
         logger.warning(
             "[REPORTER] _save_log: write blocked — data originates from a "
-            "corrupt JSON read. Inspect %s before the next write.", _log_file()
+            f"corrupt JSON read. Inspect {_log_file()} before the next write."
         )
         return
     # Atomic write: write to .tmp then os.replace onto the real file.

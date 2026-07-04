@@ -156,3 +156,4 @@ GET /api/cot         → {"ok":true, "report_date":"YYYY-MM-DD",
 | Date | Change | Reason | Affected tasks |
 |------|--------|--------|----------------|
 | 2026-07-04 | Initial freeze (§3.1–3.6) | architect pass แรก | ทั้งหมด |
+| 2026-07-04 | Amendment (F-01): T-05 data source = **MT5 deal history** ไม่ใช่ db/reader.py; endpoint `/api/ride-cohort` ใน §1 ยกเลิก — card ใช้ `/api/ride-stats` เดิม (shape §3.4 คงไว้ใน `data/ride_cohort.json`) | ตาราง `trades` ไม่มีคอลัมน์ `comment` (RIDE tag อยู่ใน MT5 order comment เท่านั้น) และ §4 ห้ามแก้ schema → spec เดิมเป็นไปไม่ได้ | T-05 |
