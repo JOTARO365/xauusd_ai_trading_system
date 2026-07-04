@@ -116,7 +116,10 @@ Gate: auditor final — ทุก acceptance ผ่าน + burn รายวั
       (พิสูจน์จาก audit run). งาน: เปลี่ยนเป็น f-string 2 จุด — ห้ามแตะ logic guard/atomic.
       scope: `agents/reporter.py` (2 บรรทัด log เท่านั้น).
 
-- [ ] **F-04** | agent: architect/user review (advisory — pre-existing, ไม่ใช่ผลงาน pipeline) |
+- [DONE 2026-07-04] **F-04** | verdict: ดีไซน์ multi-system ตั้งใจ แต่ key ผิดตัว (broker symbol แทนชื่อระบบ) = บัค |
+      แก้: `_log_file()` map ทุก symbol ที่มี XAU/GOLD → `logs/trades.json` (05a4a07);
+      merge ประวัติ: bot 976 + dash 261 (overlap 247) → 990 ไม้ ใน trades.json (user อนุมัติ);
+      backup: trades.json.pre-f04-merge.bak + gold#_trades.json.merged-20260704.bak |
       finding: `.env SYMBOL=GOLD#` ทำให้ bot เขียน `logs/gold#_trades.json`
       (`agents/reporter.py:15-17` — โค้ดเดิม) แต่ dashboard ใช้ `logs/trades.json` เสมอ
       (`dashboard/app.py:86-94`) → สองโปรเซสเขียนคนละไฟล์: MANUAL merge ของ dashboard กับ
