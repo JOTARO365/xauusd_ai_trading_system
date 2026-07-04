@@ -3452,13 +3452,22 @@ function toggleAccordion(headerEl) {
    ECONOMIC CALENDAR
    ════════════════════════════════════════════════════════════ */
 let _calEvents  = [];    // ใช้ร่วมโดย Event Radar (Live tab)
-let _eventStats = null;  // สถิติ event-reaction 15 ปี จาก /api/event-stats
+let _eventStats     = null;  // สถิติ event-reaction 15 ปี จาก /api/event-stats
+let _eventScenarios = null;  // conditional scenarios (C2 M2) จาก /api/event-scenario
 
 async function loadEventStats() {
   try {
     const r = await fetch('/api/event-stats');
     _eventStats = await r.json();
   } catch (e) { _eventStats = null; }
+}
+
+// C2 (M2): load event scenarios — mirrors loadEventStats pattern exactly
+async function loadEventScenario() {
+  try {
+    const r = await fetch('/api/event-scenario');
+    _eventScenarios = await r.json();
+  } catch (e) { _eventScenarios = null; }
 }
 
 async function loadRegime() {
@@ -3897,6 +3906,27 @@ async function loadRideStats() {
 }
 
 /* ── Event Radar (07-03 ชิ้น 3): upcoming events + prior 15 ปี + กรอบราคาคาด ── */
+// C2 (M2): surprise-conditional line. Fallback (ARCH §3.2): no forecast/consensus
+// or no scenario entry → return '' so the existing prior card renders unchanged.
+function renderScenarioLine(key, ev, px) {
+  const sc = (_eventScenarios && _eventScenarios.scenarios) || {};
+  const s = sc[key];
+  if (!s || !px) return '';
+  const fc = ev.forecast;
+  if (fc == null || String(fc).trim() === '' || String(fc).trim() === '—') return '';
+  const side = (hs, glyph, cmp) => {
+    const dir = hs.dir === 'up' ? 'ขึ้น' : 'ลง';
+    const col = hs.dir === 'up' ? 'var(--green)' : 'var(--red)';
+    const amt = (px * hs.magnitude_pct / 100).toFixed(1);
+    return `<span style="color:${col};font-weight:700">${glyph} ${cmp} forecast → ทอง${dir} ~$${amt}</span>`;
+  };
+  const prov = `(${s.hot.provenance} · n=${s.hot.n})`;
+  return `<br><span style="color:var(--muted);font-size:9px">consensus ${fc}:</span> `
+       + side(s.hot, '🔥', 'hot >') + '<span style="margin:0 4px">·</span>'
+       + side(s.cool, '❄️', 'cool <')
+       + ` <span style="color:var(--muted);font-size:9px">${prov}</span>`;
+}
+
 function renderEventCard(bs) {
   const el = document.getElementById('event-radar');
   if (!el) return;
@@ -3942,7 +3972,8 @@ function renderEventCard(bs) {
           <span style="color:var(--red);font-weight:700">▼ ลง ${s.down_pct}% → เป้า ${dnTarget}</span>
           <span style="margin:0 4px">·</span>
           <span>ทะลุต่อ D+2: ${s.d2_extends_pct != null ? s.d2_extends_pct + '%' : '—'}</span>
-          ${(upDelta !== null && dnDelta !== null) ? `<br><span style="color:var(--green);font-weight:700">▲ +$${upDelta}</span>&nbsp;&nbsp;<span style="color:var(--red);font-weight:700">▼ &minus;$${dnDelta}</span> <span style="color:var(--muted);font-size:9px">(prior)</span>` : ''}</div>`;
+          ${(upDelta !== null && dnDelta !== null) ? `<br><span style="color:var(--green);font-weight:700">▲ +$${upDelta}</span>&nbsp;&nbsp;<span style="color:var(--red);font-weight:700">▼ &minus;$${dnDelta}</span> <span style="color:var(--muted);font-size:9px">(prior)</span>` : ''}
+          ${renderScenarioLine(key, ev, px)}</div>`;
         break;
       }
     }
@@ -4195,12 +4226,14 @@ function _bootstrap() {
   fetchCalendar();
   loadLivePrice();
   loadEventStats();
+  loadEventScenario();
   loadRegime();
   loadMacroStrip();
   loadCotCard();
   setInterval(fetchData, 10000);
   setInterval(fetchCalendar, 1800000);
   setInterval(loadEventStats, 3600000);
+  setInterval(loadEventScenario, 3600000);
   setInterval(loadRegime, 3600000);
   setInterval(loadLivePrice, 5000);
   setInterval(loadMacroStrip, 3600000);  // macro data is daily — refresh hourly is sufficient

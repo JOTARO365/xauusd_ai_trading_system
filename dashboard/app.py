@@ -1172,6 +1172,22 @@ def api_burn():
         return jsonify(_empty)
 
 
+@app.route("/api/event-scenario")
+def api_event_scenario():
+    """Event scenario (sign + rubric magnitude) from data/event_scenarios.json
+    (built by scripts/build_event_scenarios.py — ARCHITECTURE §4.2, M2).
+    — display-only, pass-through serve; file missing → empty payload, never 500."""
+    _empty = {"ok": True, "updated": None, "window": None, "min_n": 30, "scenarios": {}}
+    try:
+        p = os.path.join(_BASE, "../data/event_scenarios.json")
+        with open(p, "r", encoding="utf-8") as f:
+            return jsonify(json.load(f))
+    except FileNotFoundError:
+        return jsonify(_empty)
+    except Exception:
+        return jsonify(_empty)
+
+
 @app.route("/api/calibration")
 def api_calibration():
     """Confidence calibration: predicted conf bin -> realized WR/PnL

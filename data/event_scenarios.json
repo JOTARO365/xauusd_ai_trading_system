@@ -1,0 +1,56 @@
+{
+  "ok": true,
+  "updated": "2026-07-04",
+  "window": "2011-08-05 .. 2026-06-05",
+  "min_n": 30,
+  "scenarios": {
+    "CPI": {
+      "sign": "hot_gold_down",
+      "hot": {
+        "dir": "down",
+        "magnitude_pct": 0.699,
+        "provenance": "rubric",
+        "n": 173
+      },
+      "cool": {
+        "dir": "up",
+        "magnitude_pct": 0.79,
+        "provenance": "rubric",
+        "n": 173
+      },
+      "surprise_curve": null
+    },
+    "NFP": {
+      "sign": "hot_gold_down",
+      "hot": {
+        "dir": "down",
+        "magnitude_pct": 0.92,
+        "provenance": "rubric",
+        "n": 179
+      },
+      "cool": {
+        "dir": "up",
+        "magnitude_pct": 0.87,
+        "provenance": "rubric",
+        "n": 179
+      },
+      "surprise_curve": null
+    },
+    "FOMC": {
+      "sign": "hawkish_gold_down",
+      "hot": {
+        "dir": "down",
+        "magnitude_pct": 0.814,
+        "provenance": "rubric",
+        "n": 115
+      },
+      "cool": {
+        "dir": "up",
+        "magnitude_pct": 0.955,
+        "provenance": "rubric",
+        "n": 115
+      },
+      "surprise_curve": null
+    }
+  }
+}

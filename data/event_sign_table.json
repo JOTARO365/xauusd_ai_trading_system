@@ -1,0 +1,11 @@
+{
+  "note": "Gold direction when actual is HOTTER than consensus. Hand-maintained. FROZEN.",
+  "CPI":          "hot_gold_down",
+  "CORE_CPI":     "hot_gold_down",
+  "NFP":          "hot_gold_down",
+  "PCE":          "hot_gold_down",
+  "RETAIL_SALES": "hot_gold_down",
+  "GDP":          "hot_gold_down",
+  "UNEMPLOYMENT": "hot_gold_up",
+  "FOMC":         "hawkish_gold_down"
+}

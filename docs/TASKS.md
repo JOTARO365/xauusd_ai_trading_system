@@ -74,7 +74,7 @@ fan-out — so the sub-agent delegation format is not used. Each task = one work
 
 ## Batch C — M2: Feature B sign-based scenario  · deps: A (shares index.html)
 
-### C1 — Frozen sign table + scenario builder (rubric) + endpoint
+### C1 [DONE] — Frozen sign table + scenario builder (rubric) + endpoint
 - **agent:** worker (single)
 - **scope (whitelist):** `data/event_sign_table.json` (NEW, frozen seed), `scripts/build_event_scenarios.py`
   (NEW), `data/event_scenarios.json` (NEW, generated), `dashboard/app.py` (add `/api/event-scenario` only)
@@ -91,7 +91,7 @@ fan-out — so the sub-agent delegation format is not used. Each task = one work
   `GET /api/event-scenario` returns it; delete the file → endpoint returns `_empty` with `ok:true`
   (no 500). Directions match the frozen sign table.
 
-### C2 — Conditional scenario line on the event card
+### C2 [DONE] — Conditional scenario line on the event card (finished by orchestrator หลัง worker C2 ชน session limit กลางคัน)
 - **agent:** worker (single) — **runs after C1** (needs the endpoint; shares no file with C1's app.py)
 - **scope (whitelist):** `dashboard/templates/index.html` (`renderEventCard` + a fetch of
   `/api/event-scenario` into a global, mirroring how `_eventStats` is loaded)
