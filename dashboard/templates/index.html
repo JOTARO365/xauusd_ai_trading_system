@@ -3931,6 +3931,9 @@ function renderEventCard(bs) {
         // เป้าราคาแยกทิศ: avg_up_pct/avg_down_pct = move เฉลี่ยจริงของวันที่ปิดขึ้น/ลง (15 ปี)
         const upTarget = (px && s.avg_up_pct != null) ? '~' + (px * (1 + s.avg_up_pct / 100)).toFixed(0) : '—';
         const dnTarget = (px && s.avg_down_pct != null) ? '~' + (px * (1 + s.avg_down_pct / 100)).toFixed(0) : '—';
+        // A1 (M0): explicit dollar delta derived from the same prior pcts — display-only, no new fetch
+        const upDelta  = (px && s.avg_up_pct  != null) ? (px * s.avg_up_pct  / 100).toFixed(1) : null;
+        const dnDelta  = (px && s.avg_down_pct != null) ? (px * Math.abs(s.avg_down_pct) / 100).toFixed(1) : null;
         extra = `<div style="margin-top:4px;font-size:10px;color:var(--muted)">
           prior ${s.n} ครั้ง (15 ปี) · move เฉลี่ย ${s.avg_abs_d0_pct}% = ${s.vs_baseline_x}× วันปกติ
           <span style="color:var(--gold)">· กรอบคาด ${range}</span><br>
@@ -3938,7 +3941,8 @@ function renderEventCard(bs) {
           <span style="margin:0 4px">·</span>
           <span style="color:var(--red);font-weight:700">▼ ลง ${s.down_pct}% → เป้า ${dnTarget}</span>
           <span style="margin:0 4px">·</span>
-          <span>ทะลุต่อ D+2: ${s.d2_extends_pct != null ? s.d2_extends_pct + '%' : '—'}</span></div>`;
+          <span>ทะลุต่อ D+2: ${s.d2_extends_pct != null ? s.d2_extends_pct + '%' : '—'}</span>
+          ${(upDelta !== null && dnDelta !== null) ? `<br><span style="color:var(--green);font-weight:700">▲ +$${upDelta}</span>&nbsp;&nbsp;<span style="color:var(--red);font-weight:700">▼ &minus;$${dnDelta}</span> <span style="color:var(--muted);font-size:9px">(prior)</span>` : ''}</div>`;
         break;
       }
     }

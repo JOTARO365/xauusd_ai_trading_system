@@ -1,89 +1,119 @@
-# PLAN — Stabilize & Complete: XAUUSD AI Trading System
+# PLAN — News & Event Impact Analysis (backlog #10 + #11)
 
 > Written by: planner · Last updated: 2026-07-04
-> Status: APPROVED (user amended scope 2026-07-04 — M2/M3 deferred, ดู Open Questions)
+> Status: APPROVED (user ตอบ Open Questions 2026-07-04 — ดูท้ายไฟล์)
+> Cycle ก่อนหน้า (Stabilize & Complete) ปิดแล้ว — ดู git history + continue.md
 
 ## Goal
 
-เก็บงานค้างของระบบเทรด XAUUSD ที่รัน live ด้วยเงินจริงบนเครื่อง local ให้ "นิ่งและครบ":
-ปิดช่องโหว่ที่เสี่ยงต่อเงินทุนก่อน (dashboard ที่สั่งปิดไม้ได้แต่ไม่มี auth, ไม่มีระบบแจ้งเตือน
-เมื่อบอทหยุดเงียบ — เคยเกิดแล้ว), เก็บงานที่ค้างใน working tree ให้เข้าที่, เฝ้าผลการทดลอง
-ที่เพิ่ง ship (MOMENTUM_RIDE) และเป้า cost ใหม่ (~150-250฿/วัน) ด้วยตัวเลขไม่ใช่ความรู้สึก,
-แล้วจึงเติมเครื่องมือวิเคราะห์ที่เหลือแบบไม่เพิ่ม AI call
+สร้างชั้นวิเคราะห์ "ข่าวและ event" แบบ display-first สองส่วนที่เสริมกัน เพื่อตอบคำถาม
+"ตอนนี้เกิดอะไรขึ้น + ทองน่าจะไปทางไหน": (A) ให้คะแนน impact ของข่าว/โพสต์ **รายชิ้น**
+(ทิศต่อทอง / ความมั่นใจ / ระดับความแรง / อายุของผล) แทน sentiment ก้อนเดียวที่ใช้อยู่ —
+จะได้รู้ว่าข่าวชิ้นไหนขับทอง ทางไหน แรงแค่ไหน; และ (B) ยกระดับ Event Radar เดิมจาก prior
+แบบเหมารวม เป็น scenario ที่ **ขึ้นกับ surprise** (actual ร้อน/เย็นกว่า consensus →
+ทองไปทางไหน ขนาดเท่าไร) ทั้งสองส่วนเป็นเครื่องมือแสดงผล/บริบท ไม่ใช่ trigger เทรด
+และต้องไม่เพิ่มต้นทุน AI ต่อ cycle (เป้า burn 150-250฿/วัน ยังเป็น first-class constraint)
 
 ## Scope
 
-- จัดระเบียบงานที่ยังไม่ commit (ฟีเจอร์ dashboard ชุดล่าสุด + script ใหม่ + ไฟล์หลงทาง)
-- ยืนยันว่า process ที่รันอยู่จริงเป็นโค้ดเวอร์ชันล่าสุด (บทเรียน 07-03: บอทหยุดเงียบ 8 ชม.)
-- ความปลอดภัย dashboard: บังคับ authentication หรือจำกัดเครือข่าย (มีปุ่มปิดไม้/แก้ config)
-- ระบบแจ้งเตือนภายนอก (LINE หรือ Telegram): บอทหยุด/ขาดการเชื่อมต่อ, ไม้เปิด-ปิด, SL โดน
-- แก้รายการค้างจาก audit: การปิดไม้ผ่าน dashboard ที่อาจล้มเหลวกับ broker บางโหมด,
-  race condition ของไฟล์ trade log, ลดภาระ endpoint สรุปบัญชีด้วย caching
-- จุดวัดผลตามนัด: RIDE cohort (1-2 สัปดาห์), burn รายวันเทียบเป้า, สกอร์ trend-mode รายสัปดาห์,
-  D1 flip watch, ความพร้อมก่อน CPI 07-14 และ FOMC 07-29
-- ฟีเจอร์วิเคราะห์เพิ่ม (คำนวณในโค้ด ไม่เรียก AI): macro strip (DXY / 10Y / real yield),
-  COT รายสัปดาห์, confidence calibration view
+**Feature A — Per-post News Impact scoring** (ต่อยอด X/Twitter + web news ที่บอทอ่านอยู่แล้ว)
+- Normalize โพสต์/ข่าวทุกแหล่งให้เป็น schema เดียวกัน
+- **Pre-filter ในโค้ด (ฟรี)**: ทิ้งโพสต์ที่ไม่แตะปัจจัยทอง (Fed / CPI / yields / DXY /
+  war / tariff / Trump) ก่อนจ่าย token — เป้าตัด noise 70-80%
+- Dedupe ด้วย content hash (ข่าวเดียวกันหลายแหล่ง/รีโพสต์ นับครั้งเดียว)
+- Scoring แบบ **batch** ด้วย Haiku: โพสต์ที่ผ่านตัวกรองใน window หนึ่ง → หนึ่ง LLM call
+  คืนผลรายโพสต์ = {direction bull/bear/neutral ต่อทอง, confidence, magnitude_tier 1-3,
+  half_life, reason} — **merge เข้า call สรุปข่าวเดิม** เป็นทางเลือกแรก ไม่เพิ่ม call/cycle
+- Rolling aggregate score ถ่วงด้วย magnitude × ความสด (half-life decay)
+- การ์ด "News Impact" บน dashboard: รายการโพสต์เด่นพร้อมคะแนน + ตัวเลข aggregate
+- v1 เป็น display-only; การป้อนคะแนนเข้า macro regime / analyst = Open Question
+
+**Feature B — Event scenario conditioned on surprise** (ยกระดับ Event Radar เดิม — ไม่รื้อ)
+- **Sign table ต่อ event type**: นิยามทิศก่อน (เช่น CPI hot → gold down, NFP hot → down,
+  FOMC hawkish → down) — user ยืนยันตารางก่อนแสดงผล
+- **Conditional scenario บนการ์ด**: ใช้ consensus/forecast จาก calendar feed ที่ดึงอยู่แล้ว
+  แสดง "ถ้า actual ร้อนกว่า consensus → ทองน่าจะ X | ถ้าเย็นกว่า → Y" เริ่มจาก sign +
+  magnitude เดิมสองฝั่งที่มีอยู่ (ยังไม่ conditional) แล้วค่อยแทนด้วยสถิติจริง
+- **Magnitude scale ตามขนาด surprise**: รวบรวมประวัติ actual-vs-consensus ต่อ event →
+  ความสัมพันธ์ |surprise| → |move| (พลาด 0.1% กับ 0.5% คนละเรื่อง) — computed-in-code
+  ทั้งหมด ไม่มี recurring AI cost
+
+**ร่วมกันทั้งสอง feature — Magnitude honesty (milestone แยกชัดเจน ไม่ใช่สมมติฐานแฝง)**
+- เก็บ realized price move ที่ +5 / +15 / +60 นาที หลังโพสต์ที่ถูก score และหลังเลขออก
+- ใช้ calibrate rubric tier และ surprise-curve ทีหลัง — **ห้ามเดา magnitude / ห้ามอ้าง
+  ความแม่นก่อนผ่านการ validate** (บทเรียน reverse-causality ของโปรเจกต์นี้)
+
+**งานจิ๋วแถม**: โชว์ delta +$/−$ ชัดๆ บนการ์ด Event Radar (display บรรทัดเดียว ทำก่อนได้)
 
 ## Non-Goals
 
-- **BTC system** — backlog เดิม ยังไม่เริ่ม (สวิตช์ UI ถูกถอดไปแล้ว)
-- **ปลุก VM / บัญชีที่ SO แล้ว** — user สั่ง "เก็บไว้ก่อน"; ไม่วางงานใดที่ต้องพึ่ง VM
-- **ห้ามแตะ gate logic / confidence thresholds / money management / anti-fade guards /
-  live prompts** — ทุกการเปลี่ยนต้องผ่าน explain-before-acting + user อนุมัติเท่านั้น
-  (รวมถึง "ปรับ RIDE" ก่อนครบกำหนดเฝ้าผล)
-- **ไม่เพิ่มฟีเจอร์ที่มี recurring AI-call cost** — cost เป็น first-class constraint
-- **ไม่ start/stop บอท live หรือส่งคำสั่งเทรดอัตโนมัติจากงาน development** — user คุม process เอง
-- ไม่รื้อ exit-management stack (validated +27,833฿) และไม่ re-derive ผลวิเคราะห์เดิม
-- ไม่ redesign dashboard ครั้งใหญ่ — เติมเฉพาะ gap ที่ระบุ
+- **ไม่ trigger เทรดอัตโนมัติ** จากคะแนนข่าวหรือ scenario ใดๆ — display/บริบทเท่านั้น
+- **ไม่แตะ** gate logic, confidence thresholds, money management, anti-fade guards,
+  และ live prompt ของ agents ทุกตัว
+- **ไม่เพิ่ม AI call ต่อ bot cycle** — scoring ต้อง merge เข้า call เดิมหรือเป็นงาน scheduled;
+  ไม่ใช้ Sonnet สำหรับ scoring (Haiku เท่านั้น)
+- **ไม่ rebuild Event Radar priors เดิม** (unconditional direction % + เป้าสองฝั่ง มีแล้ว
+  ใช้ต่อ) — เพิ่มเฉพาะชั้น conditional + magnitude scaling
+- ไม่เพิ่ม dependency หนักใหม่ (ML framework, vector DB ฯลฯ) — regression/สถิติทำด้วย
+  เครื่องมือที่มีอยู่
+- ไม่ทำ per-post scoring แบบ 1 call ต่อ 1 โพสต์ ไม่ว่ากรณีใด
+- ไม่สัญญา "ทำนายราคา" — ทุกตัวเลขต้องระบุที่มา (prior / rubric / calibrated) บนการ์ด
 
-## Milestones
+## Milestones (เรียงถูก-ไว-เสี่ยงต่ำก่อน; แต่ละข้อ verify ได้อิสระ)
 
-(เรียงตามความเสี่ยงต่อเงินทุน — ของที่กันเงินหายมาก่อนของสวย)
-
-1. **M1 — Working tree สะอาด + ยืนยันโค้ดที่รันจริง**
-   ตัดสิน commit policy กับ user แล้ว commit/ทิ้งงานค้างทั้งหมด; ตรวจว่า process บอทและ
-   dashboard ที่รันอยู่ใช้โค้ดล่าสุด (user เป็นคน restart)
-   ✔ ตรวจได้: git status ว่าง, log ของบอทแสดงพฤติกรรมเวอร์ชันล่าสุดใน cycle จริง
-2. ~~**M2 — Dashboard security**~~ **DEFERRED (2026-07-04)** — user ยืนยัน dashboard
-   รันเฉพาะในเครื่องนี้ ไม่เปิดสู่เครือข่าย → ยังไม่ทำ; เงื่อนไขปลุกงานนี้: เมื่อใดที่จะเปิด
-   port 5050 ให้เครื่องอื่นเข้าถึง ต้องทำ M2 ก่อนเสมอ
-3. ~~**M3 — Alerting**~~ **DEFERRED (2026-07-04)** — user ยังไม่ต้องการระบบแจ้งเตือน;
-   ความเสี่ยง "บอทหยุดเงียบ" ยังอยู่ → บรรเทาด้วยการเช็ค dashboard ด้วยตาตามรอบไปก่อน
-4. **M4 — Audit fixes ชุด B/C** (ทดสอบระดับ demo/simulation เท่านั้น — user กำหนด)
-   ปิดไม้จาก dashboard สำเร็จกับทุกโหมดคำสั่งของ broker; ขจัด race ของ trade log;
-   endpoint สรุปบัญชีมี cache
-   ✔ ตรวจได้: test ผ่าน + ปิดไม้ demo/ไม้จริงตามที่ user อนุญาตสำเร็จ, ไม่มี log corruption ซ้ำ
-5. **M5 — Measurement checkpoints (งานเฝ้าผล มีนัดชัดเจน)**
-   RIDE cohort ครบข้อมูล → สรุป win/loss ให้ user ตัดสิน knob; burn รายวันรายงานเทียบเป้า
-   150-250฿; สกอร์ trend-mode รายสัปดาห์ (n≥30 ตามเกณฑ์ pre-registered); D1 flip watch;
-   ก่อน CPI 07-14 ตรวจ Event Radar + prior ขึ้นจริงบนจอ
-   ✔ ตรวจได้: มีรายงานตัวเลขต่อนัด และ CPI-readiness check ผ่านก่อน 07-12
-6. **M6 — เครื่องมือวิเคราะห์ที่เหลือ (ไม่เพิ่ม AI call)**
-   macro strip (DXY/10Y/real yield), COT รายสัปดาห์, confidence calibration view
-   ✔ ตรวจได้: แสดงข้อมูลจริงบน dashboard โดย token burn รายวันไม่ขยับขึ้น
+- **M0 — Quick win: delta $ บนการ์ด Event Radar** — แสดงเป้าเป็น +$/−$ จากราคาปัจจุบัน
+  ชัดๆ. Verify: เปิด dashboard วันมี event เห็น delta ถูกต้องตรงกับ % เดิม
+- **M1 — Feature A ชั้นโค้ดล้วน (ฟรี)**: normalize schema + pre-filter ปัจจัยทอง + dedupe.
+  Verify: log อัตราการกรองจริง (เป้าตัด ≥70% ของโพสต์ดิบ) + ไม่มีข่าวปัจจัยทองหลุด
+  เมื่อ spot-check ย้อนหลัง 1-2 วัน; token cost ยังเท่าเดิม
+- **M2 — Feature B sign-based scenario**: sign table (user ยืนยันแล้ว) + บรรทัด conditional
+  "hot → … / cool → …" บนการ์ด event ที่มี consensus. Verify: วันมี event การ์ดแสดง
+  สอง scenario ถูกทิศตาม sign table; วันไม่มี consensus การ์ด fallback เป็นแบบเดิม
+- **M3 — Feature A batch scoring + การ์ด News Impact**: Haiku คืนคะแนนรายโพสต์ใน call
+  ที่ merge กับสรุปข่าวเดิม + rolling aggregate + การ์ดบน dashboard. Verify: จำนวน AI call
+  ต่อ cycle เท่าเดิม (ดูจาก cost tracking); token/วัน เพิ่มไม่เกินงบที่ตกลง; คะแนนรายโพสต์
+  ปรากฏบนการ์ดพร้อม reason
+- **M4 — Realized-move logger (ทั้งสอง feature)**: บันทึกราคาที่ +5/+15/+60 นาที
+  หลังโพสต์ tier สูงและหลังเลขออก ลง storage — เก็บอย่างเดียว ยังไม่ปรับอะไร.
+  Verify: หลัง event/ข่าวใหญ่ 1 รอบ มี record ครบทุก horizon
+- **M5 — Feature B surprise-magnitude จากข้อมูลจริง**: สร้างชุดประวัติ actual-vs-consensus
+  ต่อ event (แหล่งตาม Open Question) → conditional split + |surprise|→|move| แทนตัวเลข
+  rubric บนการ์ด พร้อมป้าย n และช่วงข้อมูล. Verify: ตัวเลข reproduce ได้จาก script เดียว +
+  spot-check กับ event จริงย้อนหลัง (เช่น NFP miss ล่าสุด)
+- **M6 — Calibration review (gate ด้วยจำนวน sample)**: เทียบ magnitude_tier และ
+  surprise-curve กับ realized move ที่เก็บจาก M4; รายงานผล + ปรับ rubric/แสดงผล.
+  Verify: รายงาน calibration มีตัวเลข hit-rate ต่อ tier; การ์ดแสดงสถานะ calibrated/ยังไม่
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| บอทหยุดเงียบโดยไม่มีใครรู้ (เกิดแล้ว 07-03) | สูง | สูง — พลาดโอกาส/ไม้ไร้คนดูแล | M3 ทำก่อนฟีเจอร์ใดๆ; heartbeat เป็น alert ตัวแรก |
-| Dashboard ไม่มี auth แต่สั่งปิดไม้/แก้ config ได้ | กลาง | สูงมาก — คนอื่นสั่งเทรดแทนได้ | M2 เป็นงานแรกหลังเก็บ tree; ระหว่างรอ ห้ามเปิด port สู่ public |
-| งานแก้ระบบชนกับ process live (เงินจริง) | กลาง | สูง | ทุก restart เป็นของ user; ทดสอบบน dashboard port แยก/ข้อมูลจำลองก่อน |
-| CPI 07-14 / FOMC 07-29 volatility ชน SL กว้าง | กลาง | สูง | M5 readiness check ก่อนวันงาน; ไม่แก้ guard ใดๆ ใกล้วัน event |
-| Token burn เด้งกลับเกินเป้าหลังเพิ่มฟีเจอร์ | กลาง | กลาง — ขาดทุนเชิงโครงสร้าง | ทุกฟีเจอร์ใหม่ต้อง non-AI-call; M5 วัด burn ทุกวัน |
-| RIDE cohort ตัวอย่างน้อย → ตัดสินผิด | กลาง | กลาง | รอครบกำหนด/จำนวนไม้ขั้นต่ำ ไม่ตัดสินจากไม้เดียว |
-| งานค้างไม่ commit สูญหาย/ทับกัน | กลาง | กลาง | M1 ปิดก่อนเริ่มงานอื่นทั้งหมด |
-| แหล่งข้อมูลภายนอก (macro/COT) ติด rate limit หรือหยุดให้บริการ | กลาง | ต่ำ | ใช้ quota ฟรีอย่างประหยัด + cache; ฟีเจอร์เหล่านี้เป็น display-only |
+- **Magnitude หลอก / reverse-causality** (สูง) — โปรเจกต์เคยเจ็บมาแล้ว (hold-time,
+  CHART_SHADOW). Mitigation: M4+M6 เป็น milestone บังคับ; ก่อน calibrate การ์ดต้องติดป้าย
+  "rubric — ยังไม่ validate"; ห้ามตัวเลข magnitude ใดขึ้นการ์ดโดยไม่มีที่มา
+- **Token creep** (กลาง) — batch scoring ทำให้ call เดิมอ้วนขึ้นเงียบๆ. Mitigation:
+  pre-filter+dedupe ก่อนเสมอ, cap จำนวนโพสต์ต่อ batch, วัด token/วัน เทียบ baseline
+  ก่อน-หลัง M3 ผ่าน cost tracking ที่มีอยู่; เกินงบ → ลด window/cap ทันที
+- **Consensus history หาไม่ครบ** (กลาง-สูง) — calendar feed ปัจจุบันให้ forecast ของ event
+  ข้างหน้า แต่ conditional stats ต้องการประวัติย้อนหลังหลายปี. Mitigation: M2 (sign-based)
+  ไม่พึ่งประวัติ จึง ship ได้ก่อน; M5 แยกอิสระ + Open Question เรื่องแหล่งข้อมูล
+- **n เล็กเกินเมื่อ split ตาม surprise** (กลาง) — แบ่ง 173 CPI เป็น hot/cool/inline ×
+  ขนาด surprise อาจเหลือ cell ละไม่กี่ตัว. Mitigation: แสดง n กำกับทุกตัวเลข; cell ที่
+  n ต่ำกว่าเกณฑ์ → fallback เป็น sign + prior เดิม
+- **Scoring คุณภาพต่ำจาก Haiku** (กลาง) — บทเรียน CHART_SHADOW: Haiku แทนงานวิเคราะห์
+  ลึกไม่ได้. Mitigation: งานนี้เป็น classification สั้นต่อโพสต์ (ง่ายกว่า chart) + M6 วัด
+  hit-rate จริงเทียบ realized move ก่อนเชื่อถือ/ต่อยอด
+- **แหล่งข่าวภายนอกเปลี่ยน format/ล่ม** (กลาง) — RSS/scrape เปราะโดยธรรมชาติ.
+  Mitigation: ทุกชั้นใหม่ fail-soft — พังแล้วการ์ดว่าง/ตกกลับพฤติกรรมเดิม ห้ามล้ม pipeline
 
-## Open Questions
+## Open Questions — ตอบแล้ว (user 2026-07-04)
 
-(user ตอบ 2026-07-04)
-
-- [x] **Commit policy งานค้าง** → **commit เลย + เก็บกวาด**: commit ฟีเจอร์ dashboard
-      ชุดล่าสุด, ลบภาพ screenshot สมัคร cloud, script ทดลองย้ายเข้า scripts/ หรือลบ
-- [x] **Security approach** → **ยังไม่ทำ (DEFERRED)** — dashboard รันแค่ในเครื่องนี้
-- [x] **ช่องทาง alert** → **ยังไม่ใช้ (DEFERRED)**
-- [x] **ขอบเขตการทดสอบ M4** → **demo/simulation เท่านั้น** ห้ามแตะไม้จริง
-- [ ] **RIDE decision date**: ล็อกวันตัดสินตายตัว (เช่น ~07-17) หรือเกณฑ์จำนวนไม้ขั้นต่ำ?
-      (ไม่ block งานสร้าง — เป็นการตัดสินใจตอนอ่านผล)
-- [ ] **ลำดับ M6**: architect เสนอลำดับได้เลย user จะเลือกตอน approve ARCHITECTURE.md
+1. **sign table surprise→gold** → ✅ **ใช้ default มาตรฐาน**: CPI/Core CPI/NFP/PCE/
+   Retail Sales/GDP hot→down, Unemployment สูงกว่าคาด→up, FOMC hawkish→down
+   (ผ่านช่องทางค่าเงินจริง/yields). ยึดตารางนี้เป็น sign table ของ M2.
+2. **แหล่ง consensus history (M5)** → ✅ **manual seed เฉพาะ CPI+NFP+FOMC** — คุมคุณภาพได้
+   เริ่มเล็ก; ไม่ scrape/ไม่ใช้ AlphaVantage ในเฟสนี้.
+3. **feed analyst หรือ display-only** → ✅ **display-only ใน v1** — ไม่แตะ AI pipeline/gate
+   จน M6 calibration พิสูจน์คุณภาพก่อน แล้วค่อยพิจารณา feed ทีหลัง.
+4. **calibration window + min-n** → ✅ default: **n≥30 ต่อ cell** ตามธรรมเนียม pre-registered;
+   window ให้ architect เสนอ (ยาว 2012+ เป็นฐาน, เปรียบเทียบ recent regime ได้ถ้า n พอ).
+5. **งบ token M3** → ✅ default: **≤10% ของ burn ปัจจุบัน** และรวมต้องอยู่ในเป้า 150-250฿/วัน —
+   เป็นเกณฑ์ verify ของ M3.

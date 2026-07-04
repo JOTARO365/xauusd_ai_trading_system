@@ -135,6 +135,15 @@ async def node_news(state: TradingState) -> dict:
         data  = await gather_news()
         count = data.get("count", 0)
         print_step(2, "done", f"{count} tweet")
+        # --- M1 measurement: news_impact pre-filter (observe-only, fail-soft) ---
+        try:
+            from agents import news_impact as _ni
+            _posts = _ni.normalize_posts(data)
+            _kept, _stats = _ni.prefilter_and_dedupe(_posts)
+            logger.info("[news_impact] filter %s", _stats)
+        except Exception as _ni_err:
+            logger.warning("[news_impact] prefilter skipped: %s", _ni_err)
+        # -----------------------------------------------------------------------
         return {"news_data": data}
     except Exception as e:
         print_step(2, "error", str(e)[:60])
