@@ -146,7 +146,7 @@ fan-out — so the sub-agent delegation format is not used. Each task = one work
 
 ## Batch E — M4: Realized-move logger  · deps: D (high-tier post feed); economic-event side is independent
 
-### E1 — `scripts/realized_move_logger.py` (+ `price_at` helper)
+### E1 [DONE] — `scripts/realized_move_logger.py` (+ `price_at` helper)
 - **agent:** worker (single)
 - **scope (whitelist):** `scripts/realized_move_logger.py` (NEW), `data/realized_moves.json` (NEW, generated)
 - **input contract:** high-tier posts (`magnitude_tier ≥ 2`) from `data/news_impact.json`; released
