@@ -109,7 +109,7 @@ fan-out — so the sub-agent delegation format is not used. Each task = one work
 ## Batch D — M3: Feature A batch scoring + News Impact card  · deps: B · ⚠️ REQUIRES USER APPROVAL of D1
 
 ### D1 — Merge per-post scoring into the Haiku call + cache scores
-- **agent:** worker (single) — **BLOCKED until user approves ARCHITECTURE §7 D1**
+- **agent:** worker (single) — **[DONE] implemented 2026-07-05**
 - **scope (whitelist):** `agents/news_cache.py` (`_summarize_with_haiku` `:108`, `get_news_context`
   `:274`, cache store/read only), `agents/news_impact.py` (add `parse_scores`, `rolling_aggregate`,
   `write_snapshot`)
@@ -132,7 +132,7 @@ fan-out — so the sub-agent delegation format is not used. Each task = one work
   with per-post `reason` + `provenance:"rubric"`.
 
 ### D2 — `/api/news-impact` endpoint + News Impact card
-- **agent:** worker (single) — after D1 (needs the snapshot shape)
+- **agent:** worker (single) — **[DONE] implemented 2026-07-05 (bundled with D1 per user instruction)**
 - **scope (whitelist):** `dashboard/app.py` (add `/api/news-impact` only), `dashboard/templates/index.html`
   (new News Impact card, mirroring `loadBurn()` fetch→render)
 - **input contract:** `data/news_impact.json` (§4.1).

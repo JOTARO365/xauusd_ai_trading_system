@@ -1188,6 +1188,32 @@ def api_event_scenario():
         return jsonify(_empty)
 
 
+@app.route("/api/news-impact")
+def api_news_impact():
+    """News Impact snapshot: rolling bull/bear score + scored posts (Feature A, M3).
+    Data from data/news_impact.json (written by news_cache.get_news_context after each Haiku call).
+    — display-only, pass-through serve; file missing -> empty payload, never 500 (ARCHITECTURE §4.1, §D7)."""
+    _empty = {
+        "ok": True,
+        "updated": None,
+        "window_min": 180,
+        "aggregate": {
+            "score": 0, "label": "neutral gold",
+            "n_scored": 0, "provenance": "rubric", "n": 0,
+        },
+        "filter_stats": {"raw": 0, "kept": 0, "filter_rate_pct": 0},
+        "posts": [],
+    }
+    try:
+        p = os.path.join(_BASE, "../data/news_impact.json")
+        with open(p, "r", encoding="utf-8") as f:
+            return jsonify(json.load(f))
+    except FileNotFoundError:
+        return jsonify(_empty)
+    except Exception:
+        return jsonify(_empty)
+
+
 @app.route("/api/calibration")
 def api_calibration():
     """Confidence calibration: predicted conf bin -> realized WR/PnL

@@ -1817,6 +1817,37 @@
       </div>
     </section>
 
+    <!-- NEWS IMPACT CARD — §4.1 news_impact.json (Feature A, M3) -->
+    <section id="news-impact-section">
+      <div class="section-title">News Impact — Gold Sentiment Meter (rubric)</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card">
+          <div class="label">Net Score</div>
+          <div class="value" id="ni-score">—</div>
+          <div class="sub" id="ni-label">—</div>
+        </div>
+        <div class="card">
+          <div class="label">Posts Scored</div>
+          <div class="value" id="ni-n">—</div>
+          <div class="sub" id="ni-provenance" style="font-size:10px">—</div>
+        </div>
+        <div class="card">
+          <div class="label">Filter</div>
+          <div class="value" id="ni-filter">—</div>
+          <div class="sub" id="ni-updated" style="font-size:10px">—</div>
+        </div>
+        <div class="card" style="grid-column:span 1">
+          <div class="label">Window</div>
+          <div class="value" id="ni-window">—</div>
+          <div class="sub">minutes</div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:8px">
+        <div class="label" style="margin-bottom:8px">Top Scored Posts <span style="font-size:10px;color:var(--muted)">(rubric — not yet validated)</span></div>
+        <div id="ni-posts" style="font-size:11px;font-family:var(--mono);color:var(--muted)">No data — waiting for next news cycle</div>
+      </div>
+    </section>
+
     <!-- CALIBRATION CARD — §3.5 calibration.json -->
     <section id="calibration-section">
       <div class="section-title">Confidence Calibration (Predicted vs Realized Win-Rate)</div>
@@ -3213,9 +3244,10 @@ async function loadAccounting() {
       },
     });
 
-    // load burn + calibration cards alongside accounting data
+    // load burn + calibration + news-impact cards alongside accounting data
     loadBurn();
     loadCalibration();
+    loadNewsImpact();
 
   } catch (e) {
     console.error('loadAccounting error:', e);
@@ -3332,6 +3364,100 @@ async function loadCalibration() {
     tableEl.innerHTML = rows.join('');
   } catch (e) {
     console.error('loadCalibration error:', e);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   NEWS IMPACT CARD — §4.1 /api/news-impact  (Feature A, M3)
+   ════════════════════════════════════════════════════════════ */
+async function loadNewsImpact() {
+  try {
+    const res  = await fetch('/api/news-impact');
+    const data = await res.json();
+    if (!data.ok) return;
+
+    const agg  = data.aggregate || {};
+    const fs   = data.filter_stats || {};
+    const posts = data.posts || [];
+
+    // Score value + colour
+    const scoreEl = document.getElementById('ni-score');
+    const labelEl = document.getElementById('ni-label');
+    if (scoreEl) {
+      const score = agg.score || 0;
+      scoreEl.textContent = (score > 0 ? '+' : '') + score;
+      if (score > 10)       scoreEl.className = 'value green';
+      else if (score < -10) scoreEl.className = 'value red';
+      else                  scoreEl.className = 'value';
+    }
+    if (labelEl) labelEl.textContent = agg.label || 'neutral gold';
+
+    // Posts scored + provenance
+    const nEl   = document.getElementById('ni-n');
+    const provEl = document.getElementById('ni-provenance');
+    if (nEl)   nEl.textContent = (agg.n_scored || 0) + ' posts';
+    if (provEl) provEl.textContent = (agg.provenance || 'rubric') + ' · n=' + (agg.n || 0);
+
+    // Filter stats + updated
+    const filterEl  = document.getElementById('ni-filter');
+    const updatedEl = document.getElementById('ni-updated');
+    if (filterEl) {
+      const kept = fs.kept || 0;
+      const raw  = fs.raw  || 0;
+      const pct  = (fs.filter_rate_pct || 0).toFixed(0);
+      filterEl.textContent = kept + '/' + raw + ' kept';
+      filterEl.title = pct + '% dropped';
+    }
+    if (updatedEl && data.updated) {
+      updatedEl.textContent = 'Updated: ' + data.updated.slice(0, 16).replace('T', ' ') + ' UTC';
+    } else if (updatedEl) {
+      updatedEl.textContent = 'No data yet';
+    }
+
+    // Window
+    const winEl = document.getElementById('ni-window');
+    if (winEl) winEl.textContent = (data.window_min || 180);
+
+    // Top posts list
+    const postsEl = document.getElementById('ni-posts');
+    if (!postsEl) return;
+    if (!posts.length) {
+      postsEl.textContent = 'No scored posts yet — waiting for next news cycle';
+      return;
+    }
+
+    const dirIcon = { bull: '▲', bear: '▼', neutral: '●' };
+    const dirCol  = { bull: 'var(--green)', bear: 'var(--red)', neutral: 'var(--muted)' };
+    const tierLabel = { 1: 'minor', 2: 'moderate', 3: 'major' };
+
+    postsEl.innerHTML = posts.slice(0, 8).map(p => {
+      const dir   = p.direction || 'neutral';
+      const icon  = dirIcon[dir]  || '●';
+      const col   = dirCol[dir]   || 'var(--muted)';
+      const tier  = p.magnitude_tier || 1;
+      const conf  = (p.confidence || 0) + '%';
+      const hl    = (p.half_life_min || 120) + 'min';
+      const age   = p.age_min != null ? p.age_min + 'min ago' : '';
+      const auth  = p.author ? '@' + p.author + ' ' : '';
+      const text  = (p.text || '').slice(0, 100);
+      const reason = p.reason ? ' — ' + p.reason : '';
+      const prov  = p.provenance || 'rubric';
+      return (
+        '<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:5px">' +
+          '<span style="color:' + col + ';font-size:13px;flex-shrink:0;margin-top:1px">' + icon + '</span>' +
+          '<div style="min-width:0">' +
+            '<div style="color:' + col + ';font-weight:600">' +
+              dir.toUpperCase() + ' · T' + tier + ' (' + tierLabel[tier] + ') · conf ' + conf + ' · ' + hl + ' half-life' +
+              ' <span style="color:var(--muted);font-weight:400;font-size:10px">(' + prov + ')</span>' +
+            '</div>' +
+            '<div style="color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + auth + text + '</div>' +
+            '<div style="color:var(--muted);font-size:10px">' + reason + (age ? ' · ' + age : '') + '</div>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  } catch (e) {
+    console.error('loadNewsImpact error:', e);
   }
 }
 
