@@ -1610,6 +1610,67 @@
       </div>
     </section>
 
+    <!-- NEWS IMPACT CARD — §4.1 news_impact.json (Feature A, M3) -->
+    <section id="news-impact-section">
+      <div class="section-title">News Impact — Gold Sentiment Meter (rubric)</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card">
+          <div class="label">Net Score</div>
+          <div class="value" id="ni-score">—</div>
+          <div class="sub" id="ni-label">—</div>
+        </div>
+        <div class="card">
+          <div class="label">Posts Scored</div>
+          <div class="value" id="ni-n">—</div>
+          <div class="sub" id="ni-provenance" style="font-size:10px">—</div>
+        </div>
+        <div class="card">
+          <div class="label">Filter</div>
+          <div class="value" id="ni-filter">—</div>
+          <div class="sub" id="ni-updated" style="font-size:10px">—</div>
+        </div>
+        <div class="card" style="grid-column:span 1">
+          <div class="label">Window</div>
+          <div class="value" id="ni-window">—</div>
+          <div class="sub">minutes</div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:8px">
+        <div class="label" style="margin-bottom:8px">ข่าวทองรายชิ้น — แนวโน้ม + ความแรง <span style="font-size:10px;color:var(--muted)">(แถบสี = ความแรง LOW/MED/HIGH · badge = ทิศ · rubric ยังไม่ validate)</span></div>
+        <div id="ni-posts" style="font-size:11px;color:var(--muted)">No data — waiting for next news cycle</div>
+      </div>
+    </section>
+
+    <!-- IMPACT CALIBRATION CARD — §4.3 impact_calibration.json (M6, review_calibration.py) -->
+    <section id="impact-calibration-section">
+      <div class="section-title">Impact Calibration — Predicted Magnitude vs Realized Move</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="card">
+          <div class="label">Tier 1 &mdash; Minor <span style="font-size:10px;color:var(--muted)">[0–0.4%]</span></div>
+          <div class="value" id="ic-hr-1" style="font-family:var(--mono)">—</div>
+          <div class="sub" id="ic-n-1">—</div>
+        </div>
+        <div class="card">
+          <div class="label">Tier 2 &mdash; Moderate <span style="font-size:10px;color:var(--muted)">[0.4–0.9%]</span></div>
+          <div class="value" id="ic-hr-2" style="font-family:var(--mono)">—</div>
+          <div class="sub" id="ic-n-2">—</div>
+        </div>
+        <div class="card">
+          <div class="label">Tier 3 &mdash; Major <span style="font-size:10px;color:var(--muted)">[0.9%+]</span></div>
+          <div class="value" id="ic-hr-3" style="font-family:var(--mono)">—</div>
+          <div class="sub" id="ic-n-3">—</div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="label">Overall Status</div>
+          <div id="ic-status" style="font-size:11px;color:var(--muted);font-family:var(--mono)">—</div>
+        </div>
+        <div id="ic-detail" style="margin-top:8px;font-size:11px;font-family:var(--mono);color:var(--muted)">No data — run scripts/review_calibration.py first</div>
+        <div id="ic-updated" style="font-size:10px;color:var(--muted);margin-top:6px">—</div>
+      </div>
+    </section>
+
     <!-- LAST DECISION DETAIL -->
     <section>
       <div class="section-title">Last Decision &mdash; Detail</div>
@@ -1814,67 +1875,6 @@
           <div class="label">14-Day History</div>
           <div id="burn-history" style="font-size:10px;color:var(--muted);font-family:var(--mono);line-height:1.8;margin-top:4px">—</div>
         </div>
-      </div>
-    </section>
-
-    <!-- NEWS IMPACT CARD — §4.1 news_impact.json (Feature A, M3) -->
-    <section id="news-impact-section">
-      <div class="section-title">News Impact — Gold Sentiment Meter (rubric)</div>
-      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
-        <div class="card">
-          <div class="label">Net Score</div>
-          <div class="value" id="ni-score">—</div>
-          <div class="sub" id="ni-label">—</div>
-        </div>
-        <div class="card">
-          <div class="label">Posts Scored</div>
-          <div class="value" id="ni-n">—</div>
-          <div class="sub" id="ni-provenance" style="font-size:10px">—</div>
-        </div>
-        <div class="card">
-          <div class="label">Filter</div>
-          <div class="value" id="ni-filter">—</div>
-          <div class="sub" id="ni-updated" style="font-size:10px">—</div>
-        </div>
-        <div class="card" style="grid-column:span 1">
-          <div class="label">Window</div>
-          <div class="value" id="ni-window">—</div>
-          <div class="sub">minutes</div>
-        </div>
-      </div>
-      <div class="card" style="margin-top:8px">
-        <div class="label" style="margin-bottom:8px">ข่าวทองรายชิ้น — แนวโน้ม + ความแรง <span style="font-size:10px;color:var(--muted)">(แถบสี = ความแรง LOW/MED/HIGH · badge = ทิศ · rubric ยังไม่ validate)</span></div>
-        <div id="ni-posts" style="font-size:11px;color:var(--muted)">No data — waiting for next news cycle</div>
-      </div>
-    </section>
-
-    <!-- IMPACT CALIBRATION CARD — §4.3 impact_calibration.json (M6, review_calibration.py) -->
-    <section id="impact-calibration-section">
-      <div class="section-title">Impact Calibration — Predicted Magnitude vs Realized Move</div>
-      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
-        <div class="card">
-          <div class="label">Tier 1 &mdash; Minor <span style="font-size:10px;color:var(--muted)">[0–0.4%]</span></div>
-          <div class="value" id="ic-hr-1" style="font-family:var(--mono)">—</div>
-          <div class="sub" id="ic-n-1">—</div>
-        </div>
-        <div class="card">
-          <div class="label">Tier 2 &mdash; Moderate <span style="font-size:10px;color:var(--muted)">[0.4–0.9%]</span></div>
-          <div class="value" id="ic-hr-2" style="font-family:var(--mono)">—</div>
-          <div class="sub" id="ic-n-2">—</div>
-        </div>
-        <div class="card">
-          <div class="label">Tier 3 &mdash; Major <span style="font-size:10px;color:var(--muted)">[0.9%+]</span></div>
-          <div class="value" id="ic-hr-3" style="font-family:var(--mono)">—</div>
-          <div class="sub" id="ic-n-3">—</div>
-        </div>
-      </div>
-      <div class="card" style="margin-top:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div class="label">Overall Status</div>
-          <div id="ic-status" style="font-size:11px;color:var(--muted);font-family:var(--mono)">—</div>
-        </div>
-        <div id="ic-detail" style="margin-top:8px;font-size:11px;font-family:var(--mono);color:var(--muted)">No data — run scripts/review_calibration.py first</div>
-        <div id="ic-updated" style="font-size:10px;color:var(--muted);margin-top:6px">—</div>
       </div>
     </section>
 
@@ -3274,11 +3274,9 @@ async function loadAccounting() {
       },
     });
 
-    // load burn + calibration + news-impact + impact-calibration cards alongside accounting data
+    // load burn + calibration cards alongside accounting data
     loadBurn();
     loadCalibration();
-    loadNewsImpact();
-    loadImpactCalibration();
 
   } catch (e) {
     console.error('loadAccounting error:', e);
@@ -4522,6 +4520,8 @@ function _bootstrap() {
   loadRegime();
   loadMacroStrip();
   loadCotCard();
+  loadNewsImpact();
+  loadImpactCalibration();
   setInterval(fetchData, 10000);
   setInterval(fetchCalendar, 1800000);
   setInterval(loadEventStats, 3600000);
