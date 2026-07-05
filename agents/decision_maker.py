@@ -276,6 +276,45 @@ def _last_trade_in_dir_lost(direction: str, recent_trades: list) -> bool:
     return (same_dir[-1].get("pnl") or 0) < 0
 
 
+def _news_gate_adjust(direction: str, base_floor: int) -> tuple[int, str | None]:
+    """NEWS_GATE (flag, default OFF): ให้ News Impact score ปรับ 'conf floor' เท่านั้น —
+    ข่าวสวนทิศไม้ → floor เข้มขึ้น (anti-fade), ข่าวหนุน → ผ่อนเล็กน้อยมีเพดาน.
+    ห้ามแตะ money mgmt / HTF-direction / counter-spike. Fail-safe: ข้อมูลหาย/เก่า/น้อย
+    หรือ error ใดๆ → คืน base_floor เดิม (no-op). สัญญาณนี้ยังไม่ validate → เปิดผ่าน flag."""
+    if not getattr(_cfg, "NEWS_GATE", False):
+        return base_floor, None
+    try:
+        p = Path(__file__).resolve().parent.parent / "data" / "news_impact.json"
+        with open(p, encoding="utf-8") as f:
+            snap = json.load(f)
+        agg   = snap.get("aggregate") or {}
+        score = float(agg.get("score", 0))
+        n     = int(agg.get("n_scored", 0))
+        try:
+            ts = datetime.fromisoformat(str(snap.get("updated", "")).replace("Z", "+00:00"))
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=_tz.utc)
+            age_min = (datetime.now(_tz.utc) - ts).total_seconds() / 60
+        except (ValueError, TypeError):
+            return base_floor, None   # อ่านเวลาไม่ได้ = ไม่เชื่อ snapshot
+        if n < getattr(_cfg, "NEWS_GATE_MIN_N", 3) or age_min > getattr(_cfg, "NEWS_GATE_MAX_AGE_MIN", 60):
+            return base_floor, None
+        thr = float(getattr(_cfg, "NEWS_GATE_OPPOSE", 40))
+        agree  = (direction == "BUY"  and score >=  thr) or (direction == "SELL" and score <= -thr)
+        oppose = (direction == "BUY"  and score <= -thr) or (direction == "SELL" and score >=  thr)
+        if oppose:
+            adj = base_floor + int(getattr(_cfg, "NEWS_OPPOSE_PENALTY", 8))
+            return adj, f"ข่าวสวน {direction} (score {score:+.0f}, n={n}) → floor {base_floor}→{adj}"
+        if agree:
+            hard = int(getattr(_cfg, "NEWS_GATE_HARD_FLOOR", 58))
+            adj  = max(hard, base_floor - int(getattr(_cfg, "NEWS_AGREE_RELAX", 5)))
+            if adj < base_floor:
+                return adj, f"ข่าวหนุน {direction} (score {score:+.0f}, n={n}) → floor {base_floor}→{adj}"
+        return base_floor, None
+    except Exception:
+        return base_floor, None   # ทุก error = no-op, บอทวิ่งเหมือนเดิม
+
+
 # ─────────────────────────────────────────────────────────────
 #  GATE LAYER — Python-only quantitative filters
 # ─────────────────────────────────────────────────────────────
@@ -600,8 +639,14 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     #    เหลือ 42/45 คือประตูให้ไม้ conf 50-59 ที่ WR 23.5% / −3,807 เข้ามา — เลิกลด)
     htf_zone = chart_data.get("htf_zone")
     _min_conf = _cfg.MIN_TECHNICAL_CONFIDENCE
+    # NEWS_GATE (flag, default OFF): ข่าวปรับ floor นี้เท่านั้น — ไม่แตะ gate อื่น/money mgmt
+    _min_conf, _news_note = _news_gate_adjust(direction, _min_conf)
+    if _news_note:
+        logger.info(f"[NEWS_GATE] {_news_note}")
     if conf < _min_conf:
-        return _fail(f"Confidence {conf}% < {_min_conf}% (HTF={htf_zone['tf'] if htf_zone else 'none'})")
+        _hz = htf_zone['tf'] if htf_zone else 'none'
+        _ng = f" [NEWS_GATE: {_news_note}]" if _news_note else ""
+        return _fail(f"Confidence {conf}% < {_min_conf}% (HTF={_hz}){_ng}")
 
     # 6. Entry-type gates
     if entry_type == "EMA_PULLBACK":

@@ -161,6 +161,10 @@ _CONFIG_SPEC: dict[str, str] = {
     "NEWS_OVERRIDE_MIN_CONF": "50", "HTF_REVERSAL_MIN_CONF": "70",
     "EMA_PULLBACK_BLOCK": "true",
     "TREND_CONT_CONF": "65", "TREND_CONT_MAX_DIST_PCT": "0.3", "NNLB_FASTPATH": "true",
+    # ── NEWS_GATE (News Impact score → conf floor; flag default OFF, ยังไม่ validate) ──
+    "NEWS_GATE": "false", "NEWS_GATE_OPPOSE": "40", "NEWS_OPPOSE_PENALTY": "8",
+    "NEWS_AGREE_RELAX": "5", "NEWS_GATE_HARD_FLOOR": "58", "NEWS_GATE_MIN_N": "3",
+    "NEWS_GATE_MAX_AGE_MIN": "60",
     # ── NNLB ──
     "NNLB_MODE": "false", "NNLB_BASE_EQUITY": "100",
     "NNLB_EQUITY_PER_LOT": "100", "NNLB_MAX_LOSS_PCT": "25",

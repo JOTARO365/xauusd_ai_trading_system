@@ -106,6 +106,15 @@ SL_MIN_GAP_PIPS       = int(os.getenv("SL_MIN_GAP_PIPS") or 800)
 MIN_TECHNICAL_CONFIDENCE = int(os.getenv("MIN_TECH_CONF") or 62)      # floor ทุก entry (HTF zone ไม่ลดแล้ว)
 ASIAN_MIN_CONF           = float(os.getenv("ASIAN_MIN_CONF") or 72)   # Asian 0-7 UTC ทุก entry
 COUNTER_SPIKE_PIPS       = float(os.getenv("COUNTER_SPIKE_PIPS") or 500)  # ห้ามเข้าสวนสไปก์ ≥ นี้ (0=ปิด)
+# ── NEWS_GATE (flag, default OFF) — News Impact score ปรับ "conf floor" เท่านั้น ──
+# ยังไม่ validate → เปิดด้วยความระวัง. ไม่แตะ money mgmt / HTF-direction / counter-spike.
+NEWS_GATE             = os.getenv("NEWS_GATE", "false").lower() == "true"
+NEWS_GATE_OPPOSE      = float(os.getenv("NEWS_GATE_OPPOSE") or 40)    # |score| ที่ถือว่า "แรง"
+NEWS_OPPOSE_PENALTY   = int(os.getenv("NEWS_OPPOSE_PENALTY") or 8)    # ข่าวสวน → floor +เท่านี้ (เข้มขึ้น)
+NEWS_AGREE_RELAX      = int(os.getenv("NEWS_AGREE_RELAX") or 5)       # ข่าวหนุน → floor −เท่านี้ (ผ่อน)
+NEWS_GATE_HARD_FLOOR  = int(os.getenv("NEWS_GATE_HARD_FLOOR") or 58)  # ผ่อนแล้วห้ามต่ำกว่านี้เด็ดขาด
+NEWS_GATE_MIN_N       = int(os.getenv("NEWS_GATE_MIN_N") or 3)        # ต้อง scored ≥ นี้ ไม่งั้น no-op
+NEWS_GATE_MAX_AGE_MIN = int(os.getenv("NEWS_GATE_MAX_AGE_MIN") or 60) # snapshot เก่ากว่านี้ = no-op
 NEWS_FIRST               = os.getenv("NEWS_FIRST", "true").lower() != "false"      # บล็อกเข้าสวนทิศข่าวชัด
 NEWS_BIAS_MIN_CONF       = float(os.getenv("NEWS_BIAS_MIN_CONF") or 55)
 HTF_FADE_BLOCK           = os.getenv("HTF_FADE_BLOCK", "true").lower() != "false"  # ห้าม SELL@D1/W1 support ฯลฯ
@@ -173,6 +182,15 @@ def reload_config():
     MIN_TECHNICAL_CONFIDENCE = int(os.getenv("MIN_TECH_CONF") or 62)
     ASIAN_MIN_CONF           = float(os.getenv("ASIAN_MIN_CONF") or 72)
     COUNTER_SPIKE_PIPS       = float(os.getenv("COUNTER_SPIKE_PIPS") or 500)
+    global NEWS_GATE, NEWS_GATE_OPPOSE, NEWS_OPPOSE_PENALTY, NEWS_AGREE_RELAX
+    global NEWS_GATE_HARD_FLOOR, NEWS_GATE_MIN_N, NEWS_GATE_MAX_AGE_MIN
+    NEWS_GATE             = os.getenv("NEWS_GATE", "false").lower() == "true"
+    NEWS_GATE_OPPOSE      = float(os.getenv("NEWS_GATE_OPPOSE") or 40)
+    NEWS_OPPOSE_PENALTY   = int(os.getenv("NEWS_OPPOSE_PENALTY") or 8)
+    NEWS_AGREE_RELAX      = int(os.getenv("NEWS_AGREE_RELAX") or 5)
+    NEWS_GATE_HARD_FLOOR  = int(os.getenv("NEWS_GATE_HARD_FLOOR") or 58)
+    NEWS_GATE_MIN_N       = int(os.getenv("NEWS_GATE_MIN_N") or 3)
+    NEWS_GATE_MAX_AGE_MIN = int(os.getenv("NEWS_GATE_MAX_AGE_MIN") or 60)
     NEWS_FIRST               = os.getenv("NEWS_FIRST", "true").lower() != "false"
     NEWS_BIAS_MIN_CONF       = float(os.getenv("NEWS_BIAS_MIN_CONF") or 55)
     HTF_FADE_BLOCK           = os.getenv("HTF_FADE_BLOCK", "true").lower() != "false"
