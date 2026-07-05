@@ -2531,6 +2531,8 @@ let lastFiltered = [];
 let activeSystem = 'xauusd';
 let _lastBid = null, _lastAsk = null;
 let _equityHistory = [];
+let _eqLabels = [];            // index → real trade-time label (equity curve ใช้แกน index เว้นเท่ากัน)
+const _EQ_BASE = 1000000000;   // fake-timestamp base (LWC ต้องการ time เรียงขึ้น) — จริงคือ index
 
 /* ════════════════════════════════════════════════════════════
    FORMATTERS
@@ -2580,7 +2582,10 @@ function initCharts() {
               fontFamily: 'JetBrains Mono', fontSize: 10 },
     grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
     rightPriceScale: { borderVisible: false },
-    timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false },
+    // แกน x = ลำดับไม้ (เว้นเท่ากัน ไม่มีช่องว่างจากเวลาจริง); label แปลงกลับเป็นวันจริง
+    localization: { timeFormatter: (t) => _eqLabels[t - _EQ_BASE] || '' },
+    timeScale: { borderVisible: false, timeVisible: false, secondsVisible: false,
+                 tickMarkFormatter: (t) => (_eqLabels[t - _EQ_BASE] || '').slice(5, 10) },
     crosshair: {
       mode: LightweightCharts.CrosshairMode.Magnet,
       vertLine: { color: 'rgba(212,172,13,0.45)', width: 1, labelBackgroundColor: '#D4AC0D' },
@@ -2692,13 +2697,9 @@ function updateStats(stats) {
 
   // Equity curve + sparkline
   const eq = stats.equity_curve || [];
-  { let _last = 0;
-    const _data = eq.map(e => {
-      let t = Math.floor(new Date(String(e.time).replace(' ', 'T')).getTime() / 1000);
-      if (!t || t <= _last) t = _last + 1;   // keep strictly ascending (LWC requirement)
-      _last = t;
-      return { time: t, value: e.equity };
-    });
+  { // แกน x = index ไม้ (เว้นเท่ากัน) → ไม่มีช่องว่างจากเวลาจริง; เก็บ label วันจริงไว้ hover
+    _eqLabels = eq.map(e => String(e.time));
+    const _data = eq.map((e, i) => ({ time: _EQ_BASE + i, value: e.equity }));
     equitySeries.setData(_data);
     if (_data.length) equityChart.timeScale().fitContent();
   }
