@@ -1884,6 +1884,7 @@
       <div class="card" style="overflow-x:auto">
         <div class="label" style="margin-bottom:8px">Per-bin: n trades / realized WR% / total PnL &mdash; bar = realized, line = predicted midpoint</div>
         <div id="calib-table" style="font-family:var(--mono);font-size:11px">&#8212;</div>
+        <div id="calib-suggest" style="margin-top:10px"></div>
         <div id="calib-updated" style="font-size:10px;color:var(--muted);margin-top:8px">&#8212;</div>
       </div>
     </section>
@@ -3391,6 +3392,33 @@ async function loadCalibration() {
     });
 
     tableEl.innerHTML = rows.join('');
+
+    // Conf-floor suggestion (ADVISORY — dashboard never changes the gate).
+    const sg = data.suggestion;
+    const sgEl = document.getElementById('calib-suggest');
+    if (sgEl) {
+      if (!sg || sg.status === 'insufficient') {
+        sgEl.innerHTML = '<div style="font-size:10px;color:var(--muted)">💡 conf-floor: ' +
+          ((sg && sg.note) || 'ข้อมูลไม่พอ') + '</div>';
+      } else {
+        const style = {
+          ok_keep:               { c: 'var(--green)', bg: 'rgba(38,166,91,0.10)',  icon: '✓' },
+          suggest_raise:         { c: 'var(--gold)',  bg: 'rgba(212,172,13,0.12)', icon: '⬆' },
+          suggest_lower_cautious:{ c: 'var(--red)',   bg: 'rgba(232,59,59,0.10)',  icon: '⚠' },
+          no_profitable_floor:   { c: 'var(--red)',   bg: 'rgba(232,59,59,0.10)',  icon: '⚠' },
+        }[sg.status] || { c: 'var(--muted)', bg: 'rgba(255,255,255,0.04)', icon: '💡' };
+        const head = (sg.suggested_floor != null && sg.status !== 'no_profitable_floor')
+          ? 'MIN_TECH_CONF: ปัจจุบัน ' + sg.current_floor + ' · แนะนำ ' + sg.suggested_floor
+          : 'MIN_TECH_CONF: ปัจจุบัน ' + sg.current_floor;
+        sgEl.innerHTML =
+          '<div style="border-left:3px solid ' + style.c + ';background:' + style.bg +
+            ';border-radius:4px;padding:7px 10px;font-size:11px">' +
+            '<div style="color:' + style.c + ';font-weight:700;margin-bottom:2px">' + style.icon + ' ' + head + '</div>' +
+            '<div style="color:var(--muted);font-size:10px;line-height:1.4">' + (sg.note || '') +
+              ' <span style="opacity:.7">(n=' + (sg.total_n || 0) + ', เกณฑ์ EV/ไม้ · advisory)</span></div>' +
+          '</div>';
+      }
+    }
   } catch (e) {
     console.error('loadCalibration error:', e);
   }

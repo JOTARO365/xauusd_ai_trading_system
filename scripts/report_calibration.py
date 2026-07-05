@@ -100,8 +100,75 @@ def build_payload() -> dict:
     return {
         "ok":      True,
         "bins":    result_bins,
+        "suggestion": _build_suggestion(result_bins),
         "updated": datetime.now(timezone.utc).isoformat(),
     }
+
+
+# ─── Conf-floor suggestion (ADVISORY — never changes the gate) ─────────────────
+
+_SUGGEST_MIN_N = 30   # pre-registered min sample per project convention
+
+
+def _build_suggestion(bins: list[dict]) -> dict:
+    """From realized calibration, suggest a MIN_TECH_CONF floor by asking, for each
+    candidate floor F: 'if we only traded conf >= F, what was the realized EV/trade?'
+    Suggests the floor maximizing EV/trade (with an n>=30 guard). ADVISORY ONLY —
+    the caller/dashboard never auto-applies it; the user sets it manually in Settings.
+    Honest edge cases: too little data -> insufficient; no floor profitable ->
+    the conf threshold is not the problem."""
+    current = int(os.getenv("MIN_TECH_CONF") or 62)
+    total_n = sum(b["n"] for b in bins)
+    base = {"current_floor": current, "suggested_floor": None, "min_n": _SUGGEST_MIN_N,
+            "total_n": total_n, "floors": [], "status": "insufficient", "note": ""}
+    if total_n < _SUGGEST_MIN_N:
+        base["note"] = f"ข้อมูลไม่พอ (n={total_n} < {_SUGGEST_MIN_N}) — ยังไม่แนะนำ"
+        return base
+
+    # Cumulative stats for each floor = sum of bins with conf_lo >= F.
+    floors = sorted({b["conf_lo"] for b in bins})
+    rows = []
+    for f in floors:
+        sel = [b for b in bins if b["conf_lo"] >= f]
+        n   = sum(b["n"] for b in sel)
+        wins = sum(round(b["wr"] * b["n"]) for b in sel)
+        pnl = sum(b["pnl"] for b in sel)
+        rows.append({"floor": f, "n": n,
+                     "wr": round(wins / n, 4) if n else 0.0,
+                     "pnl": round(pnl, 2),
+                     "mean_pnl": round(pnl / n, 2) if n else 0.0})
+    base["floors"] = rows
+
+    eligible = [r for r in rows if r["n"] >= _SUGGEST_MIN_N]
+    if not eligible:
+        base["status"] = "insufficient"
+        base["note"] = f"ทุก floor มีตัวอย่าง < {_SUGGEST_MIN_N} — ยังไม่แนะนำ"
+        return base
+
+    best = max(eligible, key=lambda r: r["mean_pnl"])
+    if best["mean_pnl"] <= 0:
+        base["status"] = "no_profitable_floor"
+        base["note"] = ("ไม่มี conf floor ไหนที่ EV/ไม้ เป็นบวก → ปัญหาไม่ใช่ค่า conf "
+                        "(อย่าดันขึ้นเฉยๆ) ควรดู exit/สภาพตลาดแทน")
+        return base
+
+    base["suggested_floor"] = best["floor"]
+    ev = f"EV จริง {best['mean_pnl']:+.1f}฿/ไม้ ที่ conf≥{best['floor']} (n={best['n']}, WR {best['wr']*100:.0f}%)"
+    # Bins are 5 wide, so a peak within one bin of the current floor is noise, not a
+    # signal — don't nudge the gate on it (especially not to LOWER it).
+    if abs(best["floor"] - current) < 5:
+        base["status"] = "ok_keep"
+        base["note"] = (f"floor ปัจจุบัน ({current}) เหมาะสมแล้ว — EV peak อยู่ band เดียวกัน "
+                        f"({ev}). ไม่ต้องปรับ")
+    elif best["floor"] > current:
+        base["status"] = "suggest_raise"
+        base["note"] = (f"พิจารณาขึ้น MIN_TECH_CONF {current} → {best['floor']} — {ev}. "
+                        "คำแนะนำเท่านั้น ตั้งเองใน Settings, ระบบไม่เปลี่ยน gate อัตโนมัติ")
+    else:
+        base["status"] = "suggest_lower_cautious"
+        base["note"] = (f"EV peak อยู่ที่ conf≥{best['floor']} (ต่ำกว่า floor ปัจจุบัน {current}) — "
+                        f"{ev}. การลด floor = เทรดถี่ขึ้น เสี่ยงขึ้น พิจารณาระวัง ไม่แนะนำอัตโนมัติ")
+    return base
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
