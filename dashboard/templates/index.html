@@ -3773,6 +3773,30 @@ async function fetchCalendar() {
   }
 }
 
+// Gold direction + strength badge for a calendar event (CPI/NFP/FOMC only),
+// pulled from _eventScenarios. Same visual language as the News Impact boxes:
+// strength = LOW/MED/HIGH coloured; direction = hot/cool → gold up/down. '' otherwise.
+function goldEventBadge(title) {
+  const sc = (_eventScenarios && _eventScenarios.scenarios) || {};
+  const NEEDLES = { NFP: ['non-farm', 'nonfarm', 'non farm'], CPI: ['cpi'],
+                    FOMC: ['fomc', 'federal funds'] };
+  const tl = (title || '').toLowerCase();
+  let key = null;
+  for (const [k, ns] of Object.entries(NEEDLES)) { if (ns.some(n => tl.includes(n))) { key = k; break; } }
+  const s = key && sc[key];
+  if (!s || !s.hot || !s.cool) return '';
+  const mag = ((s.hot.magnitude_pct || 0) + (s.cool.magnitude_pct || 0)) / 2;
+  const im  = mag >= 0.9 ? { c: '#e83b3b', l: 'HIGH' } : mag >= 0.7 ? { c: '#e87b23', l: 'MED' } : { c: '#e8b923', l: 'LOW' };
+  const arr = d => (d === 'up' ? '▲' : '▼');
+  const col = d => (d === 'up' ? 'var(--green)' : 'var(--red)');
+  return '<div style="margin-top:3px;font-size:9px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">' +
+    '<span style="color:' + im.c + ';font-weight:700">🪙 ' + im.l + '</span>' +
+    '<span style="color:' + col(s.hot.dir)  + '" title="hot > forecast">🔥' + arr(s.hot.dir)  + '</span>' +
+    '<span style="color:' + col(s.cool.dir) + '" title="cool < forecast">❄️' + arr(s.cool.dir) + '</span>' +
+    '<span style="color:var(--muted)">(' + (s.hot.provenance || 'rubric') + '·n=' + (s.hot.n || 0) + ')</span>' +
+  '</div>';
+}
+
 function renderCalendar(events) {
   const container = document.getElementById('cal-container');
   if (!container) return;
@@ -3822,6 +3846,7 @@ function renderCalendar(events) {
         <div class="cal-curr">${ev.currency || '—'}</div>
         <div class="cal-name">${ev.title || '—'}</div>
         <div class="cal-time">${bkkTime}</div>
+        ${goldEventBadge(ev.title)}
       </div>`;
     });
 

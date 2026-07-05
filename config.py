@@ -294,7 +294,9 @@ SWING_MIN_EQUITY     = float(os.getenv("SWING_MIN_EQUITY") or 3600)           # 
 _accounts_raw = os.getenv("X_ACCOUNTS_TO_FOLLOW", "")
 X_ACCOUNTS_TO_FOLLOW = (
     [a.strip() for a in _accounts_raw.split(",") if a.strip()]
-    or ["kun_purich", "cnnbrk", "BBCBreaking", "ZeroHedge", "markets"]
+    # สำนักข่าวต่างประเทศก่อน (สัญญาณจริง: Fed/geopolitics) — kun_purich (ไทย retail) ท้ายสุด
+    # scoring cap 12 โพสต์ตามลำดับ list → ต่างประเทศได้คิวก่อน (07-05 user สั่ง)
+    or ["cnnbrk", "BBCBreaking", "ZeroHedge", "markets", "kun_purich"]
 )
 
 # ── Keywords ──────────────────────────────────────────────────
