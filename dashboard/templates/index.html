@@ -1843,8 +1843,8 @@
         </div>
       </div>
       <div class="card" style="margin-top:8px">
-        <div class="label" style="margin-bottom:8px">Top Scored Posts <span style="font-size:10px;color:var(--muted)">(rubric — not yet validated)</span></div>
-        <div id="ni-posts" style="font-size:11px;font-family:var(--mono);color:var(--muted)">No data — waiting for next news cycle</div>
+        <div class="label" style="margin-bottom:8px">ข่าวทองรายชิ้น — แนวโน้ม + ความแรง <span style="font-size:10px;color:var(--muted)">(แถบสี = ความแรง LOW/MED/HIGH · badge = ทิศ · rubric ยังไม่ validate)</span></div>
+        <div id="ni-posts" style="font-size:11px;color:var(--muted)">No data — waiting for next news cycle</div>
       </div>
     </section>
 
@@ -3457,32 +3457,50 @@ async function loadNewsImpact() {
       return;
     }
 
-    const dirIcon = { bull: '▲', bear: '▼', neutral: '●' };
-    const dirCol  = { bull: 'var(--green)', bear: 'var(--red)', neutral: 'var(--muted)' };
-    const tierLabel = { 1: 'minor', 2: 'moderate', 3: 'major' };
+    // ForexFactory-style box per news: strength (impact bars LOW/MED/HIGH by tier)
+    // + direction badge (แนวโน้ม) + headline + confidence/reason.
+    const dirBadge = {
+      bull:    { t: '▲ ขึ้น',  c: 'var(--green)', bg: 'rgba(38,166,91,0.16)' },
+      bear:    { t: '▼ ลง',    c: 'var(--red)',   bg: 'rgba(232,59,59,0.16)' },
+      neutral: { t: '● กลาง',  c: 'var(--muted)', bg: 'rgba(150,150,150,0.14)' },
+    };
+    const impact = {
+      1: { c: '#e8b923', label: 'LOW',  bars: 1 },
+      2: { c: '#e87b23', label: 'MED',  bars: 2 },
+      3: { c: '#e83b3b', label: 'HIGH', bars: 3 },
+    };
 
     postsEl.innerHTML = posts.slice(0, 8).map(p => {
-      const dir   = p.direction || 'neutral';
-      const icon  = dirIcon[dir]  || '●';
-      const col   = dirCol[dir]   || 'var(--muted)';
-      const tier  = p.magnitude_tier || 1;
-      const conf  = (p.confidence || 0) + '%';
-      const hl    = (p.half_life_min || 120) + 'min';
-      const age   = p.age_min != null ? p.age_min + 'min ago' : '';
-      const auth  = p.author ? '@' + p.author + ' ' : '';
-      const text  = (p.text || '').slice(0, 100);
-      const reason = p.reason ? ' — ' + p.reason : '';
-      const prov  = p.provenance || 'rubric';
+      const dir  = p.direction || 'neutral';
+      const d    = dirBadge[dir] || dirBadge.neutral;
+      const tier = p.magnitude_tier || 1;
+      const im   = impact[tier] || impact[1];
+      const conf = p.confidence || 0;
+      const hl   = p.half_life_min || 120;
+      const age  = p.age_min != null ? p.age_min + 'm ago' : '';
+      const auth = p.author ? '@' + p.author : '';
+      const text = (p.text || '').slice(0, 120);
+      const reason = p.reason || '';
+      const prov = p.provenance || 'rubric';
+      const bars = [1, 2, 3].map(i =>
+        '<span style="display:inline-block;width:4px;height:' + (6 + i * 3) +
+        'px;margin-right:1px;border-radius:1px;background:' +
+        (i <= im.bars ? im.c : 'rgba(255,255,255,0.12)') + '"></span>').join('');
       return (
-        '<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:5px">' +
-          '<span style="color:' + col + ';font-size:13px;flex-shrink:0;margin-top:1px">' + icon + '</span>' +
-          '<div style="min-width:0">' +
-            '<div style="color:' + col + ';font-weight:600">' +
-              dir.toUpperCase() + ' · T' + tier + ' (' + tierLabel[tier] + ') · conf ' + conf + ' · ' + hl + ' half-life' +
-              ' <span style="color:var(--muted);font-weight:400;font-size:10px">(' + prov + ')</span>' +
+        '<div style="display:flex;gap:9px;padding:7px 9px;margin-bottom:6px;' +
+          'background:rgba(255,255,255,0.03);border-left:3px solid ' + im.c + ';border-radius:4px">' +
+          '<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:40px">' +
+            '<span style="display:inline-flex;align-items:flex-end;height:15px">' + bars + '</span>' +
+            '<span style="font-size:8px;color:' + im.c + ';font-weight:700;letter-spacing:.5px">' + im.label + '</span>' +
+          '</div>' +
+          '<div style="min-width:0;flex:1">' +
+            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;flex-wrap:wrap">' +
+              '<span style="color:' + d.c + ';background:' + d.bg + ';font-weight:700;font-size:10px;padding:1px 6px;border-radius:3px">' + d.t + '</span>' +
+              '<span style="color:var(--muted);font-size:9px">conf ' + conf + '% · half-life ' + hl + 'm' + (auth ? ' · ' + auth : '') + (age ? ' · ' + age : '') +
+                ' <span style="opacity:.7">(' + prov + ')</span></span>' +
             '</div>' +
-            '<div style="color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + auth + text + '</div>' +
-            '<div style="color:var(--muted);font-size:10px">' + reason + (age ? ' · ' + age : '') + '</div>' +
+            '<div style="color:var(--fg);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + text + '</div>' +
+            (reason ? '<div style="color:var(--muted);font-size:10px;margin-top:1px">' + reason + '</div>' : '') +
           '</div>' +
         '</div>'
       );

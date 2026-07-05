@@ -1,0 +1,89 @@
+{
+  "ok": true,
+  "updated": "2026-07-05T00:06:23Z",
+  "window_min": 180,
+  "aggregate": {
+    "score": 64,
+    "label": "bullish gold",
+    "n_scored": 5,
+    "provenance": "rubric",
+    "n": 5
+  },
+  "filter_stats": {
+    "raw": 75,
+    "kept": 23,
+    "filter_rate_pct": 69.3
+  },
+  "posts": [
+    {
+      "post_id": "cf2d5a15",
+      "source": "twitter",
+      "author": "kun_purich",
+      "text": "UBS คาดว่า Fed จะคงท่าทีเดิม ขณะที่ Warsh ลดทอนความเสี่ยงเงินเฟ้อ แม้จะมีการคาดการณ์การขึ้นอัตราดอกเบี้ย UBS คาดว่า Fed จะคงท่าทีเดิม ขณะที่ Warsh ลดทอนความเสี่",
+      "ts_utc": "Fri, 03 Jul 2026 02:58:13 GMT",
+      "age_min": 0,
+      "direction": "bull",
+      "confidence": 65,
+      "magnitude_tier": 1,
+      "half_life_min": 480,
+      "reason": "Fed holding rates supports gold; inflation concerns reduce rate-hike pressure",
+      "provenance": "rubric"
+    },
+    {
+      "post_id": "f656c895",
+      "source": "twitter",
+      "author": "kun_purich",
+      "text": "กรี๊ดดดดดดดดดดด #ราคาทองคำแท่ง บวกขึ้นมาถึง 1,550 บาทอยู่ในระดับ 65,450 บาทในระดับรับซื้อทองคำแท่งสายอ่อนอยู่ที่ 65,650 บาทเป็นอานิสงส์ของการประกาศอัตราการจ้างง",
+      "ts_utc": "Fri, 03 Jul 2026 02:44:59 GMT",
+      "age_min": 0,
+      "direction": "bull",
+      "confidence": 58,
+      "magnitude_tier": 1,
+      "half_life_min": 120,
+      "reason": "Physical gold demand spike to 65,450 THB signals buying interest",
+      "provenance": "rubric"
+    },
+    {
+      "post_id": "76d4305b",
+      "source": "twitter",
+      "author": "cnnbrk",
+      "text": "Russia unleashes a huge drone and missile attack on Kyiv, destroying apartment buildings and killing more than a dozen people. https://cnn.it/4fcRA58 Russia unl",
+      "ts_utc": "Thu, 02 Jul 2026 10:22:13 GMT",
+      "age_min": 0,
+      "direction": "bull",
+      "confidence": 72,
+      "magnitude_tier": 2,
+      "half_life_min": 480,
+      "reason": "Russia-Ukraine escalation increases geopolitical risk-off demand for safe havens",
+      "provenance": "rubric"
+    },
+    {
+      "post_id": "9d92e5b5",
+      "source": "twitter",
+      "author": "ZeroHedge",
+      "text": "*PUTIN CALLED TRUMP, INVITED HIM TO VISIT RUSSIA: AXIOS *PUTIN-TRUMP CALL LASTED HOUR AND HALF:AXIOS CITING KREMLIN ON X *PUTIN CALLED TRUMP, INVITED HIM TO VIS",
+      "ts_utc": "Sat, 04 Jul 2026 21:58:16 GMT",
+      "age_min": 0,
+      "direction": "neutral",
+      "confidence": 55,
+      "magnitude_tier": 2,
+      "half_life_min": 480,
+      "reason": "Putin-Trump diplomatic outreach reduces some geopolitical premium; mixed directi",
+      "provenance": "rubric"
+    },
+    {
+      "post_id": "a40d9910",
+      "source": "twitter",
+      "author": "kun_purich",
+      "text": "วันนี้วันหยุดสหรัฐ ตลาดปิดกี่โมง comment มาหน่อย #ราคาทองคำ #ราคาทองคำวันนี้ #ทองคำ #ราคาทอง #XAUUSD #ราคาทองวันนี้ วันนี้วันหยุดสหรัฐ ตลาดปิดกี่โมง comment มาห",
+      "ts_utc": "Fri, 03 Jul 2026 13:11:08 GMT",
+      "age_min": 0,
+      "direction": "neutral",
+      "confidence": 40,
+      "magnitude_tier": 1,
+      "half_life_min": 120,
+      "reason": "U.S. holiday closure reduces volume; technical impact only, no fundamental catal",
+      "provenance": "rubric"
+    }
+  ]
+}
