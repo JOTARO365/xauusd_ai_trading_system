@@ -638,11 +638,14 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     # 6. Min confidence — floor เดียวทุกกรณี (replay 489 ไม้: การลด floor ที่ HTF zone
     #    เหลือ 42/45 คือประตูให้ไม้ conf 50-59 ที่ WR 23.5% / −3,807 เข้ามา — เลิกลด)
     htf_zone = chart_data.get("htf_zone")
-    _min_conf = _cfg.MIN_TECHNICAL_CONFIDENCE
+    _base_floor = _cfg.MIN_TECHNICAL_CONFIDENCE
     # NEWS_GATE (flag, default OFF): ข่าวปรับ floor นี้เท่านั้น — ไม่แตะ gate อื่น/money mgmt
-    _min_conf, _news_note = _news_gate_adjust(direction, _min_conf)
+    _min_conf, _news_note = _news_gate_adjust(direction, _base_floor)
     if _news_note:
         logger.info(f"[NEWS_GATE] {_news_note}")
+    # relax เป็น "ตัวตัดสิน" = ไม้นี้ผ่านเพราะข่าวลด floor เท่านั้น (conf ต่ำกว่า floor เดิม) →
+    # tag ไว้ segment ผลใน report_news_gate (validate ว่า relax ช่วยหรือทำร้าย)
+    chart_data["_ng_relax"] = bool(_min_conf < _base_floor and _base_floor > conf >= _min_conf)
     if conf < _min_conf:
         _hz = htf_zone['tf'] if htf_zone else 'none'
         _ng = f" [NEWS_GATE: {_news_note}]" if _news_note else ""
@@ -952,7 +955,9 @@ Account — Today: {history['today_pnl']:+.2f} USD ({history['today_trades']} tr
         sentiment   = sentiment_data.get("sentiment", "NEUTRAL")
         # RIDE นำหน้า — comment โดนตัด 31 ตัว tag ต้องรอด เพื่อ segment ผล ride แยกใน MT5/DB
         _ride_tag   = "RIDE " if _momentum_ride_active(out_direction, chart_data) else ""
-        comment_tag = f"{_ride_tag}AI:{tech_signal}|PA:{pa_tag}|{sentiment}"
+        # NG = ไม้ที่ผ่านเพราะ NEWS_GATE relax เป็นตัวตัดสิน (segment ผลใน report_news_gate)
+        _ng_tag     = "NG " if chart_data.get("_ng_relax") else ""
+        comment_tag = f"{_ride_tag}{_ng_tag}AI:{tech_signal}|PA:{pa_tag}|{sentiment}"
         if notp_tag:
             comment_tag += f"|NOTP:{notp_tag}"
 

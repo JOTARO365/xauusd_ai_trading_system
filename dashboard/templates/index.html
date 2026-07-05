@@ -1641,6 +1641,21 @@
       </div>
     </section>
 
+    <!-- NEWS_GATE COHORT — ไม้ที่ผ่านเพราะ news relax ตัดสิน (validate ผลจริง) -->
+    <section id="news-gate-section">
+      <div class="section-title">NEWS_GATE Cohort &mdash; ไม้ที่ข่าวผ่อน floor ให้เข้า</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card"><div class="label">Trades (closed)</div><div class="value" id="ng-n">&mdash;</div><div class="sub" id="ng-open">&mdash;</div></div>
+        <div class="card"><div class="label">Win Rate</div><div class="value" id="ng-wr">&mdash;</div><div class="sub" id="ng-wl">&mdash;</div></div>
+        <div class="card"><div class="label">Net PnL</div><div class="value" id="ng-pnl">&mdash;</div><div class="sub">฿</div></div>
+        <div class="card"><div class="label">Verdict</div><div class="value" id="ng-verdict" style="font-size:13px">&mdash;</div><div class="sub" id="ng-updated" style="font-size:9px">&mdash;</div></div>
+      </div>
+      <div class="card" style="margin-top:8px">
+        <div class="label" style="margin-bottom:6px">ไม้ที่ NEWS_GATE relax แทรกแซง <span style="font-size:10px;color:var(--muted)">(tag NG · n&lt;20 = ยังตัดสินไม่ได้)</span></div>
+        <div id="ng-trades" style="font-size:11px;font-family:var(--mono);color:var(--muted)">ยังไม่มีไม้ที่ relax ตัดสิน (เปิด NEWS_GATE ก่อน)</div>
+      </div>
+    </section>
+
     <!-- IMPACT CALIBRATION CARD — §4.3 impact_calibration.json (M6, review_calibration.py) -->
     <section id="impact-calibration-section">
       <div class="section-title">Impact Calibration — Predicted Magnitude vs Realized Move</div>
@@ -3425,6 +3440,43 @@ async function loadCalibration() {
 }
 
 /* ════════════════════════════════════════════════════════════
+   NEWS_GATE COHORT — /api/news-gate (trades enabled by news relax)
+   ════════════════════════════════════════════════════════════ */
+async function loadNewsGate() {
+  try {
+    const d = await (await fetch('/api/news-gate')).json();
+    if (!d.ok) return;
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    const n = d.n || 0, open = d.open || 0, wr = d.wr, pnl = d.pnl || 0;
+    set('ng-n', n);
+    set('ng-open', open + ' open');
+    set('ng-wr', wr == null ? '—' : wr + '%');
+    set('ng-wl', (d.win || 0) + 'W / ' + (d.loss || 0) + 'L');
+    const pnlEl = document.getElementById('ng-pnl');
+    if (pnlEl) { pnlEl.textContent = (pnl > 0 ? '+' : '') + pnl.toFixed(0); pnlEl.className = 'value ' + (pnl > 0 ? 'green' : pnl < 0 ? 'red' : ''); }
+    // Verdict: honest — n<20 = collecting, else PnL/WR based
+    const vEl = document.getElementById('ng-verdict');
+    if (vEl) {
+      if (n < 20) { vEl.textContent = 'collecting'; vEl.style.color = 'var(--muted)'; }
+      else if (pnl > 0) { vEl.textContent = 'relax ช่วย ✓'; vEl.style.color = 'var(--green)'; }
+      else { vEl.textContent = 'relax ทำร้าย ✗'; vEl.style.color = 'var(--red)'; }
+    }
+    if (d.updated) set('ng-updated', d.updated.slice(0, 16).replace('T', ' '));
+    const t = document.getElementById('ng-trades');
+    if (t) {
+      const rows = (d.trades || []).slice(0, 8);
+      t.innerHTML = rows.length ? rows.map(r => {
+        const col = r.pnl > 0 ? 'var(--green)' : r.pnl < 0 ? 'var(--red)' : 'var(--muted)';
+        const st  = r.closed ? '' : ' <span style="color:var(--gold)">(open)</span>';
+        return '<div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.05);padding:3px 0">' +
+          '<span>' + r.time + ' · ' + r.dir + st + '</span>' +
+          '<span style="color:' + col + '">' + (r.pnl > 0 ? '+' : '') + r.pnl.toFixed(0) + '฿</span></div>';
+      }).join('') : 'ยังไม่มีไม้ที่ relax ตัดสิน (เปิด NEWS_GATE ก่อน)';
+    }
+  } catch (e) { console.error('loadNewsGate error:', e); }
+}
+
+/* ════════════════════════════════════════════════════════════
    NEWS IMPACT CARD — §4.1 /api/news-impact  (Feature A, M3)
    ════════════════════════════════════════════════════════════ */
 async function loadNewsImpact() {
@@ -4550,6 +4602,7 @@ function _bootstrap() {
   loadCotCard();
   loadNewsImpact();
   loadImpactCalibration();
+  loadNewsGate();
   setInterval(fetchData, 10000);
   setInterval(fetchCalendar, 1800000);
   setInterval(loadEventStats, 3600000);

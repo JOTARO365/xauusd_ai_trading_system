@@ -1176,6 +1176,21 @@ def api_burn():
         return jsonify(_empty)
 
 
+@app.route("/api/news-gate")
+def api_news_gate():
+    """NEWS_GATE cohort — ไม้ที่ผ่านเพราะ news relax เป็นตัวตัดสิน (tag 'NG ')
+    จาก data/news_gate.json (scripts/report_news_gate.py). display-only, never 500."""
+    _empty = {"ok": True, "n": 0, "win": 0, "loss": 0, "wr": None, "pnl": 0.0, "open": 0, "trades": []}
+    try:
+        p = os.path.join(_BASE, "../data/news_gate.json")
+        with open(p, "r", encoding="utf-8") as f:
+            return jsonify(json.load(f))
+    except FileNotFoundError:
+        return jsonify(_empty)
+    except Exception:
+        return jsonify(_empty)
+
+
 @app.route("/api/event-scenario")
 def api_event_scenario():
     """Event scenario (sign + rubric magnitude) from data/event_scenarios.json
