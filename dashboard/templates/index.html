@@ -734,6 +734,17 @@
     .tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
     .tab-content    { display: none; }
     .tab-content.active { display: block; animation: fadeIn 0.18s ease-out; }
+    /* Combined Calendar + News feed (list + slide-down accordion) */
+    .feed-group-title { font-size: 11px; color: var(--muted); letter-spacing: 1px;
+      text-transform: uppercase; margin: 0 0 4px; font-family: var(--mono); }
+    .feed-item { border-bottom: 1px solid var(--border2, #2a3142); }
+    .feed-row  { display: flex; align-items: center; gap: 8px; padding: 8px 6px; }
+    .feed-row.clickable { cursor: pointer; }
+    .feed-row.clickable:hover { background: rgba(255,255,255,0.03); }
+    .feed-caret { margin-left: auto; color: var(--muted); transition: transform .3s ease; flex-shrink: 0; }
+    .feed-item.open .feed-caret { transform: rotate(180deg); }
+    .feed-detail { max-height: 0; overflow: hidden; transition: max-height .35s ease; }
+    .feed-item.open .feed-detail { max-height: 1600px; }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(2px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -1333,14 +1344,6 @@
     </div>
   </section>
 
-  <!-- ECONOMIC CALENDAR -->
-  <section>
-    <div class="section-title">Economic Calendar &mdash; This Week</div>
-    <div class="cal-container" id="cal-container">
-      <div style="color:var(--muted);font-size:12px;font-family:var(--mono)">Loading…</div>
-    </div>
-  </section>
-
   <!-- STAT CARDS -->
   <section>
     <div class="section-title">Performance Statistics</div>
@@ -1610,9 +1613,9 @@
       </div>
     </section>
 
-    <!-- NEWS IMPACT CARD — §4.1 news_impact.json (Feature A, M3) -->
+    <!-- CALENDAR + NEWS — combined module: sentiment header + list w/ slide-down -->
     <section id="news-impact-section">
-      <div class="section-title">News Impact — Gold Sentiment Meter (rubric)</div>
+      <div class="section-title">ปฏิทิน &amp; ข่าวทอง &mdash; Calendar &amp; Gold News</div>
       <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
         <div class="card">
           <div class="label">Net Score</div>
@@ -1636,8 +1639,8 @@
         </div>
       </div>
       <div class="card" style="margin-top:8px">
-        <div class="label" style="margin-bottom:8px">ข่าวทองรายชิ้น — แนวโน้ม + ความแรง <span style="font-size:10px;color:var(--muted)">(แถบสี = ความแรง LOW/MED/HIGH · badge = ทิศ · rubric ยังไม่ validate)</span></div>
-        <div id="ni-posts" style="font-size:11px;color:var(--muted)">No data — waiting for next news cycle</div>
+        <div class="label" style="margin-bottom:8px">คลิกรายการเพื่อกางรายละเอียด <span style="font-size:10px;color:var(--muted)">(📅 ปฏิทิน = scenario · 📰 ข่าว = เนื้อหาเต็ม · rubric ยังไม่ validate)</span></div>
+        <div id="feed-list" style="font-size:11px;color:var(--muted)">Loading…</div>
       </div>
     </section>
 
@@ -3528,62 +3531,9 @@ async function loadNewsImpact() {
     const winEl = document.getElementById('ni-window');
     if (winEl) winEl.textContent = (data.window_min || 180);
 
-    // Top posts list
-    const postsEl = document.getElementById('ni-posts');
-    if (!postsEl) return;
-    if (!posts.length) {
-      postsEl.textContent = 'No scored posts yet — waiting for next news cycle';
-      return;
-    }
-
-    // ForexFactory-style box per news: strength (impact bars LOW/MED/HIGH by tier)
-    // + direction badge (แนวโน้ม) + headline + confidence/reason.
-    const dirBadge = {
-      bull:    { t: '▲ ขึ้น',  c: 'var(--green)', bg: 'rgba(38,166,91,0.16)' },
-      bear:    { t: '▼ ลง',    c: 'var(--red)',   bg: 'rgba(232,59,59,0.16)' },
-      neutral: { t: '● กลาง',  c: 'var(--muted)', bg: 'rgba(150,150,150,0.14)' },
-    };
-    const impact = {
-      1: { c: '#e8b923', label: 'LOW',  bars: 1 },
-      2: { c: '#e87b23', label: 'MED',  bars: 2 },
-      3: { c: '#e83b3b', label: 'HIGH', bars: 3 },
-    };
-
-    postsEl.innerHTML = posts.slice(0, 8).map(p => {
-      const dir  = p.direction || 'neutral';
-      const d    = dirBadge[dir] || dirBadge.neutral;
-      const tier = p.magnitude_tier || 1;
-      const im   = impact[tier] || impact[1];
-      const conf = p.confidence || 0;
-      const hl   = p.half_life_min || 120;
-      const age  = p.age_min != null ? p.age_min + 'm ago' : '';
-      const auth = p.author ? '@' + p.author : '';
-      const text = (p.text || '').slice(0, 120);
-      const reason = p.reason || '';
-      const prov = p.provenance || 'rubric';
-      const bars = [1, 2, 3].map(i =>
-        '<span style="display:inline-block;width:4px;height:' + (6 + i * 3) +
-        'px;margin-right:1px;border-radius:1px;background:' +
-        (i <= im.bars ? im.c : 'rgba(255,255,255,0.12)') + '"></span>').join('');
-      return (
-        '<div style="display:flex;gap:9px;padding:7px 9px;margin-bottom:6px;' +
-          'background:rgba(255,255,255,0.03);border-left:3px solid ' + im.c + ';border-radius:4px">' +
-          '<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:40px">' +
-            '<span style="display:inline-flex;align-items:flex-end;height:15px">' + bars + '</span>' +
-            '<span style="font-size:8px;color:' + im.c + ';font-weight:700;letter-spacing:.5px">' + im.label + '</span>' +
-          '</div>' +
-          '<div style="min-width:0;flex:1">' +
-            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;flex-wrap:wrap">' +
-              '<span style="color:' + d.c + ';background:' + d.bg + ';font-weight:700;font-size:10px;padding:1px 6px;border-radius:3px">' + d.t + '</span>' +
-              '<span style="color:var(--muted);font-size:9px">conf ' + conf + '% · half-life ' + hl + 'm' + (auth ? ' · ' + auth : '') + (age ? ' · ' + age : '') +
-                ' <span style="opacity:.7">(' + prov + ')</span></span>' +
-            '</div>' +
-            '<div style="color:var(--fg);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + text + '</div>' +
-            (reason ? '<div style="color:var(--muted);font-size:10px;margin-top:1px">' + reason + '</div>' : '') +
-          '</div>' +
-        '</div>'
-      );
-    }).join('');
+    // Store scored posts for the combined feed and re-render it.
+    _newsPosts = posts;
+    renderFeed();
   } catch (e) {
     console.error('loadNewsImpact error:', e);
   }
@@ -3805,6 +3755,7 @@ async function loadEventStats() {
   try {
     const r = await fetch('/api/event-stats');
     _eventStats = await r.json();
+    if (typeof renderFeed === 'function') renderFeed();   // detail embeds 15y stats
   } catch (e) { _eventStats = null; }
 }
 
@@ -3813,6 +3764,7 @@ async function loadEventScenario() {
   try {
     const r = await fetch('/api/event-scenario');
     _eventScenarios = await r.json();
+    if (typeof renderFeed === 'function') renderFeed();   // enables clickable calendar rows + histogram
   } catch (e) { _eventScenarios = null; }
 }
 
@@ -3845,94 +3797,311 @@ async function fetchCalendar() {
     const res  = await fetch('/api/calendar');
     const data = await res.json();
     _calEvents = data.events || [];
-    renderCalendar(data.events || []);
+    renderFeed();
   } catch(e) {
-    const el = document.getElementById('cal-container');
+    const el = document.getElementById('feed-list');
     if (el) el.innerHTML = '<div style="color:var(--muted);font-size:12px;font-family:var(--mono)">Failed to load calendar: ' + e.message + '</div>';
   }
 }
 
-// Gold direction + strength badge for a calendar event (CPI/NFP/FOMC only),
-// pulled from _eventScenarios. Same visual language as the News Impact boxes:
-// strength = LOW/MED/HIGH coloured; direction = hot/cool → gold up/down. '' otherwise.
-function goldEventBadge(title) {
-  const sc = (_eventScenarios && _eventScenarios.scenarios) || {};
+// Map a calendar event title → scenario key (CPI/NFP/FOMC) or null.
+// Single source of truth for the title→key match, shared by the badge + the
+// clickable-card + the scenario modal. Keep NEEDLES synced with analyst.py.
+function _scenarioKey(title) {
   const NEEDLES = { NFP: ['non-farm', 'nonfarm', 'non farm'], CPI: ['cpi'],
                     FOMC: ['fomc', 'federal funds'] };
   const tl = (title || '').toLowerCase();
-  let key = null;
-  for (const [k, ns] of Object.entries(NEEDLES)) { if (ns.some(n => tl.includes(n))) { key = k; break; } }
-  const s = key && sc[key];
-  if (!s || !s.hot || !s.cool) return '';
-  const mag = ((s.hot.magnitude_pct || 0) + (s.cool.magnitude_pct || 0)) / 2;
-  const im  = mag >= 0.9 ? { c: '#e83b3b', l: 'HIGH' } : mag >= 0.7 ? { c: '#e87b23', l: 'MED' } : { c: '#e8b923', l: 'LOW' };
-  const arr = d => (d === 'up' ? '▲' : '▼');
-  const col = d => (d === 'up' ? 'var(--green)' : 'var(--red)');
-  return '<div style="margin-top:3px;font-size:9px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">' +
-    '<span style="color:' + im.c + ';font-weight:700">🪙 ' + im.l + '</span>' +
-    '<span style="color:' + col(s.hot.dir)  + '" title="hot > forecast">🔥' + arr(s.hot.dir)  + '</span>' +
-    '<span style="color:' + col(s.cool.dir) + '" title="cool < forecast">❄️' + arr(s.cool.dir) + '</span>' +
-    '<span style="color:var(--muted)">(' + (s.hot.provenance || 'rubric') + '·n=' + (s.hot.n || 0) + ')</span>' +
-  '</div>';
+  for (const [k, ns] of Object.entries(NEEDLES)) { if (ns.some(n => tl.includes(n))) return k; }
+  return null;
 }
 
-function renderCalendar(events) {
-  const container = document.getElementById('cal-container');
-  if (!container) return;
-  if (!events.length) {
-    container.innerHTML = '<div style="color:var(--muted);font-size:12px;font-family:var(--mono)">No high-impact events this week</div>';
-    return;
+
+/* ════════════════════════════════════════════════════════════
+   EVENT SCENARIO MODAL — click a CPI/NFP/FOMC calendar card.
+   Display-only: data from _eventScenarios (/api/event-scenario) +
+   live price _lastBid. No AI call, no backend change.
+   ════════════════════════════════════════════════════════════ */
+let _newsPosts = [];   // latest scored X posts (from /api/news-impact) for the combined feed
+
+// magnitude % → strength tier (LOW/MED/HIGH by average |move|)
+function _esStrength(mag) {
+  return mag >= 0.9 ? { n: 4, c: '#e83b3b', l: 'HIGH' }
+       : mag >= 0.7 ? { n: 3, c: '#e87b23', l: 'MED' }
+       :              { n: 2, c: '#e8b923', l: 'LOW' };
+}
+
+// state: '' = no actual yet · 'hit' = the side that actually materialised · 'miss' = the other
+function _esPanel(head, sub, side, px, state) {
+  const up   = side.dir === 'up';
+  const col  = up ? 'var(--green)' : 'var(--red)';
+  const arr  = up ? '▲ ขึ้น' : '▼ ลง';
+  const mag  = side.magnitude_pct || 0;
+  const amt  = px ? (px * mag / 100).toFixed(1) : null;
+  const tgt  = px ? (up ? px * (1 + mag / 100) : px * (1 - mag / 100)).toFixed(0) : null;
+  const st   = _esStrength(mag);
+  const bars = [0, 1, 2, 3].map(i =>
+    `<span style="display:inline-block;width:16px;height:6px;border-radius:2px;margin-right:2px;background:${i < st.n ? st.c : 'rgba(255,255,255,0.12)'}"></span>`
+  ).join('');
+  // release state → border glow / dim
+  const border = state === 'hit' ? col : 'transparent';
+  const shadow = state === 'hit' ? `box-shadow:0 0 0 1px ${col}, 0 0 14px -4px ${col};` : '';
+  const opacity = state === 'miss' ? 'opacity:0.4;' : '';
+  return `<div style="flex:1;background:rgba(0,0,0,0.22);border-radius:8px;padding:12px;border-top:2px solid ${col};border-right:2px solid ${border};border-bottom:2px solid ${border};border-left:2px solid ${border};${shadow}${opacity}">
+    <div style="font-size:11px;font-weight:800">${head}${state === 'hit' ? ' <span style="color:'+col+'">✓ เกิดจริง</span>' : ''}</div>
+    <div style="font-size:9px;color:var(--muted);margin-bottom:8px">${sub}</div>
+    <div style="color:${col};font-size:16px;font-weight:800">${arr}</div>
+    <div style="color:${col};font-size:20px;font-weight:800">~${mag.toFixed(2)}%</div>
+    ${amt !== null ? `<div style="color:${col};font-size:12px;font-weight:700">≈ $${amt} → ${tgt}</div>` : ''}
+    <div style="margin-top:8px">${bars}</div>
+    <div style="font-size:9px;color:${st.c};font-weight:700;margin-top:3px">ความแรง ${st.l}</div>
+  </div>`;
+}
+
+// Parse a ForexFactory value string ("2.5%", "150K", "-0.3") → number|null.
+function _esNum(v) {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!s || s === '—') return null;
+  const n = parseFloat(s.replace(/[^0-9.\-]/g, ''));
+  return isNaN(n) ? null : n;
+}
+
+// MACD-style histogram of past releases. Hue = direction (green up / red down),
+// shade = momentum (bar |move| ≥ previous bar's → solid; shrinking → faded).
+// reactions: [{date, move_pct(signed), dir}]  (from event_scenarios.json)
+function _esReactionsHtml(reactions) {
+  if (!Array.isArray(reactions) || !reactions.length) return '';
+  const H = 34;   // px half-height (zero line at centre)
+  const maxAbs = Math.max.apply(null, reactions.map(r => Math.abs(r.move_pct))) || 1;
+  const bars = reactions.map((r, i) => {
+    const up   = r.dir === 'up';
+    const col  = up ? 'var(--green)' : 'var(--red)';
+    const h    = Math.max(2, Math.abs(r.move_pct) / maxAbs * H);
+    const grow = i === 0 ? true : Math.abs(r.move_pct) >= Math.abs(reactions[i - 1].move_pct);
+    const op   = grow ? 1 : 0.4;
+    const sign = r.move_pct >= 0 ? '+' : '';
+    const bar  = up
+      ? `<div style="position:absolute;left:1px;right:1px;bottom:50%;height:${h}px;background:${col};opacity:${op};border-radius:2px 2px 0 0"></div>`
+      : `<div style="position:absolute;left:1px;right:1px;top:50%;height:${h}px;background:${col};opacity:${op};border-radius:0 0 2px 2px"></div>`;
+    return `<div title="${r.date} · ${sign}${r.move_pct}%" style="flex:1;position:relative;height:${H * 2}px">${bar}</div>`;
+  }).join('');
+  const months = reactions.map(r =>
+    `<div style="flex:1;text-align:center;font-size:7px;color:var(--muted)">${r.date.slice(5, 7)}</div>`
+  ).join('');
+  return `
+    <div style="font-size:10px;color:var(--muted);margin-bottom:5px">reaction ต่อการประกาศ 12 ครั้งล่าสุด
+      <span style="font-size:9px">· เขียว=ทองขึ้น แดง=ลง · เข้ม=โมเมนตัมโตกว่าครั้งก่อน</span></div>
+    <div style="position:relative;display:flex;gap:3px;align-items:stretch;background:rgba(0,0,0,0.18);border-radius:6px;padding:6px 6px 2px">
+      <div style="position:absolute;left:6px;right:6px;top:calc(6px + ${H}px);border-top:1px dashed rgba(255,255,255,0.18)"></div>
+      ${bars}
+    </div>
+    <div style="display:flex;gap:3px;padding:0 6px;margin-top:2px">${months}</div>`;
+}
+
+// Build the FULL scenario detail HTML (countdown + numbers + HOT/COOL + 15y stats
+// + MACD histogram + surprise curve + provenance) for one calendar event —
+// rendered inline inside a feed accordion. Countdown ticks via the global .es-cd ticker.
+function buildScenarioDetail(key, ev) {
+  const sc = (_eventScenarios && _eventScenarios.scenarios) || {};
+  const s  = sc[key];
+  if (!s || !s.hot || !s.cool) return '<div style="color:var(--muted);font-size:11px">ยังไม่มี scenario</div>';
+  const px = _lastBid;
+  const ts = ev.timestamp_iso ? Date.parse(ev.timestamp_iso) : null;
+
+  // countdown block (updated live by _tickCountdowns)
+  const cd = ts != null
+    ? `<div class="es-cd" data-ts="${ts}" style="text-align:center;margin-bottom:10px;padding:8px;background:rgba(0,0,0,0.22);border-radius:8px;font-family:var(--mono)">
+        <div class="es-cd-lbl" style="font-size:9px;color:var(--muted)">—</div>
+        <div class="es-cd-big" style="font-size:20px;font-weight:800">—</div>
+      </div>`
+    : '';
+
+  // (1)+(2) numbers row: previous / forecast / actual + surprise / lean banner
+  const prev = _esNum(ev.previous), fc = _esNum(ev.forecast), act = _esNum(ev.actual);
+  const cell = (label, raw, hl) =>
+    `<div style="flex:1;text-align:center">
+      <div style="font-size:8px;color:var(--muted);letter-spacing:1px">${label}</div>
+      <div style="font-size:15px;font-weight:800;color:${hl || 'var(--text)'}">${raw != null && String(raw).trim() && String(raw) !== '—' ? raw : '—'}</div>
+    </div>`;
+  let hotState = '', coolState = '', banner = '';
+  if (act != null && fc != null) {
+    const surp = act - fc;
+    const hot = surp > 0.0001, cool = surp < -0.0001;
+    hotState  = hot ? 'hit' : (cool ? 'miss' : '');
+    coolState = cool ? 'hit' : (hot ? 'miss' : '');
+    const side = hot ? s.hot : cool ? s.cool : null;
+    const gold = side ? (side.dir === 'up' ? 'ทอง▲ ขึ้น' : 'ทอง▼ ลง') : 'ทองน่าจะนิ่ง';
+    const gcol = side ? (side.dir === 'up' ? 'var(--green)' : 'var(--red)') : 'var(--muted)';
+    banner = `<div style="margin-top:8px;text-align:center;font-size:11px;font-weight:700;padding:6px;border-radius:6px;background:rgba(212,175,55,0.1)">
+      ออกจริง <b>${ev.actual}</b> ${hot ? '&gt;' : cool ? '&lt;' : '='} คาด ${ev.forecast}
+      → <span style="color:var(--gold)">${hot ? 'HOT' : cool ? 'COOL' : 'INLINE'}</span>
+      <span style="color:${gcol}">${gold}</span></div>`;
+  } else if (fc != null && prev != null) {
+    const d = fc - prev;
+    const lean = Math.abs(d) < 1e-9 ? 'เท่าครั้งก่อน' :
+      (d > 0 ? `▲ คาดสูงขึ้น +${(+d.toFixed(2))} จากครั้งก่อน` : `▼ คาดต่ำลง ${(+d.toFixed(2))} จากครั้งก่อน`);
+    banner = `<div style="margin-top:8px;text-align:center;font-size:10px;color:var(--muted)">${lean} <span style="font-size:9px">(price-in แล้ว — HOT/COOL วัดจาก "จริง vs คาด")</span></div>`;
+  }
+  const numbers = '<div style="display:flex;gap:6px">' +
+      cell('ครั้งก่อน', ev.previous) +
+      cell('คาดการณ์', ev.forecast, 'var(--gold)') +
+      cell('ประกาศจริง', ev.actual, act != null ? 'var(--text)' : 'var(--muted)') +
+    '</div>' + banner;
+
+  const panels = '<div style="display:flex;gap:12px;margin-top:10px">' +
+    _esPanel('🔥 HOT', 'ตัวเลขออก &gt; คาดการณ์', s.hot, px, hotState) +
+    _esPanel('❄️ COOL', 'ตัวเลขออก &lt; คาดการณ์', s.cool, px, coolState) + '</div>';
+
+  // (3) 15-year prior reaction stats
+  const st15 = (_eventStats && _eventStats.events && _eventStats.events[key]) || null;
+  let stats = '';
+  if (st15) {
+    const lo = px ? (px * (1 - st15.avg_abs_d0_pct / 100)).toFixed(0) : null;
+    const hi = px ? (px * (1 + st15.avg_abs_d0_pct / 100)).toFixed(0) : null;
+    stats = `<div style="margin-top:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:5px">สถิติ reaction วันประกาศ 15 ปี (n=${st15.n})</div>
+       <div style="font-size:11px;line-height:1.7;font-family:var(--mono)">
+         move เฉลี่ย <b style="color:var(--gold)">${st15.avg_abs_d0_pct}%</b> = <b>${st15.vs_baseline_x}×</b> วันปกติ<br>
+         <span style="color:var(--green)">ขึ้น ${st15.up_pct}%</span> ·
+         <span style="color:var(--red)">ลง ${st15.down_pct}%</span> ·
+         <span style="color:var(--muted)">นิ่ง ${st15.flat_pct}%</span>
+         &nbsp;|&nbsp; ทะลุต่อ D+2: <b>${st15.d2_extends_pct}%</b>
+         ${lo ? `<br><span style="color:var(--gold)">กรอบคาดวันประกาศ ~$${lo} – $${hi}</span>` : ''}
+       </div></div>`;
   }
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const DAY_EN   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const hist = _esReactionsHtml(s.reactions);
+  const histBlock = hist ? `<div style="margin-top:12px">${hist}</div>` : '';
+
+  let curve = '';
+  if (Array.isArray(s.surprise_curve) && s.surprise_curve.length) {
+    curve = '<div style="margin-top:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:5px">ความแรงตามขนาด surprise (calibrated):</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+      s.surprise_curve.map(b =>
+        `<span style="font-size:10px;background:rgba(0,0,0,0.25);border-radius:5px;padding:4px 8px;font-family:var(--mono)">
+          ${b.surprise_bucket} → <b style="color:var(--gold)">${b.avg_abs_move_pct}%</b>
+          <span style="color:var(--muted)">n=${b.n}</span></span>`
+      ).join('') + '</div></div>';
+  }
+
+  const prov = s.hot.provenance || 'rubric';
+  const win  = (_eventScenarios && _eventScenarios.window) || '';
+  const provHtml = `<div style="margin-top:12px;font-size:10px;color:var(--muted);font-family:var(--mono);line-height:1.6">อ้างอิง: <b>${prov}</b> · n=${s.hot.n || 0}${win ? ` · window ${win}` : ''}` +
+    (prov === 'rubric' ? '<br>⚠ ประมาณจากสถิติ prior (ยังไม่ calibrated รายก้อน surprise — ต้อง n≥30/bin)' : '') + '</div>';
+
+  return cd + numbers + panels + stats + histBlock + curve + provHtml;
+}
+
+// Global 1-Hz ticker — updates every visible .es-cd countdown (feed rows + open accordions).
+function _tickCountdowns() {
+  document.querySelectorAll('.es-cd').forEach(el => {
+    const ts  = +el.dataset.ts;
+    const big = el.querySelector('.es-cd-big');
+    const lbl = el.querySelector('.es-cd-lbl');
+    if (!big || !ts) return;
+    const diff = ts - Date.now();
+    if (diff <= 0) {
+      if (lbl) lbl.textContent = 'ประกาศแล้ว';
+      big.textContent = 'RELEASED';
+      big.style.color = 'var(--muted)';
+      return;
+    }
+    const sec = Math.floor(diff / 1000);
+    const hh = Math.floor(sec / 3600), mm = Math.floor((sec % 3600) / 60), ss = sec % 60;
+    if (lbl) lbl.textContent = 'ประกาศในอีก';
+    big.textContent = (hh > 0 ? hh + 'h ' : '') + mm + 'm ' + String(ss).padStart(2, '0') + 's';
+    big.style.color = diff < 3600000 ? 'var(--red)' : diff < 21600000 ? 'var(--gold)' : 'var(--text)';
+  });
+}
+
+// Toggle a feed accordion row open/closed.
+function _toggleFeed(row) {
+  const it = row.closest('.feed-item');
+  if (it) it.classList.toggle('open');
+}
+
+// Render the combined Calendar + News feed (list rows + slide-down detail).
+// Sources already loaded: _calEvents (/api/calendar), _eventScenarios, _newsPosts (/api/news-impact).
+function renderFeed() {
+  const el = document.getElementById('feed-list');
+  if (!el) return;
   const MONTH_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const scMap = (_eventScenarios && _eventScenarios.scenarios) || {};
 
-  const byDay = {};
-  events.forEach(ev => {
-    const d = ev.timestamp_iso ? ev.timestamp_iso.slice(0, 10) : '?';
-    if (!byDay[d]) byDay[d] = [];
-    byDay[d].push(ev);
-  });
-
-  let html = '';
-  Object.keys(byDay).sort().forEach(dateStr => {
-    const isToday = dateStr === todayStr;
-    const dt      = new Date(dateStr + 'T12:00:00');
-    const label   = DAY_EN[dt.getDay()] + ' ' + dt.getDate() + ' ' + MONTH_EN[dt.getMonth()];
-
-    html += `<div class="cal-day-group">`;
-    html += `<div class="cal-day-label${isToday ? ' is-today' : ''}">`;
-    if (isToday) html += `<span class="cal-day-dot"></span>`;
-    html += label;
-    if (isToday) html += `<span style="font-size:9px;color:var(--gold);margin-left:4px">— TODAY</span>`;
-    html += `</div><div class="cal-cards">`;
-
-    byDay[dateStr].forEach(ev => {
-      const impClass  = ev.impact === 'High' ? 'impact-high' : 'impact-medium';
-      const todayCls  = isToday ? ' is-today-card' : '';
-
-      let bkkTime = ev.time || '';
-      if (ev.timestamp_iso) {
-        const d = new Date(ev.timestamp_iso);
-        const h = (d.getUTCHours() + 7) % 24;
-        const m = d.getUTCMinutes().toString().padStart(2, '0');
-        bkkTime = h.toString().padStart(2, '0') + ':' + m + ' BKK';
-      }
-
-      html += `<div class="cal-card ${impClass}${todayCls}">
-        <span class="cal-badge">${(ev.impact || '').toUpperCase()}</span>
-        <div class="cal-curr">${ev.currency || '—'}</div>
-        <div class="cal-name">${ev.title || '—'}</div>
-        <div class="cal-time">${bkkTime}</div>
-        ${goldEventBadge(ev.title)}
+  // ── 📅 Calendar group (sorted by time) ──
+  const evs = (_calEvents || []).filter(e => e.timestamp_iso)
+    .map(e => ({ ...e, t: Date.parse(e.timestamp_iso) }))
+    .sort((a, b) => a.t - b.t);
+  const calRows = evs.map(ev => {
+    const key   = _scenarioKey(ev.title);
+    const hasSc = key && scMap[key];
+    const dt = new Date(ev.timestamp_iso);
+    const hh = (dt.getUTCHours() + 7) % 24, mm = String(dt.getUTCMinutes()).padStart(2, '0');
+    const when = `${MONTH_EN[dt.getUTCMonth()]} ${dt.getUTCDate()} · ${String(hh).padStart(2,'0')}:${mm}`;
+    const timeCol = hasSc
+      ? `<span class="es-cd" data-ts="${ev.t}" style="min-width:70px;font-family:var(--mono);font-size:10px;font-weight:800"><span class="es-cd-big" style="color:var(--muted)">—</span></span>`
+      : `<span style="min-width:70px;font-family:var(--mono);font-size:10px;color:var(--muted)">${when}</span>`;
+    let badge = '';
+    if (hasSc) {
+      const sc2 = scMap[key], mag = ((sc2.hot.magnitude_pct || 0) + (sc2.cool.magnitude_pct || 0)) / 2;
+      const im = mag >= 0.9 ? { c: '#e83b3b', l: 'HIGH' } : mag >= 0.7 ? { c: '#e87b23', l: 'MED' } : { c: '#e8b923', l: 'LOW' };
+      const arr = d => d === 'up' ? '▲' : '▼', cl = d => d === 'up' ? 'var(--green)' : 'var(--red)';
+      badge = `<span style="font-size:9px;display:inline-flex;gap:4px;align-items:center;flex-shrink:0">
+        <span style="color:${im.c};font-weight:700">🪙${im.l}</span>
+        <span style="color:${cl(sc2.hot.dir)}">🔥${arr(sc2.hot.dir)}</span>
+        <span style="color:${cl(sc2.cool.dir)}">❄️${arr(sc2.cool.dir)}</span></span>`;
+    }
+    const row = `<div class="feed-row${hasSc ? ' clickable' : ''}"${hasSc ? ' onclick="_toggleFeed(this)"' : ''}>
+        ${timeCol}
+        <span style="min-width:34px;color:var(--gold);font-size:10px;font-weight:700">${ev.currency || ''}</span>
+        <span style="flex:1;min-width:0">${ev.title || ''}</span>
+        ${badge}
+        ${hasSc ? '<span class="feed-caret">▾</span>' : ''}
       </div>`;
-    });
+    const detail = hasSc
+      ? `<div class="feed-detail"><div style="padding:10px 4px 14px">${buildScenarioDetail(key, ev)}</div></div>`
+      : '';
+    return `<div class="feed-item">${row}${detail}</div>`;
+  }).join('');
 
-    html += `</div></div>`;
-  });
+  // ── 📰 News group (X posts) ──
+  const dirBadge = {
+    bull:    { t: '▲ ขึ้น',  c: 'var(--green)', bg: 'rgba(38,166,91,0.16)' },
+    bear:    { t: '▼ ลง',    c: 'var(--red)',   bg: 'rgba(232,59,59,0.16)' },
+    neutral: { t: '● กลาง',  c: 'var(--muted)', bg: 'rgba(150,150,150,0.14)' },
+  };
+  const impact = { 1: { c: '#e8b923', l: 'LOW', bars: 1 }, 2: { c: '#e87b23', l: 'MED', bars: 2 }, 3: { c: '#e83b3b', l: 'HIGH', bars: 3 } };
+  const newsRows = (_newsPosts || []).slice(0, 12).map(p => {
+    const d    = dirBadge[p.direction || 'neutral'] || dirBadge.neutral;
+    const im   = impact[p.magnitude_tier || 1] || impact[1];
+    const conf = p.confidence || 0;
+    const auth = p.author ? '@' + p.author : '';
+    const age  = p.age_min != null ? p.age_min + 'm' : '';
+    const head = (p.text || '').slice(0, 90);
+    const bars = [1, 2, 3].map(i =>
+      `<span style="display:inline-block;width:4px;height:${6 + i * 3}px;margin-right:1px;border-radius:1px;background:${i <= im.bars ? im.c : 'rgba(255,255,255,0.12)'}"></span>`).join('');
+    const row = `<div class="feed-row clickable" onclick="_toggleFeed(this)">
+        <span style="min-width:36px;display:inline-flex;align-items:flex-end;height:15px">${bars}</span>
+        <span style="color:${d.c};background:${d.bg};font-weight:700;font-size:10px;padding:1px 6px;border-radius:3px;flex-shrink:0">${d.t}</span>
+        <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${head}</span>
+        <span style="color:var(--muted);font-size:9px;flex-shrink:0">conf ${conf}%</span>
+        <span class="feed-caret">▾</span>
+      </div>`;
+    const detail = `<div class="feed-detail"><div style="padding:8px 4px 12px">
+        <div style="font-size:12px;line-height:1.6;color:var(--fg)">${p.text || ''}</div>
+        ${p.reason ? `<div style="margin-top:6px;color:var(--muted);font-size:11px">เหตุผล: ${p.reason}</div>` : ''}
+        <div style="margin-top:6px;font-size:10px;color:var(--muted);font-family:var(--mono)">
+          <span style="color:${im.c};font-weight:700">${im.l}</span> · conf ${conf}% · half-life ${p.half_life_min || 120}m${auth ? ' · ' + auth : ''}${age ? ' · ' + age + ' ago' : ''} · (${p.provenance || 'rubric'})</div>
+      </div></div>`;
+    return `<div class="feed-item">${row}${detail}</div>`;
+  }).join('');
 
-  container.innerHTML = html;
+  el.innerHTML =
+    '<div class="feed-group-title">📅 Upcoming Events</div>' +
+    (calRows || '<div style="color:var(--muted);font-size:11px;padding:6px">ไม่มี event สัปดาห์นี้</div>') +
+    '<div class="feed-group-title" style="margin-top:14px">📰 ข่าวทองล่าสุด</div>' +
+    (newsRows || '<div style="color:var(--muted);font-size:11px;padding:6px">ยังไม่มีข่าวที่ให้คะแนน — รอรอบข่าวถัดไป</div>');
+
+  _tickCountdowns();
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -4604,6 +4773,7 @@ function _bootstrap() {
   loadNewsImpact();
   loadImpactCalibration();
   loadNewsGate();
+  setInterval(_tickCountdowns, 1000);   // live countdowns in the combined feed
   setInterval(fetchData, 10000);
   setInterval(fetchCalendar, 1800000);
   setInterval(loadEventStats, 3600000);
@@ -4612,6 +4782,7 @@ function _bootstrap() {
   setInterval(loadLivePrice, 5000);
   setInterval(loadMacroStrip, 3600000);  // macro data is daily — refresh hourly is sufficient
   setInterval(loadCotCard, 3600000);     // COT data is weekly — hourly poll is sufficient
+  setInterval(loadNewsImpact, 300000);   // refresh combined feed news every 5 min
   // Live tab panels (verdict/zones/pending) — refresh เฉพาะตอน tab เปิดอยู่
   setInterval(() => {
     const t = document.querySelector('.tab-btn.active');
@@ -4661,5 +4832,6 @@ if (document.readyState === 'loading') {
     </div>
   </div>
 </div>
+
 </body>
 </html>

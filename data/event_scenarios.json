@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updated": "2026-07-04",
+  "updated": "2026-07-06",
   "window": "2011-08-05 .. 2026-06-05",
   "min_n": 30,
   "scenarios": {
@@ -18,7 +18,69 @@
         "provenance": "rubric",
         "n": 173
       },
-      "surprise_curve": null
+      "surprise_curve": null,
+      "reactions": [
+        {
+          "date": "2025-06-11",
+          "move_pct": 0.182,
+          "dir": "up"
+        },
+        {
+          "date": "2025-07-15",
+          "move_pct": -0.618,
+          "dir": "down"
+        },
+        {
+          "date": "2025-08-12",
+          "move_pct": -1.095,
+          "dir": "down"
+        },
+        {
+          "date": "2025-09-11",
+          "move_pct": 0.391,
+          "dir": "up"
+        },
+        {
+          "date": "2025-10-24",
+          "move_pct": 1.023,
+          "dir": "up"
+        },
+        {
+          "date": "2025-12-18",
+          "move_pct": 0.287,
+          "dir": "up"
+        },
+        {
+          "date": "2026-01-13",
+          "move_pct": 0.287,
+          "dir": "up"
+        },
+        {
+          "date": "2026-02-13",
+          "move_pct": -1.933,
+          "dir": "down"
+        },
+        {
+          "date": "2026-03-11",
+          "move_pct": 1.427,
+          "dir": "up"
+        },
+        {
+          "date": "2026-04-10",
+          "move_pct": 1.124,
+          "dir": "up"
+        },
+        {
+          "date": "2026-05-12",
+          "move_pct": 1.825,
+          "dir": "up"
+        },
+        {
+          "date": "2026-06-10",
+          "move_pct": -2.333,
+          "dir": "down"
+        }
+      ]
     },
     "NFP": {
       "sign": "hot_gold_down",
@@ -34,7 +96,69 @@
         "provenance": "rubric",
         "n": 179
       },
-      "surprise_curve": null
+      "surprise_curve": null,
+      "reactions": [
+        {
+          "date": "2025-07-04",
+          "move_pct": -0.574,
+          "dir": "down"
+        },
+        {
+          "date": "2025-08-01",
+          "move_pct": 0.094,
+          "dir": "up"
+        },
+        {
+          "date": "2025-09-05",
+          "move_pct": -0.128,
+          "dir": "down"
+        },
+        {
+          "date": "2025-10-03",
+          "move_pct": 0.048,
+          "dir": "up"
+        },
+        {
+          "date": "2025-11-07",
+          "move_pct": 0.255,
+          "dir": "up"
+        },
+        {
+          "date": "2025-12-05",
+          "move_pct": -0.37,
+          "dir": "down"
+        },
+        {
+          "date": "2026-01-02",
+          "move_pct": 0.739,
+          "dir": "up"
+        },
+        {
+          "date": "2026-02-06",
+          "move_pct": -4.451,
+          "dir": "down"
+        },
+        {
+          "date": "2026-03-06",
+          "move_pct": -1.898,
+          "dir": "down"
+        },
+        {
+          "date": "2026-04-03",
+          "move_pct": -2.406,
+          "dir": "down"
+        },
+        {
+          "date": "2026-05-01",
+          "move_pct": 1.361,
+          "dir": "up"
+        },
+        {
+          "date": "2026-06-05",
+          "move_pct": 0.01,
+          "dir": "up"
+        }
+      ]
     },
     "FOMC": {
       "sign": "hawkish_gold_down",
@@ -50,7 +174,69 @@
         "provenance": "rubric",
         "n": 115
       },
-      "surprise_curve": null
+      "surprise_curve": null,
+      "reactions": [
+        {
+          "date": "2025-01-29",
+          "move_pct": 0.741,
+          "dir": "up"
+        },
+        {
+          "date": "2025-03-19",
+          "move_pct": 1.013,
+          "dir": "up"
+        },
+        {
+          "date": "2025-05-07",
+          "move_pct": 1.936,
+          "dir": "up"
+        },
+        {
+          "date": "2025-06-18",
+          "move_pct": -0.445,
+          "dir": "down"
+        },
+        {
+          "date": "2025-07-30",
+          "move_pct": 0.535,
+          "dir": "up"
+        },
+        {
+          "date": "2025-09-17",
+          "move_pct": 0.446,
+          "dir": "up"
+        },
+        {
+          "date": "2025-10-29",
+          "move_pct": -0.616,
+          "dir": "down"
+        },
+        {
+          "date": "2025-12-10",
+          "move_pct": 0.425,
+          "dir": "up"
+        },
+        {
+          "date": "2026-01-28",
+          "move_pct": 2.415,
+          "dir": "up"
+        },
+        {
+          "date": "2026-03-18",
+          "move_pct": 0.026,
+          "dir": "up"
+        },
+        {
+          "date": "2026-04-29",
+          "move_pct": -1.914,
+          "dir": "down"
+        },
+        {
+          "date": "2026-06-17",
+          "move_pct": 0.542,
+          "dir": "up"
+        }
+      ]
     }
   }
 }

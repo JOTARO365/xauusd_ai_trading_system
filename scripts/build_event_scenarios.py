@@ -26,7 +26,7 @@ import os
 import sys
 import tempfile
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import date as _date, datetime, timedelta, timezone
 
 # ── paths ─────────────────────────────────────────────────────────────────────
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -37,6 +37,10 @@ _OUT_FILE        = os.path.join(_ROOT, "data", "event_scenarios.json")
 _CONSENSUS_SEED  = os.path.join(_ROOT, "data", "consensus_seed.json")
 _REALIZED_MOVES  = os.path.join(_ROOT, "data", "realized_moves.json")
 _XAU_DAILY       = os.path.join(_ROOT, "data", "xau_daily.json")
+_EVENT_DATES     = os.path.join(_ROOT, "data", "event_dates.json")
+
+# Per-release reaction histogram: how many recent releases to keep per event.
+_REACTIONS_RECENT_N = 12
 
 # ── M5 constants ───────────────────────────────────────────────────────────────
 # ARCHITECTURE §8: minimum calibration sample count for provenance="calibrated".
@@ -394,6 +398,79 @@ def apply_m5(scenarios: dict, m5_stats: dict) -> dict:
     return scenarios
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Per-release reaction histogram (display-only) — signed d0 move per past release
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _signed_daily_move_pct(date_str: str, sorted_dates: list, prices: dict) -> "float | None":
+    """
+    SIGNED daily % change on date_str vs the previous trading day
+    (same basis as event_stats: close-to-close, base = prior trading day).
+    Returns None when the date is absent or has no prior trading day.
+    """
+    if date_str not in prices:
+        return None
+    idx = bisect.bisect_left(sorted_dates, date_str)
+    if idx == 0:
+        return None
+    prev = sorted_dates[idx - 1]
+    p0, pp = prices[date_str], prices[prev]
+    if pp == 0:
+        return None
+    return round((p0 - pp) / pp * 100.0, 3)
+
+
+def _nfp_release_dates(months_back: int = 15) -> "list[str]":
+    """
+    NFP has no archived-date file (unlike CPI/FOMC); event_stats builds its dates
+    rule-based as the first Friday of each month.  Mirror that here for the trailing
+    window so NFP gets a reaction histogram too.  Returns ISO dates up to today.
+    """
+    today = datetime.now(timezone.utc).date()
+    out: list = []
+    y, m = today.year, today.month
+    for _ in range(months_back):
+        first = _date(y, m, 1)
+        first_friday = first + timedelta(days=(4 - first.weekday()) % 7)  # Fri=4
+        if first_friday <= today:
+            out.append(first_friday.isoformat())
+        m -= 1
+        if m == 0:
+            y, m = y - 1, 12
+    return sorted(out)
+
+
+def compute_reactions(event_dates: dict, xau_daily: dict,
+                      recent_n: int = _REACTIONS_RECENT_N) -> dict:
+    """
+    For each event, join its release dates with daily XAU prices to produce the
+    last `recent_n` signed d0 moves:  [{date, move_pct, dir}].  Only releases that
+    have price data (and a prior trading day) are kept.  Zero AI cost.
+    """
+    sorted_dates, prices = _build_price_index(xau_daily)
+    if not sorted_dates:
+        return {}
+
+    ev_map = (event_dates or {}).get("events", {})
+    result: dict = {}
+    for event in ("CPI", "NFP", "FOMC"):
+        if event == "NFP":
+            dates = _nfp_release_dates()
+        else:
+            dates = (ev_map.get(event) or {}).get("dates") or []
+
+        rows = []
+        for ds in sorted(dates):
+            mv = _signed_daily_move_pct(ds, sorted_dates, prices)
+            if mv is None:
+                continue
+            rows.append({"date": ds, "move_pct": mv, "dir": "up" if mv >= 0 else "down"})
+
+        if rows:
+            result[event] = rows[-recent_n:]
+    return result
+
+
 def atomic_write(path: str, payload: dict) -> None:
     """Write payload to path atomically using a sibling tmp file + os.replace."""
     dir_ = os.path.dirname(path)
@@ -447,6 +524,20 @@ def main() -> None:
     except Exception as exc:  # noqa: BLE001
         # Fail-soft: M5 errors never break the rubric output.
         print(f"[build_event_scenarios] M5 overlay error (skipped): {exc}", file=sys.stderr)
+
+    # ── Per-release reaction histogram (fail-soft) ───────────────────────────────
+    try:
+        event_dates = _load_json_safe(_EVENT_DATES)
+        xau_hist    = _load_json_safe(_XAU_DAILY)
+        reactions   = compute_reactions(event_dates, xau_hist)
+        for ev, sc in scenarios.items():
+            sc["reactions"] = reactions.get(ev, [])
+        _rc = {ev: len(r) for ev, r in reactions.items()}
+        print(f"[build_event_scenarios] reactions per event: {_rc}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[build_event_scenarios] reactions error (skipped): {exc}", file=sys.stderr)
+        for sc in scenarios.values():
+            sc.setdefault("reactions", [])
 
     # ── Write output ──────────────────────────────────────────────────────────
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
