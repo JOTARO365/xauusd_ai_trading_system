@@ -265,12 +265,34 @@ python dashboard/app.py
 
 ## Dashboard
 
-Open your browser at `http://localhost:5050`
+Open your browser at `http://localhost:5050`. Five tabs:
 
-| Page | Description |
+| Tab | Description |
 |---|---|
-| **Overview** | Portfolio, statistics, trade history, economic calendar |
+| **Dashboard** | Portfolio equity curve (index-based x-axis), performance statistics, system-vs-manual split, trade history |
+| **Live** | Real-time bot status, AI verdict, Key Levels (AI zones), Event Radar, the **Calendar & Gold-News feed** (below), RIDE / NEWS_GATE cohort cards, manual-range override |
+| **Analytics** | Performance breakdown, confidence calibration, CFTC COT positioning |
+| **Costs** | AI token spend, daily burn vs target, per-agent cost |
 | **Settings** | Live config editing — saves and auto-restarts via PM2 |
+
+### Calendar & Gold-News feed (Live tab)
+
+A single module merges the economic calendar with per-post gold-news sentiment into a
+click-to-expand list. Everything here is **display-only** — computed in code or from cached
+data, with **zero AI calls** (no LLM cost from viewing the dashboard):
+
+- **📅 Upcoming events** — CPI / NFP / FOMC rows with a live countdown. Click a row to slide
+  open its **scenario**: `>forecast` vs `<forecast` panels (gold direction + magnitude %/$ + a
+  3-bar strength meter — green = gold up / red = gold down), previous/forecast/actual numbers
+  with a release-surprise highlight, 15-year reaction stats, and a **MACD-style histogram** of
+  the last 12 releases (green = gold closed up / red = down, shade = momentum vs prior release).
+- **📰 Latest gold news** — scored X / news posts (direction + strength tier + confidence);
+  click to read the full text and rationale.
+
+Scenario data is precomputed by `scripts/build_event_scenarios.py` (joins release dates with
+daily XAU closes → `data/event_scenarios.json`) and served through pass-through `/api/*`
+endpoints, so viewing never triggers an LLM call. Refresh all display data at once with
+`python scripts/refresh_dashboard_data.py` (schedule it via Task Scheduler / cron).
 
 ---
 
@@ -678,7 +700,7 @@ The entry flow follows **news → price action → analysis → order**:
 - **Per-agent token accounting, multi-provider ready** — each agent's model comes from `agents/llm_models.py` (`MODEL_<AGENT>` env override) and `accountant._normalize_usage()` accepts Anthropic / OpenAI-compatible / LangChain usage objects
 - **Smoke test** — `python scripts/smoke_test.py` checks config knobs + entry guards after a refactor
 - **Strategy versioning** — all new trades include `strategy_version=2` to distinguish from legacy data
-- **Dashboard** — Flask web UI on port 5050 with economic calendar
+- **Dashboard** — Flask web UI on port 5050: a combined economic-calendar + gold-news feed with click-to-expand event scenarios (countdown, surprise panels, 15y stats, MACD-style reaction histogram), all display-only (no LLM cost)
 - **PM2 process manager** — auto-restart, live config changes via dashboard
 
 ---
