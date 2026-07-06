@@ -4055,14 +4055,27 @@ function renderFeed() {
       const arr = d => d === 'up' ? '▲' : '▼', cl = d => d === 'up' ? 'var(--green)' : 'var(--red)';
       badge = `<span style="font-size:9px;display:inline-flex;gap:4px;align-items:center;flex-shrink:0">
         <span style="color:${im.c};font-weight:700">🪙${im.l}</span>
-        <span style="color:${cl(sc2.hot.dir)}">🔥${arr(sc2.hot.dir)}</span>
-        <span style="color:${cl(sc2.cool.dir)}">❄️${arr(sc2.cool.dir)}</span></span>`;
+        <span style="color:${cl(sc2.hot.dir)}">${arr(sc2.hot.dir)}</span>
+        <span style="color:${cl(sc2.cool.dir)}">${arr(sc2.cool.dir)}</span></span>`;
+    }
+    // Inline numbers for non-scenario rows: actual (released) or คาด/ก่อน (upcoming)
+    let numsCol = '';
+    if (!hasSc) {
+      const prev = (ev.previous && ev.previous !== '—') ? ev.previous : '';
+      const fc   = (ev.forecast && ev.forecast !== '—') ? ev.forecast : '';
+      const rel  = ev.actual && ev.actual !== 'pending' && ev.actual !== '—';
+      if (rel) {
+        numsCol = `<span style="font-size:9px;font-family:var(--mono);flex-shrink:0;text-align:right">
+          <b style="color:var(--gold)">${ev.actual}</b>${fc ? `<span style="color:var(--muted)"> /${fc}</span>` : ''}</span>`;
+      } else if (fc || prev) {
+        numsCol = `<span style="font-size:9px;font-family:var(--mono);color:var(--muted);flex-shrink:0;text-align:right">${fc ? 'คาด ' + fc : ''}${fc && prev ? ' · ' : ''}${prev ? 'ก่อน ' + prev : ''}</span>`;
+      }
     }
     const row = `<div class="feed-row${hasSc ? ' clickable' : ''}"${hasSc ? ' onclick="_toggleFeed(this)"' : ''}>
         ${timeCol}
         <span style="min-width:34px;color:var(--gold);font-size:10px;font-weight:700">${ev.currency || ''}</span>
         <span style="flex:1;min-width:0">${ev.title || ''}</span>
-        ${badge}
+        ${badge}${numsCol}
         ${hasSc ? '<span class="feed-caret">▾</span>' : ''}
       </div>`;
     const detail = hasSc
@@ -4104,7 +4117,7 @@ function renderFeed() {
   }).join('');
 
   el.innerHTML =
-    '<div class="feed-group-title">📅 Upcoming Events</div>' +
+    '<div class="feed-group-title">📅 ปฏิทินเศรษฐกิจ — สัปดาห์นี้</div>' +
     (calRows || '<div style="color:var(--muted);font-size:11px;padding:6px">ไม่มี event สัปดาห์นี้</div>') +
     '<div class="feed-group-title" style="margin-top:14px">📰 ข่าวทองล่าสุด</div>' +
     (newsRows || '<div style="color:var(--muted);font-size:11px;padding:6px">ยังไม่มีข่าวที่ให้คะแนน — รอรอบข่าวถัดไป</div>');
@@ -4462,16 +4475,16 @@ function renderScenarioLine(key, ev, px) {
   if (!s || !px) return '';
   const fc = ev.forecast;
   if (fc == null || String(fc).trim() === '' || String(fc).trim() === '—') return '';
-  const side = (hs, glyph, cmp) => {
+  const side = (hs, cmp) => {
     const dir = hs.dir === 'up' ? 'ขึ้น' : 'ลง';
     const col = hs.dir === 'up' ? 'var(--green)' : 'var(--red)';
     const amt = (px * hs.magnitude_pct / 100).toFixed(1);
-    return `<span style="color:${col};font-weight:700">${glyph} ${cmp} forecast → ทอง${dir} ~$${amt}</span>`;
+    return `<span style="color:${col};font-weight:700">${cmp} forecast → ทอง${dir} ~$${amt}</span>`;
   };
   const prov = `(${s.hot.provenance} · n=${s.hot.n})`;
   return `<br><span style="color:var(--muted);font-size:9px">consensus ${fc}:</span> `
-       + side(s.hot, '🔥', 'hot >') + '<span style="margin:0 4px">·</span>'
-       + side(s.cool, '❄️', 'cool <')
+       + side(s.hot, 'hot >') + '<span style="margin:0 4px">·</span>'
+       + side(s.cool, 'cool <')
        + ` <span style="color:var(--muted);font-size:9px">${prov}</span>`;
 }
 

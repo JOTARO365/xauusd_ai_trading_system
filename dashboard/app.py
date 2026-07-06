@@ -1320,10 +1320,12 @@ def api_cot():
 
 @app.route("/api/calendar")
 def api_calendar():
-    """ดึง economic calendar สัปดาห์นี้ (High + Medium impact events)"""
+    """Calendar feed: US (USD) = ทั้งหมดของสัปดาห์นี้ (ทุก impact, past+future);
+    สกุลอื่น = High/Medium ที่จะเกิดใน 7 วัน (เหมือนเดิม)."""
     try:
         from connectors.web_news import fetch_forexfactory_calendar
-        events = fetch_forexfactory_calendar(hours_ahead=168)
+        events = fetch_forexfactory_calendar(hours_ahead=168, include_all_us=True)
+        events.sort(key=lambda e: e.get("timestamp_iso", ""))
         return jsonify({"events": events, "ok": True})
     except Exception as e:
         return jsonify({"events": [], "ok": False, "error": str(e)})
