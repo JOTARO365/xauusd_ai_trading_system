@@ -3823,15 +3823,17 @@ function _scenarioKey(title) {
    ════════════════════════════════════════════════════════════ */
 let _newsPosts = [];   // latest scored X posts (from /api/news-impact) for the combined feed
 
-// magnitude % → strength tier (LOW/MED/HIGH by average |move|)
+// magnitude % → strength tier (1/2/3 = LOW/MED/HIGH by average |move|)
 function _esStrength(mag) {
-  return mag >= 0.9 ? { n: 4, c: '#e83b3b', l: 'HIGH' }
-       : mag >= 0.7 ? { n: 3, c: '#e87b23', l: 'MED' }
-       :              { n: 2, c: '#e8b923', l: 'LOW' };
+  return mag >= 0.9 ? { tier: 3, l: 'HIGH' }
+       : mag >= 0.7 ? { tier: 2, l: 'MED' }
+       :              { tier: 1, l: 'LOW' };
 }
 
-// state: '' = no actual yet · 'hit' = the side that actually materialised · 'miss' = the other
-function _esPanel(head, sub, side, px, state) {
+// One surprise-side panel (>คาด or <คาด). Colour = gold direction (up green / down red).
+// Strength = 3 ascending bars (small→large), filled by tier (LOW=1 / MED=2 / HIGH=3).
+// state: '' = no actual yet · 'hit' = the side that materialised · 'miss' = the other
+function _esPanel(sub, side, px, state) {
   const up   = side.dir === 'up';
   const col  = up ? 'var(--green)' : 'var(--red)';
   const arr  = up ? '▲ ขึ้น' : '▼ ลง';
@@ -3839,21 +3841,20 @@ function _esPanel(head, sub, side, px, state) {
   const amt  = px ? (px * mag / 100).toFixed(1) : null;
   const tgt  = px ? (up ? px * (1 + mag / 100) : px * (1 - mag / 100)).toFixed(0) : null;
   const st   = _esStrength(mag);
-  const bars = [0, 1, 2, 3].map(i =>
-    `<span style="display:inline-block;width:16px;height:6px;border-radius:2px;margin-right:2px;background:${i < st.n ? st.c : 'rgba(255,255,255,0.12)'}"></span>`
+  const bars = [10, 15, 20].map((hh, i) =>
+    `<span style="display:inline-block;width:9px;height:${hh}px;border-radius:2px;margin-right:3px;background:${i < st.tier ? col : 'rgba(255,255,255,0.12)'}"></span>`
   ).join('');
   // release state → border glow / dim
   const border = state === 'hit' ? col : 'transparent';
   const shadow = state === 'hit' ? `box-shadow:0 0 0 1px ${col}, 0 0 14px -4px ${col};` : '';
   const opacity = state === 'miss' ? 'opacity:0.4;' : '';
   return `<div style="flex:1;background:rgba(0,0,0,0.22);border-radius:8px;padding:12px;border-top:2px solid ${col};border-right:2px solid ${border};border-bottom:2px solid ${border};border-left:2px solid ${border};${shadow}${opacity}">
-    <div style="font-size:11px;font-weight:800">${head}${state === 'hit' ? ' <span style="color:'+col+'">✓ เกิดจริง</span>' : ''}</div>
-    <div style="font-size:9px;color:var(--muted);margin-bottom:8px">${sub}</div>
+    <div style="font-size:9px;color:var(--muted);margin-bottom:8px">${sub}${state === 'hit' ? ' <span style="color:'+col+';font-weight:800">✓ เกิดจริง</span>' : ''}</div>
     <div style="color:${col};font-size:16px;font-weight:800">${arr}</div>
     <div style="color:${col};font-size:20px;font-weight:800">~${mag.toFixed(2)}%</div>
     ${amt !== null ? `<div style="color:${col};font-size:12px;font-weight:700">≈ $${amt} → ${tgt}</div>` : ''}
-    <div style="margin-top:8px">${bars}</div>
-    <div style="font-size:9px;color:${st.c};font-weight:700;margin-top:3px">ความแรง ${st.l}</div>
+    <div style="margin-top:10px;display:flex;align-items:flex-end;height:22px">${bars}</div>
+    <div style="font-size:9px;color:${col};font-weight:700;margin-top:3px">ความแรง ${st.l}</div>
   </div>`;
 }
 
@@ -3934,7 +3935,7 @@ function buildScenarioDetail(key, ev) {
     const gcol = side ? (side.dir === 'up' ? 'var(--green)' : 'var(--red)') : 'var(--muted)';
     banner = `<div style="margin-top:8px;text-align:center;font-size:11px;font-weight:700;padding:6px;border-radius:6px;background:rgba(212,175,55,0.1)">
       ออกจริง <b>${ev.actual}</b> ${hot ? '&gt;' : cool ? '&lt;' : '='} คาด ${ev.forecast}
-      → <span style="color:var(--gold)">${hot ? 'HOT' : cool ? 'COOL' : 'INLINE'}</span>
+      → <span style="color:var(--gold)">${hot ? 'สูงกว่าคาด' : cool ? 'ต่ำกว่าคาด' : 'ตรงคาด'}</span>
       <span style="color:${gcol}">${gold}</span></div>`;
   } else if (fc != null && prev != null) {
     const d = fc - prev;
@@ -3949,8 +3950,8 @@ function buildScenarioDetail(key, ev) {
     '</div>' + banner;
 
   const panels = '<div style="display:flex;gap:12px;margin-top:10px">' +
-    _esPanel('🔥 HOT', 'ตัวเลขออก &gt; คาดการณ์', s.hot, px, hotState) +
-    _esPanel('❄️ COOL', 'ตัวเลขออก &lt; คาดการณ์', s.cool, px, coolState) + '</div>';
+    _esPanel('ตัวเลขออก &gt; คาดการณ์', s.hot, px, hotState) +
+    _esPanel('ตัวเลขออก &lt; คาดการณ์', s.cool, px, coolState) + '</div>';
 
   // (3) 15-year prior reaction stats
   const st15 = (_eventStats && _eventStats.events && _eventStats.events[key]) || null;
