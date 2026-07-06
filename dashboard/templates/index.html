@@ -745,6 +745,9 @@
     .feed-item.open .feed-caret { transform: rotate(180deg); }
     .feed-detail { max-height: 0; overflow: hidden; transition: max-height .35s ease; }
     .feed-item.open .feed-detail { max-height: 1600px; }
+    /* countdown blinks when < 15 min to the release */
+    @keyframes es-blink { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+    .es-cd-blink { animation: es-blink 1s steps(1,end) infinite; }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(2px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -4004,13 +4007,17 @@ function _tickCountdowns() {
       if (lbl) lbl.textContent = 'ประกาศแล้ว';
       big.textContent = 'RELEASED';
       big.style.color = 'var(--muted)';
+      big.classList.remove('es-cd-blink');
       return;
     }
     const sec = Math.floor(diff / 1000);
-    const hh = Math.floor(sec / 3600), mm = Math.floor((sec % 3600) / 60), ss = sec % 60;
+    const dd = Math.floor(sec / 86400);
+    const hh = Math.floor((sec % 86400) / 3600), mm = Math.floor((sec % 3600) / 60), ss = sec % 60;
     if (lbl) lbl.textContent = 'ประกาศในอีก';
-    big.textContent = (hh > 0 ? hh + 'h ' : '') + mm + 'm ' + String(ss).padStart(2, '0') + 's';
+    big.textContent = (dd > 0 ? dd + 'd ' : '') + (dd > 0 || hh > 0 ? hh + 'h ' : '') +
+                      mm + 'm ' + String(ss).padStart(2, '0') + 's';
     big.style.color = diff < 3600000 ? 'var(--red)' : diff < 21600000 ? 'var(--gold)' : 'var(--text)';
+    big.classList.toggle('es-cd-blink', diff < 900000);   // < 15 min → blink (ใกล้ประกาศ)
   });
 }
 
