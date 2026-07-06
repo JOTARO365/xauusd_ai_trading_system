@@ -1,5 +1,5 @@
 {
- "updated": "2026-07-03",
+ "updated": "2026-07-06",
  "source": "data/xau_daily.json (AlphaVantage daily)",
  "baseline_avg_abs_pct": 0.56,
  "events": {
@@ -50,6 +50,86 @@
    "basis": "daily close; วันประกาศจริงจาก federalreserve.gov fomccalendars + fomchistorical (statement day)",
    "flat_threshold_pct": 0.05,
    "vs_baseline_x": 1.56
+  },
+  "CORE_CPI": {
+   "n": 173,
+   "window": "2012-01-19 .. 2026-06-10",
+   "up_pct": 54.9,
+   "down_pct": 40.5,
+   "flat_pct": 4.6,
+   "avg_d0_pct": 0.151,
+   "median_d0_pct": 0.181,
+   "avg_abs_d0_pct": 0.718,
+   "avg_up_pct": 0.79,
+   "avg_down_pct": -0.699,
+   "d2_extends_pct": 54.5,
+   "basis": "daily close; วันประกาศจริงจาก = CPI (Core CPI อยู่ในรายงาน CPI ฉบับเดียวกัน)",
+   "flat_threshold_pct": 0.05,
+   "vs_baseline_x": 1.28
+  },
+  "UNEMPLOYMENT": {
+   "n": 181,
+   "window": "2011-06-03 .. 2026-06-05",
+   "up_pct": 47.0,
+   "down_pct": 43.1,
+   "flat_pct": 9.9,
+   "avg_d0_pct": 0.01,
+   "median_d0_pct": 0.01,
+   "avg_abs_d0_pct": 0.806,
+   "avg_up_pct": 0.866,
+   "avg_down_pct": -0.921,
+   "d2_extends_pct": 49.1,
+   "basis": "daily close; วันประกาศจริงจาก = NFP first-Friday (Employment Situation ฉบับเดียวกัน)",
+   "flat_threshold_pct": 0.05,
+   "vs_baseline_x": 1.44
+  },
+  "ISM_MFG": {
+   "n": 180,
+   "window": "2011-07-01 .. 2026-06-01",
+   "up_pct": 53.3,
+   "down_pct": 40.6,
+   "flat_pct": 6.1,
+   "avg_d0_pct": 0.186,
+   "median_d0_pct": 0.14,
+   "avg_abs_d0_pct": 0.793,
+   "avg_up_pct": 0.915,
+   "avg_down_pct": -0.747,
+   "d2_extends_pct": 46.2,
+   "basis": "daily close; วันประกาศจริงจาก rule: วันทำการที่ 1 ของเดือน + US federal holidays",
+   "flat_threshold_pct": 0.05,
+   "vs_baseline_x": 1.42
+  },
+  "ISM_SVC": {
+   "n": 181,
+   "window": "2011-06-03 .. 2026-06-03",
+   "up_pct": 43.6,
+   "down_pct": 47.0,
+   "flat_pct": 9.4,
+   "avg_d0_pct": -0.082,
+   "median_d0_pct": -0.004,
+   "avg_abs_d0_pct": 0.721,
+   "avg_up_pct": 0.728,
+   "avg_down_pct": -0.854,
+   "d2_extends_pct": 48.2,
+   "basis": "daily close; วันประกาศจริงจาก rule: วันทำการที่ 3 ของเดือน + US federal holidays",
+   "flat_threshold_pct": 0.05,
+   "vs_baseline_x": 1.29
+  },
+  "ADP": {
+   "n": 180,
+   "window": "2011-06-29 .. 2026-06-03",
+   "up_pct": 46.7,
+   "down_pct": 46.1,
+   "flat_pct": 7.2,
+   "avg_d0_pct": 0.01,
+   "median_d0_pct": 0.007,
+   "avg_abs_d0_pct": 0.704,
+   "avg_up_pct": 0.763,
+   "avg_down_pct": -0.75,
+   "d2_extends_pct": 44.9,
+   "basis": "daily close; วันประกาศจริงจาก rule: วันพุธก่อนศุกร์แรก (สัปดาห์เดียวกับ NFP)",
+   "flat_threshold_pct": 0.05,
+   "vs_baseline_x": 1.26
   }
  }
 }

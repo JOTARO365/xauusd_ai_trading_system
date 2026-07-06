@@ -453,7 +453,8 @@ def compute_reactions(event_dates: dict, xau_daily: dict,
 
     ev_map = (event_dates or {}).get("events", {})
     result: dict = {}
-    for event in ("CPI", "NFP", "FOMC"):
+    # NFP has no dates file (rule-based); every other event reads its dates array.
+    for event in sorted(set(ev_map.keys()) | {"NFP"}):
         if event == "NFP":
             dates = _nfp_release_dates()
         else:

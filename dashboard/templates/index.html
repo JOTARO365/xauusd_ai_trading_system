@@ -3811,10 +3811,17 @@ async function fetchCalendar() {
 // Single source of truth for the title→key match, shared by the badge + the
 // clickable-card + the scenario modal. Keep NEEDLES synced with analyst.py.
 function _scenarioKey(title) {
-  const NEEDLES = { NFP: ['non-farm', 'nonfarm', 'non farm'], CPI: ['cpi'],
-                    FOMC: ['fomc', 'federal funds'] };
+  // Most-specific first. Weekly variants (ADP Weekly, Unemployment Claims) must
+  // NOT map to the monthly scenarios — their stats are for the monthly release.
   const tl = (title || '').toLowerCase();
-  for (const [k, ns] of Object.entries(NEEDLES)) { if (ns.some(n => tl.includes(n))) return k; }
+  if (tl.includes('core cpi') || tl.includes('core consumer price')) return 'CORE_CPI';
+  if (tl.includes('cpi') || tl.includes('consumer price index')) return 'CPI';
+  if (tl.includes('ism') && tl.includes('manufacturing')) return 'ISM_MFG';
+  if (tl.includes('ism') && (tl.includes('services') || tl.includes('non-manufacturing') || tl.includes('non manufacturing'))) return 'ISM_SVC';
+  if (tl.includes('adp') && !tl.includes('weekly')) return 'ADP';
+  if (tl.includes('non-farm') || tl.includes('nonfarm') || tl.includes('non farm')) return 'NFP';
+  if (tl.includes('unemployment rate')) return 'UNEMPLOYMENT';   // ไม่จับ "Unemployment Claims" (weekly)
+  if (tl.includes('fomc') || tl.includes('federal funds')) return 'FOMC';
   return null;
 }
 
@@ -3905,6 +3912,8 @@ function _esReactionsHtml(reactions) {
 // Build the FULL scenario detail HTML (countdown + numbers + HOT/COOL + 15y stats
 // + MACD histogram + surprise curve + provenance) for one calendar event —
 // rendered inline inside a feed accordion. Countdown ticks via the global .es-cd ticker.
+const MONTH_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
 function buildScenarioDetail(key, ev) {
   const sc = (_eventScenarios && _eventScenarios.scenarios) || {};
   const s  = sc[key];
@@ -3912,13 +3921,24 @@ function buildScenarioDetail(key, ev) {
   const px = _lastBid;
   const ts = ev.timestamp_iso ? Date.parse(ev.timestamp_iso) : null;
 
-  // countdown block (updated live by _tickCountdowns)
-  const cd = ts != null
-    ? `<div class="es-cd" data-ts="${ts}" style="text-align:center;margin-bottom:10px;padding:8px;background:rgba(0,0,0,0.22);border-radius:8px;font-family:var(--mono)">
+  // countdown block — live tick ONLY for today's release; other days show the date
+  const cd = (() => {
+    if (ts == null) return '';
+    const bk = new Date(ts + 7 * 3600 * 1000), bn = new Date(Date.now() + 7 * 3600 * 1000);
+    const today = `${bk.getUTCFullYear()}-${bk.getUTCMonth()}-${bk.getUTCDate()}`
+               === `${bn.getUTCFullYear()}-${bn.getUTCMonth()}-${bn.getUTCDate()}`;
+    if (today) {
+      return `<div class="es-cd" data-ts="${ts}" style="text-align:center;margin-bottom:10px;padding:8px;background:rgba(0,0,0,0.22);border-radius:8px;font-family:var(--mono)">
         <div class="es-cd-lbl" style="font-size:9px;color:var(--muted)">—</div>
         <div class="es-cd-big" style="font-size:20px;font-weight:800">—</div>
-      </div>`
-    : '';
+      </div>`;
+    }
+    const d = new Date(ts), hh = (d.getUTCHours() + 7) % 24, mm = String(d.getUTCMinutes()).padStart(2, '0');
+    return `<div style="text-align:center;margin-bottom:10px;padding:8px;background:rgba(0,0,0,0.22);border-radius:8px;font-family:var(--mono)">
+        <div style="font-size:9px;color:var(--muted)">วันประกาศ</div>
+        <div style="font-size:16px;font-weight:800;color:var(--gold)">${MONTH_EN[d.getUTCMonth()]} ${d.getUTCDate()} · ${String(hh).padStart(2, '0')}:${mm} น.</div>
+      </div>`;
+  })();
 
   // (1)+(2) numbers row: previous / forecast / actual + surprise / lean banner
   const prev = _esNum(ev.previous), fc = _esNum(ev.forecast), act = _esNum(ev.actual);
@@ -4032,20 +4052,25 @@ function _toggleFeed(row) {
 function renderFeed() {
   const el = document.getElementById('feed-list');
   if (!el) return;
-  const MONTH_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const scMap = (_eventScenarios && _eventScenarios.scenarios) || {};
 
   // ── 📅 Calendar group (sorted by time) ──
   const evs = (_calEvents || []).filter(e => e.timestamp_iso)
     .map(e => ({ ...e, t: Date.parse(e.timestamp_iso) }))
     .sort((a, b) => a.t - b.t);
+  // "today" in Bangkok (UTC+7) — live countdown shows ONLY for same-day releases
+  const _bn = new Date(Date.now() + 7 * 3600 * 1000);
+  const _bkkToday = `${_bn.getUTCFullYear()}-${_bn.getUTCMonth()}-${_bn.getUTCDate()}`;
   const calRows = evs.map(ev => {
     const key   = _scenarioKey(ev.title);
     const hasSc = key && scMap[key];
     const dt = new Date(ev.timestamp_iso);
     const hh = (dt.getUTCHours() + 7) % 24, mm = String(dt.getUTCMinutes()).padStart(2, '0');
     const when = `${MONTH_EN[dt.getUTCMonth()]} ${dt.getUTCDate()} · ${String(hh).padStart(2,'0')}:${mm}`;
-    const timeCol = hasSc
+    const bkk = new Date(ev.t + 7 * 3600 * 1000);
+    const isToday = `${bkk.getUTCFullYear()}-${bkk.getUTCMonth()}-${bkk.getUTCDate()}` === _bkkToday;
+    // countdown เฉพาะการประกาศของวันนี้ (ทุกตัว); วันอื่นแสดงเป็นวันที่
+    const timeCol = isToday
       ? `<span class="es-cd" data-ts="${ev.t}" style="min-width:70px;font-family:var(--mono);font-size:10px;font-weight:800"><span class="es-cd-big" style="color:var(--muted)">—</span></span>`
       : `<span style="min-width:70px;font-family:var(--mono);font-size:10px;color:var(--muted)">${when}</span>`;
     let badge = '';

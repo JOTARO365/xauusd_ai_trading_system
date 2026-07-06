@@ -7,5 +7,8 @@
   "RETAIL_SALES": "hot_gold_down",
   "GDP":          "hot_gold_down",
   "UNEMPLOYMENT": "hot_gold_up",
+  "ISM_MFG":      "hot_gold_down",
+  "ISM_SVC":      "hot_gold_down",
+  "ADP":          "hot_gold_down",
   "FOMC":         "hawkish_gold_down"
 }
