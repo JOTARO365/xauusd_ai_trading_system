@@ -4422,7 +4422,10 @@ function renderZones(bs) {
     const htfTag = (htf && htf.level && Math.abs(htf.level - lv) / lv < 0.003)
       ? ` <span style="color:var(--gold);font-size:9px;font-weight:700">★${htf.tf}</span>` : '';
     // ทำไมวาง level นี้ — จาก sr_meta (chart_watcher): TF + touches + confluence
-    const whyLine = m ? `<div style="padding:0 0 2px 82px;font-size:9px;color:var(--muted);opacity:.8">${m.why || ''}</div>` : '';
+    // UHAS #2: recency (แตะล่าสุดกี่แท่ง) + avg bounce ($) — เด้งสด/แรงแค่ไหนจริง
+    const react = m && (m.bars_since_touch != null || m.avg_bounce != null)
+      ? `<span style="color:var(--gold)">แตะล่าสุด ${m.bars_since_touch ?? '—'} แท่ง${m.avg_bounce != null ? ` · เด้ง ~$${m.avg_bounce}` : ''}</span>` : '';
+    const whyLine = m ? `<div style="padding:0 0 2px 82px;font-size:9px;color:var(--muted);opacity:.8">${m.why || ''}${react ? ' · ' + react : ''}</div>` : '';
     return `<div style="display:flex;align-items:center;gap:10px;padding:3px 0">
       <span style="width:72px;color:${color};font-weight:700">${lv.toFixed(2)}</span>
       <span style="width:52px;color:var(--muted);font-size:10px">${dist}</span>

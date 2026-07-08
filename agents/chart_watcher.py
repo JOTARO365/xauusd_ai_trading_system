@@ -656,6 +656,39 @@ def _touch_score_bonus(touches: int) -> int:
     return -10                    # 7+ = worn zone, risk of break (คงเดิม)
 
 
+def _touch_recency_bounce(df: pd.DataFrame, level: float, side: str,
+                          zone_pct: float = 0.003, fwd: int = 10) -> tuple:
+    """DISPLAY-ONLY (UHAS #2): (bars_since_touch, avg_bounce_$) ต่อ zone.
+    bars_since_touch = แท่งนับจากที่ราคาแตะโซนครั้งล่าสุด.
+    avg_bounce = ค่าเฉลี่ย $ ที่ราคาเด้งออกจากโซนภายใน fwd แท่ง หลัง touch (ทิศตาม side:
+      S=เด้งขึ้น, R=สะบัดลง) เฉลี่ยจาก 5 touch ล่าสุด. คืน (None, None) ถ้าไม่มี touch/df.
+    ไม่กระทบ logic เทรด — ไม่ถูกส่งเข้า LLM (sr_meta = display)."""
+    if df is None or "high" not in df or "low" not in df:
+        return None, None
+    highs, lows = df["high"].values, df["low"].values
+    n = len(highs)
+    zone = level * zone_pct
+    touch_idx, in_zone = [], False
+    for i in range(n):
+        hit = lows[i] <= level + zone and highs[i] >= level - zone
+        if hit and not in_zone:
+            touch_idx.append(i)
+        in_zone = hit
+    if not touch_idx:
+        return None, None
+    bars_since = int((n - 1) - touch_idx[-1])
+    bounces = []
+    for i in touch_idx[-5:]:
+        j0, j1 = i + 1, min(i + 1 + fwd, n)
+        if j0 >= n:
+            continue
+        exc = (float(highs[j0:j1].max()) - level) if side == "S" else (level - float(lows[j0:j1].min()))
+        if exc > 0:
+            bounces.append(exc)
+    avg_bounce = round(sum(bounces) / len(bounces), 1) if bounces else None
+    return bars_since, avg_bounce
+
+
 def _build_sr_meta(h4_sr: dict, h1_sr: dict, key_lvl: dict,
                    d1_sr: dict | None, w1_sr: dict | None,
                    h4_df, h1_df) -> list:
@@ -685,7 +718,9 @@ def _build_sr_meta(h4_sr: dict, h1_sr: dict, key_lvl: dict,
             score += 5; why.append("≈PDL")
         if any(abs(lv - r) / lv < 0.001 for r in rounds):
             score += 3; why.append("เลขกลม")
+        bars_since, avg_bounce = _touch_recency_bounce(df, lv, side)   # UHAS #2 (display-only)
         return {"level": round(float(lv), 2), "side": side, "tf": tf, "touches": touches,
+                "bars_since_touch": bars_since, "avg_bounce": avg_bounce,
                 "strength": max(25, min(95, score)), "why": " · ".join(why)}
 
     meta  = [_one(lv, "R", "H4", h4_df) for lv in h4_sr.get("resistance", [])]

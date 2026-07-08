@@ -139,6 +139,40 @@ Claude API ทำหน้าที่ LLM core ได้ ถูกกว่า/
 
 ---
 
+## PART 6 — UHAS live 08-07 additions (candidate features, ยังไม่ build)
+
+จากไลฟ์ oRjLdb2AiX4 (08-07, transcript 133K ~95% price-call — terminal feature ถูกเอ่ยถึงน้อย
+เพราะเป็นภาพบนจอ). เก็บเฉพาะที่ผู้พูดอ้างถึงจริง + ยังไม่มีในระบบ + display-only/computed-in-code.
+เรียงตามความคุ้มค่า:
+
+1. **Per-zone touch-reaction stat** (คุ้มสุด — ต่อยอด zone ladder เดิม)
+   - ผู้พูด: "แตะโซนนี้ 79 แท่งก่อน เด้ง ~44 เหรียญ, ต้านแข็ง 99%"
+   - มีบางส่วนแล้ว: `bot_status.zones.sr_meta` มี `touches` + `strength` + `why` (แสดง/ต่อยอดได้เลย display-only)
+   - ที่ขาด: **bars-since-touch (recency)** + **avg bounce ($)** ต่อ zone → ต้องคำนวณจาก OHLC intraday
+     ฝั่ง bot (chart_watcher) แล้วใส่เพิ่มใน sr_meta (agent code — ต้องขออนุมัติ)
+   - value: อัปเกรด zone จาก %นิ่งๆ → "เด้งแรง/สดจริงแค่ไหน" = prior เข้าเทรดชัดขึ้น
+
+2. **Liquidity pool map** — จุด stop-cluster เหนือ/ใต้ราคา (ต่างจาก S/R zone)
+   - ผู้พูด: "liquidity อยู่ตรงไหน" → pool บน ~4125, ล่าง ~4100/4098; พูดเรื่อง "กวาด" ก่อนกลับตัว
+   - data: MT5 price — equal-highs/equal-lows clustering + swing extremes ล่าสุด
+   - value: ทองชอบกวาด stop ที่ pool ก่อนวิ่งจริง → ชี้จุด sweep-and-reverse
+
+3. **Volume wall + buy/sell imbalance**
+   - ผู้พูด: "โซนวอลุ่มสะสมหนา = กำแพงจริง", "เริ่มมีวอลุ่มฝั่งเซลล์"
+   - data: MT5 tick-volume by price (HVN) + up/down-bar volume delta
+   - ⚠️ caveat: MT5 gold volume = **tick-volume ไม่ใช่ contract จริง** — ต้องติดป้ายกำกับเสมอ
+   - value: ราคาที่คนเล่นหนา + เตือน order-flow พลิกทิศ
+
+4. **Auto-Fibonacci (multi-TF + RSI)** — priority ต่ำสุด (เอ่ยผ่านครั้งเดียว)
+   - data: MT5 price auto-swing H4/D → 0.382/0.5/0.618 + RSI computed-in-code
+   - value: ระดับ pullback entry ที่โต๊ะใช้จริง
+
+**Build note:** #1(บางส่วน)/#2/#3/#4 ที่เป็น display ล้วน ทำใน dashboard ได้ (zero AI cost).
+ส่วนที่ต้อง OHLC intraday (recency/bounce/liquidity/volume) ต้องคำนวณฝั่ง bot = แตะ chart_watcher →
+ต้องขออนุมัติ design ก่อน (iron rule).
+
+---
+
 ## APPENDIX — ข้อมูลตลาดที่กลั่นได้ (สำหรับ macro_regime, จะหมดอายุเร็ว)
 - **NFP 07-02 actual 57K** vs forecast 114K (prior 172K → revised 129K) = **miss แรง** → ทองพุ่ง +60 ทันที 4065→4120-4128, run ถึง ~4140 **stall ที่ prior-high 4140, ไม่ผ่าน 4200**, ไม่แตะ 3960
 - UHAS post-NFP bias: **bullish** (jobs อ่อน → Fed no rush → หนุนทอง); ต้านถัดไป 4170/4188/4200; support flip เป็น ~4080
