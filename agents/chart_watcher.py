@@ -227,6 +227,47 @@ def find_swing_levels(df: pd.DataFrame, window: int = 5, max_levels: int = 5) ->
     return {"resistance": resistances, "support": supports}
 
 
+def find_liquidity_pools(df, current, window: int = 5, cluster_pct: float = 0.0015,
+                         min_count: int = 2, max_pools: int = 4) -> dict:
+    """DISPLAY-ONLY (UHAS #1): stop-cluster liquidity pools.
+    equal highs = buy-side liquidity (BSL) เหนือราคา (stop ของ short + breakout buy) ; equal lows =
+    sell-side (SSL) ใต้ราคา. count = จำนวน swing ที่เกาะกลุ่ม (ยิ่งมาก = pool หนา). ราคาชอบ 'กวาด'
+    pool ก่อนกลับตัว — ต่างจาก S/R zone (จุด reject). ไม่เข้า LLM (display), zero token.
+    คืน {"buy_side":[{level,count,dist_pct}], "sell_side":[...]} ; fail-soft ว่างเมื่อ df/current ไม่พอ."""
+    empty = {"buy_side": [], "sell_side": []}
+    if df is None or current is None or "high" not in df or len(df) < 2 * window + 1:
+        return empty
+    high, low = df["high"].values, df["low"].values
+    n = len(high)
+    sh, sl = [], []
+    for i in range(window, n - window):
+        if all(high[i] >= high[i-j] for j in range(1, window+1)) and all(high[i] >= high[i+j] for j in range(1, window+1)):
+            sh.append(round(float(high[i]), 2))
+        if all(low[i] <= low[i-j] for j in range(1, window+1)) and all(low[i] <= low[i+j] for j in range(1, window+1)):
+            sl.append(round(float(low[i]), 2))
+    cur = float(current)
+
+    def cluster(levels):
+        out, grp = [], []
+        for lv in sorted(levels):
+            if grp and (lv - grp[0]) / grp[0] > cluster_pct:
+                if len(grp) >= min_count:
+                    out.append((round(sum(grp) / len(grp), 2), len(grp)))
+                grp = []
+            grp.append(lv)
+        if len(grp) >= min_count:
+            out.append((round(sum(grp) / len(grp), 2), len(grp)))
+        return out
+
+    bsl = [{"level": lv, "count": c, "dist_pct": round((lv - cur) / cur * 100, 2)}
+           for lv, c in cluster(sh) if lv > cur]
+    ssl = [{"level": lv, "count": c, "dist_pct": round((cur - lv) / cur * 100, 2)}
+           for lv, c in cluster(sl) if lv < cur]
+    bsl.sort(key=lambda x: x["dist_pct"])
+    ssl.sort(key=lambda x: x["dist_pct"])
+    return {"buy_side": bsl[:max_pools], "sell_side": ssl[:max_pools]}
+
+
 def detect_htf_zone(current: float, d1_sr: dict, w1_sr: dict,
                     threshold_pct: float = 0.5) -> dict | None:
     """
@@ -1371,6 +1412,7 @@ ENTRY_TYPE: SR_ZONE หรือ ENGULFING หรือ STRUCTURE_PULLBACK ห�
                           "support":    h4_sr["support"]    + h1_sr["support"]},
         "sr_meta":       _build_sr_meta(h4_sr, h1_sr, key_lvl, d1_sr, w1_sr,
                                         h4.get("df"), h1.get("df")),
+        "liquidity_pools": find_liquidity_pools(h1.get("df"), h1.get("close")),  # UHAS #1 (display-only)
         "key_levels":    key_lvl,
         "htf_zone":      htf_zone,   # None หรือ {"tf","level","zone_type","dist_pct"}
         "d1_trend":      d1_trend,   # BULLISH/BEARISH/NEUTRAL — จากแท่ง D1 ที่ปิดแล้วเท่านั้น

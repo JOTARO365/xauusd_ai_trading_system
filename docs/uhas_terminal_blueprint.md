@@ -152,7 +152,9 @@ Claude API ทำหน้าที่ LLM core ได้ ถูกกว่า/
      ฝั่ง bot (chart_watcher) แล้วใส่เพิ่มใน sr_meta (agent code — ต้องขออนุมัติ)
    - value: อัปเกรด zone จาก %นิ่งๆ → "เด้งแรง/สดจริงแค่ไหน" = prior เข้าเทรดชัดขึ้น
 
-2. **Liquidity pool map** — จุด stop-cluster เหนือ/ใต้ราคา (ต่างจาก S/R zone)
+2. **Liquidity pool map** — ✅ **DONE 2026-07-08** (chart_watcher.find_liquidity_pools → BSL/SSL cluster
+   equal highs/lows บน H1, display-only zero-token; dashboard renderLiquidity. v2 = swept-detection ยังไม่ทำ)
+   — จุด stop-cluster เหนือ/ใต้ราคา (ต่างจาก S/R zone)
    - ผู้พูด: "liquidity อยู่ตรงไหน" → pool บน ~4125, ล่าง ~4100/4098; พูดเรื่อง "กวาด" ก่อนกลับตัว
    - data: MT5 price — equal-highs/equal-lows clustering + swing extremes ล่าสุด
    - value: ทองชอบกวาด stop ที่ pool ก่อนวิ่งจริง → ชี้จุด sweep-and-reverse

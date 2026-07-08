@@ -1609,6 +1609,7 @@
       <div class="chart-card" style="padding:14px 18px">
         <div id="zone-ladder" style="font-family:var(--mono);font-size:12px">Loading…</div>
         <div id="fib-panel" style="font-family:var(--mono);margin-top:8px"></div>
+        <div id="liquidity-panel" style="font-family:var(--mono);margin-top:6px"></div>
       </div>
     </section>
 
@@ -4312,6 +4313,7 @@ async function loadMonitor() {
     renderVerdict(bs);
     renderZones(bs);
     renderFib(bs);
+    renderLiquidity(bs);
     if (!_calEvents.length) fetchCalendar();   // เผื่อเปิด Live tab ก่อน calendar โหลดรอบแรก
     renderEventCard(bs);
     await loadCandles();    // init/refresh กราฟ (throttle ในตัว) — await กัน race ตอนวาดเส้นโซนครั้งแรก
@@ -4425,6 +4427,19 @@ function renderFib(bs) {
   el.innerHTML = (h4 || h1)
     ? `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:2px">FIBONACCI (auto-swing)</div>${h4}${h1}`
     : '';
+}
+
+// UHAS #1: liquidity pool map — stop clusters (equal highs/lows) จาก chart_watcher (display-only)
+function renderLiquidity(bs) {
+  const el = document.getElementById('liquidity-panel');
+  if (!el) return;
+  const lp = bs.liquidity_pools || {}, bsl = lp.buy_side || [], ssl = lp.sell_side || [];
+  if (!bsl.length && !ssl.length) { el.innerHTML = ''; return; }
+  const pool = (p, up) => `<span style="margin-right:10px"><span style="color:${up ? 'var(--red)' : 'var(--green)'}">${up ? '▲' : '▼'}</span> <b>${(+p.level).toFixed(2)}</b><span style="color:var(--muted)">×${p.count} (${p.dist_pct}%)</span></span>`;
+  el.innerHTML =
+    `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0">💧 LIQUIDITY POOLS (H1 — sweep targets)</div>` +
+    (bsl.length ? `<div style="font-size:10px">BSL↑ ${bsl.map(p => pool(p, true)).join('')}</div>` : '') +
+    (ssl.length ? `<div style="font-size:10px">SSL↓ ${ssl.map(p => pool(p, false)).join('')}</div>` : '');
 }
 
 function renderZones(bs) {
