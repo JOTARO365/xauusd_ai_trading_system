@@ -163,7 +163,8 @@ Claude API ทำหน้าที่ LLM core ได้ ถูกกว่า/
    - ⚠️ caveat: MT5 gold volume = **tick-volume ไม่ใช่ contract จริง** — ต้องติดป้ายกำกับเสมอ
    - value: ราคาที่คนเล่นหนา + เตือน order-flow พลิกทิศ
 
-4. **Auto-Fibonacci (multi-TF + RSI)** — priority ต่ำสุด (เอ่ยผ่านครั้งเดียว)
+4. **Auto-Fibonacci (multi-TF + RSI)** — ✅ **DONE 2026-07-08** (display-only; data มีใน bot_status
+   fib_h4/fib_h1 จาก chart_watcher.calc_fibonacci อยู่แล้ว — เพิ่มแค่ renderFib() ใน dashboard)
    - data: MT5 price auto-swing H4/D → 0.382/0.5/0.618 + RSI computed-in-code
    - value: ระดับ pullback entry ที่โต๊ะใช้จริง
 

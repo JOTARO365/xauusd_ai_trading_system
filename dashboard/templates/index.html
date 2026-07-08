@@ -1608,6 +1608,7 @@
       <div class="section-title">Key Levels &mdash; AI Zones</div>
       <div class="chart-card" style="padding:14px 18px">
         <div id="zone-ladder" style="font-family:var(--mono);font-size:12px">Loading…</div>
+        <div id="fib-panel" style="font-family:var(--mono);margin-top:8px"></div>
       </div>
     </section>
 
@@ -4310,6 +4311,7 @@ async function loadMonitor() {
 
     renderVerdict(bs);
     renderZones(bs);
+    renderFib(bs);
     if (!_calEvents.length) fetchCalendar();   // เผื่อเปิด Live tab ก่อน calendar โหลดรอบแรก
     renderEventCard(bs);
     await loadCandles();    // init/refresh กราฟ (throttle ในตัว) — await กัน race ตอนวาดเส้นโซนครั้งแรก
@@ -4396,6 +4398,33 @@ function renderVerdict(bs) {
   const rideEl = document.getElementById('verdict-ride');
   rideEl.textContent = rideDir ? `⚡ RIDE ${rideDir}` : 'off';
   rideEl.style.color = rideDir ? 'var(--gold)' : 'var(--muted)';
+}
+
+// UHAS #4: auto-Fibonacci — data มาจาก chart_watcher (bs.fib_h4 / bs.fib_h1) แล้ว, display เท่านั้น
+function renderFib(bs) {
+  const el = document.getElementById('fib-panel');
+  if (!el) return;
+  const one = (fib, tf) => {
+    if (!fib || fib.swing_dir === 'FLAT' || !fib.nearest) return '';
+    const dcol = fib.swing_dir === 'UP' ? 'var(--green)' : 'var(--red)';
+    const dir  = fib.swing_dir === 'UP' ? '▲UP' : '▼DOWN';
+    const n = fib.nearest, inZone = n.in_zone;
+    const keys = Object.entries(fib.levels || {})
+      .map(([p, m]) => ({ price: +p, name: m[1], key: m[2] }))
+      .filter(x => x.key).sort((a, b) => b.price - a.price)
+      .map(x => `<span style="margin-right:10px;${Math.abs(x.price - n.price) < 0.001 ? 'color:var(--gold);font-weight:700' : 'color:var(--muted)'}">${x.name} ${x.price.toFixed(2)}</span>`)
+      .join('');
+    return `<div style="padding:4px 0;border-top:1px solid var(--border2,#2a3142)">
+      <div style="font-size:10px"><b>${tf}</b> <span style="color:${dcol}">${dir}</span>
+        <span style="color:var(--muted)">${fib.swing_low}─${fib.swing_high}</span>
+        · ใกล้ <span style="color:${inZone ? 'var(--gold)' : 'var(--text)'};font-weight:700">${n.name} ${(+n.price).toFixed(2)}</span>
+        <span style="color:var(--muted)">(${n.distance_pct}%${inZone ? ' · IN-ZONE' : ''})</span></div>
+      <div style="font-size:9px;margin-top:2px">${keys}</div></div>`;
+  };
+  const h4 = one(bs.fib_h4, 'H4'), h1 = one(bs.fib_h1, 'H1');
+  el.innerHTML = (h4 || h1)
+    ? `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:2px">FIBONACCI (auto-swing)</div>${h4}${h1}`
+    : '';
 }
 
 function renderZones(bs) {
