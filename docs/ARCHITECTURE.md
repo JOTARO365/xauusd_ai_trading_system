@@ -453,3 +453,280 @@ Append-only; a record is written incrementally as each horizon matures (partial 
 
 Token creep guard (PLAN Risk): pre-filter + dedupe + **cap posts/batch (default 12)** before
 the prompt; if THB/day rises >10% after M3, cut the window / cap immediately.
+
+---
+---
+
+# Cycle #12 — Regime Auto-Enrichment & Shift Detector (DRAFT — pending user approval)
+
+> Written by: architect · 2026-07-08 · Input: `docs/PLAN.md` (cycle #12, Open-Qs answered)
+> **Status: DRAFT — needs user approval before ANY worker starts** (explain-before-acting,
+> live-money; iron rule). Everything above this line (the shipped #10/#11 news/event system) is
+> STILL LIVE and unchanged by this cycle.
+> This section is SELF-CONTAINED for cycle #12; §refs below are C12-§ unless they point up-file.
+
+## C12-§0. Scope, principles, and what this cycle is NOT
+
+Only **Thread 1 (regime MACRO_AUTO enrichment)** + **Thread 2 (regime-shift dashboard flag)**
+are designed here. **Thread 3 (de-cruft) is a verified NO-OP** — M0 proved twitter/Nitter is
+ALIVE (75 tweets/cycle), the two orphan `.md` prompts are kept as documentation, and the
+prefilter double-compute is cheap observe-only instrumentation kept for its metric; nothing is
+removed.
+
+Principles (inherited, binding):
+- **Zero new AI call per bot cycle.** `update_regime.py` is REST-only (AlphaVantage), zero Claude
+  token. `news_impact.json` is read as an already-paid artifact (Haiku spent in the news cycle).
+- **Context, not command.** New auto lines are *factor tilts* in the analyst's regime block, in
+  the SAME grammar as the existing `inflation_surprise ->` lines — never a trade directive. They
+  never touch `_run_gates`, `decision_maker`, money management, SL/TP, or confidence thresholds.
+- **Kill-switch preserved.** `analyst._regime_context()` strips `<!--...-->` marker lines and
+  injects the rest as top-authority context; **an empty body ⇒ analyst falls back to
+  `analyst.json` gold_factors** (safe). Every new line lives INSIDE the existing
+  `MACRO_AUTO_START/END` markers, so deleting the block restores old behavior exactly.
+- **Fail-soft, per-line.** If AlphaVantage or `news_impact.json` is missing/stale/malformed, the
+  affected auto line is simply **not written** (old behavior = that line absent). The DATA line
+  and the human narrative are never harmed. No exception ever escapes the script.
+- **Display-only dashboard.** Thread 2 mirrors `/api/burn` (empty-shape, `ok:true`, never 500);
+  no POST, no write-back from the browser.
+
+## C12-§1. File structure — new / changed files and responsibility
+
+### New files
+| File | Responsibility | Task |
+|---|---|---|
+| `data/regime_state.json` | Persisted last-known monitored regime values + shift flag + short history, written by `update_regime.py` each run. Read by `/api/regime-state`. Fail-soft, atomic write. | H2 |
+
+### Changed files (whitelist per task)
+| File | Change | Task | Sensitivity |
+|---|---|---|---|
+| `scripts/update_regime.py` | **H1:** in `build_block()`, append up to two conditional auto lines — an **auto CATALYSTS** line (calendar + `event_scenarios.json`) and a **news_sentiment agreement** line (AlphaVantage NEWS_SENTIMENT ∧ `news_impact.json`). **H2:** after building the block, derive the monitored tuple + detect shifts + write `data/regime_state.json`. | H1, H2 | ⚠️ writes the regime context the **Sonnet analyst reads every cycle** → can tilt bias (R1). **Requires user approval before H1 starts** (explain-before-acting), same class as #10/#11's D1. Not a `.json` prompt; not gate/money logic. |
+| `agents/prompts/macro_regime.md` | Not hand-edited by any worker. It is **rewritten at runtime by `update_regime.py` INSIDE the `MACRO_AUTO` markers only** (existing mechanism). Listed here so the surface is explicit. | (runtime) | The human narrative below the markers is never touched by the script (iron rule: only between markers). |
+| `dashboard/app.py` | Add ONE pass-through endpoint `/api/regime-state`, mirroring `/api/burn` exactly. | I1 | display-only; single owner |
+| `dashboard/templates/index.html` | Add a regime-shift **indicator** (pill when `shift.active`, muted current-values line otherwise). | I2 | display-only; single owner |
+| `scripts/setup_vm_regime.ps1` | Change the scheduled cadence **weekly → daily** (AV budget 3→4 of 25/day). Ops-only. | J1 | low; scheduler, no code path |
+
+### Explicitly NOT touched (PLAN Non-Goals + iron rules)
+`agents/analyst.py` (reads the block unchanged — kill-switch is the empty-body fallback),
+`agents/decision_maker.py`, `_run_gates` / anti-fade guards, confidence thresholds, money
+management, SL/TP, `agents/prompts/*.json`, `agents/news_impact.py` (its JSON output is **read**,
+its scoring logic untouched), `agents/news_cache.py`. No NEWS_GATE, no trade trigger.
+
+## C12-§2. Thread 1 — data flow (auto lines inside MACRO_AUTO)
+
+```
+scripts/update_regime.py  [scheduled daily, REST-only, ZERO Claude token]
+  build_block():
+    ├─ (existing) fetch CPI / FedFunds / 10Y → DATA line + inflation->gold + WATCH   [unchanged]
+    │
+    ├─ [H1] AUTO CATALYSTS line
+    │     ├─ fetch_forexfactory_calendar(hours_ahead=168, include_all_us=True)  (try/except → skip line)
+    │     ├─ map each upcoming HIGH-impact US event title → scenario key via NEEDLE map (CPI/NFP/FOMC…)
+    │     ├─ read data/event_scenarios.json → scenarios[key].hot.dir / cool.dir
+    │     └─ emit ≤2 nearest matched events as "EVENT MM-DD (hot->{dir} / cool->{dir})"
+    │
+    └─ [H1] AUTO sentiment line — TAG-ONLY (emit ONLY when BOTH sources agree, else nothing)
+          ├─ Source A: AlphaVantage NEWS_SENTIMENT
+          │     params topics=economy_monetary,financial_markets, tickers=<gold proxy, default GLD>
+          │     av = mean(feed[].ticker_sentiment[GLD].ticker_sentiment_score)   # gold-directional
+          │     av_dir = bullish if av>=+0.15 | bearish if av<=-0.15 | neutral   (AV's own neutral band)
+          │     (if endpoint down / quota SPENT / no gold-proxy ticker in feed → av_dir = None → skip line)
+          ├─ Source B: data/news_impact.json  (already-paid Haiku aggregate)
+          │     ni = aggregate.score (-100..+100, + = bullish gold)
+          │     ni_dir = bullish if ni>10 | bearish if ni<-10 | neutral   (matches news_impact labels)
+          ├─ AGREEMENT RULE (frozen): TRIGGER the line iff av_dir == ni_dir AND that direction ∈ {bullish,bearish}
+          │     otherwise emit NOTHING (= today's behavior, no false signal)
+          │     NB: the agreed direction is the internal TRIGGER only — it is NOT printed as a
+          │         gold call. The written line is tag-only (see grammar below).
+          └─ geo tag: scan news_impact.posts[].text for {war,iran,hormuz,israel,tariff,sanction,strike}
+                 present ⇒ tag "risk-bid geopolitics", else "macro tone"
+
+  Rewrite ONLY between <!-- MACRO_AUTO_START … --> and <!-- MACRO_AUTO_END --> (existing re.sub).
+  Analyst next cycle reads the enriched block as top context (no code change in analyst.py).
+```
+
+Fail-soft: each of the two new lines is independently guarded; any failure ⇒ that line absent,
+DATA line + human narrative intact, script exits 0.
+
+### FROZEN — MACRO_AUTO line grammar (block ordering is frozen top→bottom)
+```
+<!-- MACRO_AUTO_START … -->
+DATA (auto YYYY-MM-DD): CPI YoY … FedFunds … 10Y … real policy rate …        [existing, unchanged]
+- inflation_surprise -> … gold (…)                                            [existing, unchanged]
+- WATCH: …                                                                    [existing, optional]
+- CATALYSTS (auto YYYY-MM-DD): CPI 07-12 (hot->down / cool->up); NFP 08-01 (hot->down / cool->up)   [NEW H1, optional]
+- sentiment (auto YYYY-MM-DD): risk-bid geopolitics — AV & news_impact agree (AV +0.28, ni +77)   [NEW H1, optional, TAG-ONLY]
+<!-- MACRO_AUTO_END -->
+```
+Rules (frozen — TAG-ONLY, re-frozen per user 2026-07-08):
+- The `sentiment (auto …)` line is **tag-only: it carries NO directional verb** (no
+  BULLISH/BEARISH/UP/DOWN/gold-direction word). It hands the analyst a neutral *sentiment context
+  tag* + the two agreeing provenance numbers and lets the analyst interpret direction itself.
+  *Rationale:* the `news_impact` rubric is not yet validated (R6); a softer tag avoids feeding an
+  unproven directional command into the analyst's authoritative block.
+- Tag vocabulary (frozen) ∈ {`risk-bid geopolitics`, `macro tone`} — a *descriptor of what the
+  news is about*, never a gold call. The geo tag is chosen when the frozen geo-keyword scan hits,
+  else `macro tone`.
+- The line is still **emitted only on agreement** (the internal AV∧news_impact non-neutral
+  agreement rule below is unchanged — it is the *trigger* for showing the tag, not shown as a
+  direction). `AV {av:+.2f}` and `news_impact {ni:+d}` (`ni` = signed aggregate score) travel as
+  provenance so a human reader sees both agreeing inputs. It is always the LAST, lowest-authority
+  line in the block.
+- `CATALYSTS (auto …)` lists **at most 2** nearest matched high-impact US events; `MM-DD` date;
+  `hot->`/`cool->` dirs come verbatim from `event_scenarios.json`. No events matched ⇒ line omitted.
+- **Token budget:** worst case +2 short lines ≈ +30–40 input tokens/cycle on the un-cached Sonnet
+  call. Hard cap = these two lines only; no raw news text, no per-post dump.
+- **Config kill:** env `REGIME_SENTIMENT_ENABLED=0` disables the sentiment line (and its AV
+  call) entirely; the CATALYSTS + DATA lines still write. (Freeze the env name.)
+
+> **⚠️ AV gold-proxy tag UNVERIFIED-LIVE (confirm during H1 testing).** The exact gold-proxy
+> ticker that NEWS_SENTIMENT tags (default `GLD`, env `REGIME_SENTIMENT_TICKER`) could NOT be
+> confirmed live on 2026-07-08 because the shared AlphaVantage free key had already hit its
+> **25 req/day** limit. **H1 testing must confirm the live tag on a budget-available day**; if
+> `GLD` is not present in the feed, set `REGIME_SENTIMENT_TICKER` to a working gold proxy
+> (candidate: `FOREX:XAU`) — a change of the env value only, no contract change. The 25/day AV
+> budget is **shared and already tight** (`update_regime.py` uses 3–4/day + other fetch scripts),
+> so the NEWS_SENTIMENT call is one more draw on that pool and **MUST fail-soft when the quota is
+> spent** (av_dir=None ⇒ sentiment line omitted, DATA + CATALYSTS + narrative intact).
+
+## C12-§3. Thread 2 — regime-shift detector + dashboard flag
+
+```
+update_regime.py  [after build_block, H2]
+  ├─ current tuple = {fed_dir, real_rate_sign, sentiment_tilt}
+  │      fed_dir          ← build_block (hiking|cutting|on hold)              [already computed]
+  │      real_rate_sign   ← sign(real_rate) with DEAD-BAND: |real_rate|<0.1 ⇒ carry previous sign
+  │      sentiment_tilt   ← agreement result (bullish|bearish|neutral; neutral if line omitted)
+  ├─ read PREVIOUS data/regime_state.json (missing ⇒ no prior ⇒ shift.active=false, just seed)
+  ├─ shift.kind = monitored fields whose value differs from the previous run:
+  │      fed_dir_flip | real_rate_sign_flip | sentiment_tilt_flip
+  │      DEBOUNCE: count sentiment_tilt_flip ONLY when the NEW tilt is non-neutral
+  │               (crossing into/out of neutral on the boundary does not alert)
+  ├─ shift.active = (shift.kind is non-empty)
+  ├─ on active flip: append {date, kind} to history[] (cap last 10)
+  └─ atomic write data/regime_state.json  (tmp + os.replace)
+```
+Auto-clear (no browser write-back needed): because state persists the *last run's* tuple, a flip
+fires on the run it happens and `shift.active` returns to false on the next daily run when the
+tuple is unchanged. `history[]` preserves recent shifts for the user after the pill clears. This
+keeps Thread 2 fully display-only (mirrors the `/api/burn` no-write pattern).
+
+### FROZEN — `data/regime_state.json` schema
+```json
+{
+  "ok": true,
+  "updated": "2026-07-08T06:00:00Z",
+  "fed_dir": "on hold",
+  "real_rate_sign": "negative",
+  "sentiment_tilt": "bullish",
+  "cpi_yoy": 4.2,
+  "fed_funds": 3.63,
+  "real_rate": -0.6,
+  "shift": {
+    "active": true,
+    "kind": ["fed_dir_flip"],
+    "from": { "fed_dir": "cutting", "real_rate_sign": "negative", "sentiment_tilt": "neutral" },
+    "to":   { "fed_dir": "on hold", "real_rate_sign": "negative", "sentiment_tilt": "bullish" },
+    "since": "2026-07-08T06:00:00Z"
+  },
+  "history": [ { "date": "2026-07-08", "kind": ["fed_dir_flip"] } ]
+}
+```
+`sentiment_tilt` ∈ {bullish,bearish,neutral}; `fed_dir` ∈ {hiking,cutting,on hold};
+`real_rate_sign` ∈ {negative,positive}. `shift.kind` ⊆ {fed_dir_flip,real_rate_sign_flip,
+sentiment_tilt_flip}. When no prior state exists, `shift.active=false`, `kind=[]`, `from=null`.
+
+### FROZEN — `GET /api/regime-state` (mirrors `/api/burn`)
+Serves `data/regime_state.json` pass-through; on missing/corrupt file returns `_empty`, never 500.
+```
+_empty = {
+  "ok": true, "updated": null, "fed_dir": null, "real_rate_sign": null,
+  "sentiment_tilt": "neutral", "cpi_yoy": null, "fed_funds": null, "real_rate": null,
+  "shift": {"active": false, "kind": [], "from": null, "to": null, "since": null},
+  "history": []
+}
+```
+
+### FROZEN — dashboard indicator (index.html)
+- `shift.active === true` ⇒ a highlighted pill `⚠ REGIME SHIFT — {kind joined}` + `since` date +
+  hint text: *"macro regime moved — run youtube-to-knowhow to refresh the narrative."*
+- else ⇒ a muted one-liner: `regime stable · Fed {fed_dir} · real-rate {sign} · tilt {sentiment_tilt}`.
+- empty/missing payload ⇒ render nothing (no crash). Poll like the existing `loadBurn()` fetch.
+
+## C12-§4. Interfaces FROZEN before task decomposition
+1. **MACRO_AUTO line grammar + block ordering** (C12-§2) — the two new line formats (the sentiment
+   line is **TAG-ONLY, no directional verb**), the agreement rule (trigger only), the geo-tag
+   vocabulary {`risk-bid geopolitics`,`macro tone`}, and the `REGIME_SENTIMENT_ENABLED` env kill.
+2. **`data/regime_state.json` schema** (C12-§3) incl. the `shift` object and `history[]` cap.
+3. **`GET /api/regime-state` shape + `_empty`** (C12-§3) — mirrors `/api/burn`, never 500.
+4. **AlphaVantage NEWS_SENTIMENT read contract**: field used = per-item
+   `ticker_sentiment[<gold proxy>].ticker_sentiment_score`; gold proxy default `GLD`
+   (override env `REGIME_SENTIMENT_TICKER`); neutral band ±0.15; no fallback to
+   `overall_sentiment_score` (absent gold-proxy ⇒ treat as no reading ⇒ omit line).
+Changing any of the four after workers start requires a new architect pass logged in this file.
+
+## C12-§5. Decisions (each WITH rationale)
+- **C12-D1 — News-sentiment auto line only on cross-source AGREEMENT (AV ∧ news_impact), else
+  emit nothing.** *Because* the user mandated a false-signal guard, and the two feeds are
+  independent (AV = external NLP over economy/markets news; news_impact = our Haiku scoring of
+  the tweet/web feed). Agreement is a cheap ensemble that suppresses one-source noise.
+  *Considered* a single source or a weighted blend; *rejected* — a blend can assert a direction
+  neither source strongly holds, and PLAN R3/R6 warn both are un-calibrated.
+- **C12-D2 — Use AV per-ticker `ticker_sentiment_score` on a gold proxy, NOT
+  `overall_sentiment_score`.** *Because* the per-ticker score is sentiment of news *about gold*
+  (directly gold-directional), while the overall economy score's map to gold is regime-dependent
+  and sign-ambiguous (the exact reverse-causality trap this project has been burned by).
+  *Considered* the overall score with a documented inversion; *rejected* — fragile, un-honest.
+- **C12-D3 — New lines live INSIDE the existing MACRO_AUTO markers, as the lowest lines.**
+  *Because* it preserves the one true kill-switch (empty body ⇒ default gold_factors) and reads as
+  minor context, not a command (R1 mitigation). *Considered* a separate new marker block or a new
+  file the analyst also reads; *rejected* — more surface, another thing that can strand tokens or
+  bypass the kill-switch.
+- **C12-D3b — Sentiment line is TAG-ONLY (no directional verb); direction is an internal trigger
+  only (re-frozen per user 2026-07-08).** *Because* the `news_impact` rubric is not yet validated
+  (R6); printing `BULLISH/BEARISH gold` into the analyst's *authoritative* block would feed an
+  unproven directional command that can tilt bias (R1). A neutral context tag ("what the news is
+  about" + the two agreeing provenance numbers) lets the analyst judge direction itself.
+  *Considered* the earlier directional-word grammar; *rejected* by the user for R1/R6 safety. The
+  agreement rule still gates *whether* the tag appears, so the ensemble noise-suppression is kept.
+- **C12-D4 — Shift flag auto-clears from persisted state; NO browser acknowledgement/POST.**
+  *Because* the dashboard is display-only (the `/api/burn` pattern has no write path); comparing
+  each run's tuple to the previous run's gives a one-shot alert that clears next day, with
+  `history[]` for recall. *Considered* an `acknowledged` flag toggled by a click; *rejected* —
+  needs a POST endpoint, breaking the display-only contract.
+- **C12-D5 — Dead-band on real-rate sign + non-neutral-only sentiment flips (debounce).**
+  *Because* CPI revisions can nudge `real_rate` across zero and sentiment across the neutral
+  boundary daily; without hysteresis the pill would chatter (PLAN R5). *No alternative* — this is
+  the PLAN's explicit debounce requirement.
+- **C12-D6 — `update_regime.py` owns Thread 1 + Thread 2 (one file, sequential tasks), reading
+  `event_scenarios.json` / `news_impact.json` / calendar as already-produced artifacts.**
+  *Because* all the inputs already exist and are free; concentrating the logic in the one
+  REST-only zero-token script keeps the "no new AI call" guarantee trivially true and avoids a
+  new scheduled process. *Considered* a separate enrichment script; *rejected* — duplicate
+  scheduling + fetch, no benefit.
+- **C12-D7 — Cadence weekly → daily in `setup_vm_regime.ps1`.** *Because* PLAN wants daily
+  freshness and AV usage stays 4/25/day. *Considered* per-cycle; *rejected* — AV quota + these
+  are slow-moving monthly series, daily is plenty.
+
+## C12-§6. Risks & verification hooks (per PLAN M3/M4/M5)
+- **R1 unintended trade-behavior change (HIGH).** *Verify (shadow):* run `analyst` offline on a
+  captured cycle WITH vs WITHOUT the two new lines on a regime day (CPI/NFP/FOMC) and compare
+  `sentiment / bias / confidence` — a spurious direction flip is a FAIL. Mitigation baked in:
+  **tag-only** (no directional verb) grammar, lowest authority line, agreement-gated, kill-switch
+  intact.
+- **R2 token creep (MED).** *Verify:* measure analyst input tokens/cycle before vs after via
+  `db.reader.get_accounting()` / `agent_usage`; the two lines must add ≲40 tokens; over budget ⇒
+  cut the CATALYSTS line first. Un-cached Sonnet every cycle is the reason for the hard 2-line cap.
+- **R3 NEWS_SENTIMENT wrong/down/quota (MED).** *Verify:* simulate AV error / empty feed ⇒
+  news_sentiment line omitted, rest of block intact, script exits 0. Agreement rule + gold-proxy
+  ticker choice are the correctness guards.
+- **R5 shift false-positive (MED).** *Verify:* fixture a previous `regime_state.json`, flip
+  `fed_dir` ⇒ `shift.active=true` + history append; re-run unchanged ⇒ `active=false` (no chatter);
+  nudge `real_rate` within ±0.1 of zero ⇒ no `real_rate_sign_flip`.
+- **Kill-switch check.** Empty the MACRO_AUTO body ⇒ analyst falls back to gold_factors (existing
+  behavior); `REGIME_SENTIMENT_ENABLED=0` ⇒ no AV sentiment call, no sentiment line.
+
+## C12-§7. Non-goals (restated — this cycle will NOT)
+No NEWS_GATE, no change to `decision_maker` / `_run_gates` / money / SL/TP / confidence; the auto
+lines are **context, not a trade trigger**; `event_scenarios` / `news_impact` stay display/context
+only (not order-driving); no `.json` prompt edits; no chart image/video into any AI (confirmed
+none exists); Thread 3 removes nothing (verified NO-OP).

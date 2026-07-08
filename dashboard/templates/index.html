@@ -1248,6 +1248,9 @@
     </div>
   </div>
 
+  <!-- REGIME-STATE INDICATOR — C12-§3 /api/regime-state (shift-alert pill or muted stable line) -->
+  <div id="regime-state-bar" style="display:none;margin:0 0 10px;padding:7px 14px;border-radius:8px;font-family:var(--mono,monospace);font-size:11px;align-items:center;gap:8px"></div>
+
   <div class="tab-nav">
     <button class="tab-btn active" data-tab="overview"    onclick="switchTab('overview')">Dashboard</button>
     <button class="tab-btn"        data-tab="monitor"     onclick="switchTab('monitor')">Live</button>
@@ -1593,7 +1596,7 @@
         <div id="verdict-tf-strip" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
         <div class="detail-grid">
           <div class="detail-cell"><div class="detail-label">Plan SL (BUY/SELL)</div><span id="verdict-sl" class="detail-value">—</span></div>
-          <div class="detail-cell"><div class="detail-label">Plan TP</div><span id="verdict-tp" class="detail-value">—</span></div>
+          <div class="detail-cell"><div class="detail-label">Plan TP (BUY/SELL)</div><span id="verdict-tp" class="detail-value">—</span></div>
           <div class="detail-cell"><div class="detail-label">R:R</div><span id="verdict-rr" class="detail-value">—</span></div>
           <div class="detail-cell"><div class="detail-label">Ride Mode</div><span id="verdict-ride" class="detail-value">—</span></div>
         </div>
@@ -3795,6 +3798,68 @@ async function loadRegime() {
   } catch (e) { /* strip ซ่อนอยู่แล้ว */ }
 }
 
+/* ════════════════════════════════════════════════════════════
+   REGIME-STATE INDICATOR — C12-§3 /api/regime-state
+   shift.active → red pill; else → muted stable line; updated=null → hide (ARCHITECTURE C12-§3)
+   ════════════════════════════════════════════════════════════ */
+async function loadRegimeState() {
+  const bar = document.getElementById('regime-state-bar');
+  if (!bar) return;
+  try {
+    const res  = await fetch('/api/regime-state');
+    const data = await res.json();
+
+    // No file yet (empty shape has updated=null) or invalid → render nothing
+    if (!data || !data.ok || !data.updated) {
+      bar.style.display = 'none';
+      return;
+    }
+
+    const shift = data.shift || {};
+    if (shift.active) {
+      // Highlighted pill when a regime flip is detected
+      const kinds = (shift.kind || []).join(', ');
+      const since = shift.since ? shift.since.slice(0, 10) : '';
+      bar.style.cssText = [
+        'display:flex', 'margin:0 0 10px', 'padding:7px 14px',
+        'border:1px solid var(--red,#E94560)',
+        'border-left:3px solid var(--red,#E94560)',
+        'border-radius:8px', 'font-family:var(--mono,monospace)', 'font-size:11px',
+        'color:var(--text,#DDE2EC)', 'align-items:center', 'gap:8px',
+        'background:rgba(233,69,96,0.06)',
+      ].join(';');
+      bar.innerHTML =
+        '<span style="font-weight:700;color:var(--red,#E94560);flex-shrink:0">' +
+          '&#9888; REGIME SHIFT — ' + kinds +
+        '</span>' +
+        '<span style="color:var(--muted,#6B7488)">since ' + since + '</span>' +
+        '<span style="color:var(--muted,#6B7488);font-size:10px;margin-left:auto">' +
+          'macro regime moved — run youtube-to-knowhow to refresh the narrative' +
+        '</span>';
+    } else {
+      // Muted one-liner when regime is stable
+      const fedDir = data.fed_dir        || '—';
+      const rrSign = data.real_rate_sign || '—';
+      const tilt   = data.sentiment_tilt || '—';
+      bar.style.cssText = [
+        'display:flex', 'margin:0 0 10px', 'padding:5px 14px',
+        'border:1px solid var(--border2,#2a3142)',
+        'border-radius:8px', 'font-family:var(--mono,monospace)', 'font-size:11px',
+        'color:var(--text-dim,#9aa3b8)', 'align-items:center', 'gap:8px',
+      ].join(';');
+      bar.innerHTML =
+        '<span style="color:var(--green,#2DC653);font-size:10px">&#9679;</span>' +
+        '<span>regime stable · Fed ' + fedDir +
+          ' · real-rate ' + rrSign +
+          ' · tilt ' + tilt +
+        '</span>';
+    }
+  } catch (e) {
+    if (bar) bar.style.display = 'none';
+    console.error('loadRegimeState error:', e);
+  }
+}
+
 async function fetchCalendar() {
   try {
     const res  = await fetch('/api/calendar');
@@ -4302,9 +4367,23 @@ function renderVerdict(bs) {
     _tfBadge('H1',  h1.direction,  h1.strength) +
     _tfBadge('H4',  mk.trend, null) +
     _tfBadge('D1',  mk.d1_trend, null);
-  document.getElementById('verdict-sl').textContent =
-    (plan.buy_sl_pips || plan.sell_sl_pips) ? `${plan.buy_sl_pips ?? '—'} / ${plan.sell_sl_pips ?? '—'}p` : '—';
-  document.getElementById('verdict-tp').textContent = plan.tp_pips ? plan.tp_pips + 'p' : '—';
+  // แสดง SL/TP เป็นราคาทองจริง (ดูง่ายกว่า pips). 1 pip = 0.01 (point ทอง — ตรงกับ
+  // profit_pips=diff/point ใน mt5_connector). BUY/SELL คนละราคา; ไม่มี bid → fallback pips.
+  const vpx = (bs.price_info || {}).bid, PT = 0.01;
+  const _pr = v => (v != null ? v.toFixed(2) : '—');
+  const slEl = document.getElementById('verdict-sl'), tpEl = document.getElementById('verdict-tp');
+  if (vpx && (plan.buy_sl_pips || plan.sell_sl_pips)) {
+    const bSL = plan.buy_sl_pips != null ? vpx - plan.buy_sl_pips * PT : null;
+    const sSL = plan.sell_sl_pips != null ? vpx + plan.sell_sl_pips * PT : null;
+    slEl.textContent = `B ${_pr(bSL)} / S ${_pr(sSL)}`;
+  } else {
+    slEl.textContent = (plan.buy_sl_pips || plan.sell_sl_pips) ? `${plan.buy_sl_pips ?? '—'} / ${plan.sell_sl_pips ?? '—'}p` : '—';
+  }
+  if (vpx && plan.tp_pips) {
+    tpEl.textContent = `B ${_pr(vpx + plan.tp_pips * PT)} / S ${_pr(vpx - plan.tp_pips * PT)}`;
+  } else {
+    tpEl.textContent = plan.tp_pips ? plan.tp_pips + 'p' : '—';
+  }
   const ls = bs.last_signal || {};
   const slDir = ls.direction === 'SELL' ? plan.sell_sl_pips : plan.buy_sl_pips;
   document.getElementById('verdict-rr').textContent =
@@ -4814,6 +4893,7 @@ function _bootstrap() {
   loadEventStats();
   loadEventScenario();
   loadRegime();
+  loadRegimeState();
   loadMacroStrip();
   loadCotCard();
   loadNewsImpact();
@@ -4825,6 +4905,7 @@ function _bootstrap() {
   setInterval(loadEventStats, 3600000);
   setInterval(loadEventScenario, 3600000);
   setInterval(loadRegime, 3600000);
+  setInterval(loadRegimeState, 3600000); // regime_state.json updated daily — hourly poll sufficient
   setInterval(loadLivePrice, 5000);
   setInterval(loadMacroStrip, 3600000);  // macro data is daily — refresh hourly is sufficient
   setInterval(loadCotCard, 3600000);     // COT data is weekly — hourly poll is sufficient

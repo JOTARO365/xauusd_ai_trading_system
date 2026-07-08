@@ -284,3 +284,148 @@ fan-out — so the sub-agent delegation format is not used. Each task = one work
 - **No diff** may touch `agents/prompts/*.json`, `_run_gates`, money management, or confidence
   thresholds. Any worker hitting such a need marks the task **[BLOCKED]** and escalates (do not diverge).
 - Every code edit / bug / fix also logged in `.claude/context/continue.md` (CLAUDE.md override #2).
+
+---
+---
+
+# TASKS — Cycle #12 · Regime Auto-Enrichment & Shift Detector
+
+> Written by: architect · 2026-07-08 · Design of record: `docs/ARCHITECTURE.md` §"Cycle #12"
+> (C12-§). Contracts in **C12-§4 are FROZEN**.
+> ⚠️ **APPROVAL GATE — implementation waits for user approval.** Every task below is `[ ]` NOT
+> STARTED. **No worker may begin until the user approves the Cycle #12 architecture** (explain-
+> before-acting, live-money iron rule). In particular **Batch H1 edits the regime context the
+> Sonnet analyst reads every cycle** (can tilt bias, R1) — same approval class as #10/#11's D1.
+> Workers update this file + `.claude/context/continue.md` per CLAUDE.md override #2.
+
+## Batch / dependency structure
+
+```
+Batch H1 (Thread 1)  update_regime.py auto CATALYSTS + news_sentiment agreement line
+                     · deps: user approval · [scripts/update_regime.py]
+Batch H2 (Thread 2)  update_regime.py shift detector → data/regime_state.json
+                     · deps: H1 (SAME FILE, sequential) · [scripts/update_regime.py, data/regime_state.json]
+Batch H3 (dashboard) parallel — disjoint files, frozen contract C12-§3/§4:
+   ├─ I1  /api/regime-state endpoint ........ deps: H2 (sample file) · [dashboard/app.py]
+   └─ I2  regime-shift UI indicator ......... deps: I1 contract (frozen) · [dashboard/templates/index.html]
+   Gate: auditor integration check → empty-shape ok:true, pill renders on active shift
+Batch J1 (ops)       setup_vm_regime.ps1 weekly → daily · deps: H1+H2 landed · [scripts/setup_vm_regime.ps1]
+```
+`scripts/update_regime.py` is shared by H1 and H2 → **sequential, one owner at a time** (not
+parallel). H3's two files are disjoint and build against the frozen `regime_state.json` /
+`/api/regime-state` contracts, so I1+I2 may run in parallel with an integration gate after. No
+task spans 3+ independent parallel modules → sub-agent delegation format not required.
+
+---
+
+## Batch H1 — Thread 1: MACRO_AUTO enrichment  · deps: USER APPROVAL
+
+### H1 [DONE] — auto CATALYSTS + news_sentiment agreement line in `update_regime.py`
+- **agent:** worker (single)
+- **scope (whitelist):** `scripts/update_regime.py` only (`build_block()` + helpers; a small
+  self-contained title→scenario-key NEEDLE map + geo-keyword list may be added as module
+  constants). MUST NOT touch `agents/prompts/macro_regime.md` by hand (the script rewrites it
+  between markers at runtime), `analyst.py`, or any `.json` prompt.
+- **input contract:** C12-§2 + C12-§4. Reads `data/event_scenarios.json` (`scenarios[key].hot.dir`
+  / `cool.dir`), `data/news_impact.json` (`aggregate.score`, `posts[].text`),
+  `connectors.web_news.fetch_forexfactory_calendar(hours_ahead=168, include_all_us=True)`, and
+  AlphaVantage `NEWS_SENTIMENT` (topics=economy_monetary,financial_markets; tickers=gold proxy,
+  default `GLD`, env `REGIME_SENTIMENT_TICKER`).
+- **output contract:** `build_block()` appends, INSIDE the `MACRO_AUTO` markers and in the frozen
+  order (DATA → inflation → WATCH → CATALYSTS → sentiment[tag-only]):
+  - **CATALYSTS line** (C12-§2 grammar), ≤2 nearest matched high-impact US events, `hot->`/`cool->`
+    dirs verbatim from `event_scenarios.json`; no match or calendar fetch fails ⇒ line omitted.
+  - **sentiment line — TAG-ONLY** (no directional verb; frozen grammar C12-§2), emitted ONLY when
+    `av_dir == ni_dir ∈ {bullish,bearish}` (agreement is the *trigger*, not printed as a direction);
+    tag ∈ {`risk-bid geopolitics`,`macro tone`} from the frozen keyword scan; provenance
+    `(AV {av:+.2f}, ni {ni:+d})`. Any missing source / disagreement / neutral ⇒ line omitted.
+    ⚠️ Confirm the live AV gold-proxy tag (`GLD` default, else `REGIME_SENTIMENT_TICKER`) on a
+    budget-available day (25/day AV quota is shared/tight); quota spent ⇒ fail-soft, line omitted.
+  - Env `REGIME_SENTIMENT_ENABLED=0` ⇒ skip the AV call + sentiment line entirely.
+  - Every new-line path wrapped fail-soft: failure ⇒ that line absent, DATA line + human narrative
+    intact, script exits 0.
+- **acceptance:** (1) `--dry-run` on a day with an upcoming CPI/NFP prints a correctly-formatted
+  CATALYSTS line with dirs matching `event_scenarios.json`. (2) When AV gold-proxy sentiment and
+  `news_impact` agree non-neutral → one **tag-only** `sentiment (auto …)` line (NO
+  BULLISH/BEARISH/UP/DOWN verb) in the frozen format; when they disagree / either is neutral /
+  AV unavailable → NO sentiment line (block otherwise unchanged).
+  (3) **Token check:** the two added lines add ≲40 input tokens to the analyst call (measure
+  before/after via `db.reader.get_accounting()` / `agent_usage`). (4) **Shadow (R1):** analyst on
+  a captured regime-day cycle WITH vs WITHOUT the lines does not spuriously flip `bias` direction.
+  (5) `REGIME_SENTIMENT_ENABLED=0` ⇒ no AV sentiment call, no sentiment line; DATA+CATALYSTS still
+  written. Emptying the MACRO_AUTO body ⇒ analyst falls back to gold_factors (kill-switch intact).
+
+---
+
+## Batch H2 — Thread 2: regime-shift detector  · deps: H1 (same file)
+
+### H2 [DONE] — shift detection + `data/regime_state.json` writer in `update_regime.py`
+- **agent:** worker (single) — runs AFTER H1 (shares `update_regime.py`)
+- **scope (whitelist):** `scripts/update_regime.py` (post-`build_block` state logic), `data/regime_state.json` (NEW, generated)
+- **input contract:** C12-§3. Current tuple from `build_block`-derived values: `fed_dir`,
+  `real_rate_sign` (dead-band |real_rate|<0.1 ⇒ carry previous sign), `sentiment_tilt`
+  (bullish/bearish/neutral from H1's agreement result). Previous values from an existing
+  `data/regime_state.json`.
+- **output contract:** compute `shift.kind` = monitored fields differing from the previous run
+  ({fed_dir_flip, real_rate_sign_flip, sentiment_tilt_flip}); **debounce** — count
+  `sentiment_tilt_flip` only when the NEW tilt is non-neutral. `shift.active = kind≠[]`. On an
+  active flip append `{date, kind}` to `history[]` (cap 10). Write the EXACT C12-§3 schema atomically
+  (tmp + `os.replace`). Missing prior state ⇒ `shift.active=false`, `kind=[]`, `from=null` (seed only).
+  Fail-soft: any error ⇒ no crash, prior file left intact.
+- **acceptance:** fixture a prior `regime_state.json`, flip `fed_dir` → new file has
+  `shift.active=true`, `kind=["fed_dir_flip"]`, correct `from`/`to`, and a `history` append; re-run
+  with unchanged inputs → `shift.active=false` (no chatter); nudge `real_rate` within ±0.1 of zero
+  → no `real_rate_sign_flip`; output validates against C12-§3.
+
+---
+
+## Batch H3 — dashboard (parallel; disjoint files, frozen contract)
+
+### I1 [DONE] — `GET /api/regime-state` pass-through endpoint
+- **agent:** worker (single)
+- **scope (whitelist):** `dashboard/app.py` (add `/api/regime-state` only)
+- **input contract:** `data/regime_state.json` (C12-§3).
+- **output contract:** mirror `/api/burn` EXACTLY — module `_empty` per C12-§3; `try open +
+  jsonify(json.load(f))`; `except FileNotFoundError/Exception → jsonify(_empty)`. Never 500, never
+  wrap the file on success.
+- **acceptance:** `GET /api/regime-state` returns the live file; delete the file → returns `_empty`
+  with `ok:true` (no 500); shape matches C12-§3.
+
+### I2 [DONE] — regime-shift indicator on the dashboard
+- **agent:** worker (single) — builds against I1's frozen contract (parallel-safe; integration gate after)
+- **scope (whitelist):** `dashboard/templates/index.html` (new regime-shift indicator + a fetch of
+  `/api/regime-state`, mirroring the existing `loadBurn()` fetch→render)
+- **input contract:** `/api/regime-state` (C12-§3).
+- **output contract:** `shift.active` ⇒ highlighted pill `⚠ REGIME SHIFT — {kind}` + `since` +
+  hint "run youtube-to-knowhow to refresh the narrative"; else muted line
+  `regime stable · Fed {fed_dir} · real-rate {sign} · tilt {sentiment_tilt}`; empty/missing payload
+  ⇒ render nothing (no console error).
+- **acceptance:** with `shift.active:true` the pill renders with kind+since; with an inactive/empty
+  payload no pill and no crash; no console error.
+- **Gate (auditor):** integration check after H3 — endpoint empty-shape returns `ok:true` (never
+  500); UI renders correctly for active / inactive / empty payloads.
+
+---
+
+## Batch J1 — ops: daily cadence  · deps: H1+H2 landed
+
+### J1 [ ] — `setup_vm_regime.ps1` weekly → daily
+- **agent:** worker (single)
+- **scope (whitelist):** `scripts/setup_vm_regime.ps1` only
+- **input contract:** existing weekly scheduled task definition.
+- **output contract:** change the schedule trigger weekly → daily (AV budget 4/25/day). No code-path
+  change, ops-only.
+- **acceptance:** the scheduled task registers as daily; a manual `update_regime.py --dry-run` after
+  the change still succeeds.
+
+---
+
+## Cross-batch integration gate (auditor) — Cycle #12
+- After H1: token before/after (`get_accounting`) within budget; shadow analyst on a regime day
+  shows no spurious `bias` flip; fail-soft paths verified (AV down / `news_impact.json` missing).
+- After H2: shift fixtures (flip fires once, unchanged re-run clears, dead-band holds).
+- After H3: all `/api/regime-state` empty-shape returns `ok:true` (never 500); pill renders.
+- **No diff** may touch `agents/prompts/*.json`, `analyst.py` decision logic, `_run_gates`, money
+  management, SL/TP, confidence thresholds. A worker hitting such a need marks the task
+  **[BLOCKED]** and escalates (do not diverge).
+- Every code edit / bug / fix also logged in `.claude/context/continue.md` (override #2).

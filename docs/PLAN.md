@@ -1,119 +1,149 @@
-# PLAN — News & Event Impact Analysis (backlog #10 + #11)
+# PLAN — Regime Auto-Enrichment & System De-cruft (cycle #12)
 
-> Written by: planner · Last updated: 2026-07-04
-> Status: APPROVED (user ตอบ Open Questions 2026-07-04 — ดูท้ายไฟล์)
-> Cycle ก่อนหน้า (Stabilize & Complete) ปิดแล้ว — ดู git history + continue.md
+> Written by: planner · Last updated: 2026-07-08
+> Status: DRAFT — รออนุมัติจาก user ก่อนเข้า Architecture
+> Cycle ก่อนหน้า (#10/#11 News & Event Impact) **ปิดแล้ว** — shipped: economic
+> calendar + event_scenarios + per-post news_impact + realized-move/calibration.
+> PLAN.md เดิมถูกแทนที่ (rolling one-plan-per-cycle) — ของเก่าอยู่ใน git history + continue.md.
+
+---
+
+## Motivation (จากการสำรวจ 2026-07-08 — 2 subagents, read-only; หลักฐาน file:line ใน continue.md)
+
+ผู้ใช้ถาม 2 ข้อ: (1) ระบบเดิมอันไหนไม่ใช้แล้ว (2) การ "ส่งวิดิโอให้วิเคราะห์" ยังจำเป็นไหม
++ ทำยังไงไม่ต้องส่งทุกครั้ง. พบข้อเท็จจริงสำคัญ:
+
+- **บอทไม่ได้ส่งภาพ/วิดิโอ chart เข้า AI เลย** — ไม่มี base64/vision ใน agents. "การส่งวิดิโอ"
+  = การป้อน **narrative ของ `agents/prompts/macro_regime.md`** ด้วยมือ (ดู YouTube macro →
+  youtube-to-knowhow → กลั่นเป็น regime). analyst อ่านไฟล์นี้ทุก cycle เป็น context สูงสุด.
+- **`macro_regime.md` มี 2 ชั้น:** MACRO_AUTO (auto CPI/Fed/10Y จาก AlphaVantage ผ่าน
+  `update_regime.py`, REST-only zero token) + narrative (PHASE/DRIVERS/FILTER/CATALYSTS/
+  geopolitics — ป้อนมือ). narrative ปัจจุบันลงวันที่ 07-02 (เก่า) และไฟล์บอกเอง "อัปเดตเมื่อ
+  regime เปลี่ยน ไม่ใช่ทุกวัน". ลบ narrative = analyst กลับ default gold_factors (ปลอดภัย).
+- **เซอร์ไพรส์:** ฟีดใหม่จาก cycle #10/#11 (news_impact, event_scenarios, macro_strip, cot)
+  เกือบทั้งหมด **dashboard-only — ไม่เคยไหลเข้า analyst**. เราจ่าย Haiku ให้คะแนน news_impact
+  ทุกรอบอยู่แล้ว (ทิศ + geopolitics tag) แต่ผลไปโผล่แค่ dashboard.
+  → ตรงกับ **Open-Q#3 ของ cycle #10/#11** ที่ตอบไว้ว่า "display-only ใน v1 → feed เข้า analyst
+  ทีหลังเมื่อ calibration พิสูจน์คุณภาพ". **cycle #12 คือการหยิบ step 'feed ทีหลาง' นั้นมาทำ**
+  โดยเริ่มจากช่องทาง regime (ไม่ใช่ trade gate).
+- **AlphaVantage NEWS_SENTIMENT** provision ไว้แต่ไม่เคยเรียก (grep = 0).
+- **Dead/noise ที่ยืนยัน:** 2 orphan prompt `.md` (`trend_strategy.md`, `news_gatherer.md`);
+  `twitter_client.py` (Nitter) น่าจะคืน 0 tweet ทุก cycle (Nitter ล่มปี 2025); news prefilter
+  ถูกคำนวณซ้ำ 2 รอบ/cycle (observe-only แล้วทิ้ง + ของจริงใน news_cache).
+
+**แก่นที่ลดไม่ได้ (ต้องใช้คน/วิดิโอ):** PHASE thesis + playbook เงื่อนไข (RECONCILE/FILTER,
+"Warsh อ่านไม่ได้อย่าเดา", "ห้าม fade spike") — การตีความล่วงหน้า ไม่ใช่ตัวเลข.
+
+---
 
 ## Goal
 
-สร้างชั้นวิเคราะห์ "ข่าวและ event" แบบ display-first สองส่วนที่เสริมกัน เพื่อตอบคำถาม
-"ตอนนี้เกิดอะไรขึ้น + ทองน่าจะไปทางไหน": (A) ให้คะแนน impact ของข่าว/โพสต์ **รายชิ้น**
-(ทิศต่อทอง / ความมั่นใจ / ระดับความแรง / อายุของผล) แทน sentiment ก้อนเดียวที่ใช้อยู่ —
-จะได้รู้ว่าข่าวชิ้นไหนขับทอง ทางไหน แรงแค่ไหน; และ (B) ยกระดับ Event Radar เดิมจาก prior
-แบบเหมารวม เป็น scenario ที่ **ขึ้นกับ surprise** (actual ร้อน/เย็นกว่า consensus →
-ทองไปทางไหน ขนาดเท่าไร) ทั้งสองส่วนเป็นเครื่องมือแสดงผล/บริบท ไม่ใช่ trigger เทรด
-และต้องไม่เพิ่มต้นทุน AI ต่อ cycle (เป้า burn 150-250฿/วัน ยังเป็น first-class constraint)
+ลดการพึ่งพา "ป้อน narrative ด้วยมือ/วิดิโอทุกครั้ง" โดย (ก) auto-generate ส่วน mechanical
+ของ regime จากฟีดที่มี/จ่ายไปแล้ว, (ข) เตือนคนเฉพาะตอน regime เปลี่ยนจริง, และ (ค) เก็บกวาด
+dead code / งานซ้ำซ้อน. **ต้องไม่เพิ่มต้นทุน AI ต่อ cycle** และ **ต้องไม่เปลี่ยนพฤติกรรมเทรด
+โดยไม่ได้ตั้งใจ** (live-money).
 
-## Scope
+---
 
-**Feature A — Per-post News Impact scoring** (ต่อยอด X/Twitter + web news ที่บอทอ่านอยู่แล้ว)
-- Normalize โพสต์/ข่าวทุกแหล่งให้เป็น schema เดียวกัน
-- **Pre-filter ในโค้ด (ฟรี)**: ทิ้งโพสต์ที่ไม่แตะปัจจัยทอง (Fed / CPI / yields / DXY /
-  war / tariff / Trump) ก่อนจ่าย token — เป้าตัด noise 70-80%
-- Dedupe ด้วย content hash (ข่าวเดียวกันหลายแหล่ง/รีโพสต์ นับครั้งเดียว)
-- Scoring แบบ **batch** ด้วย Haiku: โพสต์ที่ผ่านตัวกรองใน window หนึ่ง → หนึ่ง LLM call
-  คืนผลรายโพสต์ = {direction bull/bear/neutral ต่อทอง, confidence, magnitude_tier 1-3,
-  half_life, reason} — **merge เข้า call สรุปข่าวเดิม** เป็นทางเลือกแรก ไม่เพิ่ม call/cycle
-- Rolling aggregate score ถ่วงด้วย magnitude × ความสด (half-life decay)
-- การ์ด "News Impact" บน dashboard: รายการโพสต์เด่นพร้อมคะแนน + ตัวเลข aggregate
-- v1 เป็น display-only; การป้อนคะแนนเข้า macro regime / analyst = Open Question
+## Scope (3 threads)
 
-**Feature B — Event scenario conditioned on surprise** (ยกระดับ Event Radar เดิม — ไม่รื้อ)
-- **Sign table ต่อ event type**: นิยามทิศก่อน (เช่น CPI hot → gold down, NFP hot → down,
-  FOMC hawkish → down) — user ยืนยันตารางก่อนแสดงผล
-- **Conditional scenario บนการ์ด**: ใช้ consensus/forecast จาก calendar feed ที่ดึงอยู่แล้ว
-  แสดง "ถ้า actual ร้อนกว่า consensus → ทองน่าจะ X | ถ้าเย็นกว่า → Y" เริ่มจาก sign +
-  magnitude เดิมสองฝั่งที่มีอยู่ (ยังไม่ conditional) แล้วค่อยแทนด้วยสถิติจริง
-- **Magnitude scale ตามขนาด surprise**: รวบรวมประวัติ actual-vs-consensus ต่อ event →
-  ความสัมพันธ์ |surprise| → |move| (พลาด 0.1% กับ 0.5% คนละเรื่อง) — computed-in-code
-  ทั้งหมด ไม่มี recurring AI cost
+### Thread 1 — Regime MACRO_AUTO enrichment (ตัวหลักของการลดวิดิโอ)
+ขยาย `scripts/update_regime.py` (REST-only, zero Claude token) ให้เขียนบรรทัด auto เพิ่ม:
+- **auto CATALYSTS line** — จากปฏิทิน ForexFactory + `event_scenarios.json`/`event_stats.json`
+  (วัน + ทิศ hot/cool ที่คำนวณไว้แล้ว) แทนการพิมพ์ catalysts มือ.
+- **auto sentiment/geopolitics tilt line** — จาก AlphaVantage NEWS_SENTIMENT และ/หรือ
+  aggregate `data/news_impact.json` (Haiku จ่ายแล้ว) → สรุปทิศ hawkish/dovish + geopolitics
+  เป็น 1 บรรทัดสั้น.
+- คุมความยาว: analyst รัน **Sonnet ทุก cycle ไม่มี prompt cache** → เพิ่ม **1-2 บรรทัด terse
+  เท่านั้น**, ห้าม dump ข้อความข่าวดิบ.
+- **สอดคล้อง Open-Q#3 เดิม:** เป็นการ feed เข้า *regime context* (บริบท) ไม่ใช่ trade gate;
+  ยังไม่แตะ decision path โดยตรง.
 
-**ร่วมกันทั้งสอง feature — Magnitude honesty (milestone แยกชัดเจน ไม่ใช่สมมติฐานแฝง)**
-- เก็บ realized price move ที่ +5 / +15 / +60 นาที หลังโพสต์ที่ถูก score และหลังเลขออก
-- ใช้ calibrate rubric tier และ surprise-curve ทีหลัง — **ห้ามเดา magnitude / ห้ามอ้าง
-  ความแม่นก่อนผ่านการ validate** (บทเรียน reverse-causality ของโปรเจกต์นี้)
+### Thread 2 — Regime-shift detector + ping
+ใน `update_regime.py` ตรวจ "regime เปลี่ยน" จากค่าที่คำนวณอยู่แล้ว (fed direction flip /
+real-rate sign flip / sentiment tilt ข้าม threshold) → เขียน state ล่าสุดลงไฟล์ + ส่งสัญญาณ
+เตือน เพื่อให้ **คนรัน youtube-to-knowhow เฉพาะตอน shift**. เพิ่ม cadence เป็นรายวัน
+(AV ใช้ 3-6/25 req/วัน). infra scheduled มีอยู่แล้ว (setup_vm_regime.ps1 weekly → เปลี่ยนเป็น daily).
 
-**งานจิ๋วแถม**: โชว์ delta +$/−$ ชัดๆ บนการ์ด Event Radar (display บรรทัดเดียว ทำก่อนได้)
+### Thread 3 — De-cruft (noise/dead cleanup, independent, low-risk)
+- ลบ orphan prompt docs: `agents/prompts/trend_strategy.md`, `agents/prompts/news_gatherer.md`
+  (verify grep 0 refs ก่อนลบ).
+- **ยืนยัน twitter=0 จาก log ก่อน** — ถ้า Nitter คืน 0 tweet จริงต่อเนื่อง → เสนอ disable/ลด
+  cadence (แยก decision ให้ user; ห้ามตัด news flow มั่ว).
+- ตัด news prefilter ที่คำนวณซ้ำใน node_news (observe-only) — verify เป็น instrumentation ล้วนก่อน.
 
-## Non-Goals
+---
 
-- **ไม่ trigger เทรดอัตโนมัติ** จากคะแนนข่าวหรือ scenario ใดๆ — display/บริบทเท่านั้น
-- **ไม่แตะ** gate logic, confidence thresholds, money management, anti-fade guards,
-  และ live prompt ของ agents ทุกตัว
-- **ไม่เพิ่ม AI call ต่อ bot cycle** — scoring ต้อง merge เข้า call เดิมหรือเป็นงาน scheduled;
-  ไม่ใช้ Sonnet สำหรับ scoring (Haiku เท่านั้น)
-- **ไม่ rebuild Event Radar priors เดิม** (unconditional direction % + เป้าสองฝั่ง มีแล้ว
-  ใช้ต่อ) — เพิ่มเฉพาะชั้น conditional + magnitude scaling
-- ไม่เพิ่ม dependency หนักใหม่ (ML framework, vector DB ฯลฯ) — regression/สถิติทำด้วย
-  เครื่องมือที่มีอยู่
-- ไม่ทำ per-post scoring แบบ 1 call ต่อ 1 โพสต์ ไม่ว่ากรณีใด
-- ไม่สัญญา "ทำนายราคา" — ทุกตัวเลขต้องระบุที่มา (prior / rubric / calibrated) บนการ์ด
+## Milestones (เรียงตาม dependency + ความเสี่ยงต่ำ→สูง; verify ได้อิสระ)
 
-## Milestones (เรียงถูก-ไว-เสี่ยงต่ำก่อน; แต่ละข้อ verify ได้อิสระ)
+- **M0 — ยืนยันข้อเท็จจริงเสี่ยงต่ำ** (ไม่แตะ path เทรด): grep log ยืนยัน twitter=0; ยืนยัน
+  orphan .md 0 refs; ยืนยัน prefilter เป็น observe-only. Verify: หลักฐานชัดในแต่ละข้อ.
+- **M1 — Architecture freeze**: architect เขียน `docs/ARCHITECTURE.md` — format บรรทัด auto
+  (ตายตัว), field จาก NEWS_SENTIMENT/news_impact/calendar ที่ใช้, กติกา shift-detect +
+  state-file schema, kill-switch. **แสดง user อนุมัติก่อน worker เริ่ม** (iron rule).
+- **M2 — Thread 3 cleanup** (low-risk): ลบ orphan docs + ตัด prefilter ซ้ำ. Verify: pipeline
+  รันปกติ, ไม่มี import พัง, token/cycle ไม่เพิ่ม.
+- **M3 — Thread 1 enrichment**: update_regime.py เพิ่ม auto CATALYSTS + sentiment tilt.
+  Verify: บล็อก MACRO_AUTO มีบรรทัดใหม่ถูก format; วัด token/cycle ที่ analyst จริง
+  (before/after) ไม่พองเกินงบ; fail-soft เมื่อ AV/news_impact ว่าง.
+- **M4 — Thread 2 shift-detector + ping** + cadence รายวัน. Verify: จำลอง fed/real-rate flip
+  → state เปลี่ยน + ping ยิง; ไม่มี false-positive ในข้อมูลนิ่ง (debounce).
+- **M5 — Audit**: auditor เทียบ vs ARCHITECTURE + วัด (ก) narrative งานมือลดจริง (มีบรรทัด auto
+  แทน catalysts/sentiment) (ข) token/cycle ไม่พอง (ค) **พฤติกรรมเทรดไม่เปลี่ยน** —
+  shadow/replay วันมี regime (CPI/NFP/FOMC) เทียบ bias ก่อน-หลัง.
 
-- **M0 — Quick win: delta $ บนการ์ด Event Radar** — แสดงเป้าเป็น +$/−$ จากราคาปัจจุบัน
-  ชัดๆ. Verify: เปิด dashboard วันมี event เห็น delta ถูกต้องตรงกับ % เดิม
-- **M1 — Feature A ชั้นโค้ดล้วน (ฟรี)**: normalize schema + pre-filter ปัจจัยทอง + dedupe.
-  Verify: log อัตราการกรองจริง (เป้าตัด ≥70% ของโพสต์ดิบ) + ไม่มีข่าวปัจจัยทองหลุด
-  เมื่อ spot-check ย้อนหลัง 1-2 วัน; token cost ยังเท่าเดิม
-- **M2 — Feature B sign-based scenario**: sign table (user ยืนยันแล้ว) + บรรทัด conditional
-  "hot → … / cool → …" บนการ์ด event ที่มี consensus. Verify: วันมี event การ์ดแสดง
-  สอง scenario ถูกทิศตาม sign table; วันไม่มี consensus การ์ด fallback เป็นแบบเดิม
-- **M3 — Feature A batch scoring + การ์ด News Impact**: Haiku คืนคะแนนรายโพสต์ใน call
-  ที่ merge กับสรุปข่าวเดิม + rolling aggregate + การ์ดบน dashboard. Verify: จำนวน AI call
-  ต่อ cycle เท่าเดิม (ดูจาก cost tracking); token/วัน เพิ่มไม่เกินงบที่ตกลง; คะแนนรายโพสต์
-  ปรากฏบนการ์ดพร้อม reason
-- **M4 — Realized-move logger (ทั้งสอง feature)**: บันทึกราคาที่ +5/+15/+60 นาที
-  หลังโพสต์ tier สูงและหลังเลขออก ลง storage — เก็บอย่างเดียว ยังไม่ปรับอะไร.
-  Verify: หลัง event/ข่าวใหญ่ 1 รอบ มี record ครบทุก horizon
-- **M5 — Feature B surprise-magnitude จากข้อมูลจริง**: สร้างชุดประวัติ actual-vs-consensus
-  ต่อ event (แหล่งตาม Open Question) → conditional split + |surprise|→|move| แทนตัวเลข
-  rubric บนการ์ด พร้อมป้าย n และช่วงข้อมูล. Verify: ตัวเลข reproduce ได้จาก script เดียว +
-  spot-check กับ event จริงย้อนหลัง (เช่น NFP miss ล่าสุด)
-- **M6 — Calibration review (gate ด้วยจำนวน sample)**: เทียบ magnitude_tier และ
-  surprise-curve กับ realized move ที่เก็บจาก M4; รายงานผล + ปรับ rubric/แสดงผล.
-  Verify: รายงาน calibration มีตัวเลข hit-rate ต่อ tier; การ์ดแสดงสถานะ calibrated/ยังไม่
+---
 
 ## Risks
 
-- **Magnitude หลอก / reverse-causality** (สูง) — โปรเจกต์เคยเจ็บมาแล้ว (hold-time,
-  CHART_SHADOW). Mitigation: M4+M6 เป็น milestone บังคับ; ก่อน calibrate การ์ดต้องติดป้าย
-  "rubric — ยังไม่ validate"; ห้ามตัวเลข magnitude ใดขึ้นการ์ดโดยไม่มีที่มา
-- **Token creep** (กลาง) — batch scoring ทำให้ call เดิมอ้วนขึ้นเงียบๆ. Mitigation:
-  pre-filter+dedupe ก่อนเสมอ, cap จำนวนโพสต์ต่อ batch, วัด token/วัน เทียบ baseline
-  ก่อน-หลัง M3 ผ่าน cost tracking ที่มีอยู่; เกินงบ → ลด window/cap ทันที
-- **Consensus history หาไม่ครบ** (กลาง-สูง) — calendar feed ปัจจุบันให้ forecast ของ event
-  ข้างหน้า แต่ conditional stats ต้องการประวัติย้อนหลังหลายปี. Mitigation: M2 (sign-based)
-  ไม่พึ่งประวัติ จึง ship ได้ก่อน; M5 แยกอิสระ + Open Question เรื่องแหล่งข้อมูล
-- **n เล็กเกินเมื่อ split ตาม surprise** (กลาง) — แบ่ง 173 CPI เป็น hot/cool/inline ×
-  ขนาด surprise อาจเหลือ cell ละไม่กี่ตัว. Mitigation: แสดง n กำกับทุกตัวเลข; cell ที่
-  n ต่ำกว่าเกณฑ์ → fallback เป็น sign + prior เดิม
-- **Scoring คุณภาพต่ำจาก Haiku** (กลาง) — บทเรียน CHART_SHADOW: Haiku แทนงานวิเคราะห์
-  ลึกไม่ได้. Mitigation: งานนี้เป็น classification สั้นต่อโพสต์ (ง่ายกว่า chart) + M6 วัด
-  hit-rate จริงเทียบ realized move ก่อนเชื่อถือ/ต่อยอด
-- **แหล่งข่าวภายนอกเปลี่ยน format/ล่ม** (กลาง) — RSS/scrape เปราะโดยธรรมชาติ.
-  Mitigation: ทุกชั้นใหม่ fail-soft — พังแล้วการ์ดว่าง/ตกกลับพฤติกรรมเดิม ห้ามล้ม pipeline
+- **R1 (สูง) — เปลี่ยนพฤติกรรมเทรดโดยไม่ตั้งใจ:** narrative → analyst.bias → force ทิศเทรดได้
+  เมื่อ NEWS_FIRST + conf≥55. บรรทัด auto ใหม่อาจเลื่อน bias. **บรรเทา:** auto line เป็น
+  "ทิศ + เหตุผลสั้น" เชิงบริบท ไม่ใช่คำสั่ง; shadow ก่อนเปิด; kill-switch (ลบบล็อก = default).
+- **R2 — token/cycle พอง:** Sonnet ทุก cycle ไม่มี cache. **บรรเทา:** จำกัด 1-2 บรรทัด, วัด
+  before/after ผ่าน cost tracking; เกินงบ → ตัดทันที.
+- **R3 — NEWS_SENTIMENT ทิศเพี้ยน/ล่ม/quota:** free 25/วัน. **บรรเทา:** fail-soft (ไม่มีข้อมูล
+  → ไม่เขียนบรรทัดนั้น, ของเดิมอยู่ครบ); cross-check กับ news_impact; sanity ทิศก่อนเชื่อ.
+- **R4 — ตัด twitter ผิด:** disable ทั้งที่ยังได้ tweet = เสีย signal. **บรรเทา:** ตัดสินจาก log
+  จริงเท่านั้น, เสนอ user, ไม่ auto-remove.
+- **R5 — regime-shift false positive:** ping บ่อย = กวน. **บรรเทา:** threshold + debounce +
+  state persistence.
+- **R6 — news_impact/sentiment ยังไม่ calibrate** (จาก cycle เดิม พบ AI overconfident):
+  การ feed เข้า regime = ใช้สัญญาณที่ยัง validate ไม่เต็ม. **บรรเทา:** ใช้เป็น context ทิศ
+  หยาบเท่านั้น (ไม่ใช่ magnitude/คำสั่ง), ติดป้ายที่มา, ยังไม่แตะ gate.
 
-## Open Questions — ตอบแล้ว (user 2026-07-04)
+---
 
-1. **sign table surprise→gold** → ✅ **ใช้ default มาตรฐาน**: CPI/Core CPI/NFP/PCE/
-   Retail Sales/GDP hot→down, Unemployment สูงกว่าคาด→up, FOMC hawkish→down
-   (ผ่านช่องทางค่าเงินจริง/yields). ยึดตารางนี้เป็น sign table ของ M2.
-2. **แหล่ง consensus history (M5)** → ✅ **manual seed เฉพาะ CPI+NFP+FOMC** — คุมคุณภาพได้
-   เริ่มเล็ก; ไม่ scrape/ไม่ใช้ AlphaVantage ในเฟสนี้.
-3. **feed analyst หรือ display-only** → ✅ **display-only ใน v1** — ไม่แตะ AI pipeline/gate
-   จน M6 calibration พิสูจน์คุณภาพก่อน แล้วค่อยพิจารณา feed ทีหลัง.
-4. **calibration window + min-n** → ✅ default: **n≥30 ต่อ cell** ตามธรรมเนียม pre-registered;
-   window ให้ architect เสนอ (ยาว 2012+ เป็นฐาน, เปรียบเทียบ recent regime ได้ถ้า n พอ).
-5. **งบ token M3** → ✅ default: **≤10% ของ burn ปัจจุบัน** และรวมต้องอยู่ในเป้า 150-250฿/วัน —
-   เป็นเกณฑ์ verify ของ M3.
+## Non-goals (cycle นี้ **จะไม่ทำ**)
+
+- **ไม่** เปิด NEWS_GATE / เปลี่ยน gate logic ใน decision_maker (แยกเรื่อง; validate ไม่พอ).
+- **ไม่** ตัด narrative แก่นทิ้ง (PHASE thesis + playbook ยังมาจากคน).
+- **ไม่** แตะ live prompt `.json`, money management, `_run_gates`, SL/TP, confidence thresholds
+  (iron rules).
+- **ไม่** ทำให้ event_scenarios/macro_strip/cot กลายเป็น trigger เทรด (ยัง display-only).
+- **ไม่** ส่งภาพ/วิดิโอ chart เข้า AI (ยืนยันแล้วว่าไม่มี — ไม่ใช่ประเด็น).
+
+---
+
+## Open Questions — ตอบแล้ว (user 2026-07-08)
+
+1. **Thread 1 แหล่ง sentiment** → ✅ **ใช้ทั้งคู่ยืนยันกัน** (NEWS_SENTIMENT + news_impact) —
+   เขียนบรรทัด auto เฉพาะตอน 2 แหล่งชี้ทิศเดียวกัน (กัน false signal).
+2. **Thread 2 ช่องทาง ping** → ✅ **Dashboard flag** (zero setup, เห็นตอนเปิดดู).
+3. **Thread 3 twitter** → ✅ **เช็ค log ก่อน** — ผล M0: twitter ALIVE → **ไม่แตะ**.
+4. **ลำดับ** → ✅ **M0 + Thread 3 ก่อน** แล้ว 1→2.
+
+## M0 Results (2026-07-08 — read-only verification)
+
+⚠️ **verification พลิกสมมติฐาน dead-code เกือบทั้งหมด:**
+- **twitter/Nitter = ALIVE** — `logs/system.log` 07-08: 75 tweets/cycle (@cnnbrk/@BBCBreaking/
+  @ZeroHedge/@markets/@kun_purich ×15), กรองเหลือ 22/75 แตะปัจจัยทอง. **ไม่ disable.**
+- **`trend_strategy.md`** = rulebook กลยุทธ์ 167 บรรทัด (คนเขียน, ref ใน QUICKREF) → dead-as-code
+  แต่เป็นเอกสาร. **เก็บ.**
+- **`news_gatherer.md`** = prompt spec 117 บรรทัด; `news_gatherer.py` (57 บรรทัด) **ไม่เรียก LLM**
+  → prompt ไม่เคยถูกใช้จริง (orphaned design artifact) แต่ลบแล้วไม่ได้อะไร. **เก็บ.**
+- **prefilter double-compute** (`trading_graph.py:138-142`) = M1 measurement observe-only,
+  ไม่มี AI cost. ตัดแล้วเสีย metric. **เก็บ.**
+
+**→ Thread 3 (de-cruft) แทบเป็นศูนย์** — ระบบเก่าไม่ตาย แค่ "ยังไม่ต่อเข้า analyst" = งานของ
+Thread 1. งานจริงเหลือ Thread 1 (enrich) + Thread 2 (shift-detect+ping). ขั้นถัดไป = **M1
+architect freeze (ARCHITECTURE.md)** รอ user อนุมัติ design ก่อน worker เริ่ม.

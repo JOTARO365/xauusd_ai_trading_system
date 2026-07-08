@@ -1262,6 +1262,32 @@ def api_impact_calibration():
         return jsonify(_empty)
 
 
+@app.route("/api/regime-state")
+def api_regime_state():
+    """Regime-shift state from data/regime_state.json (written by scripts/update_regime.py — C12-§3).
+    — display-only, pass-through serve; file missing → empty shape, never 500 (mirrors /api/burn)."""
+    _empty = {
+        "ok": True,
+        "updated": None,
+        "fed_dir": None,
+        "real_rate_sign": None,
+        "sentiment_tilt": "neutral",
+        "cpi_yoy": None,
+        "fed_funds": None,
+        "real_rate": None,
+        "shift": {"active": False, "kind": [], "from": None, "to": None, "since": None},
+        "history": [],
+    }
+    try:
+        p = os.path.join(_BASE, "../data/regime_state.json")
+        with open(p, "r", encoding="utf-8") as f:
+            return jsonify(json.load(f))
+    except FileNotFoundError:
+        return jsonify(_empty)
+    except Exception:
+        return jsonify(_empty)
+
+
 @app.route("/api/calibration")
 def api_calibration():
     """Confidence calibration: predicted conf bin -> realized WR/PnL
