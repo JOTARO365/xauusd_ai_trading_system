@@ -320,7 +320,7 @@ task spans 3+ independent parallel modules → sub-agent delegation format not r
 
 ## Batch H1 — Thread 1: MACRO_AUTO enrichment  · deps: USER APPROVAL
 
-### H1 [DONE] — auto CATALYSTS + news_sentiment agreement line in `update_regime.py`
+### H1 [DONE — ⚠️ AUDIT 2026-07-08: sentiment line silently dead on prod machine (cp874) → F-11; R1 shadow test + token measure still pending] — auto CATALYSTS + news_sentiment agreement line in `update_regime.py`
 - **agent:** worker (single)
 - **scope (whitelist):** `scripts/update_regime.py` only (`build_block()` + helpers; a small
   self-contained title→scenario-key NEEDLE map + geo-keyword list may be added as module
@@ -409,7 +409,7 @@ task spans 3+ independent parallel modules → sub-agent delegation format not r
 
 ## Batch J1 — ops: daily cadence  · deps: H1+H2 landed
 
-### J1 [ ] — `setup_vm_regime.ps1` weekly → daily
+### J1 [WIP — ⚠️ AUDIT 2026-07-08: code change already landed (unlogged, F-13); remaining = VM re-registration (user ops) + continue.md entry] — `setup_vm_regime.ps1` weekly → daily
 - **agent:** worker (single)
 - **scope (whitelist):** `scripts/setup_vm_regime.ps1` only
 - **input contract:** existing weekly scheduled task definition.
@@ -417,6 +417,56 @@ task spans 3+ independent parallel modules → sub-agent delegation format not r
   change, ops-only.
 - **acceptance:** the scheduled task registers as daily; a manual `update_regime.py --dry-run` after
   the change still succeeds.
+
+---
+
+## Fix tasks — filed by auditor 2026-07-08 (see docs/AUDIT.md "Cycle #12" for full evidence)
+
+### F-11 [DONE 2026-07-08] — sentiment line silently dead on the production Windows machine (MED — functional)
+- **fix applied:** added `encoding="utf-8"` to all three reads (`:177`, `:249`, `:352`). Verified:
+  bare `open()` raises `UnicodeDecodeError` byte 0x9c on the real file; utf-8 read OK; dry-run now
+  emits the CATALYSTS line (sentiment still omitted today only because AV quota is spent — fail-soft).
+- **agent:** worker (single) · **scope (whitelist):** `scripts/update_regime.py` only
+- **root cause:** `_sentiment_line_and_tilt` opens `data/news_impact.json` with a bare
+  `open(NEWS_IMPACT_PATH)` (`update_regime.py:249`). Windows default locale is cp874;
+  `news_impact.json` is written UTF-8 with non-ASCII (`ensure_ascii=False`,
+  `agents/news_impact.py:551-552`). Reading it raises `UnicodeDecodeError` (byte 0x9c), which the
+  function's `except Exception` swallows → always returns `(neutral, None)`. **The sentiment line
+  never emits on the prod machine even when AV and news_impact agree, and `sentiment_tilt` is
+  pinned `neutral`, which also disables H2 `sentiment_tilt_flip`.** Verified by an isolated
+  harness reading the REAL production file (aggregate.score=+69 bullish, AV stubbed agreeing) →
+  line omitted. The same bare-open latent bug exists at `:177` (event_scenarios — ASCII today by
+  luck) and `:352` (regime_state — ASCII, safe today).
+- **fix contract:** add `encoding="utf-8"` to all three reads (`:177`, `:249`, `:352`). No logic
+  change. (The AV `Information`/`Note`/agreement paths are all correct once the file is readable.)
+- **acceptance:** with the real `data/news_impact.json` present and a stubbed/real agreeing AV
+  reading, `_sentiment_line_and_tilt` returns a non-None TAG-ONLY line; all fail-soft paths (missing
+  / malformed file, AV down/quota, disagreement) still omit cleanly; no directional verb in output.
+
+### F-12 [ ] — REGIME_SENTIMENT_ENABLED should default OFF until R1 shadow test passes (decision — R1 live-money)
+- **agent:** user decision + (optional) worker · **scope:** VM env, or `update_regime.py:244` default
+- **root cause:** the sentiment line defaults ENABLED (`os.getenv("REGIME_SENTIMENT_ENABLED","1")`)
+  and will enter the analyst's authoritative regime block on the first real run after F-11 is
+  fixed. The C12-§6 R1 shadow test (analyst bias WITH vs WITHOUT the lines on a regime day) has NOT
+  been run by anyone, the token before/after measurement is pending, and `news_impact` scoring is
+  known-overconfident (R6). Static mitigations (tag-only, agreement-gated, lowest-authority,
+  kill-switch) are sound but do not substitute for one behavioral shadow observation.
+- **fix contract:** user either sets `REGIME_SENTIMENT_ENABLED=0` in the VM env (zero code change),
+  OR approves flipping the code default at `update_regime.py:244` to `"0"` (inverts a frozen env
+  semantic → needs user approval, architect logs it). CATALYSTS + DATA lines stay on. Flip to ON
+  only after F-11 fixed AND a regime-day shadow shows no spurious `bias` direction flip.
+- **acceptance:** on the VM, the sentiment line + its AV call are disabled until the shadow test is
+  recorded; DATA + CATALYSTS still write; documented in continue.md.
+
+### F-13 [ ] — J1 code landed without status/log; VM re-registration outstanding (LOW — process)
+- **agent:** worker + user ops · **scope:** `docs/TASKS.md` (J1 status), `.claude/context/continue.md`
+- **root cause:** `setup_vm_regime.ps1` was changed weekly→daily (`:54`) but J1 stayed `[ ]` and no
+  continue.md entry was written (override #2). The scheduled task on the VM has not been
+  re-registered (that is a user ops step).
+- **fix contract:** reconcile J1 status, add the continue.md entry (file changed + why), and the
+  user re-runs `scripts/setup_vm_regime.ps1` on the VM to register the daily trigger.
+- **acceptance:** J1 marked `[DONE]` only after the VM task shows a daily trigger and a post-change
+  `update_regime.py --dry-run` succeeds; continue.md has the entry.
 
 ---
 

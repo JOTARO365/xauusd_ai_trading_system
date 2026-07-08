@@ -155,3 +155,126 @@ cycle was designed to prevent. F-07 must be resolved before anyone reads the sur
    ≤10% and total within 150-250฿ (ARCH §9 says cut the cap/window if exceeded).
 5. Calibration takes time by design: badges stay "rubric — ยังไม่ validate" until n≥30 per
    cell/tier accumulates in realized_moves.json. That is correct behavior, not a bug.
+
+---
+---
+
+# AUDIT — Cycle #12 · Regime Auto-Enrichment & Shift Detector (H1/H2/I1/I2/J1)
+
+> Written by: auditor · Run: 2026-07-08 13:54–14:00 (+0700)
+> Design of record: ARCHITECTURE.md "Cycle #12" (C12-§2/§3/§4 FROZEN). Code = working-tree
+> diff vs HEAD bfec5c7 (uncommitted). Test command: `& $PY tests\test_all.py`.
+> Audit method: static diff review + isolated function harness (AV fetch STUBBED — no quota
+> spent; state writes redirected to scratchpad; 34/35 checks) + one real `--dry-run`
+> (writes nothing, 3 AV series calls) + live `GET /api/regime-state` on the running dashboard.
+
+## Test suite vs baseline
+
+**PASS — zero new failures.** Suite: 29 tests → **2 FAIL + 6 ERROR, the exact known
+pre-existing set** (2× `TestStreakGate` quiet-session assertion — run at 13:54+0700 = 06:54
+UTC, inside the 0–7 UTC Asian gate; 6× `TestMomentumFastPath` ERROR, TypeError
+`agents/decision_maker.py:607` `7 <= _utc_hour` vs MagicMock). `git diff` touches NO file
+under `agents/` or `tests/` → failure set cannot be attributed to this cycle.
+
+## Per-Item Results
+
+| Task | Criterion | Verdict | Evidence (file:line / run output) |
+|------|-----------|---------|-----------------------------------|
+| H1 | CATALYSTS line: frozen grammar, ≤2 nearest matched High-impact USD events, dirs verbatim from event_scenarios.json | PASS | `scripts/update_regime.py:163-228`; harness C1/C6: `- CATALYSTS (auto 2026-07-08): CPI 07-09 (hot->down / cool->up); NFP 07-10 (hot->down / cool->up)` matches frozen regex; same-key dedupe, non-USD/Medium/past events excluded (C4/C5). Real `--dry-run`: `- CATALYSTS (auto 2026-07-08): FOMC 07-08 (hot->down / cool->up)`, dirs match `data/event_scenarios.json` FOMC cell |
+| H1 | CATALYSTS fail-soft: FF error / scenarios missing / no match ⇒ line omitted, exit 0 | PASS | harness C2/C3/C4 all return `None`; each path guarded `update_regime.py:167-181`; dry-run exit 0 |
+| H1 | Sentiment line TAG-ONLY — NO directional verb | PASS (code) | `update_regime.py:311-316` prints only `{tag} — AV & news_impact agree (AV %+.2f, ni %+d)`; harness S1 regex + forbidden-word scan (`bullish|bearish|up|down|buy|sell|long|short`) → no hit. Tag vocabulary exactly {`risk-bid geopolitics`,`macro tone`} (`:309-310`); internal direction never printed (`:305` comment + code) |
+| H1 | Agreement gate: emit iff av_dir == ni_dir ∈ {bullish,bearish}, else omit | PASS | `:253-303`; harness S1 (agree→emit), S3 (disagree→omit), S4 (AV neutral→omit), S5 (ni neutral→omit **before** the AV call — quota saved), S8 (gold proxy absent→omit, no `overall_sentiment_score` fallback per C12-§4.4), thresholds ±0.15 AV / ±10 ni per contract |
+| H1 | Kill-switch `REGIME_SENTIMENT_ENABLED=0` ⇒ no AV call, no line | PASS | `:244-245`; harness S11: env=0 → `(neutral, None)`, stubbed AV fetch invoked 0 times |
+| H1 | Fail-soft: AV quota/network/Information, missing/malformed news_impact.json ⇒ line omitted, never crash | PASS | `_av_fetch_fail_soft` `:150-160` returns None on any error (never sys.exit); `:283-284` handles `Information`/`Note`; harness S6/S7/S9/S10 all omit cleanly |
+| H1 | **Sentiment line actually emits when sources agree — on THIS machine** | **FAIL → F-11** | `update_regime.py:249` `open(NEWS_IMPACT_PATH)` without `encoding="utf-8"`. Windows locale = cp874; `data/news_impact.json` is UTF-8 with non-ASCII (written `ensure_ascii=False`, `agents/news_impact.py:551-552`) → `UnicodeDecodeError` (byte 0x9c) swallowed by `except Exception` → returns `(neutral, None)`. Harness S12 probe with the REAL production file (aggregate.score=+69 bullish, stub AV agreeing): line silently omitted. The sentiment feature is functionally dead on the production machine, and `sentiment_tilt` is pinned `neutral` (also disables H2 `sentiment_tilt_flip`). Same latent hole at `:177` (event_scenarios — ASCII today by luck) and `:352` (regime_state — ASCII, safe today). Worker's continue.md note "AV rate-limited → line omitted (fail-soft verified)" misdiagnosed this: the omission fires BEFORE the AV call |
+| H1 | Block order frozen: DATA → inflation → WATCH → CATALYSTS → sentiment, inside markers only | PASS | `build_block()` `:495-505` appends in exactly that order; markers via existing `re.sub` unchanged; dry-run output shows correct order |
+| H1 | `agents/prompts/macro_regime.md` not corrupted | PASS | File intact: markers at `macro_regime.md:17,21`, DATA line `:18` (still auto 2026-06-27 — no live run yet), human narrative above (`:15`) and below (`:22-34`) untouched; file absent from `git diff` |
+| H1 | Token budget: two lines ≲40 input tokens | PARTIAL (estimate over) | Frozen-grammar worst case = 97+95 = 192 chars ≈ **55–70 tokens both-lines** (> the ≈30–40 frozen estimate; worker's ≈33 estimate optimistic). Single-line typical (CATALYSTS only, today's reality) ≈ 30–35 ✓. Cost ceiling ≈ 2 THB/day at 288 cycles — immaterial vs 150–250฿ budget, but the before/after `get_accounting` measurement (acceptance #3) is still PENDING live cycles. Grammar itself is frozen, so this is a doc-estimate gap, not an implementation deviation |
+| H1 | Shadow R1 test (analyst bias WITH vs WITHOUT lines) | **NOT VERIFIABLE STATICALLY** | Requires the live Sonnet analyst on a captured cycle. Not run — see R1 verdict below |
+| H1 | Live AV gold-proxy tag (GLD) confirmation | PENDING (blocked by F-11) | The dry-run never reached the AV NEWS_SENTIMENT call (encoding failure aborts earlier). Must re-verify after F-11 on a budget-available day (C12-§2 warning stands) |
+| H2 | `regime_state.json` exact C12-§3 schema, atomic write | PASS | `update_regime.py:323-429`; harness H2a: key set == {ok,updated,fed_dir,real_rate_sign,sentiment_tilt,cpi_yoy,fed_funds,real_rate,shift,history}; atomic tmp+`Path.replace` (=os.replace) `:419-421` |
+| H2 | Seed: no prior ⇒ active=false, kind=[], from=null | PASS | harness H2a on empty dir |
+| H2 | Flip fires once, unchanged re-run clears (no chatter) | PASS | harness H2b (fed_dir flip → active, kind=["fed_dir_flip"], correct from/to, history+1) + H2c (re-run → active=false, history kept) |
+| H2 | Real-rate dead-band ±0.1 carries prior sign | PASS | `:337-341,357-362`; harness H2d: real_rate −0.6→+0.05 ⇒ sign stays "negative", no flip; H2e: →+0.5 ⇒ `real_rate_sign_flip` fires |
+| H2 | Sentiment debounce: flip only when NEW tilt non-neutral | PASS | `:371-373`; harness H2f (neutral→bullish counts) + H2g (bullish→neutral does NOT) |
+| H2 | history[] cap 10 | PASS | `:393`; harness H2h: 12 flips → len 10 |
+| H2 | Fail-soft: bad input ⇒ warn, prior file byte-identical | PASS | whole body in try/except `:331-429`; harness H2i |
+| H2 | dry-run writes nothing | PASS | `main()` `:534-536` returns before both writes; dry-run printed "regime_state.json NOT written"; `data/regime_state.json` does not exist (Test-Path False) |
+| I1 | `/api/regime-state` mirrors `/api/burn`, `_empty` per C12-§3, never 500 | PASS | `dashboard/app.py:1265-1289` — identical structure to `api_burn` `:1165-1174` (try open+jsonify / except FileNotFoundError / except Exception → `_empty`); `_empty` field-for-field == C12-§3 frozen shape. **Live check:** `GET http://localhost:5050/api/regime-state` with file absent → HTTP 200, exact `_empty`, `ok:true` |
+| I2 | Pill on shift.active (kind+since+hint); muted stable line; empty payload ⇒ render nothing | PASS (code) | `index.html:1252` (bar, initial display:none), `:3805-3861` `loadRegimeState()`: `!ok || !updated` → hide; active → `⚠ REGIME SHIFT — {kind}` + `since` + youtube-to-knowhow hint; else `regime stable · Fed {fed_dir} · real-rate {sign} · tilt {tilt}`; catch → hide. Wired in `_bootstrap` `:4896` + hourly poll `:4908` mirroring loadBurn. Worker's Flask-test-client + Jinja-parse evidence in continue.md; active-pill visual not re-driven live (file doesn't exist yet — empty path IS today's real path, verified live above) |
+| J1 | Scheduler weekly → daily | PASS (code) / PENDING (ops) + **F-13 process** | `setup_vm_regime.ps1:54` `New-ScheduledTaskTrigger -Daily -At $Time` (was `-Weekly -DaysOfWeek Monday`); dry-run still succeeds ✓. BUT: TASKS.md J1 still `[ ]` and continue.md has no J1 entry — code landed without status/log (override #2). Actual re-registration on the VM = user ops step, not yet done |
+
+## Scope / iron-rules check
+
+| Check | Result | Evidence |
+|---|---|---|
+| Only whitelisted files changed | PASS (with 2 noted non-cycle items) | `git diff --stat`: code changes ONLY in the 4 whitelisted files + docs. Noted: (1) `index.html:4370-4386` SL/TP-shown-as-price + label edit in `renderVerdict` — separate user-driven display edit, logged in continue.md "2026-07-08 (m)", NOT part of cycle #12, display-only, no task entry (pre-existing pipeline-process gap, not a cycle #12 violation); (2) `data/*.json` modifications + untracked `news_gate.json`/`news_scores_cache.json` = runtime artifacts of already-committed producers (`scripts/report_news_gate.py:27`, `agents/news_cache.py:25`), not worker edits |
+| No touch: `agents/prompts/*.json`, `_run_gates`, decision_maker, money mgmt, SL/TP, confidence thresholds, analyst.py | PASS | `git diff` contains zero files under `agents/`; `macro_regime.md` (the only prompts-adjacent surface) unchanged on disk |
+| Workers stayed inside task scopes H1/H2/I1/I2/J1 | PASS | Diff hunks map 1:1 to the four whitelisted files; update_regime.py edits are `build_block` + new helpers + `main()` tail, exactly per task scope |
+| continue.md logging (override #2) | PASS for H1/H2/I1/I2; **gap for J1** (→ F-13) | Entries "2026-07-08 (n)" and "2026-07-08 H3" cover H1/H2/I1/I2 with tests; no J1 entry |
+
+## Code-style (global CLAUDE.md auditor additions)
+
+- `_sentiment_line_and_tilt` (~90 lines) and `_write_regime_state` (~105 lines) exceed the
+  ~40-line guideline but are linear, single-purpose, and readable in one pass — noted, no fix
+  task. No optimization without WHY; no O(n²) on unbounded input (geo scan is ≤posts×7 keywords,
+  posts bounded by the snapshot cap).
+
+## R1 verdict — should REGIME_SENTIMENT_ENABLED default to ON?
+
+**What was verified statically:** tag-only grammar enforced by construction (no directional
+token can reach the formatted string — harness forbidden-word scan PASS); emission double-gated
+(cross-source agreement AND both non-neutral); lowest-authority last line; kill-switch works
+(S11); every failure path degrades to "line absent" (S3–S10) — i.e., the worst static outcome
+is the pre-cycle status quo.
+
+**What CANNOT be verified here:** how the live Sonnet analyst's `sentiment/bias/confidence`
+actually responds to the added lines (the C12-§6 R1 shadow test needs a captured cycle replayed
+through the live analyst) — and that test has NOT been run by anyone. The token before/after
+measurement is equally pending.
+
+**Recommendation: default OFF until shadowed.** Two reasons beyond the un-run shadow test:
+(1) F-11 means the sentiment line has never once been exercised end-to-end — enabling by
+default ships a zero-live-evidence feature into the analyst's authoritative block the moment
+F-11 is fixed; (2) `news_impact` scoring is known-overconfident from this project's own
+calibration (R6). Cheapest safe path: user sets `REGIME_SENTIMENT_ENABLED=0` on the VM today
+(zero code change), OR architect flips the code default at `update_regime.py:244` to "0"
+(one-line, needs user approval since it inverts a frozen env semantic). Flip to ON only after
+F-11 is fixed AND one R1 shadow comparison on a regime day shows no spurious bias flip.
+The CATALYSTS line (factual dates + frozen sign-table dirs) may stay on as shipped.
+
+## Integration Gate — Cycle #12
+
+| Check | Result | Evidence |
+|---|---|---|
+| Build / imports | PASS | update_regime imports + full dry-run exit 0; dashboard serving new endpoint live |
+| Test suite vs baseline | PASS | Identical 2F+6E pre-existing set; no `agents/`/`tests/` files in diff |
+| Frozen contracts C12-§2/§3/§4 | PASS | Line grammar, agreement rule, tag vocabulary, env names, regime_state schema, endpoint `_empty` all match (table above) |
+| Endpoint never-500 / empty-shape | PASS | Live HTTP 200 `_empty` with file absent |
+| Scope whitelist | PASS | See scope table |
+| Sentiment feature live-functional | **FAIL (F-11)** | cp874 decode kills the line before the AV call on the production machine |
+
+**GATE: OPEN for J1 ops (register the daily task) and for continued dashboard use** — the
+shipped CATALYSTS/H2/I1/I2 paths are contract-clean and fail-soft, and the next real
+`update_regime.py` run cannot harm `macro_regime.md` (worst case: auto lines absent).
+**GATE: CLOSED for relying on the sentiment line / sentiment_tilt shift detection until F-11
+is fixed**, and **the R1 shadow test remains a precondition for trusting the enriched block on
+a regime day** (recommend sentiment default-off until then, above).
+
+## Fix Tasks Filed (docs/TASKS.md — Cycle #12)
+
+- **F-11** (MED, functional) — add `encoding="utf-8"` to the three `open()` reads in
+  `update_regime.py` (`:177`, `:249`, `:352`); sentiment line is silently dead on cp874 Windows.
+- **F-12** (decision, R1) — default `REGIME_SENTIMENT_ENABLED` to OFF until F-11 + live shadow
+  bias test pass; user decision required.
+- **F-13** (LOW, process) — J1 code landed with TASKS.md still `[ ]` and no continue.md entry;
+  reconcile status + log; user re-runs `setup_vm_regime.ps1` on the VM to actually register daily.
+
+## User Action Items (Cycle #12)
+
+1. Decide F-12 now (cheapest: set `REGIME_SENTIMENT_ENABLED=0` in the VM env until shadowed).
+2. After F-11 is fixed: run `update_regime.py` on a budget-available day to confirm the live AV
+   GLD proxy tag (C12-§2 warning) and produce the first real `regime_state.json`.
+3. Re-run `scripts/setup_vm_regime.ps1` on the VM to register the DAILY schedule (J1 ops half).
+4. After the first enriched live run: measure analyst tokens before/after via `get_accounting`
+   (H1 acceptance #3) and run the R1 shadow comparison on the next CPI/NFP/FOMC day.

@@ -174,7 +174,7 @@ def _catalysts_line(today: date):
         return None
 
     try:
-        with open(EVENT_SCENARIOS_PATH) as f:
+        with open(EVENT_SCENARIOS_PATH, encoding="utf-8") as f:
             scenarios = json.load(f).get("scenarios", {})
     except Exception:
         return None
@@ -246,7 +246,7 @@ def _sentiment_line_and_tilt(today: date):
 
     # Source B: data/news_impact.json aggregate score
     try:
-        with open(NEWS_IMPACT_PATH) as f:
+        with open(NEWS_IMPACT_PATH, encoding="utf-8") as f:
             ni_data = json.load(f)
         ni_score = float(ni_data.get("aggregate", {}).get("score", 0))
         ni_dir   = "bullish" if ni_score > 10 else "bearish" if ni_score < -10 else "neutral"
@@ -349,7 +349,7 @@ def _write_regime_state(build_result: dict) -> None:
         # Load previous state (missing file → no prior)
         prior = None
         try:
-            with open(REGIME_STATE_PATH) as f:
+            with open(REGIME_STATE_PATH, encoding="utf-8") as f:
                 prior = json.load(f)
         except Exception:
             pass
