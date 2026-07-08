@@ -1610,6 +1610,7 @@
         <div id="zone-ladder" style="font-family:var(--mono);font-size:12px">Loading…</div>
         <div id="fib-panel" style="font-family:var(--mono);margin-top:8px"></div>
         <div id="liquidity-panel" style="font-family:var(--mono);margin-top:6px"></div>
+        <div id="volume-panel" style="font-family:var(--mono);margin-top:6px"></div>
       </div>
     </section>
 
@@ -4314,6 +4315,7 @@ async function loadMonitor() {
     renderZones(bs);
     renderFib(bs);
     renderLiquidity(bs);
+    renderVolume(bs);
     if (!_calEvents.length) fetchCalendar();   // เผื่อเปิด Live tab ก่อน calendar โหลดรอบแรก
     renderEventCard(bs);
     await loadCandles();    // init/refresh กราฟ (throttle ในตัว) — await กัน race ตอนวาดเส้นโซนครั้งแรก
@@ -4427,6 +4429,23 @@ function renderFib(bs) {
   el.innerHTML = (h4 || h1)
     ? `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:2px">FIBONACCI (auto-swing)</div>${h4}${h1}`
     : '';
+}
+
+// UHAS #3: volume wall (HVN) + buy/sell imbalance — ⚠️ tick-volume ไม่ใช่ contract จริง
+function renderVolume(bs) {
+  const el = document.getElementById('volume-panel');
+  if (!el) return;
+  const vp = bs.volume_profile || {}, wall = vp.wall, bp = vp.buy_pct;
+  if (!wall && bp == null) { el.innerHTML = ''; return; }
+  const wallStr = wall ? `กำแพง <b>${(+wall.level).toFixed(2)}</b> <span style="color:var(--muted)">(${wall.pct}% ของ vol)</span>` : '';
+  let imb = '';
+  if (bp != null) {
+    const tcol = vp.tilt === 'buy' ? 'var(--green)' : vp.tilt === 'sell' ? 'var(--red)' : 'var(--muted)';
+    imb = `<span style="margin-left:10px">flow <span style="color:var(--green)">${bp}%</span>/<span style="color:var(--red)">${vp.sell_pct}%</span> <b style="color:${tcol}">${vp.tilt}</b></span>`;
+  }
+  el.innerHTML =
+    `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0">📊 VOLUME (H1 · ${vp.basis || 'tick-vol'})</div>` +
+    `<div style="font-size:10px">${wallStr}${imb}</div>`;
 }
 
 // UHAS #1: liquidity pool map — stop clusters (equal highs/lows) จาก chart_watcher (display-only)

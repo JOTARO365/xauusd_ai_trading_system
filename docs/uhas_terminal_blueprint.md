@@ -159,7 +159,9 @@ Claude API ทำหน้าที่ LLM core ได้ ถูกกว่า/
    - data: MT5 price — equal-highs/equal-lows clustering + swing extremes ล่าสุด
    - value: ทองชอบกวาด stop ที่ pool ก่อนวิ่งจริง → ชี้จุด sweep-and-reverse
 
-3. **Volume wall + buy/sell imbalance**
+3. **Volume wall + buy/sell imbalance** — ✅ **DONE 2026-07-08** (chart_watcher.analyze_volume_profile →
+   HVN wall + buy/sell tilt จาก tick_volume บน H1, display-only zero-token; dashboard renderVolume.
+   ⚠️ ป้าย basis "tick-volume ไม่ใช่ contract จริง" ทุกที่)
    - ผู้พูด: "โซนวอลุ่มสะสมหนา = กำแพงจริง", "เริ่มมีวอลุ่มฝั่งเซลล์"
    - data: MT5 tick-volume by price (HVN) + up/down-bar volume delta
    - ⚠️ caveat: MT5 gold volume = **tick-volume ไม่ใช่ contract จริง** — ต้องติดป้ายกำกับเสมอ
