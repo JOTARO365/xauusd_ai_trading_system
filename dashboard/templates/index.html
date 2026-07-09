@@ -4484,16 +4484,31 @@ function renderZones(bs) {
     const bar = st ? `<div style="height:4px;width:${Math.min(st, 100)}%;background:${color};border-radius:2px;opacity:.7"></div>` : '';
     const htfTag = (htf && htf.level && Math.abs(htf.level - lv) / lv < 0.003)
       ? ` <span style="color:var(--gold);font-size:9px;font-weight:700">★${htf.tf}</span>` : '';
+    // C (คลิป): confluence — แนวโครงสร้างชนกันหลายที่ = โซนแข็ง
+    const cf = m && m.confluence;
+    const confTag = cf
+      ? ` <span title="${cf.with.join(' + ')}" style="color:var(--gold);font-size:9px;font-weight:800">⚡×${cf.count}</span>` : '';
+    // B (คลิป): ยืนยันเบรก — ปิดยืนข้ามแนว vs แค่ไส้เทียน
+    const bh = m && m.break_hold;
+    const holdTag = bh
+      ? (bh.status === 'held'
+          ? ` <span style="color:var(--green);font-size:9px;font-weight:700">ยืน✓${bh.closes}</span>`
+          : ` <span style="color:#e0a800;font-size:9px;font-weight:700">ไส้เทียน✗</span>`)
+      : '';
     // ทำไมวาง level นี้ — จาก sr_meta (chart_watcher): TF + touches + confluence
     // UHAS #2: recency (แตะล่าสุดกี่แท่ง) + avg bounce ($) — เด้งสด/แรงแค่ไหนจริง
     const react = m && (m.bars_since_touch != null || m.avg_bounce != null)
       ? `<span style="color:var(--gold)">แตะล่าสุด ${m.bars_since_touch ?? '—'} แท่ง${m.avg_bounce != null ? ` · เด้ง ~$${m.avg_bounce}` : ''}</span>` : '';
-    const whyLine = m ? `<div style="padding:0 0 2px 82px;font-size:9px;color:var(--muted);opacity:.8">${m.why || ''}${react ? ' · ' + react : ''}</div>` : '';
+    // A (คลิป): โอกาสเด้ง vs ทะลุ % จากสถิติที่ราคาเคยเทสแนวนี้
+    const bb = m && m.break_pct != null
+      ? `<span>โอกาส <b style="color:var(--green)">เด้ง ${m.bounce_pct}%</b> · <b style="color:var(--red)">ทะลุ ${m.break_pct}%</b> <span style="opacity:.6">(${m.n_tests} ครั้ง)</span></span>` : '';
+    const extra = [m && m.why, react, bb].filter(Boolean).join(' · ');
+    const whyLine = m ? `<div style="padding:0 0 2px 82px;font-size:9px;color:var(--muted);opacity:.85">${extra}</div>` : '';
     return `<div style="display:flex;align-items:center;gap:10px;padding:3px 0">
       <span style="width:72px;color:${color};font-weight:700">${lv.toFixed(2)}</span>
       <span style="width:52px;color:var(--muted);font-size:10px">${dist}</span>
       <span style="width:40px;color:var(--muted);font-size:10px">${st ? st + '%' : ''}</span>
-      <div style="flex:1">${bar}</div>${htfTag}</div>${whyLine}`;
+      <div style="flex:1">${bar}</div>${confTag}${holdTag}${htfTag}</div>${whyLine}`;
   };
   const res = (z.resistance || []).slice().sort((a, b) => b - a);
   const sup = (z.support || []).slice().sort((a, b) => b - a);

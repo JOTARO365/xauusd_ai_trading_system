@@ -768,9 +768,100 @@ def _touch_recency_bounce(df: pd.DataFrame, level: float, side: str,
     return bars_since, avg_bounce
 
 
+def _break_bounce_stats(df: pd.DataFrame, level: float, side: str,
+                        zone_pct: float = 0.003, fwd: int = 8,
+                        margin_pct: float = 0.0012) -> tuple:
+    """DISPLAY-ONLY (คลิป n0ate2cd5AY): (bounce_pct, break_pct, n_tests) ต่อแนว.
+    ทุกครั้งที่ราคาเข้าโซนแนว ดูใน fwd แท่งถัดไปว่า 'ทะลุ' (close ข้ามเกิน margin)
+    หรือ 'เด้ง' (ไม่ผ่าน). R=แนวต้าน (break=ปิดเหนือ), S=แนวรับ (break=ปิดใต้).
+    คืน (None,None,n) ถ้า test < 3 (สถิติน้อยไป). ไม่ส่งเข้า LLM (sr_meta = display)."""
+    if df is None or "high" not in df or "low" not in df or "close" not in df:
+        return None, None, 0
+    highs, lows, closes = df["high"].values, df["low"].values, df["close"].values
+    n = len(highs)
+    zone, margin = level * zone_pct, level * margin_pct
+    in_zone = False
+    breaks = tests = 0
+    for i in range(n):
+        hit = lows[i] <= level + zone and highs[i] >= level - zone
+        if hit and not in_zone:
+            j0, j1 = i + 1, min(i + 1 + fwd, n)
+            if j0 < n:
+                window = closes[j0:j1]
+                broke = bool((window > level + margin).any()) if side == "R" \
+                    else bool((window < level - margin).any())
+                tests += 1
+                breaks += 1 if broke else 0
+        in_zone = hit
+    if tests < 3:
+        return None, None, tests
+    break_pct = round(100 * breaks / tests)
+    return 100 - break_pct, break_pct, tests
+
+
+def _break_hold_status(df: pd.DataFrame, level: float, side: str,
+                       hold_n: int = 3, margin_pct: float = 0.0006) -> dict | None:
+    """DISPLAY-ONLY (คลิป n0ate2cd5AY): ยืนยันเบรก = ปิด 'ยืน' ข้ามแนว ไม่ใช่แค่ไส้เทียน.
+    ดู hold_n แท่งล่าสุด. R: held=ปิดยืนเหนือแนว, S: held=ปิดยืนใต้แนว. wick=ไส้ทะลุแต่ปิดกลับ.
+    คืน {"status","closes"} หรือ None ถ้าราคายังไม่แตะแนวใน N แท่ง (แนวไกล = ไม่โชว์). ไม่ส่งเข้า LLM."""
+    if df is None or "high" not in df or "low" not in df or "close" not in df:
+        return None
+    if len(df) < hold_n:
+        return None
+    highs  = df["high"].values[-hold_n:]
+    lows   = df["low"].values[-hold_n:]
+    closes = df["close"].values[-hold_n:]
+    margin = level * margin_pct
+    if side == "R":
+        pierced = bool((highs > level + margin).any())
+        closes_beyond = int((closes > level + margin).sum())
+    else:
+        pierced = bool((lows < level - margin).any())
+        closes_beyond = int((closes < level - margin).sum())
+    if not pierced and closes_beyond == 0:
+        return None
+    if closes_beyond >= 2:
+        status = "held"
+    elif pierced:
+        status = "wick"
+    else:
+        return None
+    return {"status": status, "closes": closes_beyond}
+
+
+def _tag_confluence(meta: list, fib_h4: dict, fib_h1: dict,
+                    cluster_pct: float = 0.0015) -> None:
+    """DISPLAY-ONLY (คลิป n0ate2cd5AY): mark แนวที่ 'ชนกัน' หลายที่ = โซนแข็ง.
+    หาแนว sr_meta ที่มีแนวโครงสร้างอื่นอยู่ในระยะ cluster_pct (~$6 ที่ทอง 4000):
+      • แนว sr_meta อีก TF, • fib key level (H4/H1).
+    เติม field 'confluence' = {"with":[label...], "count":n} ใน meta ที่มี ≥1 partner.
+    แก้ meta in-place. ไม่ส่งเข้า LLM."""
+    def _fib_keys(fib: dict, tf: str) -> list:
+        out = []
+        for p, v in (fib or {}).get("levels", {}).items():
+            if v[2]:                       # is_key
+                out.append((float(p), f"fib {v[1]} {tf}"))
+        return out
+
+    anchors = _fib_keys(fib_h4, "H4") + _fib_keys(fib_h1, "H1")
+    for i, m in enumerate(meta):
+        lv = m["level"]
+        band = lv * cluster_pct
+        partners = []
+        for j, other in enumerate(meta):
+            if j != i and abs(other["level"] - lv) <= band:
+                partners.append(f"{other['tf']} {other['side']}")
+        for plv, plabel in anchors:
+            if abs(plv - lv) <= band:
+                partners.append(plabel)
+        if partners:
+            m["confluence"] = {"with": partners[:3], "count": len(partners)}
+
+
 def _build_sr_meta(h4_sr: dict, h1_sr: dict, key_lvl: dict,
                    d1_sr: dict | None, w1_sr: dict | None,
-                   h4_df, h1_df) -> list:
+                   h4_df, h1_df,
+                   fib_h4: dict | None = None, fib_h1: dict | None = None) -> list:
     """Metadata ต่อ S/R level สำหรับ dashboard (07-03): strength % + เหตุผลว่าทำไมวาง level นี้
     เกณฑ์เดียวกับ setup scanner — touches (_touch_score_bonus) + HTF confluence + key-level confluence
     ไม่กระทบ logic เทรดใดๆ (display เท่านั้น)"""
@@ -798,14 +889,18 @@ def _build_sr_meta(h4_sr: dict, h1_sr: dict, key_lvl: dict,
         if any(abs(lv - r) / lv < 0.001 for r in rounds):
             score += 3; why.append("เลขกลม")
         bars_since, avg_bounce = _touch_recency_bounce(df, lv, side)   # UHAS #2 (display-only)
+        bounce_pct, break_pct, n_tests = _break_bounce_stats(df, lv, side)  # A (display-only)
         return {"level": round(float(lv), 2), "side": side, "tf": tf, "touches": touches,
                 "bars_since_touch": bars_since, "avg_bounce": avg_bounce,
+                "bounce_pct": bounce_pct, "break_pct": break_pct, "n_tests": n_tests,
+                "break_hold": _break_hold_status(df, lv, side),          # B (display-only)
                 "strength": max(25, min(95, score)), "why": " · ".join(why)}
 
     meta  = [_one(lv, "R", "H4", h4_df) for lv in h4_sr.get("resistance", [])]
     meta += [_one(lv, "S", "H4", h4_df) for lv in h4_sr.get("support", [])]
     meta += [_one(lv, "R", "H1", h1_df) for lv in h1_sr.get("resistance", [])]
     meta += [_one(lv, "S", "H1", h1_df) for lv in h1_sr.get("support", [])]
+    _tag_confluence(meta, fib_h4 or {}, fib_h1 or {})                    # C (display-only)
     return meta
 
 
@@ -1449,7 +1544,7 @@ ENTRY_TYPE: SR_ZONE หรือ ENGULFING หรือ STRUCTURE_PULLBACK ห�
         "sr_zones":      {"resistance": h4_sr["resistance"] + h1_sr["resistance"],
                           "support":    h4_sr["support"]    + h1_sr["support"]},
         "sr_meta":       _build_sr_meta(h4_sr, h1_sr, key_lvl, d1_sr, w1_sr,
-                                        h4.get("df"), h1.get("df")),
+                                        h4.get("df"), h1.get("df"), fib_h4, fib_h1),
         "liquidity_pools": find_liquidity_pools(h1.get("df"), h1.get("close")),  # UHAS #1 (display-only)
         "volume_profile": analyze_volume_profile(h1.get("df"), h1.get("close")),  # UHAS #3 (display-only)
         "key_levels":    key_lvl,
