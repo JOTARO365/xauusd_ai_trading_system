@@ -475,6 +475,29 @@ def check_open_slot(direction: str, last_dir_lost: bool = False) -> tuple[bool, 
     return True, ""
 
 
+def _clamp_stops_level(price, sl, tp, is_buy, no_tp, stops_min, point):
+    """Enforce the broker's minimum stops-level distance on SL/TP. Used by both the entry
+    path and the retry branch — a retry that recomputes SL/TP at a new price must re-clamp,
+    else it can submit stops inside the broker minimum and get a hard reject. Returns (sl, tp)."""
+    if stops_min <= 0:
+        return sl, tp
+    if is_buy:
+        if price - sl < stops_min:
+            sl = price - stops_min
+            logger.warning(f"SL clamp → {round((price-sl)/point)} pips (stops_level)")
+        if not no_tp and tp - price < stops_min:
+            tp = price + stops_min
+            logger.warning(f"TP clamp → {round((tp-price)/point)} pips (stops_level)")
+    else:
+        if sl - price < stops_min:
+            sl = price + stops_min
+            logger.warning(f"SL clamp → {round((sl-price)/point)} pips (stops_level)")
+        if not no_tp and price - tp < stops_min:
+            tp = price - stops_min
+            logger.warning(f"TP clamp → {round((price-tp)/point)} pips (stops_level)")
+    return sl, tp
+
+
 def open_order(direction: str, sl_pips: float, tp_pips: float,
                comment: str = "", min_rr: float | None = None,
                confidence_scale: float = 1.0) -> dict:
@@ -520,25 +543,13 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         price = tick.ask
         sl = price - sl_pips * point
         tp = 0.0 if no_tp else price + tp_pips * point
-        if stops_min > 0:
-            if price - sl < stops_min:
-                sl = price - stops_min
-                logger.warning(f"SL ปรับจาก {sl_pips} pips → {round((price-sl)/point)} pips (stops_level)")
-            if not no_tp and tp - price < stops_min:
-                tp = price + stops_min
-                logger.warning(f"TP ปรับ → {round((tp-price)/point)} pips (stops_level)")
+        sl, tp = _clamp_stops_level(price, sl, tp, True, no_tp, stops_min, point)
     elif direction.upper() == "SELL":
         order_type = mt5.ORDER_TYPE_SELL
         price = tick.bid
         sl = price + sl_pips * point
         tp = 0.0 if no_tp else price - tp_pips * point
-        if stops_min > 0:
-            if sl - price < stops_min:
-                sl = price + stops_min
-                logger.warning(f"SL ปรับจาก {sl_pips} pips → {round((sl-price)/point)} pips (stops_level)")
-            if not no_tp and price - tp < stops_min:
-                tp = price - stops_min
-                logger.warning(f"TP ปรับ → {round((price-tp)/point)} pips (stops_level)")
+        sl, tp = _clamp_stops_level(price, sl, tp, False, no_tp, stops_min, point)
     else:
         return {"success": False, "error": f"Invalid direction: {direction}"}
 
@@ -605,6 +616,9 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
             sl    = (price - sl_pips * point) if is_buy else (price + sl_pips * point)
             tp    = (0.0 if no_tp else price + tp_pips * point) if is_buy \
                     else (0.0 if no_tp else price - tp_pips * point)
+            # re-clamp to the broker stops-level at the new price (was skipped before → retry
+            # could submit SL/TP inside the minimum distance and get a hard reject)
+            sl, tp = _clamp_stops_level(price, sl, tp, is_buy, no_tp, stops_min, point)
             request["price"] = price
             request["sl"]    = round(sl, 2)
             request["tp"]    = round(tp, 2)
@@ -1720,6 +1734,15 @@ def manage_dynamic_tp() -> int:
     point = info.point
 
     positions = mt5.positions_get(symbol=SYMBOL)
+
+    # prune per-ticket state for positions no longer open — otherwise a broker-reused ticket
+    # inherits a stale ext_count (>= TP_EXT_MAX blocks the new position's dynamic-TP) and the
+    # dicts grow unbounded. Mirrors the prune _partial_state / _be_pending / _zone_state do.
+    active = {p.ticket for p in positions} if positions else set()
+    for _d in (_tp_ext_count, _tp_ext_last_time):
+        for _t in [t for t in _d if t not in active]:
+            del _d[_t]
+
     if not positions:
         return 0
 

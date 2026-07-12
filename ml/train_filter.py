@@ -30,7 +30,10 @@ SEP = "=" * 64
 # ⚠️ sl_pips จาก DB `sl` ถูกตัดออก — มัน LEAK outcome: breakeven/trailing เลื่อน SL
 # ของไม้กำไรมาใกล้ entry (sl_pips เล็ก) แต่ไม้ขาดทุน SL อยู่เดิม (กว้าง) → win median 100
 # vs loss 1000 (10×). ใส่แล้ว AUC พุ่งปลอมเป็น 0.87; ตัดออกได้ AUC จริง ~0.55.
-# ถ้าจะใช้ SL ต้องเป็น "planned SL ตอนเข้าไม้" (จาก chart_watcher) ที่ยังไม่ถูกขยับ — ยังไม่ได้ log แยก.
+# ถ้าจะใช้ SL ต้องเป็น "planned SL ตอนเข้าไม้" (จาก chart_watcher) ที่ยังไม่ถูกขยับ.
+# UPDATE 2026-07-12 (B12): planned_sl_pips ถูก log แยกใน DB แล้ว (writer.py) = leakage-free —
+# เพิ่มเป็น NUM_FEAT ได้เมื่อ closed-trade ที่มีคอลัมน์นี้สะสมพอ (ดู sample count + AUC gate ล่าง).
+# ยังไม่บังคับใส่ตอนนี้เพื่อไม่ให้ sample หด (แถวเก่าก่อนเพิ่มคอลัมน์ = NULL → ต้องตัดทิ้ง).
 NUM_FEATS = ["confidence", "hour"]
 CAT_FEATS = ["entry_type", "direction", "trend", "sr_zone", "sr_strength", "sentiment", "pa_action"]
 
@@ -67,7 +70,8 @@ def load_dataframe() -> pd.DataFrame:
         except Exception:
             pass
         recs.append({
-            "sl_pips":     abs(e - sl) / 0.01,
+            # NB: ไม่ใส่ sl_pips = abs(e-sl) — leaky (final SL ถูก trailing/BE ขยับ, ดูคอมเมนต์บนสุด).
+            # e/sl ยังใช้เป็น presence-guard ด้านบนเท่านั้น. ใช้ planned_sl_pips (DB) แทนเมื่อ coverage พอ
             "confidence":  float(t["technical_confidence"]),
             "hour":        hour,
             "entry_type":  et.strip().upper(),

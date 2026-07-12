@@ -218,8 +218,8 @@ def _get_close_times(days: int = 7) -> dict[str, dict]:
                         "close_reason": _REASON.get(getattr(d, "reason", 0), f"REASON_{getattr(d, 'reason', 0)}"),
                         "close_price":  getattr(d, "price", None),
                     }
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"history_deals_get failed in _get_close_times: {e}")
     return close_map
 
 

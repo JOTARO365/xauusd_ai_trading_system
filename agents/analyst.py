@@ -13,6 +13,8 @@ _llm = ChatAnthropic(
     api_key=ANTHROPIC_API_KEY,
     max_tokens=300,
     temperature=0,
+    timeout=40,       # กัน SDK default ~600s×2 (ดู decision_maker) — cap cycle latency บน API stall
+    max_retries=1,
 ).with_structured_output(AnalystOutput, include_raw=True)
 
 SYSTEM_PROMPT = json.dumps(
@@ -204,13 +206,17 @@ def analyze_sentiment(news_data: dict, chart_data: dict | None = None) -> dict:
             continue
         try:
             event_dt = datetime.fromisoformat(ts)
+            if event_dt.tzinfo is None:
+                # guard a naive timestamp (cached/alt source) — aware−naive would raise TypeError
+                # and the event would be silently dropped, leaving nearest_event_minutes=9999
+                event_dt = event_dt.replace(tzinfo=timezone.utc)
             mins = int((event_dt - now).total_seconds() / 60)
             if mins < 0:
                 continue   # ผ่านไปแล้ว
             pending_events.append({**ev, "minutes_ahead": mins})
             nearest_minutes = min(nearest_minutes, mins)
-        except Exception:
-            pass
+        except (ValueError, TypeError) as e:
+            logger.debug(f"pending-event parse skipped ts={ts!r}: {e}")
 
     result["upcoming_events"]       = pending_events[:5]
     result["has_upcoming_event"]    = len(pending_events) > 0

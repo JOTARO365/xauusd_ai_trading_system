@@ -12,7 +12,7 @@ from connectors.price_feed import get_ohlcv, get_current_price
 from config import ANTHROPIC_API_KEY, SYMBOL, EMA_PULLBACK_MAX_SL, EMA_PULLBACK_MIN_CONF
 from loguru import logger
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=40.0, max_retries=1)
 
 SYSTEM_PROMPT = json.dumps(
     json.loads(Path("agents/prompts/chart_watcher.json").read_text(encoding="utf-8")),

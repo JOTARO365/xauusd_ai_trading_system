@@ -15,6 +15,8 @@ _llm = ChatAnthropic(
     api_key=ANTHROPIC_API_KEY,
     max_tokens=256,   # 120 เดิมคับ — reason ฟิลด์ free-text ถูก truncate → structured parse fail → SKIP เงียบ
     temperature=0,
+    timeout=40,       # กัน SDK default ~600s×2 — API ค้างจะยืด cycle จน protective mgmt (downstream) ไม่ทำงาน
+    max_retries=1,
 ).with_structured_output(DecisionMakerOutput, include_raw=True)
 
 # ── Order fail streak tracker ─────────────────────────────────────────────────
@@ -878,11 +880,10 @@ SL: {sl_pips:.0f}p | TP: {tp_pips:.0f}p | R:R: {tp_pips/sl_pips:.1f} (min {eff_r
 History — {entry_wr}
 Account — Today: {history['today_pnl']:+.2f} USD ({history['today_trades']} trades) | WR10: {history['last_10_winrate']}% | Streak: {history['losing_streak']}L{chr(10) + lesson_block if lesson_block else ""}"""
 
+    # NB: ไม่ใส่ cache_control — เรียกรอบละครั้ง, cycle interval > TTL 5 นาที ของ ephemeral
+    # → cache_read=0 (พิสูจน์แล้วใน analyst.py:172) จ่าย write premium 1.25x ฟรี
     messages = [
-        {"role": "system", "content": [
-            {"type": "text", "text": SYSTEM_PROMPT,
-             "cache_control": {"type": "ephemeral"}}
-        ]},
+        {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_message},
     ]
     try:
@@ -904,6 +905,14 @@ Account — Today: {history['today_pnl']:+.2f} USD ({history['today_trades']} tr
         decision_text = f"decision unavailable ({e})"
 
     logger.info(f"Quality:{trade_quality} ConfScore:{confidence_score}")
+
+    # B6: Claude's direction ต้องตรงกับ gate-validated direction (line 754). anti-fade/HTF/
+    # counter-trend gates ตรวจกับ `direction` (gate) เท่านั้น — ถ้า Claude กลับทิศ จะเปิดไม้ที่
+    # ไม่มี gate ไหนตรวจเลย. fail-safe → บังคับ SKIP (ไม่มีทางเปิดทิศที่ไม่ผ่าน gate)
+    if decision == "EXECUTE" and out_direction in ("BUY", "SELL") and out_direction != direction:
+        logger.warning(f"[DM] direction mismatch: gate={direction} vs Claude={out_direction} → SKIP")
+        decision      = "SKIP"
+        decision_text = f"direction mismatch: gate={direction} claude={out_direction}"
 
     if decision == "EXECUTE" and out_direction in ("BUY", "SELL"):
         # ── เลือก SL ตามทิศทาง (ยืนยันอีกครั้ง) ─────────────────

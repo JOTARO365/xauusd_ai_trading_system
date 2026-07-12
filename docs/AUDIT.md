@@ -1,3 +1,124 @@
+# AUDIT — Full-System Code Review & Bug Hunt (v0.4.0)
+
+> Written by: auditor · Run: 2026-07-12 · Scope: whole trading path
+> Method: 4 parallel tracer-agents, each reading full functions and tracing
+> real numbers (balance $2000, SL 1500pts, conf 65%). CONFIRMED is kept
+> strictly separate from NEEDS-VERIFICATION. No code was changed by this audit.
+> Files read in full: main.py, config.py, agents/{decision_maker, analyst,
+> market_advisor, chart_watcher, swing_manager, position_guardian, accountant,
+> news_gatherer, news_cache, news_impact, trading_graph, pending_manager}.py,
+> connectors/{mt5_connector, web_news}.py, db/{reader, writer, connection, sync}.py,
+> reporter.py. Cross-checked: ml/train_filter.py, utils/market_clock.py, schema.sql.
+
+## Reconciliation of the prompt's "known unfixed bugs" — 3 of 4 are stale
+
+| Stated "known unfixed" bug | Verdict |
+|---|---|
+| `_partial_stage` never cleaned up (mt5:~497) | ❌ **Refuted** — the var is `_partial_state` and it *is* pruned (mt5_connector.py:1272/1192). The genuine uncleaned dict is elsewhere → **B3** |
+| weekly pending uses local time (main:~521) | ✅ **Confirmed** → **B4** (real line 622) |
+| analyst naive-vs-aware datetime (~124) | ❌ **Refuted as active** — calendar `timestamp_iso` is tz-aware on the live ForexFactory path (web_news.py:85/87), so no TypeError and `pending_events` populates. Latent gap only → **B7** (real line 206) |
+| news_cache `task_type` lowercase (~202) | ❌ **Refuted** — uppercase everywhere already (news_cache.py:306/364/394); line 202 is unrelated prompt code |
+
+Lesson reinforced: two of these were re-tests of the prior false-positive class —
+disproven by reading the guard clause / the actual data path.
+
+## Bug / Defect Table (ranked by real-money exposure)
+
+"Money?" = can it directly move the account balance. Sev in parentheses notes the
+condition under which it activates.
+
+| # | Finding | file:line | Severity | Verified | Money? |
+|---|---|---|---|---|---|
+| **B1** | **`RISK_PER_TRADE=0.50` = 50%/trade.** Inert today only because `MIN_LOT=MAX_LOT=0.01` clamps every lot to 0.01. Raise `MAX_LOT` without lowering risk → ~32% single-trade risk (0.50×0.65×$2000=$650 target). Non-NNLB path has no max-loss-% cap (unlike NNLB's `NNLB_MAX_LOSS_PCT`). *Found independently by 2 agents.* | config.py:53 → mt5_connector.py:85-88 | **High (latent)** | CONFIRMED (intent = user's call) | ✅ if `MAX_LOT` raised |
+| **B2** | **Daily-loss circuit breaker defanged at default.** `max_daily_loss=1.00` (=100%) → gate 1 effectively never fires unless `.env` overrides it. | config.py:54 | **High (latent)** | CONFIRMED (intent = user's call) | ✅ removes safety net |
+| **B3** | **`_tp_ext_count`/`_tp_ext_last_time` never pruned** — the *real* ticket-reuse leak. Every other state dict prunes closed tickets (`_partial_state`:1272, `_be_pending`:938/954, `_zone_state`:1577); `manage_dynamic_tp` has no prune. Reused ticket → new position sees `ext_done≥TP_EXT_MAX` → Dynamic-TP never extends + phantom cooldown; slow memory growth. | mt5_connector.py:1377-1378, 1749-1794 | Med (DYNAMIC_TP only) | CONFIRMED | ⚠️ caps winners |
+| **B4** | **Weekly straddle fires on LOCAL date, not UTC.** Only clock in the trading path not on UTC. Never fully misses/double-fires (dedupe + live-order guard), but drifts by the host UTC offset — on a US/UTC VM the Monday straddle lands hours into the week. | main.py:622 | Med | CONFIRMED | ⚠️ degrades entry timing |
+| **B5** | **EMA_PULLBACK hard-blocked normally but synthesized & traded LLM-unreviewed in NNLB.** Normal path blocks it (`EMA_PULLBACK_BLOCK`, WR31%/−594); NNLB sets `entry_type="EMA_PULLBACK"`, returns at 476 before the block, and with `NNLB_FASTPATH=true` opens the order at 761-786 without Claude. | decision_maker.py:410-414, 476, 655-657 | Med (NNLB only) | CONFIRMED | ✅ trades a toxic setup if NNLB on |
+| **B6** | **Claude's `out_direction` not re-asserted vs the gate-validated direction.** All anti-fade/HTF gates validate the *gate* direction; execution then trusts Claude's `result.direction` and re-selects SL by it, with no `out_direction==gate["direction"]` check. Structured output makes a flip low-probability but nothing enforces it. | decision_maker.py:895-896, 908-911 | Med (low prob, high consequence) | NEEDS-VERIFICATION | ✅ if a flip ever occurs |
+| **B7** | **Only unguarded `fromisoformat` on a calendar timestamp** in the repo (no `tzinfo is None` guard, unlike scripts/update_regime.py:193 and decision_maker.py:294). Dormant today; if any cached/alt source ever emits naive time, the bare `except: pass` silently drops the event and `nearest_event_minutes` stays 9999 (feeds `_effective_min_rr` + No-TP-on-event). | analyst.py:206, 212-213 | Low-Med | CONFIRMED (latent) | ⚠️ silently mishandles events |
+| **B8** | **Two clock conventions for `mt5.history_deals_get`** — SL-reentry uses aware-UTC 30-min window; daily-cap/reporter use naive-local. On a broker-server-time mismatch the *tight* 30-min window can systematically exclude fresh SL closes → Post-SL re-entry silently finds nothing (fail-safe direction). Wide-window callers tolerate the drift. | pending_manager.py:839-841 vs mt5_connector.py:736-737 | Med | NEEDS-VERIFICATION (inconsistency confirmed; runtime miss needs a 1-line broker-tz probe) | ⚠️ under-delivers |
+| **B9** | **No per-cycle deadline; agent LLM clients have no `timeout`/`max_retries`** (SDK default ~600s×2). Protective management (BE/trailing/`ensure_sl_protection`) sits *downstream* of the 4-call LLM chain in the full path → an API stall leaves open positions unmanaged (Guardian is default-off). `DEFAULT_INTERVAL=300` is only the post-cycle sleep, not a cap. | main.py:409; decision_maker.py:13, market_advisor.py:9, analyst.py:11, chart_watcher.py:15 | Med | CONFIRMED | ⚠️ no protection during stall |
+| **B10** | **`swing_manager.py` MT5 calls bypass `_mt5_lock`** — unserialized concurrent access with the guardian thread (MT5 binding not thread-safe). The lock-wrap loop (mt5_connector.py:1969-1976) wraps the connector's own fns but not `manage_swing_campaign`. Bites only when `SWING_ENABLED`+`GUARDIAN_ENABLED` both on. | swing_manager.py:63/91/107/216-233 | Med (both flags on) | CONFIRMED | ⚠️ order corruption risk |
+| **B11** | **`open_order` retry sleeps ≤1s under `_mt5_lock`**, blocking the guardian; retry path also skips the stops-level re-clamp (523-541) + RR re-check (552-557) → possible hard reject. Worst case fails cleanly (no naked/oversized order). | mt5_connector.py:598-623 | Low | CONFIRMED | ❌ fails cleanly |
+| **B12** | **5 decision-snapshot columns written but never read** (`planned_sl_pips, entry_score, atr_h4, momentum, htf_zone_tf`) — same class as the old `strategy_version` bug. Worse: `ml/train_filter.py:48-51` re-derives `sl_pips` from the *final* mutated `sl` → reintroduces the outcome leakage `planned_sl_pips` was added to prevent. | writer.py:91-95; reader.py:39-45; ml/train_filter.py:48-51 | Low-Med | NEEDS-VERIFICATION (may be staged for a v2 trainer) | ❌ ML quality only |
+| **B13** | **`pa_patterns`/`manual_reason`/`manual_analysis` mapped on read but never in schema/write** → always blank when a trade row comes from DB vs JSON. (`pa_zone`/`pa_level` same JSON-only status.) | reader.py:74-78 | Low | CONFIRMED | ❌ display/analytics |
+| **B14** | **Bare `except: pass` in `_get_close_times`** swallows MT5 history errors with no log → close metadata silently degrades to `now()`/`UNKNOWN` (PnL still recovered separately). | reporter.py:221-222 | Low | CONFIRMED | ❌ metadata only |
+| **B15** | **`news_gatherer` `asyncio.gather` without `return_exceptions=True`** — if the twitter fetch raises, the cycle loses calendar + articles too (the web fetchers catch internally and return []). | news_gatherer.py:19-23 | Low-Med | NEEDS-VERIFICATION | ❌ data availability |
+
+### Intentional-but-worth-recording (not bugs)
+- **Dynamic min-RR floor is 1.5, not the advertised 2.0.** `_effective_min_rr` (decision_maker.py:218-248) returns 1.5/1.7/1.8 in hot conditions and is the real floor used at TP-scaling (947) and `open_order(min_rr=…)` (969). Intentional & documented, but "RR 2.0" does **not** hold system-wide — the enforced floor is 1.5.
+
+## Concrete cycle trace (conf 65%, RR 2.0, 3-loss streak, event 20 min away)
+
+Aligned BUY, BULLISH trend, at SUPPORT, active hour, `NNLB_MODE=false`: all 12 gates
+pass; streak=3 (<max 5) applies `streak_scale=0.60`; `eff_rr` relaxes to ~1.7-1.8 (event
+≤30min → hot), RR 2.0 clears; **No-TP-on-event fires** (`nearest_mins=20 ≤ NO_TP_EVENT_MINS=20`
+→ `effective_tp=0`); TP-scaling correctly skipped by the `effective_tp>0` guard. **Outcome:**
+trade allowed (subject to Claude SKIP), sized 0.60×, opened **with no TP into the event** — only
+the SL bounds it. Self-consistent; the strategy stance (ride the event rather than block a fresh
+entry) is a design choice, see Opinion O-A.
+
+## Areas verified CLEAN (checked, not invented into bugs)
+- pip_value still 0.01 — not regressed (`_calc_pip_value`:100, gold $1/point/lot).
+- Breakeven direction correct (manage_breakeven:1030, force-BE:1329, partial-1R:1238) — not inverted; backward-move guards present.
+- `_partial_state` cleanup present (1272/1192); EMA NaN seed OK (`_ema_np`:1381); accountant div-guards OK (`total_in>0`).
+- position_guardian fail-soft, lock-wrapped calls; NNLB path has a real max-loss cap.
+- `strategy_version` traced end-to-end write→schema→select→map→consume (writer.py:96 → schema:39 → reader.py:44/79 → reporter.py:665/786). The past field-loss bug is genuinely fixed.
+- News cache TTL: units (seconds) + tz (UTC throughout) consistent, TTL expires; price-move invalidation exists (`force_fresh` via analyst.py:115-117 → COUNTER_SPIKE_PIPS).
+- JSON↔DB integrity: `get_trades` returns `None` (not `[]`) on error → reporter falls back to trades.json; startup reconciliation via sync.py (skips existing tickets). No empty-list-as-truth on the money path (open-trade gates read MT5 directly).
+- All LLM/agent failure paths default to **no-trade / neutral** (analyst NEUTRAL conf 0; market_advisor SIDEWAYS/NEUTRAL; decision_maker SKIP/NONE). No path defaults to "trade anyway."
+- Gate threshold ladder internally consistent: 62 universal floor → 65/70/72/75/80 for riskier setups (not the "62 vs 80 contradiction" the prompt suspected). Streak-5 consistent across NNLB + normal. No two gates double-block the same setup.
+- Module-level state (`_cycle`, `_last_chart_data`, …) reassigned in place, never appended — bounded, no memory growth. LangGraph compiled with no checkpointer → stateless per cycle.
+- news_impact.py parse/aggregate/snapshot: fail-soft, atomic writes (tmp+os.replace), F-10 empty-overwrite guard present.
+
+## Optimization Table (ranked by ROI)
+
+| # | Proposal | Effort | Impact | Priority |
+|---|---|---|---|---|
+| **O1** | Remove `cache_control: ephemeral` from market_advisor + decision_maker system prompts (or confirm cycles <5min). Analyst already removed it with evidence ("205 calls, cache_read=0, paying 1.25× write premium for nothing"); the other two still pay it every cycle. | S | Cost — kills a 1.25× write premium on 2 agents/cycle | **High** |
+| **O2** | Batch Gemini embeds (`contents=[...]`) + bulk-insert on cache MISS. ~23 items each fire a separate `embed_content` + insert; free tier (~25/day) can exhaust in ~1 MISS. | M | Cost + quota — biggest token/quota win | **High** |
+| **O3** | Add `timeout≈30-45s, max_retries=1` to the 4 agent LLM clients (also caps B9's stall). | S | Stability + latency cap | **High** |
+| **O4** | Bound the MT5 reconnect loop (main.py:512-516) — retries every 10s forever, no alert. Add a failure counter → WARN + backoff after N. | S | Robustness — surfaces a dead broker | Med |
+| **O5** | Single `_broker_now()`/`_broker_window()` helper for every `history_deals_get` caller (fixes B8 permanently). | M | Correctness | Med |
+| **O6** | Bulk `agent_usage` insert per cycle (writer.py:127-143 loops one insert/agent) + window/cache the unbounded accounting scans (reader.py:106-178 full-table scan + Python sum on every dashboard load). | S+M | Speed — dashboard + DB load | Med |
+| **O7** | Cache the M15 momentum result per cycle — `_is_momentum_strong` recomputes 4 EMAs+RSI on 55 bars for each of dynamic-TP / momentum-exit / post-event-TP, all under the MT5 lock. | S | Latency (under lock) | Low |
+| **O8** | Consider moving protective management (`ensure_sl_protection`/`manage_breakeven`) ahead of the LLM chain in the graph, or default `GUARDIAN_ENABLED=on` for the live VM. **Graph-routing / money change → architect + user approval.** | M | Safety — protects during AI stalls | Med |
+
+## Opinions (labeled — strategy soundness, not defects)
+- **O-A (add gate?):** No event-blackout gate on *entries* — a fresh entry is permitted 20 min before a high-impact event and the no-TP logic encourages holding through it. Decide explicitly: keep "ride the event" or add a `nearest_event_minutes ≤ X` entry block.
+- **O-B (reconcile):** Resolve the EMA_PULLBACK contradiction (B5) — pick one philosophy across normal and NNLB paths.
+- **O-C (config safety):** B1 + B2 defaults should be revisited for the live micro-account.
+
+## Postmortem — recurring root-cause patterns + prevention checklist
+
+**Patterns (past bugs + this audit):**
+1. **Constants trusted without real-world verification** — the original 10× `pip_value`. Today's analogue: B1/B2 — code-correct but real-world-dangerous defaults, masked by an unrelated clamp/override. A number that only bites when a *second* knob changes.
+2. **Fields that don't survive write→read→consume** — the old `strategy_version`. Today: B12/B13 — orphaned columns keep sprouting.
+3. **One subsystem on a different clock** — B4/B8/B7. Project standardized on UTC everywhere *except* three unmigrated spots. Timezone drift is this codebase's most persistent bug family.
+4. **Silent `except: pass` hiding decision-gating state** — B7/B14/B15. Fail-safe *direction* has prevented money loss, but destroys observability.
+5. **Two code paths, one philosophy not enforced across both** — B5 (EMA_PULLBACK), B6 (gate vs execution direction).
+
+**Prevention checklist — before merging any change:**
+- [ ] **Financial constant?** Verify against the live broker AND name the *other* knob (MAX_LOT/MIN_LOT/env) currently masking it. A safe default must be safe *without* the mask.
+- [ ] **New DB field?** Trace write → schema → select → map → consume in the same PR. If nothing reads it, don't write it.
+- [ ] **Any `datetime`?** Use `datetime.now(timezone.utc)`; guard every `fromisoformat` with `if dt.tzinfo is None`. Never `date.today()`/naive `now()` in the trading path.
+- [ ] **`except` clause?** Name the exception type + `logger.debug/warning`. No bare `except: pass` on anything feeding a gate.
+- [ ] **New module-level dict keyed by ticket?** Add the same prune (`{t:v for … if t in active}`) the other managers use, same PR.
+- [ ] **Second code path (NNLB/swing/hedge)?** Re-apply every block/lock the normal path has, or document why it's exempt.
+- [ ] **New LLM client?** Set `timeout` + `max_retries`; decide `cache_control` on the *measured* cycle interval, not by default.
+
+**Same-class risk still latent (masked, not fixed):** B1 (lot clamp), B2 (env override), B8 (Bangkok dev-box tz), B12 (v2 trainer not live). Each is one config/deploy change from activating.
+
+## Fix tasks filed (see docs/TASKS.md)
+The auditor reports only; fixes are new tasks. Safe / no-approval-needed: B3, B7,
+B14, B15, O1, O3. Requires user approval (money-management / gate / graph): B1, B2,
+B5, B6, B8, B10, O8. NEEDS-VERIFICATION probes first: B6, B8, B12, B15.
+
+---
+---
+
+# ARCHIVED — previous cycle audit (superseded by the 2026-07-12 full-system audit above)
+
 # AUDIT — News & Event Impact Analysis (M0-M6, batches A-G)
 
 > Written by: auditor · Last run: 2026-07-05 06:38-07:05 (+0700)

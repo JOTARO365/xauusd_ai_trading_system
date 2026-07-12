@@ -16,11 +16,20 @@ async def gather_news() -> dict:
     logger.info("Agent 2 (ผู้หาข้อมูล): กำลังดึงข่าวจาก X + ForexFactory + Investing.com...")
 
     # ดึงข้อมูลทุกแหล่งพร้อมกัน — Twitter ดึงครั้งเดียว แล้วแยก filtered vs raw ทีหลัง
+    # return_exceptions=True → ถ้าแหล่งใดแหล่งหนึ่ง raise (เช่น twitter) จะไม่ทำให้ทั้ง cycle
+    # เสีย calendar + articles ไปด้วย; coerce ผลที่เป็น exception → [] แยกรายแหล่ง
     (raw_tweets, calendar, articles) = await asyncio.gather(
         fetch_from_accounts(limit_per_account=15),
         asyncio.to_thread(fetch_forexfactory_calendar, 24),
         asyncio.to_thread(fetch_investing_news, 10),
+        return_exceptions=True,
     )
+    for _name, _val in (("twitter", raw_tweets), ("forexfactory", calendar), ("investing", articles)):
+        if isinstance(_val, BaseException):
+            logger.warning(f"gather_news: {_name} fetch failed: {_val}")
+    raw_tweets = raw_tweets if isinstance(raw_tweets, list) else []
+    calendar   = calendar   if isinstance(calendar, list)   else []
+    articles   = articles   if isinstance(articles, list)   else []
 
     # กรอง keyword (gold/XAU/etc) จาก raw tweets — word-boundary (ดู _KW_RE)
     keyword_tweets = [

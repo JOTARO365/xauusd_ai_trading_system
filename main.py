@@ -4,7 +4,7 @@ import json
 import os
 import sys
 import time
-from datetime import date as _date, datetime as _dt
+from datetime import date as _date, datetime as _dt, timezone as _timezone
 from loguru import logger
 from connectors.price_feed import connect_mt5, disconnect_mt5, is_mt5_connected, recent_movement, get_account_info
 from connectors.mt5_connector import get_open_positions, get_current_price, is_hedge_active, check_open_slot, is_algo_trading_enabled
@@ -619,7 +619,9 @@ async def main():
 
             # ── Weekly calendar pending (จันทร์เช้า) — รันเสมอไม่ขึ้นกับ slots ──
             global _last_weekly_pending_date
-            today = _date.today()
+            # UTC date — every other clock in the trading path is UTC (market_clock, session
+            # gates). Local date drifted the Monday straddle per host; UTC Monday is deterministic.
+            today = _dt.now(_timezone.utc).date()
             if today.weekday() == 0 and today != _last_weekly_pending_date:
                 _last_weekly_pending_date = today
                 wkly = place_weekly_calendar_pending(_last_chart_data or {})

@@ -479,3 +479,207 @@ task spans 3+ independent parallel modules → sub-agent delegation format not r
   management, SL/TP, confidence thresholds. A worker hitting such a need marks the task
   **[BLOCKED]** and escalates (do not diverge).
 - Every code edit / bug / fix also logged in `.claude/context/continue.md` (override #2).
+
+---
+
+## Cycle #13 — Full-System Audit Fixes (from docs/AUDIT.md, 2026-07-12)
+
+> Written by: auditor (fix tasks from the full-system review). Design of record for any
+> money-management / gate / graph change: **must be explained + user-approved BEFORE coding**
+> (`.claude/CLAUDE.md` explain-before-acting; iron rules). Auditor reports only — these are the
+> filed follow-ups, not applied. Every code edit also logged in `.claude/context/continue.md`.
+> IDs match the B#/O# rows in `docs/AUDIT.md`.
+
+### Batch AF-safe — no design/approval needed (display/robustness/observability only)
+
+#### B3 [DONE] — Prune `_tp_ext_count` / `_tp_ext_last_time` for closed tickets
+- **agent:** worker · **scope:** `connectors/mt5_connector.py` (`manage_dynamic_tp` only, ~1728-1794)
+- **root cause:** the two module dicts are never pruned (unlike `_partial_state`:1272, `_be_pending`:938,
+  `_zone_state`:1577). Ticket reuse -> new position sees stale `ext_done >= TP_EXT_MAX` -> Dynamic-TP never
+  extends; slow memory growth.
+- **fix contract:** after `positions` is fetched, `active = {p.ticket for p in positions}` then delete any
+  key not in `active` from both dicts (mirror the existing prune idiom). No threshold/logic change.
+- **acceptance:** unit — seed both dicts with a closed ticket, run one `manage_dynamic_tp` pass with that
+  ticket absent from `positions` -> both dicts no longer contain it; a live open ticket's counts survive.
+
+#### B7 [DONE] — Guard `fromisoformat` tzinfo + narrow the bare except in analyst pending-events loop
+- **agent:** worker · **scope:** `agents/analyst.py` (~196-213 only)
+- **root cause:** line 206 is the only calendar-`fromisoformat` in the repo without an `if tzinfo is None`
+  guard; the surrounding `except Exception: pass` (212-213) would silently drop the event and leave
+  `nearest_event_minutes=9999` (feeds `_effective_min_rr` + No-TP-on-event).
+- **fix contract:** `if event_dt.tzinfo is None: event_dt = event_dt.replace(tzinfo=timezone.utc)` before the
+  subtraction; narrow `except Exception` -> `except (ValueError, TypeError)` + `logger.debug`. Match the
+  guarded pattern already at `scripts/update_regime.py:193` / `decision_maker.py:294`.
+- **acceptance:** feed a naive `timestamp_iso` fixture -> event is parsed (not dropped), `nearest_event_minutes`
+  computed; a genuinely malformed ts logs a debug line instead of silent pass. No behavior change on the
+  live tz-aware ForexFactory path.
+
+#### B14 [DONE] — Log inside `_get_close_times` bare except
+- **agent:** worker · **scope:** `agents/reporter.py` (221-222 only)
+- **fix contract:** `except Exception as e: logger.warning("history_deals_get failed in _get_close_times: %s", e)`
+  before `return close_map`. No control-flow change.
+- **acceptance:** simulate an `mt5.history_deals_get` raise -> a warning is logged; `close_map` still returned.
+
+#### B15 [DONE] — `news_gatherer.gather_news` isolate per-source failures
+- **agent:** worker · **scope:** `agents/news_gatherer.py` (19-23 only)
+- **fix contract:** `asyncio.gather(..., return_exceptions=True)` + coerce any exception result to `[]` per
+  source, so a twitter-fetch raise cannot drop calendar + articles.
+- **acceptance:** make `fetch_from_accounts` raise -> calendar + web results still return; the twitter slice is `[]`.
+
+#### O1 [DONE] — Remove `cache_control: ephemeral` from market_advisor + decision_maker (or confirm <5min cycles)
+- **agent:** worker · **scope:** `agents/market_advisor.py` (61-64), `agents/decision_maker.py` (882-885)
+- **root cause:** analyst already removed it with evidence (cache_read=0, paying 1.25x write premium; cycle
+  interval > 5-min ephemeral TTL). The other two still attach it every cycle.
+- **fix contract:** FIRST confirm the live cycle interval vs 5 min (via `get_accounting` cache_read stats). If
+  >5 min -> remove `cache_control` from both. If <5 min -> instead RE-ENABLE it on analyst (opposite fix).
+  Prompt text unchanged either way.
+- **acceptance:** cache_read remains 0 in the burn card after the change (removal case) with no token increase;
+  decision output unchanged.
+- **DONE (2026-07-12):** settled as >5min (DEFAULT_INTERVAL=300 + processing; both agents called once/cycle;
+  analyst.py:172 proved 205 calls cache_read=0). Removed `cache_control` from `market_advisor.py:65` and
+  `decision_maker.py:886`, system content now the plain string SYSTEM_PROMPT (mirrors analyst). **chart_watcher
+  left intact** — it makes multiple LLM calls per cycle so its system-prompt cache CAN read-hit intra-cycle
+  (out of O1 scope, correctly). Verify token drop on the burn card after the next live run.
+
+#### O3 [DONE] — Set `timeout` + `max_retries` on the 4 agent LLM clients
+- **agent:** worker · **scope:** `agents/{decision_maker,market_advisor,analyst}.py` client ctor, `agents/chart_watcher.py:15`
+- **root cause:** no `timeout`/`max_retries` -> SDK default ~600s x2; combined with B9 an API stall stretches the
+  cycle and delays downstream protective management.
+- **fix contract:** `timeout=30-45`, `max_retries=1` on each client. No prompt/logic change. (Pairs with B9.)
+- **acceptance:** a forced slow/stalled call returns/aborts within ~timeout x (retries+1); normal cycles unaffected.
+
+#### B4 [DONE] — Weekly straddle uses local date instead of UTC
+- **agent:** worker · **scope:** `main.py` (~622 + the `date` import at line 7)
+- **root cause:** `_date.today()` is the only clock in the trading path not on UTC; the Monday straddle drifts
+  by the host UTC offset (survives on the Bangkok box, lands hours into the week on a US/UTC VM).
+- **fix contract:** `today = datetime.now(timezone.utc).date()` (keep `weekday()==0`; `_last_weekly_pending_date`
+  becomes a UTC date so the dedupe stays consistent). Pure clock-alignment, no threshold change.
+- **note:** touches weekly *pending-order placement timing* -> mention to user before landing (explain-before-acting),
+  though it changes only WHEN the existing straddle fires, not sizing/SL/TP.
+- **acceptance:** simulate hosts at UTC-5 / UTC+7 -> straddle fires within the first live window of the UTC market
+  week; no double-fire (dedupe holds); `_has_weekly_pending` live-order guard unchanged.
+
+#### B11 [DONE — partial] — `open_order` retry: reuse stops-clamp on retry (sleep-under-lock deferred)
+- **agent:** worker · **scope:** `connectors/mt5_connector.py` (598-623, retry branch of `open_order`)
+- **root cause:** the retry `_time.sleep(0.5)` runs while holding `_mt5_lock` (blocks the guardian <=1s); the retry
+  path also skips the stops-level re-clamp (523-541) and RR re-check (552-557) -> a retry can submit SL/TP inside
+  the broker stops-level and get rejected.
+- **fix contract:** move the sleep outside the lock (or shorten); factor the stops_min clamp into a helper reused
+  by the retry branch. Worst case today fails cleanly, so this is a robustness fix, not a correctness bug.
+- **acceptance:** a forced REQUOTE retry re-applies the stops clamp before resubmit; guardian is not stalled for
+  the sleep duration.
+- **DONE (2026-07-12):** stops-clamp factored into `_clamp_stops_level` (mt5_connector.py, above `open_order`)
+  and called on BOTH the entry path and the retry branch — helper proven byte-equivalent to the old inline
+  block on 24 BUY/SELL×tight/wide×no_tp cases + stops_min<=0 no-op. **Sleep-under-lock (≤1s, Low) left as-is**:
+  the lock is applied by a wrapper around the whole `open_order`, so moving the sleep out means restructuring
+  the lock architecture — deferred as higher-risk-than-reward on a live order path (user informed). Reopen if
+  the guardian stall ever matters.
+
+#### B13 [DONE — drop route] — `pa_patterns` / `manual_reason` / `manual_analysis` mapped on read but never persisted
+- **agent:** worker · **scope:** `db/reader.py` (74-78) — plus `db/writer.py` + `db/schema.sql` if keeping them
+- **root cause:** these three (and `pa_zone`/`pa_level`) are mapped in `get_trades` but are not columns and are
+  never written -> always blank when a trade row comes from DB rather than `trades.json`.
+- **fix contract:** EITHER drop the dead map lines (they mislead), OR add the columns + write + select them
+  end-to-end (mirror the `strategy_version` fix). Display/analytics only.
+- **acceptance:** if kept — a DB-sourced trade row shows the same pa/manual fields as its JSON twin; if dropped —
+  no consumer regresses (grep confirms only dashboard display reads them).
+- **DONE (2026-07-12, drop):** removed the 3 map lines in `db/reader.py`. Grep-verified every consumer guards
+  access — `index.html:2817` (`t.pa_patterns && …`), `:2823-24` (`|| ''`), `lesson_learner.py:107` /
+  `backfill_context.py:75` (`.get()`); `dashboard/app.py:267-330` *builds* MANUAL-trade dicts (doesn't read the
+  reader) and `reporter.py` writes them to `trades.json` (JSON path unchanged). On the DB path they were always
+  `[]`/`""` so display is byte-identical. `pa_zone`/`pa_level` were never in the reader map — nothing to drop.
+
+> **B9 (no per-cycle deadline / unmanaged positions during an LLM stall)** is covered by **O3** (agent-client
+> `timeout`/`max_retries`) for the stall cap and **O8** (protective-management ordering / Guardian default) for
+> the downstream-protection half. No separate task — close B9 when O3 lands and O8 is decided.
+
+### Batch AF-verify — probe before fixing (NEEDS-VERIFICATION in AUDIT)
+
+#### B6 [DONE] — Re-assert Claude `out_direction` == gate direction
+- **agent:** worker · **scope:** `agents/decision_maker.py` (~895-911) — **verify first, then guard**
+- **verify:** confirm the structured-output schema/prompt can actually emit a direction opposite to the
+  gate-validated one. If provably impossible -> close as WONTFIX with evidence.
+- **fix contract (if possible):** `if out_direction != gate["direction"]: return SKIP` before executing.
+- **acceptance:** a fixture where Claude returns EXECUTE with the flipped direction -> SKIP, no order placed.
+- **DONE (2026-07-12):** VERIFIED the flip IS possible — `DecisionMakerOutput.direction: Literal["BUY","SELL","NONE"]`
+  (schemas.py:57) lets Claude emit either side, and execution used `out_direction` (decision_maker.py:897) with
+  no check vs the gate direction (`direction`, line 754). Added a fail-safe guard before the execute block
+  (line ~909): `if decision=="EXECUTE" and out_direction in (BUY,SELL) and out_direction != direction: SKIP`,
+  routed through the existing SKIP return (no new return shape). Unit-tested: aligned executes; flipped→SKIP
+  (no order); Claude-SKIP / NONE unaffected. Fail-safe (can only prevent a mis-directed trade, never opens one).
+
+#### B8 [ ] — Unify `history_deals_get` clock; fix SL-reentry 30-min window
+- **agent:** worker · **scope:** `agents/pending_manager.py` (839-841), `connectors/mt5_connector.py` (`_broker_now`/window helper), `agents/reporter.py` (209)
+- **verify:** one-line broker-tz probe — log `deal.time` of a known-recent deal vs `datetime.utcnow()` on a
+  trading day; quantify the offset.
+- **fix contract:** add a single `_broker_now()`/`_broker_window()` helper (offset from `symbol_info_tick.time`
+  vs `time.time()`), use it in all `history_deals_get` callers. **Read-path only — no order logic.**
+- **acceptance:** on a trading day, `_get_recent_sl_closes` returns a deal that closed <30 min ago (previously missed).
+- **IN PROGRESS (2026-07-12):** probe prepared → `scripts/probe_broker_tz.py` (READ-ONLY: symbol_info_tick +
+  history_deals_get only, no orders). **User must run it** (controls the live process) on a trading day:
+  `! <py> scripts\probe_broker_tz.py`. It prints the broker-server-vs-UTC offset. The `_broker_now()` helper fix
+  is HELD until that offset (and its sign) is confirmed, so the multi-file read-path change lands with the
+  direction proven correct rather than guessed.
+
+#### B12 [DONE — verified + cleanup] — Point train_filter at `planned_sl_pips`; wire or drop the 5 orphan columns
+- **agent:** worker · **scope:** `ml/train_filter.py` (48-51 select + sl_pips derivation), optionally `db/reader.py` select/map
+- **root cause:** 5 decision-snapshot columns are write-only; `train_filter` re-derives `sl_pips` from the
+  *final* mutated `sl` -> reintroduces the outcome leakage `planned_sl_pips` was added to prevent.
+- **verify:** confirm whether a v2 trainer is meant to consume these (may be intentionally staged).
+- **fix contract:** add `planned_sl_pips` to `train_filter.load_dataframe` select and use it instead of
+  `entry_price - sl`; if the fields should be generally available, add all five to `reader.get_trades`.
+- **acceptance:** trainer's `sl_pips` equals stored `planned_sl_pips` (not the trailing-mutated value) for a
+  sample of trades where BE/trailing moved the SL.
+- **DONE (2026-07-12):** VERIFY result — the active leakage the audit feared is **NOT present**: `sl_pips=abs(e-sl)`
+  was computed (train_filter.py:70) but is **excluded from features** (`NUM_FEATS`/`CAT_FEATS` don't include it,
+  X=df[NUM_FEATS+CAT_FEATS]) — the author already handled it (top comment). Cleanup applied: removed the dead
+  leaky `sl_pips` computation (a trap for a future dev who might add it to NUM_FEATS) and refreshed the stale
+  comment — `planned_sl_pips` is now logged in DB (writer.py) and is the correct leakage-free source to add as a
+  NUM_FEAT **once closed-trade coverage is sufficient** (old rows are NULL; forcing it now would shrink the ~346
+  sample). The script's own sample-count + AUC≥0.58 gate self-protects, so the feature-add is deferred to when
+  data accumulates, not a code risk. `train_filter` is OFFLINE — no live-pipeline impact.
+
+### Batch AF-approval — MONEY / GATE / GRAPH: explain + user approval BEFORE coding
+
+> These touch confidence thresholds / SL-TP / money management / gate logic / graph routing.
+> Per iron rules a worker may NOT start these until the user approves the design. Left `[BLOCKED]` pending decision.
+
+#### B1 [BLOCKED: needs user decision] — `RISK_PER_TRADE=0.50` default + missing max-loss% cap (non-NNLB)
+- **decision needed:** is 0.50 (=50%) deliberate, relying on `MAX_LOT=0.01` as the real limiter, or should the
+  default be ~0.005? And should `calculate_lot_size` get a max-loss-% clamp symmetric to `NNLB_MAX_LOSS_PCT`?
+- **proposed fix (on approval):** lower default to 0.005 AND add a max-loss-% guard so raising `MAX_LOT` can't
+  silently create 30%+ single-trade risk. `config.py:53` + `mt5_connector.py:85-97`.
+
+#### B2 [BLOCKED: needs user decision] — `max_daily_loss=1.00` (100%) default defangs the daily circuit breaker
+- **decision needed:** does the live `.env` already override this? If not, set a real default (e.g. 0.05-0.10).
+- **proposed fix (on approval):** `config.py:54` default -> sane value; confirm gate 1 fires in a shadow test.
+
+#### B5 [BLOCKED: needs user decision] — EMA_PULLBACK synthesized & traded LLM-unreviewed in NNLB
+- **decision needed:** reconcile the two paths — either give NNLB TREND_CONT its own entry tag (not
+  `EMA_PULLBACK`) or apply `EMA_PULLBACK_BLOCK` inside the NNLB branch.
+- **proposed fix (on approval):** `decision_maker.py:410-414` / add block in the NNLB branch before 476.
+
+#### B10 [BLOCKED: needs user decision] — `swing_manager` MT5 calls bypass `_mt5_lock`
+- **decision needed:** approve serializing swing MT5 access with the guardian thread.
+- **proposed fix (on approval):** acquire `mt5_connector._mt5_lock` inside `manage_swing_campaign`, or add it to
+  the connector's lock-wrap list. Only bites when SWING+GUARDIAN both on.
+
+#### O8 [BLOCKED: needs architect + user] — Protective management downstream of the LLM chain
+- **decision needed:** move `ensure_sl_protection`/`manage_breakeven` ahead of the LLM chain in the graph, or
+  default `GUARDIAN_ENABLED=on` for the live VM. Graph-routing / behavioral change.
+
+### Optional optimizations (no bug, ROI-ranked in AUDIT) — file when prioritized
+- O2 batch Gemini embeds + bulk-insert on cache MISS (`news_cache.py`) — cost/quota.
+- O4 bound MT5 reconnect loop + alert (`main.py:512-516`) — robustness.
+- O6 bulk `agent_usage` insert (`writer.py:127-143`) + window the accounting scans (`reader.py:106-178`) — speed.
+- O7 cache M15 momentum per cycle (`mt5_connector.py`) — latency under lock.
+
+---
+
+## Cross-batch integration gate (auditor) — Cycle #13
+- Batch AF-safe (B3/B7/B14/B15/O1/O3): `& $PY tests\test_all.py` failure set unchanged vs baseline
+  (time-of-day failures excluded per CLAUDE.md); each fix has its own unit acceptance above.
+- Batch AF-verify (B6/B8/B12): the verification probe is recorded in continue.md BEFORE any code change.
+- Batch AF-approval (B1/B2/B5/B10/O8): remain `[BLOCKED]` until the user approves the design — no diff lands first.
+- **No diff** may touch `agents/prompts/*.json`, `_run_gates`, money management, SL/TP, or confidence
+  thresholds without explicit approval. Every edit logged in `.claude/context/continue.md` (override #2).

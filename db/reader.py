@@ -71,11 +71,12 @@ def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list
                 "sr_zone":               r.get("sr_zone"),
                 "sr_strength":           r.get("sr_strength"),
                 "pa_action":             r.get("pa_action"),
-                "pa_patterns":           r.get("pa_patterns") or [],
                 "sentiment":             r.get("sentiment"),
                 "analysis":              r.get("analysis"),
-                "manual_reason":         r.get("manual_reason", ""),
-                "manual_analysis":       r.get("manual_analysis", ""),
+                # NB: pa_patterns / manual_reason / manual_analysis เคย map ที่นี่แต่ไม่ใช่คอลัมน์ใน
+                # DB (ไม่อยู่ใน select/writer/schema) → บน DB path เป็น []/"" เสมอ (misleading). ลบทิ้ง —
+                # consumer ทุกตัว guard อยู่แล้ว (index.html t.x&&/||, lesson_learner/backfill .get())
+                # trades.json ยังมี field ครบจาก reporter (JSON path ไม่กระทบ)
                 "strategy_version":      r.get("strategy_version", 1),
             })
         # CONTRACT: คืน chronological (เก่า→ใหม่) เหมือน logs/trades.json — ทุก consumer

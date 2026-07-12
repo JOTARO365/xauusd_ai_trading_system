@@ -11,6 +11,8 @@ _llm = ChatAnthropic(
     api_key=ANTHROPIC_API_KEY,
     max_tokens=450,
     temperature=0,
+    timeout=40,       # กัน SDK default ~600s×2 (ดู decision_maker) — cap cycle latency บน API stall
+    max_retries=1,
 ).with_structured_output(MarketAdvisorOutput, include_raw=True)
 
 SYSTEM_PROMPT = json.dumps(
@@ -57,11 +59,10 @@ Historical performance:
     global _last_usage
     _last_usage = None
     try:
+        # NB: ไม่ใส่ cache_control — เรียกรอบละครั้ง, cycle interval > TTL 5 นาที ของ ephemeral
+        # → cache_read=0 (พิสูจน์แล้วใน analyst.py:172) จ่าย write premium 1.25x ฟรี
         messages = [
-            {"role": "system", "content": [
-                {"type": "text", "text": SYSTEM_PROMPT,
-                 "cache_control": {"type": "ephemeral"}}
-            ]},
+            {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_message},
         ]
         raw_out = _llm.invoke(messages)
