@@ -37,14 +37,22 @@ def main():
     local_epoch = time.time()
 
     # 1) offset จาก tick ล่าสุด (broker server epoch vs UTC epoch)
+    #    ⚠️ ใช้ได้เฉพาะเมื่อ tick เป็นของ "ตอนนี้" (ตลาดเปิด + terminal ต่อ feed). ถ้า tick เก่า
+    #    (ตลาดปิด/disconnect) offset ที่ได้ = อายุ tick ไม่ใช่ tz offset → ต้องเตือน ไม่งั้นเข้าใจผิด
+    STALE_SEC = 300   # tick เก่ากว่า 5 นาที = ไม่มี feed สด
     tick = mt5.symbol_info_tick(SYMBOL)
     if tick is None:
-        print(f"[WARN] ไม่มี tick ของ {SYMBOL} (ตลาดปิด?) — ลอง deal ต่อ")
+        print(f"[WARN] ไม่มี tick ของ {SYMBOL} (ตลาดปิด/terminal ไม่ต่อ) — ลอง deal ต่อ")
     else:
-        offset_sec = tick.time - local_epoch
+        age_sec = local_epoch - tick.time
         print(f"[TICK]  {SYMBOL} tick.time={tick.time} ({datetime.fromtimestamp(tick.time, timezone.utc):%Y-%m-%d %H:%M:%S} 'UTC-labeled')")
         print(f"        time.time()={local_epoch:.0f} ({now_utc:%Y-%m-%d %H:%M:%S} UTC จริง)")
-        print(f"        >>> broker-server offset ≈ {offset_sec/3600:+.2f} ชม. (บวก = server นำ UTC)")
+        if age_sec > STALE_SEC:
+            print(f"        ❌ tick เก่า {age_sec/3600:.1f} ชม. = ไม่มี feed สด (ตลาดปิด/terminal disconnect).")
+            print(f"           วัด broker-tz offset ไม่ได้ตอนนี้ — รันใหม่ตอน terminal ต่อ broker + ตลาดเปิด")
+        else:
+            offset_sec = tick.time - local_epoch
+            print(f"        ✅ tick สด (อายุ {age_sec:.0f}s) → broker-server offset ≈ {offset_sec/3600:+.2f} ชม. (บวก = server นำ UTC)")
 
     # 2) deal ล่าสุดใน 7 วัน — เทียบ deal.time กับ UTC now
     frm = now_utc - timedelta(days=7)
