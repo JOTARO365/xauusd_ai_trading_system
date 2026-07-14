@@ -141,8 +141,10 @@ GUARDIAN_ENABLED      = os.getenv("GUARDIAN_ENABLED", "false").lower() == "true"
 GUARDIAN_INTERVAL_SEC = int(os.getenv("GUARDIAN_INTERVAL_SEC") or 4)     # poll ทุกกี่วินาที
 
 # ── Specialist agents (multi-TF entries, Layer-A) ─────────────
-# *** DEFAULT OFF *** — ships flag-off จน replay-validator ผ่าน. ON = เพิ่ม spec context ให้
-# decision_maker (advisory, ไม่แตะ gate/cap 6/floor 62). ดู docs/DESIGN_specialist_agents.md
+# *** DEFAULT OFF *** — ships flag-off จน replay-validator ผ่าน. ดู docs/DESIGN_specialist_agents.md
+# SHADOW  = compute + append-only capture logs/spec_shadow.jsonl (เก็บ data, 0 token, 0 behavior change)
+# ENABLED = advisory context ให้ decision_maker (ไม่แตะ gate/cap 6/floor 62). เปิดหลัง replay ผ่านเท่านั้น
+SPECIALIST_SHADOW     = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
 SPECIALIST_ENABLED    = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"
 
 def reload_config():
@@ -208,7 +210,8 @@ def reload_config():
     TREND_CONT_MAX_DIST_PCT  = float(os.getenv("TREND_CONT_MAX_DIST_PCT") or 0.3)
     NNLB_FASTPATH            = os.getenv("NNLB_FASTPATH", "true").lower() != "false"
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
-    global SPECIALIST_ENABLED
+    global SPECIALIST_ENABLED, SPECIALIST_SHADOW
+    SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
     SPECIALIST_ENABLED       = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"
     global EMA_PULLBACK_BLOCK, AUTO_SL_PROTECT, MAX_TRADES_PER_DAY, AUTO_SL_PIPS, SL_MIN_GAP_PIPS
     EMA_PULLBACK_BLOCK       = (os.getenv("EMA_PULLBACK_BLOCK") or "true").lower() != "false"

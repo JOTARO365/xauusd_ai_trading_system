@@ -309,12 +309,36 @@ def node_accounting(state: TradingState) -> dict:
 
 # ── Specialist node (Layer-A, flag-gated) ───────────────────────────────────────
 
+def _append_spec_shadow(cd: dict, zm: dict, spec: dict, current: float) -> None:
+    """Append-only capture of the FULL specialist input contract → logs/spec_shadow.jsonl, so an
+    offline replay can later answer trigger-rate / cap / win-rate. Pure file write, 0 tokens.
+    Whitelisted fields (drops the big `raw`/`scan`) keep the log replay-sufficient without bloat."""
+    from datetime import datetime, timezone
+    import json as _json
+    rec = {
+        "ts":          datetime.now(timezone.utc).isoformat(),
+        "current":     current,
+        "trend":       cd.get("trend"),        "d1_trend":   cd.get("d1_trend"),
+        "momentum_tf": cd.get("momentum_tf"),  "candle_pat": cd.get("candle_pat"),
+        "sr_actions":  cd.get("sr_actions"),   "sr_meta":    cd.get("sr_meta"),
+        "sr_zones":    cd.get("sr_zones"),     "key_levels": cd.get("key_levels"),
+        "htf_zone":    cd.get("htf_zone"),     "indicators": cd.get("indicators"),
+        "zone_map":    zm,                     "spec_route": spec,
+    }
+    with open("logs/spec_shadow.jsonl", "a", encoding="utf-8") as f:
+        f.write(_json.dumps(rec, ensure_ascii=False, default=str) + "\n")
+
+
 def node_specialist(state: TradingState) -> dict:
-    """Build zone_map + route specialist candidates. Flag-gated: SPECIALIST_ENABLED=false
-    (default) => passthrough, ZERO behavior change. On => enriches chart_data with
-    zone_map + spec_route (advisory; decision_maker gates + cap 6 still decide)."""
+    """Build zone_map + route specialist candidates.
+      SPECIALIST_SHADOW=true  => compute + append-only capture to logs/spec_shadow.jsonl, but DO NOT
+                                 influence the decision (data-collection mode; 0 tokens, 0 behavior change).
+      SPECIALIST_ENABLED=true => also enrich chart_data (advisory to decision_maker; gates + cap decide).
+      both false (default)    => passthrough {}, ZERO change."""
     import config as _cfg
-    if not getattr(_cfg, "SPECIALIST_ENABLED", False):
+    enabled = getattr(_cfg, "SPECIALIST_ENABLED", False)
+    shadow  = getattr(_cfg, "SPECIALIST_SHADOW", False)
+    if not (enabled or shadow):
         return {}
     try:
         from agents.zone_mapper import build_zone_map
@@ -327,7 +351,13 @@ def node_specialist(state: TradingState) -> dict:
         zm   = build_zone_map(cd, current)
         spec = route(cd, zm)
         logger.info(spec["log"])
-        return {"chart_data": {**cd, "zone_map": zm, "spec_route": spec}}
+        if shadow:
+            try:
+                _append_spec_shadow(cd, zm, spec, current)
+            except Exception as _se:
+                logger.error(f"[GRAPH:specialist] shadow capture failed: {_se}")
+        # shadow-only mode captures but must NOT change the decision → return {}
+        return {"chart_data": {**cd, "zone_map": zm, "spec_route": spec}} if enabled else {}
     except Exception as e:
         logger.error(f"[GRAPH:specialist] {e}")
         return {}
