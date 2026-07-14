@@ -457,8 +457,9 @@ This registers At-LogOn / Interactive scheduled tasks for the bot + dashboard th
 | `FIXED_LOT` | `0.01` | `0.01` | Used when LOT_MODE=fixed |
 | `MIN_LOT` | `0.01` | `0.01` | Minimum lot size |
 | `MAX_LOT` | `0.01` | `0.01` | Maximum lot size (caps all scaling — raise it for NNLB) |
-| `RISK_PER_TRADE` | `0.50` | `0.50` | Risk per trade % (0.50 = 0.5%) |
-| `MAX_DAILY_LOSS` | `1.00` | `1.00` | Max daily loss % |
+| `RISK_PER_TRADE` | `0.02` | `0.02` | Risk per trade as a **raw fraction** — 0.02 = 2%, 0.50 = 50% (**NOT** 0.5%). Only used when `LOT_MODE=auto`; ignored in `fixed`. Hard-capped by `MAX_RISK_PCT`. |
+| `MAX_DAILY_LOSS` | `0.10` | `0.10` | Max daily loss as a fraction (0.10 = 10%). Daily circuit breaker (gate 1). |
+| `MAX_RISK_PCT` | `0.05` | `0.05` | **B1 safety net** — risk per trade can never exceed this fraction of balance regardless of `RISK_PER_TRADE` (prevents a mis-set RISK blowing the account when `LOT_MODE=auto`). `0` disables the cap. |
 | `MAX_OPEN_TRADES` | `4` | `4` | Max simultaneous open trades |
 | `DEFAULT_SL_PIPS` | `2000` | `2000` | Default SL in pips (XAU: 1 pip = $0.01) |
 | `DEFAULT_TP_PIPS` | `5000` | `5000` | Default TP in pips |

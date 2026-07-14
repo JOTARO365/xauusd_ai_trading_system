@@ -83,6 +83,13 @@ def calculate_lot_size(account_balance: float, sl_pips: float,
     else:
         scale = max(0.0, min(1.0, confidence_scale))
         risk_amount = account_balance * MONEY_MANAGEMENT["risk_per_trade"] * scale
+        # B1 hard cap: risk ต่อไม้ห้ามเกิน MAX_RISK_PCT ของ balance ไม่ว่า RISK_PER_TRADE เท่าไร
+        # (กัน RISK สูง เช่น 2.0=200% ระเบิดพอร์ตเมื่อสลับ LOT_MODE=auto). fixed mode ไม่เข้า branch นี้
+        _max_risk = account_balance * getattr(_cfg, "MAX_RISK_PCT", 0.05)
+        if _max_risk > 0 and risk_amount > _max_risk:
+            logger.warning(f"Risk cap: ${risk_amount:.2f} → ${_max_risk:.2f} "
+                           f"(MAX_RISK_PCT={getattr(_cfg, 'MAX_RISK_PCT', 0.05):.0%})")
+            risk_amount = _max_risk
         lot = round(risk_amount / (sl_pips * pip_value_lot), 2)
 
     clamped = max(_cfg.MIN_LOT, min(lot, _cfg.MAX_LOT))

@@ -50,8 +50,8 @@ STREAK_PROTECTION = os.getenv("STREAK_PROTECTION", "true").lower() != "false"
 
 # ── Money Management ──────────────────────────────────────────
 MONEY_MANAGEMENT = {
-    "risk_per_trade":        float(os.getenv("RISK_PER_TRADE")        or 0.50),
-    "max_daily_loss":        float(os.getenv("MAX_DAILY_LOSS")        or 1.00),
+    "risk_per_trade":        float(os.getenv("RISK_PER_TRADE")        or 0.02),   # B1: 2% safe default (เดิม 0.50=50% footgun)
+    "max_daily_loss":        float(os.getenv("MAX_DAILY_LOSS")        or 0.10),   # B2: 10% (เดิม 1.00=100% = daily circuit breaker ปิด)
     "max_open_trades":       int(os.getenv("MAX_OPEN_TRADES")         or 4),
     "default_sl_pips":       int(os.getenv("DEFAULT_SL_PIPS")         or 2000),
     "default_tp_pips":       int(os.getenv("DEFAULT_TP_PIPS")         or 5000),
@@ -65,6 +65,10 @@ MONEY_MANAGEMENT = {
     "conf_full_size_at":     int(os.getenv("CONF_FULL_SIZE_AT")       or 80),
     "conf_min_scale":        float(os.getenv("CONF_MIN_SCALE")        or 0.5),
 }
+
+# B1 safety net: hard cap risk ต่อไม้ (auto lot) — risk ต่อ trade ห้ามเกิน % นี้ของ balance ไม่ว่า
+# RISK_PER_TRADE เท่าไร (กัน RISK สูง เช่น 2.0=200% ระเบิดพอร์ตเมื่อสลับ LOT_MODE=auto). 0 = ปิด cap
+MAX_RISK_PCT = float(os.getenv("MAX_RISK_PCT") or 0.05)
 
 # ── EMA_PULLBACK toxicity gate ────────────────────────────────
 # Loss analysis 2026-06: EMA_PULLBACK entries with a wide SL (high ATR) or a
@@ -210,9 +214,10 @@ def reload_config():
     TREND_CONT_MAX_DIST_PCT  = float(os.getenv("TREND_CONT_MAX_DIST_PCT") or 0.3)
     NNLB_FASTPATH            = os.getenv("NNLB_FASTPATH", "true").lower() != "false"
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
-    global SPECIALIST_ENABLED, SPECIALIST_SHADOW
+    global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
     SPECIALIST_ENABLED       = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"
+    MAX_RISK_PCT             = float(os.getenv("MAX_RISK_PCT") or 0.05)
     global EMA_PULLBACK_BLOCK, AUTO_SL_PROTECT, MAX_TRADES_PER_DAY, AUTO_SL_PIPS, SL_MIN_GAP_PIPS
     EMA_PULLBACK_BLOCK       = (os.getenv("EMA_PULLBACK_BLOCK") or "true").lower() != "false"
     AUTO_SL_PROTECT          = (os.getenv("AUTO_SL_PROTECT") or "true").lower() != "false"
@@ -240,8 +245,8 @@ def reload_config():
     SWING_MAX_HOLD_DAYS  = int(os.getenv("SWING_MAX_HOLD_DAYS") or 30)
     SWING_MIN_EQUITY     = float(os.getenv("SWING_MIN_EQUITY") or 3600)
     MONEY_MANAGEMENT.update({
-        "risk_per_trade":        float(os.getenv("RISK_PER_TRADE")        or 0.50),
-        "max_daily_loss":        float(os.getenv("MAX_DAILY_LOSS")        or 1.00),
+        "risk_per_trade":        float(os.getenv("RISK_PER_TRADE")        or 0.02),   # B1
+        "max_daily_loss":        float(os.getenv("MAX_DAILY_LOSS")        or 0.10),   # B2
         "max_open_trades":       int(os.getenv("MAX_OPEN_TRADES")         or 4),
         "default_sl_pips":       int(os.getenv("DEFAULT_SL_PIPS")         or 2000),
         "default_tp_pips":       int(os.getenv("DEFAULT_TP_PIPS")         or 5000),
