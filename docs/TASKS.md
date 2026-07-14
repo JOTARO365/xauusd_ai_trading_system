@@ -644,27 +644,39 @@ task spans 3+ independent parallel modules → sub-agent delegation format not r
 > These touch confidence thresholds / SL-TP / money management / gate logic / graph routing.
 > Per iron rules a worker may NOT start these until the user approves the design. Left `[BLOCKED]` pending decision.
 
-#### B1 [BLOCKED: needs user decision] — `RISK_PER_TRADE=0.50` default + missing max-loss% cap (non-NNLB)
+#### B1 [DONE 2026-07-14] — `RISK_PER_TRADE` default + missing max-loss% cap (non-NNLB)
+- User-approved. Added `MAX_RISK_PCT=0.05` hard cap in `calculate_lot_size` (risk/trade ≤ 5% of balance
+  regardless of RISK_PER_TRADE — .env has 2.0=200%, inert under LOT_MODE=fixed); config default 0.50→0.02.
+  Verified cap fires end-to-end. Rule-9 set (config/reload/.env.example/README). Commit a5d89e3.
 - **decision needed:** is 0.50 (=50%) deliberate, relying on `MAX_LOT=0.01` as the real limiter, or should the
   default be ~0.005? And should `calculate_lot_size` get a max-loss-% clamp symmetric to `NNLB_MAX_LOSS_PCT`?
 - **proposed fix (on approval):** lower default to 0.005 AND add a max-loss-% guard so raising `MAX_LOT` can't
   silently create 30%+ single-trade risk. `config.py:53` + `mt5_connector.py:85-97`.
 
-#### B2 [BLOCKED: needs user decision] — `max_daily_loss=1.00` (100%) default defangs the daily circuit breaker
+#### B2 [DONE 2026-07-14] — `max_daily_loss=1.00` (100%) default defangs the daily circuit breaker
+- User-approved. config default 1.00→0.10. Live .env already overrides to 0.30 (VM unaffected). Commit a5d89e3.
 - **decision needed:** does the live `.env` already override this? If not, set a real default (e.g. 0.05-0.10).
 - **proposed fix (on approval):** `config.py:54` default -> sane value; confirm gate 1 fires in a shadow test.
 
-#### B5 [BLOCKED: needs user decision] — EMA_PULLBACK synthesized & traded LLM-unreviewed in NNLB
+#### B5 [DONE 2026-07-14] — EMA_PULLBACK synthesized & traded LLM-unreviewed in NNLB
+- User-approved (dormant: NNLB_MODE=false). NNLB TREND_CONT now tags `entry_type="TREND_CONT"` (not
+  EMA_PULLBACK) so gate 657 EMA_PULLBACK_BLOCK won't wrongly block it if NNLB_FASTPATH=false; line 596
+  `_is_trend_follow` still True via tech_signal. Grep-verified no downstream dependency breaks.
 - **decision needed:** reconcile the two paths — either give NNLB TREND_CONT its own entry tag (not
   `EMA_PULLBACK`) or apply `EMA_PULLBACK_BLOCK` inside the NNLB branch.
 - **proposed fix (on approval):** `decision_maker.py:410-414` / add block in the NNLB branch before 476.
 
-#### B10 [BLOCKED: needs user decision] — `swing_manager` MT5 calls bypass `_mt5_lock`
+#### B10 [DONE 2026-07-14] — `swing_manager` MT5 calls bypass `_mt5_lock`
+- User-approved (dormant: SWING+GUARDIAN=false). `@_locked` on `manage_swing_campaign` serializes its MT5
+  access with the guardian thread (RLock reentrant → nested `_calc_pip_value` safe). Verified no deadlock.
 - **decision needed:** approve serializing swing MT5 access with the guardian thread.
 - **proposed fix (on approval):** acquire `mt5_connector._mt5_lock` inside `manage_swing_campaign`, or add it to
   the connector's lock-wrap list. Only bites when SWING+GUARDIAN both on.
 
-#### O8 [BLOCKED: needs architect + user] — Protective management downstream of the LLM chain
+#### O8 [DEFERRED 2026-07-14] — Protective management downstream of the LLM chain
+- User chose to defer. Rationale: O3 (agent timeout 40s) already caps the stall that made this dangerous;
+  the real fix (enable GUARDIAN) needs live-MT5 concurrency testing while the bot is down. Revisit when the
+  bot is back on broker. Not blocking — mitigated.
 - **decision needed:** move `ensure_sl_protection`/`manage_breakeven` ahead of the LLM chain in the graph, or
   default `GUARDIAN_ENABLED=on` for the live VM. Graph-routing / behavioral change.
 

@@ -413,7 +413,9 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
                     tech_signal = f"TREND_CONT_{_tc_dir}"
                     chart_data["signal"]     = _tc_dir
                     chart_data["confidence"] = int(_cfg.TREND_CONT_CONF)   # tunable; ยังไม่มี zone anchor
-                    chart_data["entry_type"] = "EMA_PULLBACK"
+                    # B5: tag TREND_CONT (setup ตั้งใจ) ไม่ใช่ EMA_PULLBACK (toxic type) — กัน gate 657
+                    # EMA_PULLBACK_BLOCK บล็อกผิดถ้า NNLB_FASTPATH=false (line 596 _is_trend_follow ยัง True ผ่าน tech_signal)
+                    chart_data["entry_type"] = "TREND_CONT"
                     conf = int(_cfg.TREND_CONT_CONF)
                     # SL = H4 ATR (clamped), TP = SL × 2  → R:R = 2.0
                     _h4_atr = float(chart_data.get("indicators", {}).get("h4", {}).get("atr") or 0)

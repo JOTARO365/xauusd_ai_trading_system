@@ -35,7 +35,7 @@ from loguru import logger
 
 import config as _cfg
 from config import SYMBOL
-from connectors.mt5_connector import SYSTEM_MAGIC, _calc_pip_value, _safe_comment
+from connectors.mt5_connector import SYSTEM_MAGIC, _calc_pip_value, _safe_comment, _locked
 
 SWG_TAG = "SWG-"                 # comment prefix แยก swing ออกจาก scalp
 _REENTRY_COOLDOWN_H = 4          # ห้ามเปิด campaign ใหม่ภายใน N ชม. หลังปิด (กัน churn)
@@ -202,6 +202,7 @@ def _current_risk(camp: dict) -> float:
     return total
 
 
+@_locked   # B10: serialize MT5 access กับ guardian thread (RLock reentrant — nested _calc_pip_value ปลอดภัย)
 def manage_swing_campaign(chart_data: dict) -> int:
     """
     Entry point — เรียกจาก trading_graph.node_position_mgmt ทุก cycle.
