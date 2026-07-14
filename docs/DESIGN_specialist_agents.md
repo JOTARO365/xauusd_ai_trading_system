@@ -1,6 +1,8 @@
 # DESIGN — Specialist Agents (ZoneMapper / TrendSpecialist / RangeSpecialist)
 
-> Status: **DRAFT — awaiting user approval. No code written, no subagents created.**
+> Status: **APPROVED 2026-07-14 — §5 frozen. Requirement: multi-TF entries (more entry
+> candidates) BUT cap=6/day + conf floor=62 UNCHANGED (user chose "คง guard"). 0 iron-rule
+> change. Ships flag-OFF. Next: create Layer-B subagents → implement Layer-A.**
 > Written by: architect · Date: 2026-07-14 · Source spec: user (two-layer specialist design)
 > Design of record once approved. Per `.claude/CLAUDE.md` explain-before-acting + iron rules,
 > nothing in Layer A gets implemented until this doc is approved.
@@ -57,21 +59,28 @@ of chart_watcher — we *reuse* its primitives.
   + existing PA detectors. Mirrors today's gate-5 SIDEWAYS logic (`decision_maker.py:581-606`) +
   `manage_range_pending` guards, now centralized. Same rule: no new LLM call.
 
-### 2.4 Routing table (regime → exactly ONE active specialist)
+### 2.4 Routing — PER-TIMEFRAME lanes (multi-TF entries)
 
-| Regime signal | Active specialist | Dormant (must NOT fire) | Log line |
-|---|---|---|---|
-| trend = BULLISH (UPTREND) | TrendSpecialist · UPTREND branch | RangeSpecialist, DOWNTREND branch | `[SPEC] TrendUp active — <why>` |
-| trend = BEARISH (DOWNTREND) | TrendSpecialist · DOWNTREND branch | RangeSpecialist, UPTREND branch | `[SPEC] TrendDown active — <why>` |
-| trend = SIDEWAYS | RangeSpecialist | TrendSpecialist | `[SPEC] Range active — <why>` |
-| TRANSITION (advisor) | **none** (conservative: no fresh entry) | all | `[SPEC] Transition — stand down` |
+The router runs **per timeframe lane** (H1, H4, D1 — W1 informs bias only). Each lane gets its own
+deterministic regime → exactly ONE specialist owns that lane that cycle. Because different TFs can be
+in different regimes at once, a single cycle can surface **multiple entry candidates** (e.g. H1 lane =
+Range edge-buy while H4 lane = Trend pullback) — this is how "more entries" happens WITHOUT loosening
+any bar.
 
-- **Router source (DECISION NEEDED — see §5):** recommend the **deterministic `chart_data["trend"]`**
-  (H4, free, already what gates 4/5 enforce) as the primary router, with `advisor.regime` as an
-  optional confirm. Using the LLM regime as the sole router would make routing depend on an LLM field
-  that is advisory-only today.
-- **Dormancy rule:** the classifier selects one; the other two specialists' trigger conditions must
-  evaluate False. Log active specialist + reason every cycle (goes to `system.log`, zero token).
+| Lane regime (deterministic per TF) | Owner specialist | Dormant in that lane |
+|---|---|---|
+| trend(TF) = BULLISH | TrendSpecialist · UPTREND | RangeSpecialist, DOWNTREND |
+| trend(TF) = BEARISH | TrendSpecialist · DOWNTREND | RangeSpecialist, UPTREND |
+| trend(TF) = SIDEWAYS | RangeSpecialist | TrendSpecialist |
+| TRANSITION (that TF only) | that lane stands down | — (other lanes still trade) |
+
+- **Router source (FROZEN §5.1):** deterministic per-TF trend (H1/H4/D1) — free, replay-able, aligned
+  with gates 4/5. `advisor.regime` is an optional cross-check logged on disagreement, never the sole router.
+- **All candidates funnel through the SAME `decision_maker` gates + the shared daily cap = 6 + conf
+  floor = 62.** Multi-TF adds *candidates*, not looser thresholds; the cap is the backstop that keeps
+  "more entries" from becoming "overtrading" (replay: trade #7+ = −411). Log the winning lane + why,
+  and log candidates that were capped out (zero token).
+- **Dormancy rule (per lane):** within a lane, only the owning specialist's triggers may evaluate True.
 
 ### 2.5 Zero-new-LLM-call cost statement  ✅
 - ZoneMapper, TrendSpecialist, RangeSpecialist = **pure Python. 0 tokens.**
@@ -110,19 +119,20 @@ documented history of agent false-positive bug reports — unverified claims are
 | `gate-integration-auditor` | `decision_maker.py` (gates) + pending/zone-reentry/swing order paths | Prove the new regime gate cannot contradict gates 2b–5c (HTF_DIRECTION_BLOCK, anti-fade, counter-trend, SIDEWAYS); produce a **gate-conflict matrix**; enumerate every order path that bypasses DecisionMaker (§3) and whether each got the regime check. → report file |
 | `replay-validator` | recent H1/H4 history (MT5 export / logged bars) + the 3 specialist condition sets | Per-regime trigger counts, hypothetical R:R outcomes, false-signal cases. **Feature stays flag-OFF until this report is reviewed.** → report file |
 
-## 5. Decisions the user must make before implementation
+## 5. Decisions — FROZEN 2026-07-14 (user approved)
 
-1. **Router source:** deterministic `chart_data["trend"]` (recommended) vs `advisor.regime` (LLM) vs
-   both-must-agree. Affects how often each specialist activates.
-2. **Scope of the regime rule:** market-order path only (simplest, honest), OR duplicate the regime
-   check into the 3 bypass paths too (pending/zone-reentry/swing) for true coverage (bigger change,
-   touches gate-adjacent code → more approval surface).
-3. **TRANSITION regime:** stand down (no entry) — confirm this conservative default.
-4. **Where ZoneMapper lives:** new graph node after `chart` (recommended, clean separation) vs folded
-   into `node_chart`.
-5. **`sr_meta` promotion:** ZoneMapper would make the currently display-only `sr_meta` a real input.
-   Confirm that's intended (it changes `sr_meta` from zero-token display to a consumed object — still
-   0 new LLM calls, but it now influences logic).
+1. **Router source:** ✅ deterministic **per-TF trend (H1/H4/D1)**, `advisor.regime` = logged cross-check
+   only. (Revised from single-H4 to per-TF to enable multi-TF entries.)
+2. **Scope of the regime rule:** ✅ **market-order path first** (flag-OFF). Duplicating into the 3 bypass
+   paths (pending/zone-reentry/swing) is a possible phase-2, not now.
+3. **TRANSITION regime:** ✅ **per-lane stand-down** — a TF in TRANSITION doesn't trade, but other TFs in
+   a clear regime still can (supports "more entries" without forcing a whole-cycle stop).
+4. **ZoneMapper location:** ✅ **new graph node after `chart`**.
+5. **`sr_meta` promotion:** ✅ **promote** to a real input (still 0 new LLM calls). MUST log in continue.md
+   that `sr_meta` is no longer display-only.
+6. **Entry frequency vs guards (added requirement):** ✅ **cap=6/day + conf floor=62 UNCHANGED.** Multi-TF
+   adds candidates that still pass every existing gate; NO iron-rule / money-management change. If a future
+   step wants a higher cap or lower floor, that is a SEPARATE approval requiring a replay backtest first.
 
 ## 6. Non-goals / guardrails restated
 - 0 new LLM calls (§2.5). No threshold/SL-TP/anti-fade/money-mgmt change without separate approval.

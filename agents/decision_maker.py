@@ -869,6 +869,16 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
                    f"H4 EMA20={_h4_ind.get('ema20',0):.0f} < EMA50={_h4_ind.get('ema50',0):.0f} "
                    f"— EMA stack is the S/R, no zone required")
 
+    # Specialist advisory (Layer-A) — flag-gated; empty when OFF => prompt unchanged.
+    # Advisory only: the gates below + cap 6 + floor 62 still decide. Does NOT add an LLM call.
+    spec_line = ""
+    if getattr(_cfg, "SPECIALIST_ENABLED", False):
+        _top = (chart_data.get("spec_route") or {}).get("top")
+        if _top:
+            # .get() (not hard-subscript) so a future producer-shape change can't KeyError the cycle
+            spec_line = (f"\nSpecialist: {_top.get('tf','?')} {_top.get('direction','?')} "
+                         f"Q{_top.get('quality','?')} ({_top.get('specialist','?')}) — {_top.get('reason','')}")
+
     user_message = f"""Signal: {direction} | Conf: {conf}% | Entry: {entry_type}
 Zone: {sr_zone} {sr_str} | PA: {pa_str} | Candle: {candle_str}
 {htf_line}{tc_line}
@@ -876,7 +886,7 @@ Trend H4: {trend} | Session: {session} ({hour_utc:02d}:xx UTC)
 Momentum: {mom_str}
 SL: {sl_pips:.0f}p | TP: {tp_pips:.0f}p | R:R: {tp_pips/sl_pips:.1f} (min {eff_rr_preview:.1f})
 {sent_line}
-{regime_line}
+{regime_line}{spec_line}
 History — {entry_wr}
 Account — Today: {history['today_pnl']:+.2f} USD ({history['today_trades']} trades) | WR10: {history['last_10_winrate']}% | Streak: {history['losing_streak']}L{chr(10) + lesson_block if lesson_block else ""}"""
 

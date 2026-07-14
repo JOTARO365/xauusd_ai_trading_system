@@ -307,6 +307,32 @@ def node_accounting(state: TradingState) -> dict:
     return {}
 
 
+# ── Specialist node (Layer-A, flag-gated) ───────────────────────────────────────
+
+def node_specialist(state: TradingState) -> dict:
+    """Build zone_map + route specialist candidates. Flag-gated: SPECIALIST_ENABLED=false
+    (default) => passthrough, ZERO behavior change. On => enriches chart_data with
+    zone_map + spec_route (advisory; decision_maker gates + cap 6 still decide)."""
+    import config as _cfg
+    if not getattr(_cfg, "SPECIALIST_ENABLED", False):
+        return {}
+    try:
+        from agents.zone_mapper import build_zone_map
+        from agents.specialist_router import route
+        cd  = state.get("chart_data") or {}
+        ind = cd.get("indicators") or {}
+        current = (ind.get("m15") or {}).get("close") or (ind.get("h1") or {}).get("close")
+        if not current:
+            return {}
+        zm   = build_zone_map(cd, current)
+        spec = route(cd, zm)
+        logger.info(spec["log"])
+        return {"chart_data": {**cd, "zone_map": zm, "spec_route": spec}}
+    except Exception as e:
+        logger.error(f"[GRAPH:specialist] {e}")
+        return {}
+
+
 # ── Routing ────────────────────────────────────────────────────────────────────
 
 def route_entry(state: TradingState) -> str:
@@ -339,6 +365,7 @@ def build_trading_graph():
 
     g.add_node("_entry",        node_entry)
     g.add_node("chart",         node_chart)
+    g.add_node("specialist",    node_specialist)
     g.add_node("advisor",       node_advisor)
     g.add_node("news",          node_news)
     g.add_node("analyst",       node_analyst)
@@ -352,7 +379,8 @@ def build_trading_graph():
         "chart":         "chart",
         "position_mgmt": "position_mgmt",
     })
-    g.add_edge("chart",    "advisor")
+    g.add_edge("chart",      "specialist")
+    g.add_edge("specialist", "advisor")
     g.add_conditional_edges("advisor", route_after_advisor, {
         "news":          "news",
         "position_mgmt": "position_mgmt",   # net_degraded: ยังต้องดูแลไม้ก่อนจบ cycle
