@@ -93,6 +93,32 @@ def _known_tickets(log: dict) -> set:
     return {str(t.get("ticket")) for t in log.get("trades", []) if t.get("ticket")}
 
 
+def _db_known_tickets() -> set:
+    """Ticket ที่มีใน DB แล้ว — durable dedup source สำหรับ scan_manual_orders.
+
+    ปัญหาเดิม: local trades.json โดน lost-update (หลายจุด _load_log/_save_log แยกกัน
+    เขียนทับ append) → manual order ที่ sync เข้า DB แล้ว "หลุด" จาก local known →
+    ถูก re-detect + re-mark-closed + _db_write_trade ทุก cycle (449 ไม้ history 60 วัน
+    = 449 DB writes ≈ 350s/cycle). DB เป็น source ที่ทน clobber → เอามา union กับ local.
+    fail-soft: DB ล่ม → คืน set ว่าง (scan ทำงานต่อด้วย local known เหมือนเดิม)."""
+    try:
+        from db.connection import get_client
+        client = get_client()
+        tickets: set[str] = set()
+        start = 0
+        while True:
+            rows = (client.table("trades").select("ticket")
+                    .range(start, start + 999).execute().data) or []
+            tickets.update(str(r["ticket"]) for r in rows if r.get("ticket") is not None)
+            if len(rows) < 1000:
+                break
+            start += 1000
+        return tickets
+    except Exception as e:
+        logger.debug(f"[REPORTER] _db_known_tickets fail-soft: {e}")
+        return set()
+
+
 # ─────────────────────────────────────────────────────────────
 #  MANUAL ORDER SCANNER
 # ─────────────────────────────────────────────────────────────
@@ -344,7 +370,9 @@ def scan_manual_orders(chart_data: dict | None = None) -> int:
     log     = _load_log()
     _sync_closed_trades(log)    # อัปเดต PnL/status ของ trade ที่ปิดแล้ว
     _sync_pending_orders(log)   # ตรวจ pending filled / expired
-    known   = _known_tickets(log)
+    # dedup = local trades.json ∪ DB — DB ทน lost-update ที่ทำให้ manual order หลุด
+    # จาก local json แล้วถูก re-detect/re-sync ทุก cycle (bug: 449 ไม้ → 350s/cycle)
+    known   = _known_tickets(log) | _db_known_tickets()
     mt5_hist = get_mt5_history(days=60)
     new_count = 0
 
