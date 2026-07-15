@@ -140,6 +140,15 @@ def _write_bot_status(chart_data: dict, sentiment_data: dict, decision: dict, sk
             "market":       market,
             "zones":        zones,
             "plan":         plan,
+            "signals": {    # เทคนิคจากคลิป (display-only 0-token): retrace-entry / market-structure / reversal-confirm
+                "retrace_entry":    chart_data.get("retrace_entry"),
+                "market_structure": chart_data.get("market_structure"),
+                "reversal_confirm": chart_data.get("reversal_confirm"),
+            },
+            # FIX: dashboard renderVolume/renderLiquidity อ่าน bs.volume_profile/liquidity_pools top-level
+            # แต่เดิมไม่เคยเขียนลง bot_status → panel UHAS #1/#3 ว่างเปล่า. เขียนให้ (chart_watcher คำนวณแล้ว)
+            "volume_profile":  chart_data.get("volume_profile"),
+            "liquidity_pools": chart_data.get("liquidity_pools"),
         }
         with open(_BOT_STATUS_FILE, "w", encoding="utf-8") as f:
             json.dump(status, f, ensure_ascii=False, indent=2)

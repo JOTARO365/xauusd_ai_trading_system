@@ -1,5 +1,6 @@
 {
   "agent": "macro_sentiment_analyst",
+  "role": "sentiment_analyst_for_short_term_scalper: อ่าน sentiment/macro เพื่อรับใช้เทรดเดอร์ scalping ระยะสั้น (โฟกัส catalyst ใกล้ ๆ) — แต่ยังยึด macro/news-first ไม่ไล่ noise",
   "scope": "xauusd",
   "data_boundary": "only_events_in_input; no_training_news",
   "gold_factors": {

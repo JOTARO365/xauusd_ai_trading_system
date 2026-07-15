@@ -1611,6 +1611,7 @@
         <div id="fib-panel" style="font-family:var(--mono);margin-top:8px"></div>
         <div id="liquidity-panel" style="font-family:var(--mono);margin-top:6px"></div>
         <div id="volume-panel" style="font-family:var(--mono);margin-top:6px"></div>
+        <div id="signals-panel" style="font-family:var(--mono);margin-top:6px"></div>
       </div>
     </section>
 
@@ -4316,6 +4317,7 @@ async function loadMonitor() {
     renderFib(bs);
     renderLiquidity(bs);
     renderVolume(bs);
+    renderSignals(bs);
     if (!_calEvents.length) fetchCalendar();   // เผื่อเปิด Live tab ก่อน calendar โหลดรอบแรก
     renderEventCard(bs);
     await loadCandles();    // init/refresh กราฟ (throttle ในตัว) — await กัน race ตอนวาดเส้นโซนครั้งแรก
@@ -4459,6 +4461,29 @@ function renderLiquidity(bs) {
     `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0">💧 LIQUIDITY POOLS (H1 — sweep targets)</div>` +
     (bsl.length ? `<div style="font-size:10px">BSL↑ ${bsl.map(p => pool(p, true)).join('')}</div>` : '') +
     (ssl.length ? `<div style="font-size:10px">SSL↓ ${ssl.map(p => pool(p, false)).join('')}</div>` : '');
+}
+
+// เทคนิคจากคลิป LIVE ทองคำ 14 ก.ค. (display-only): retrace-entry / market-structure / reversal-confirm
+function renderSignals(bs) {
+  const el = document.getElementById('signals-panel');
+  if (!el) return;
+  const s = bs.signals || {}, ms = s.market_structure, re = s.retrace_entry, rc = s.reversal_confirm;
+  if (!ms && !re && !rc) { el.innerHTML = ''; return; }
+  let html = `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0">🎯 ENTRY TECH (คลิป · display-only)</div>`;
+  if (ms) {
+    const col = ms.state === 'UPTREND' ? 'var(--green)' : ms.state === 'DOWNTREND' ? 'var(--red)'
+              : (ms.state === 'ACCUMULATION' || ms.state === 'DISTRIBUTION') ? '#e0a800' : 'var(--muted)';
+    html += `<div style="font-size:10px">โครงสร้าง <b style="color:${col}">${ms.state}</b> <span style="color:var(--muted)">(${ms.why})</span></div>`;
+  }
+  if (re) {
+    const dcol = re.direction === 'BUY' ? 'var(--green)' : 'var(--red)';
+    html += `<div style="font-size:10px">รอย่อเข้าไส้ <b style="color:${dcol}">${re.direction}</b> @ <b>${(+re.suggested_entry).toFixed(2)}</b> · SL <b>${re.wick_sl_pips}p</b> <span style="color:var(--muted)">(แทน ${re.close_sl_pips}p = แคบลง ${re.sl_tighter_pct}% → R:R ดีขึ้น)</span></div>`;
+  }
+  if (rc) {
+    const ok = rc.status === 'confirmed';
+    html += `<div style="font-size:10px">reversal@zone: <b style="color:${ok ? 'var(--green)' : '#e0a800'}">${ok ? 'ยืนยันแล้ว✓' : 'รอแท่งยืนยัน'}</b> <span style="color:var(--muted)">${rc.note || ''}</span></div>`;
+  }
+  el.innerHTML = html;
 }
 
 function renderZones(bs) {
