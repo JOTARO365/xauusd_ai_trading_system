@@ -881,9 +881,26 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
             spec_line = (f"\nSpecialist: {_top.get('tf','?')} {_top.get('direction','?')} "
                          f"Q{_top.get('quality','?')} ({_top.get('specialist','?')}) — {_top.get('reason','')}")
 
+    # Display-analysis → decision context (advisory): unified zone score/grade + nearest unfilled FVG.
+    # Terse (~25 tok), 0 new call. Gates already ran (Python) — informs the final quality-check only,
+    # ไม่ override gate/threshold. Best-scored S + R จาก sr_meta.
+    _srm = chart_data.get("sr_meta") or []
+    def _best_zone(side):
+        cands = [m for m in _srm if m.get("side") == side and m.get("score") is not None]
+        return max(cands, key=lambda m: m["score"]) if cands else None
+    _bs, _br = _best_zone("S"), _best_zone("R")
+    _zs = " ".join(p for p in [
+        f"S{_bs['level']}({_bs.get('grade')}·{_bs.get('score')})" if _bs else "",
+        f"R{_br['level']}({_br.get('grade')}·{_br.get('score')})" if _br else "",
+    ] if p)
+    _fvgs = chart_data.get("fvg") or []
+    _fv = (f" | FVG {_fvgs[0].get('type')} {_fvgs[0].get('bottom')}-{_fvgs[0].get('top')} "
+           f"({_fvgs[0].get('dist_pct')}%)") if _fvgs else ""
+    analysis_line = f"\nZone score: {_zs}{_fv}" if (_zs or _fv) else ""
+
     user_message = f"""Signal: {direction} | Conf: {conf}% | Entry: {entry_type}
 Zone: {sr_zone} {sr_str} | PA: {pa_str} | Candle: {candle_str}
-{htf_line}{tc_line}
+{htf_line}{tc_line}{analysis_line}
 Trend H4: {trend} | Session: {session} ({hour_utc:02d}:xx UTC)
 Momentum: {mom_str}
 SL: {sl_pips:.0f}p | TP: {tp_pips:.0f}p | R:R: {tp_pips/sl_pips:.1f} (min {eff_rr_preview:.1f})
