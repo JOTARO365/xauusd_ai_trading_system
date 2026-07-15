@@ -132,7 +132,7 @@ def analyze_sentiment(news_data: dict, chart_data: dict | None = None) -> dict:
     if calendar:
         cal_lines = "\n".join(
             f"  [{ev['time']}] {ev['currency']} — {ev['title']} | "
-            f"Forecast: {ev.get('forecast','?')} | Actual: {ev.get('actual','pending')}"
+            f"Prev: {ev.get('previous','?')} | Forecast: {ev.get('forecast','?')} | Actual: {ev.get('actual','pending')}"
             for ev in calendar[:8]
         )
         cal_section = f"=== ForexFactory Calendar ===\n{cal_lines}"

@@ -4165,7 +4165,10 @@ function renderFeed() {
         numsCol = `<span style="font-size:9px;font-family:var(--mono);flex-shrink:0;text-align:right">
           <b style="color:var(--gold)">${ev.actual}</b>${fc ? `<span style="color:var(--muted)"> /${fc}</span>` : ''}${prev ? `<span style="color:var(--muted)"> · ก่อน ${prev}</span>${trend}` : ''}</span>`;
       } else if (fc || prev) {
-        numsCol = `<span style="font-size:9px;font-family:var(--mono);color:var(--muted);flex-shrink:0;text-align:right">${fc ? 'คาด ' + fc : ''}${fc && prev ? ' · ' : ''}${prev ? 'ก่อน ' + prev : ''}</span>`;
+        // upcoming: ลูกศรเทียบ forecast vs previous (คาดว่าจะขึ้น/ลงจากครั้งก่อน)
+        const pv2 = _esNum(ev.previous), fcn = _esNum(ev.forecast);
+        const etrend = (pv2 != null && fcn != null) ? (fcn > pv2 ? '<span style="color:var(--green)">▲</span>' : fcn < pv2 ? '<span style="color:var(--red)">▼</span>' : '') : '';
+        numsCol = `<span style="font-size:9px;font-family:var(--mono);color:var(--muted);flex-shrink:0;text-align:right">${fc ? 'คาด ' + fc : ''}${fc && prev ? ' · ' : ''}${prev ? 'ก่อน ' + prev : ''}${etrend}</span>`;
       }
     }
     const row = `<div class="feed-row${hasSc ? ' clickable' : ''}"${hasSc ? ' onclick="_toggleFeed(this)"' : ''}>
