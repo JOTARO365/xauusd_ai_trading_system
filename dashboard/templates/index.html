@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>XAUUSD Trading Terminal</title>
+  <title>XAU/USD · Gold Desk</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -186,6 +186,12 @@
     .ticker-change.down .ticker-val { color: var(--red); }
 
     #last-update { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+    /* Wall-Street ticker: session badge + bias pill */
+    #px-session { color: var(--gold); font-weight: 700; letter-spacing: 0.5px; }
+    .ticker-bias .ticker-val { font-weight: 800; letter-spacing: 0.5px; }
+    #px-bias-wrap.long  .ticker-val { color: #26C281; }
+    #px-bias-wrap.short .ticker-val { color: #E94560; }
+    #px-bias-wrap.flat  .ticker-val { color: var(--muted); }
 
     /* ─── LAYOUT ─────────────────────────────────────── */
     .container {
@@ -1185,13 +1191,13 @@
   <div class="header-left">
     <div class="brand">
       <div class="brand-mark">AU</div>
-      <h1 id="dashboard-title">XAUUSD &middot; Trading Terminal</h1>
+      <h1 id="dashboard-title">XAU/USD &middot; GOLD DESK</h1>
     </div>
     <div class="live-dot"></div>
   </div>
   <div class="header-right">
     <div class="ticker" id="live-ticker">
-      <div class="ticker-symbol">XAUUSD</div>
+      <div class="ticker-symbol">XAU/USD</div>
       <div class="ticker-cell ticker-bid">
         <span class="ticker-label">Bid</span>
         <span class="ticker-val" id="px-bid">—</span>
@@ -1208,6 +1214,8 @@
         <span class="ticker-label">Chg %</span>
         <span class="ticker-val" id="px-change">—</span>
       </div>
+      <div class="ticker-cell"><span class="ticker-label">Session</span><span class="ticker-val" id="px-session">—</span></div>
+      <div class="ticker-cell ticker-bias" id="px-bias-wrap"><span class="ticker-label">Bias</span><span class="ticker-val" id="px-bias">—</span></div>
     </div>
     <span id="last-update">Loading…</span>
   </div>
@@ -1310,7 +1318,7 @@
 
   <!-- AGENT PIPELINE -->
   <section>
-    <div class="section-title">Agent Pipeline</div>
+    <div class="section-title">EXECUTION DESK</div>
     <div class="pipeline" id="pipeline-container">
       <div class="pipeline-step" data-step="chart_watcher">
         <div class="step-num">01 / CHART</div>
@@ -1352,7 +1360,7 @@
 
   <!-- STAT CARDS -->
   <section>
-    <div class="section-title">Performance Statistics</div>
+    <div class="section-title">BOOK PERFORMANCE</div>
     <div class="stat-grid">
       <div class="card">
         <div class="label">Total P&amp;L</div>
@@ -1414,7 +1422,7 @@
 
   <!-- SOURCE BREAKDOWN -->
   <section>
-    <div class="section-title">System vs Manual</div>
+    <div class="section-title">ALGO vs DISCRETIONARY</div>
     <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
       <div class="card">
         <div class="label">System Trades</div>
@@ -1551,7 +1559,7 @@
 
     <!-- WHY NO ENTRY — gate blocks สด (07-03) -->
     <section>
-      <div class="section-title">Why No Entry &mdash; Gate Blocks ล่าสุด</div>
+      <div class="section-title">STAND-DOWN LOG &mdash; Gate Blocks</div>
       <div class="table-card">
         <div class="table-wrap" style="max-height:260px;overflow-y:auto">
           <table>
@@ -1564,7 +1572,7 @@
 
     <!-- BOT STATUS -->
     <section>
-      <div class="section-title">Bot Status</div>
+      <div class="section-title">DESK STATUS</div>
       <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
         <div class="card">
           <div class="label">Cycle</div>
@@ -1591,7 +1599,7 @@
 
     <!-- AI VERDICT — multi-TF (UHAS-style ชิ้น 2, 07-03) -->
     <section>
-      <div class="section-title">AI Verdict &mdash; Multi-Timeframe</div>
+      <div class="section-title">THE TAPE &mdash; Multi-TF Read</div>
       <div class="chart-card">
         <div id="verdict-tf-strip" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
         <div class="detail-grid">
@@ -1605,7 +1613,7 @@
 
     <!-- KEY LEVELS — AI zones ladder (UHAS-style ชิ้น 1, 07-03) -->
     <section>
-      <div class="section-title">Key Levels &mdash; AI Zones</div>
+      <div class="section-title">LEVELS &mdash; S/R Book</div>
       <div class="chart-card" style="padding:14px 18px">
         <div id="zone-ladder" style="font-family:var(--mono);font-size:12px">Loading…</div>
         <div id="fib-panel" style="font-family:var(--mono);margin-top:8px"></div>
@@ -1617,7 +1625,7 @@
 
     <!-- EVENT RADAR — prior + forward projection (UHAS-style ชิ้น 3, 07-03) -->
     <section>
-      <div class="section-title">Event Radar &mdash; Priors &amp; Projection</div>
+      <div class="section-title">MACRO RADAR &mdash; Priors &amp; Projection</div>
       <div class="chart-card" style="padding:14px 18px">
         <div id="event-radar" style="font-family:var(--mono);font-size:12px">Loading…</div>
       </div>
@@ -1625,7 +1633,7 @@
 
     <!-- CALENDAR + NEWS — combined module: sentiment header + list w/ slide-down -->
     <section id="news-impact-section">
-      <div class="section-title">ปฏิทิน &amp; ข่าวทอง &mdash; Calendar &amp; Gold News</div>
+      <div class="section-title">MACRO CALENDAR &mdash; Gold News</div>
       <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
         <div class="card">
           <div class="label">Net Score</div>
@@ -1701,7 +1709,7 @@
 
     <!-- LAST DECISION DETAIL -->
     <section>
-      <div class="section-title">Last Decision &mdash; Detail</div>
+      <div class="section-title">LAST TICKET &mdash; Detail</div>
       <div class="chart-card">
         <div class="detail-grid">
           <div class="detail-cell"><div class="detail-label">Trend</div><span id="mon-trend" class="detail-value">—</span></div>
@@ -1744,7 +1752,7 @@
 
     <!-- PENDING ORDERS -->
     <section>
-      <div class="section-title">Pending Orders</div>
+      <div class="section-title">WORKING ORDERS</div>
       <div class="table-card">
         <div class="table-toolbar">
           <h3>Pending Orders by Tag</h3>
@@ -1865,7 +1873,7 @@
   <div class="tab-content" id="tab-accounting">
 
     <section>
-      <div class="section-title">AI Spend</div>
+      <div class="section-title">DESK COST</div>
       <div class="stat-grid">
         <div class="card">
           <div class="label">Today Cost</div>
@@ -1892,7 +1900,7 @@
 
     <!-- BURN CARD — §3.4 burn_daily.json -->
     <section id="burn-section">
-      <div class="section-title">Daily Burn vs Target (฿150–250/day)</div>
+      <div class="section-title">RUN RATE vs Target (฿150–250/day)</div>
       <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
         <div class="card">
           <div class="label">Today Burn</div>
@@ -3036,6 +3044,26 @@ async function loadLivePrice() {
       chEl.textContent = (cp >= 0 ? '+' : '') + cp.toFixed(2) + '%';
       chWrap.classList.toggle('up', cp >= 0);
       chWrap.classList.toggle('down', cp < 0);
+    }
+
+    // Session badge (UTC clock) + bias pill (market trend) — Wall-Street desk feel
+    const seEl = document.getElementById('px-session');
+    if (seEl) {
+      const h = new Date().getUTCHours();
+      let ses = 'ASIA';
+      if (h >= 7 && h < 12) ses = 'LONDON';
+      else if (h >= 12 && h < 16) ses = 'LDN/NY';
+      else if (h >= 16 && h < 21) ses = 'NEW YORK';
+      seEl.textContent = ses;
+    }
+    const biEl = document.getElementById('px-bias'), biWrap = document.getElementById('px-bias-wrap');
+    if (biEl && biWrap) {
+      const tr = (bs.market || {}).trend || '';
+      let bias = 'FLAT', cls = 'flat';
+      if (tr === 'BULLISH' || tr === 'BULLISH_TREND') { bias = 'LONG'; cls = 'long'; }
+      else if (tr === 'BEARISH' || tr === 'BEARISH_TREND') { bias = 'SHORT'; cls = 'short'; }
+      biEl.textContent = bias;
+      biWrap.classList.remove('long', 'short', 'flat'); biWrap.classList.add(cls);
     }
 
     // Ready mode banner
@@ -4217,7 +4245,7 @@ function renderFeed() {
   }).join('');
 
   el.innerHTML =
-    '<div class="feed-group-title">📅 ปฏิทินเศรษฐกิจ — สัปดาห์นี้</div>' +
+    '<div class="feed-group-title">📅 ECONOMIC CALENDAR — This Week</div>' +
     (calRows || '<div style="color:var(--muted);font-size:11px;padding:6px">ไม่มี event สัปดาห์นี้</div>') +
     '<div class="feed-group-title" style="margin-top:14px">📰 ข่าวทองล่าสุด</div>' +
     (newsRows || '<div style="color:var(--muted);font-size:11px;padding:6px">ยังไม่มีข่าวที่ให้คะแนน — รอรอบข่าวถัดไป</div>');
@@ -4452,7 +4480,7 @@ function renderVolume(bs) {
     imb = `<span style="margin-left:10px">flow <span style="color:var(--green)">${bp}%</span>/<span style="color:var(--red)">${vp.sell_pct}%</span> <b style="color:${tcol}">${vp.tilt}</b></span>`;
   }
   el.innerHTML =
-    `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0">📊 VOLUME (H1 · ${vp.basis || 'tick-vol'})</div>` +
+    `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0">📊 TAPE / VOLUME (H1 · ${vp.basis || 'tick-vol'})</div>` +
     `<div style="font-size:10px">${wallStr}${imb}</div>`;
 }
 
@@ -4464,7 +4492,7 @@ function renderLiquidity(bs) {
   if (!bsl.length && !ssl.length) { el.innerHTML = ''; return; }
   const pool = (p, up) => `<span style="margin-right:10px"><span style="color:${up ? 'var(--red)' : 'var(--green)'}">${up ? '▲' : '▼'}</span> <b>${(+p.level).toFixed(2)}</b><span style="color:var(--muted)">×${p.count} (${p.dist_pct}%)</span></span>`;
   el.innerHTML =
-    `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0">💧 LIQUIDITY POOLS (H1 — sweep targets)</div>` +
+    `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0">💧 STOP LIQUIDITY (H1 — sweep targets)</div>` +
     (bsl.length ? `<div style="font-size:10px">BSL↑ ${bsl.map(p => pool(p, true)).join('')}</div>` : '') +
     (ssl.length ? `<div style="font-size:10px">SSL↓ ${ssl.map(p => pool(p, false)).join('')}</div>` : '');
 }
@@ -4475,7 +4503,7 @@ function renderSignals(bs) {
   if (!el) return;
   const s = bs.signals || {}, ms = s.market_structure, re = s.retrace_entry, rc = s.reversal_confirm, fvg = s.fvg || [], dp = s.double_pattern;
   if (!ms && !re && !rc && !fvg.length && !dp) { el.innerHTML = ''; return; }
-  let html = `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0">🎯 ENTRY TECH (คลิป · display-only)</div>`;
+  let html = `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0">⚡ TAPE SETUPS · ref only</div>`;
   if (ms) {
     const col = ms.state === 'UPTREND' ? 'var(--green)' : ms.state === 'DOWNTREND' ? 'var(--red)'
               : (ms.state === 'ACCUMULATION' || ms.state === 'DISTRIBUTION') ? '#e0a800' : 'var(--muted)';
