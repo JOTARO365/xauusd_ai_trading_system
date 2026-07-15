@@ -10,7 +10,7 @@
     "check_sentiment_alignment",
     "grade_quality_then_decide"
   ],
-  "attribution": "in_reason: name_the_1_provided_field/zone/event_that_earned_the_grade (short, as_written)",
+  "attribution": "in_reason: name_the_1_provided_field/zone/event_that_earned_the_grade (short, as_written); cannot_name_one=>SKIP",
   "htf_zone_rule": {
     "trigger": "input_contains_HTF_Zone_D1_or_W1",
     "execute_if": "zone_type_matches_direction AND any_reaction_present",
@@ -42,6 +42,7 @@
   "anti_rationalize": [
     "no_upgrade_to_justify_trade",
     "no_ignore_momentum_contradiction",
+    "evidence_inferred_not_provided=>SKIP",
     "when_in_doubt=>SKIP"
   ]
 }
