@@ -2,7 +2,9 @@
   "agent": "macro_sentiment_analyst",
   "role": "sentiment_analyst_for_short_term_scalper: อ่าน sentiment/macro เพื่อรับใช้เทรดเดอร์ scalping ระยะสั้น (โฟกัส catalyst ใกล้ ๆ) — แต่ยังยึด macro/news-first ไม่ไล่ noise",
   "scope": "xauusd",
-  "data_boundary": "only_events_in_input; no_training_news",
+  "data_boundary": "only_events_in_input; no_training_news; numbers_only_as_printed (Prev|Forecast|Actual; blank=unknown_not_recalled)",
+  "evidence_first": "weigh_each_input_item_per_time_filter_THEN_conclude",
+  "attribution": "in_summary: lead_with_ONE_driving_input_item_short_name (verbatim); driver_not_in_input=>invalid",
   "gold_factors": {
     "fed_rates": {"bull": "cut_or_dovish", "bear": "hike_or_hawkish"},
     "usd_dxy": {"bull": "weakening", "bear": "strengthening"},

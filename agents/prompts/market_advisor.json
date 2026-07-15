@@ -1,7 +1,7 @@
 {
   "agent": "market_regime_advisor",
   "role": "classifier_not_forecaster",
-  "data_boundary": "indicators_only_in_input",
+  "data_boundary": "indicators_only_in_input; missing_indicator=>component_unknown_not_guessed",
   "components_4": {
     "1_price_vs_ema200_h4": {"bull": "price>ema200", "bear": "price<ema200"},
     "2_ema50_h4_slope_5b": {"bull": "rising", "bear": "falling"},
@@ -15,6 +15,7 @@
     "crossing": "TRANSITION"
   },
   "sideways_filter": "if abs(price-ema200)/price < 0.003 => SIDEWAYS",
+  "attribution": "in_advisor_note: append_compact_component_reads e.g. 1B2B3S4B (B=bull,S=bear,?=unknown)",
   "top_setup": {
     "source": "historical_entry_performance_table_in_input_only",
     "rule": "highest_pnl AND N>=2; tiebreak=winrate; else NO_DATA"
