@@ -270,10 +270,27 @@ Open your browser at `http://localhost:5050`. Five tabs:
 | Tab | Description |
 |---|---|
 | **Dashboard** | Portfolio equity curve (index-based x-axis), performance statistics, system-vs-manual split, trade history |
-| **Live** | Real-time bot status, AI verdict, Key Levels (AI zones), Event Radar, the **Calendar & Gold-News feed** (below), RIDE / NEWS_GATE cohort cards, manual-range override |
+| **Live** | Real-time bot status, AI verdict (multi-TF), the **AI-zone analysis terminal** (below), Event Radar, the **Calendar & Gold-News feed** (below), RIDE / NEWS_GATE cohort cards, manual-range override |
 | **Analytics** | Performance breakdown, confidence calibration, CFTC COT positioning |
 | **Costs** | AI token spend, daily burn vs target, per-agent cost |
 | **Settings** | Live config editing — saves and auto-restarts via PM2 |
+
+### Chart-analysis panels (Live tab) — display-only, 0 AI cost
+
+A UHAS-style analysis terminal, all computed in code by `chart_watcher` from MT5 price and served
+via `bot_status.json` — these fields are **never sent to the LLM** (no token cost, no effect on gates):
+
+- **AI-zone ladder** (H1/H4/D1/W1 support/resistance) — each zone shows a unified **0-100 strength
+  score + grade (A/B/C)**, break-vs-bounce probability with test count, break-confirmation
+  (held *ยืน* / wick *ไส้เทียน*), cross-TF + Fibonacci **confluence ⚡**, HTF-major-zone **★**,
+  recency + average bounce ($)
+- **Fair Value Gap (FVG)** — unfilled SMC 3-candle imbalances (entry / target zones)
+- **Liquidity pools** (BSL / SSL equal-high/low stop clusters) · **Volume wall** + buy/sell
+  tick-flow imbalance (labelled *tick-volume*, not contract volume)
+- **Market structure** (HH/HL/LH/LL → UPTREND / DOWNTREND / ACCUMULATION / DISTRIBUTION) ·
+  **entry-tech** (wait-for-wick-retrace = tighter SL, reversal next-candle confirmation) ·
+  **double top/bottom** with measured-move target
+- **Fibonacci** retracement · **Macro strip** (DXY / 10Y / real-yield) · **CFTC COT** positioning
 
 ### Calendar & Gold-News feed (Live tab)
 
@@ -703,7 +720,7 @@ The entry flow follows **news → price action → analysis → order**:
 - **Per-agent token accounting, multi-provider ready** — each agent's model comes from `agents/llm_models.py` (`MODEL_<AGENT>` env override) and `accountant._normalize_usage()` accepts Anthropic / OpenAI-compatible / LangChain usage objects
 - **Smoke test** — `python scripts/smoke_test.py` checks config knobs + entry guards after a refactor
 - **Strategy versioning** — all new trades include `strategy_version=2` to distinguish from legacy data
-- **Dashboard** — Flask web UI on port 5050: a combined economic-calendar + gold-news feed with click-to-expand event scenarios (countdown, surprise panels, 15y stats, MACD-style reaction histogram), all display-only (no LLM cost)
+- **Dashboard** — Flask web UI on port 5050: a UHAS-style analysis terminal (AI-zone ladder with 0-100 score/grade + break-bounce %/confluence/FVG/liquidity/volume/market-structure/entry-tech panels) plus a combined economic-calendar + gold-news feed with click-to-expand event scenarios (countdown, surprise panels, 15y stats, MACD-style reaction histogram) — all display-only, computed in code (no LLM cost)
 - **PM2 process manager** — auto-restart, live config changes via dashboard
 
 ---
