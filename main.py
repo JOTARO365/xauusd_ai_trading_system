@@ -144,6 +144,8 @@ def _write_bot_status(chart_data: dict, sentiment_data: dict, decision: dict, sk
                 "retrace_entry":    chart_data.get("retrace_entry"),
                 "market_structure": chart_data.get("market_structure"),
                 "reversal_confirm": chart_data.get("reversal_confirm"),
+                "fvg":              chart_data.get("fvg"),               # A UHAS
+                "double_pattern":   chart_data.get("double_pattern"),    # C UHAS
             },
             # FIX: dashboard renderVolume/renderLiquidity อ่าน bs.volume_profile/liquidity_pools top-level
             # แต่เดิมไม่เคยเขียนลง bot_status → panel UHAS #1/#3 ว่างเปล่า. เขียนให้ (chart_watcher คำนวณแล้ว)

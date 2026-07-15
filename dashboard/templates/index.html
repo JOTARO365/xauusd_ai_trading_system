@@ -4467,8 +4467,8 @@ function renderLiquidity(bs) {
 function renderSignals(bs) {
   const el = document.getElementById('signals-panel');
   if (!el) return;
-  const s = bs.signals || {}, ms = s.market_structure, re = s.retrace_entry, rc = s.reversal_confirm;
-  if (!ms && !re && !rc) { el.innerHTML = ''; return; }
+  const s = bs.signals || {}, ms = s.market_structure, re = s.retrace_entry, rc = s.reversal_confirm, fvg = s.fvg || [], dp = s.double_pattern;
+  if (!ms && !re && !rc && !fvg.length && !dp) { el.innerHTML = ''; return; }
   let html = `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0">🎯 ENTRY TECH (คลิป · display-only)</div>`;
   if (ms) {
     const col = ms.state === 'UPTREND' ? 'var(--green)' : ms.state === 'DOWNTREND' ? 'var(--red)'
@@ -4482,6 +4482,14 @@ function renderSignals(bs) {
   if (rc) {
     const ok = rc.status === 'confirmed';
     html += `<div style="font-size:10px">reversal@zone: <b style="color:${ok ? 'var(--green)' : '#e0a800'}">${ok ? 'ยืนยันแล้ว✓' : 'รอแท่งยืนยัน'}</b> <span style="color:var(--muted)">${rc.note || ''}</span></div>`;
+  }
+  if (dp) {
+    const dcol = dp.direction === 'BUY' ? 'var(--green)' : 'var(--red)';
+    html += `<div style="font-size:10px">แพทเทิร์น <b style="color:${dcol}">${dp.pattern.replace('_', ' ')}</b> @ ${dp.level} · เป้า <b>${dp.target}</b> <span style="color:var(--muted)">(คอ ${dp.neckline})</span></div>`;
+  }
+  if (fvg.length) {
+    const gap = g => `<span style="margin-right:8px"><span style="color:${g.type === 'bull' ? 'var(--green)' : 'var(--red)'}">${g.type === 'bull' ? '▲' : '▼'}FVG</span> <b>${g.bottom}–${g.top}</b><span style="color:var(--muted)"> (${g.dist_pct}%)</span></span>`;
+    html += `<div style="font-size:10px">Fair Value Gap ${fvg.map(gap).join('')}</div>`;
   }
   el.innerHTML = html;
 }
@@ -4520,6 +4528,10 @@ function renderZones(bs) {
           ? ` <span style="color:var(--green);font-size:9px;font-weight:700">ยืน✓${bh.closes}</span>`
           : ` <span style="color:#e0a800;font-size:9px;font-weight:700">ไส้เทียน✗</span>`)
       : '';
+    // B UHAS: unified 0-100 score + grade — เลขเดียวแทนการอ่าน 5 ค่าแยก (ตรง UHAS terminal)
+    const gr = m && m.grade, scv = m && m.score;
+    const gcol = gr === 'A' ? 'var(--green)' : gr === 'B' ? '#e0a800' : 'var(--muted)';
+    const scoreTag = scv != null ? ` <span title="unified zone score" style="color:${gcol};font-size:9px;font-weight:800">${gr}·${scv}</span>` : '';
     // ทำไมวาง level นี้ — จาก sr_meta (chart_watcher): TF + touches + confluence
     // UHAS #2: recency (แตะล่าสุดกี่แท่ง) + avg bounce ($) — เด้งสด/แรงแค่ไหนจริง
     const react = m && (m.bars_since_touch != null || m.avg_bounce != null)
@@ -4533,7 +4545,7 @@ function renderZones(bs) {
       <span style="width:72px;color:${color};font-weight:700">${lv.toFixed(2)}</span>
       <span style="width:52px;color:var(--muted);font-size:10px">${dist}</span>
       <span style="width:40px;color:var(--muted);font-size:10px">${st ? st + '%' : ''}</span>
-      <div style="flex:1">${bar}</div>${confTag}${holdTag}${htfTag}</div>${whyLine}`;
+      <div style="flex:1">${bar}</div>${scoreTag}${confTag}${holdTag}${htfTag}</div>${whyLine}`;
   };
   const res = (z.resistance || []).slice().sort((a, b) => b - a);
   const sup = (z.support || []).slice().sort((a, b) => b - a);
