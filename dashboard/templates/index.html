@@ -4159,8 +4159,11 @@ function renderFeed() {
       const fc   = (ev.forecast && ev.forecast !== '—') ? ev.forecast : '';
       const rel  = ev.actual && ev.actual !== 'pending' && ev.actual !== '—';
       if (rel) {
+        // released: actual /forecast · ก่อน previous (+ลูกศรเทียบครั้งก่อน) — ดูเลขก่อนหน้าได้ครบ
+        const pv = _esNum(ev.previous), av = _esNum(ev.actual);
+        const trend = (pv != null && av != null) ? (av > pv ? '<span style="color:var(--green)">▲</span>' : av < pv ? '<span style="color:var(--red)">▼</span>' : '=') : '';
         numsCol = `<span style="font-size:9px;font-family:var(--mono);flex-shrink:0;text-align:right">
-          <b style="color:var(--gold)">${ev.actual}</b>${fc ? `<span style="color:var(--muted)"> /${fc}</span>` : ''}</span>`;
+          <b style="color:var(--gold)">${ev.actual}</b>${fc ? `<span style="color:var(--muted)"> /${fc}</span>` : ''}${prev ? `<span style="color:var(--muted)"> · ก่อน ${prev}</span>${trend}` : ''}</span>`;
       } else if (fc || prev) {
         numsCol = `<span style="font-size:9px;font-family:var(--mono);color:var(--muted);flex-shrink:0;text-align:right">${fc ? 'คาด ' + fc : ''}${fc && prev ? ' · ' : ''}${prev ? 'ก่อน ' + prev : ''}</span>`;
       }
