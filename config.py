@@ -151,6 +151,18 @@ GUARDIAN_INTERVAL_SEC = int(os.getenv("GUARDIAN_INTERVAL_SEC") or 4)     # poll 
 SPECIALIST_SHADOW     = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
 SPECIALIST_ENABLED    = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"
 
+# ZRE = Zone Re-Entry RR≥2 (v2 fixed-SL). วาง LIMIT ดักเด้งที่โซนเกรดสูงเชิงรุก (RR≥2, SL คงที่).
+# เกราะสุด (replay 2026-07-16): trend-align-only (ตัด SIDEWAYS ที่ replay ขาดทุน −0.6R),
+# grade A/B + score≥ZRE_MIN_SCORE, สด ≤ZRE_MAX_BARS_SINCE, ในระยะ ZRE_PROXIMITY_PCT%,
+# cap ZRE_MAX_CONCURRENT/ทิศ + daily cap เดิม. ENABLED=วางจริง, SHADOW=log อย่างเดียว, OFF ทั้งคู่=no-op.
+ZONE_REENTRY_ENABLED  = os.getenv("ZONE_REENTRY_ENABLED", "false").lower() == "true"
+ZONE_REENTRY_SHADOW   = os.getenv("ZONE_REENTRY_SHADOW", "false").lower() == "true"
+ZRE_MIN_SCORE         = int(os.getenv("ZRE_MIN_SCORE") or 78)
+ZRE_MAX_BARS_SINCE    = int(os.getenv("ZRE_MAX_BARS_SINCE") or 3)
+ZRE_PROXIMITY_PCT     = float(os.getenv("ZRE_PROXIMITY_PCT") or 0.4)
+ZRE_TREND_ALIGN_ONLY  = os.getenv("ZRE_TREND_ALIGN_ONLY", "true").lower() != "false"
+ZRE_MAX_CONCURRENT    = int(os.getenv("ZRE_MAX_CONCURRENT") or 2)
+
 def reload_config():
     """อ่าน .env ใหม่และอัปเดตตัวแปรทั้งหมด — เรียกทุกต้น cycle เพื่อ pick up dashboard changes"""
     global SYMBOL, START_BALANCE, LOT_MODE, FIXED_LOT, MIN_LOT, MAX_LOT
@@ -217,6 +229,16 @@ def reload_config():
     global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
     SPECIALIST_ENABLED       = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"
+
+    global ZONE_REENTRY_ENABLED, ZONE_REENTRY_SHADOW, ZRE_MIN_SCORE, ZRE_MAX_BARS_SINCE
+    global ZRE_PROXIMITY_PCT, ZRE_TREND_ALIGN_ONLY, ZRE_MAX_CONCURRENT
+    ZONE_REENTRY_ENABLED     = os.getenv("ZONE_REENTRY_ENABLED", "false").lower() == "true"
+    ZONE_REENTRY_SHADOW      = os.getenv("ZONE_REENTRY_SHADOW", "false").lower() == "true"
+    ZRE_MIN_SCORE            = int(os.getenv("ZRE_MIN_SCORE") or 78)
+    ZRE_MAX_BARS_SINCE       = int(os.getenv("ZRE_MAX_BARS_SINCE") or 3)
+    ZRE_PROXIMITY_PCT        = float(os.getenv("ZRE_PROXIMITY_PCT") or 0.4)
+    ZRE_TREND_ALIGN_ONLY     = os.getenv("ZRE_TREND_ALIGN_ONLY", "true").lower() != "false"
+    ZRE_MAX_CONCURRENT       = int(os.getenv("ZRE_MAX_CONCURRENT") or 2)
     MAX_RISK_PCT             = float(os.getenv("MAX_RISK_PCT") or 0.05)
     global EMA_PULLBACK_BLOCK, AUTO_SL_PROTECT, MAX_TRADES_PER_DAY, AUTO_SL_PIPS, SL_MIN_GAP_PIPS
     EMA_PULLBACK_BLOCK       = (os.getenv("EMA_PULLBACK_BLOCK") or "true").lower() != "false"

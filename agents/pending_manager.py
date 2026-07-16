@@ -1014,3 +1014,160 @@ def manage_sl_reentry(chart_data: dict) -> int:
                 logger.warning(f"Post-SL SELL_LIMIT failed: {res.get('error')}")
 
     return placed
+
+
+# ─────────────────────────────────────────────────────────────
+#  ZONE RE-ENTRY (ZRE v2, RR≥2, fixed-SL) — proactive bounce catcher
+# ─────────────────────────────────────────────────────────────
+
+_ZRE_TAG         = "ZRE-"
+_ZRE_SHADOW_FILE = os.path.join(os.path.dirname(__file__), "../logs/zre_shadow.jsonl")
+
+
+def _zre_shadow_write(rec: dict) -> None:
+    """append-only shadow log (เก็บ data ด้วย live sr_meta score เสมอ — ปิด fidelity gap ของ replay)."""
+    try:
+        with open(_ZRE_SHADOW_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
+def _count_zre_pending(direction: str) -> int:
+    tag = f"{_ZRE_TAG}{direction[:4].upper()}"   # ZRE-BUY / ZRE-SELL
+    return sum(1 for o in get_pending_orders() if str(o.get("comment", "")).startswith(tag))
+
+
+def manage_zone_reentry(chart_data: dict) -> int:
+    """
+    ZRE v2 — วาง LIMIT ดักเด้งที่โซนเกรดสูงเชิงรุก (ไม่ต้องรอโดน SL ก่อนแบบ SL-RE).
+
+    เกราะสุด (replay 2026-07-16 → docs/reviews/zre-v2-replay.md):
+    - flag OFF ทั้งคู่ → no-op. SHADOW → log อย่างเดียว. ENABLED → วางจริง.
+    - trend-align-only: D1 ต้อง BULLISH/BEARISH (ตัด SIDEWAYS ที่ replay ขาดทุน −0.6R)
+    - candidate: sr_meta grade A/B + score≥ZRE_MIN_SCORE + สด(bars_since_touch≤N) + ในระยะ%
+    - guard reuse: _d1_counter, counter_spike, _is_covered(1/โซน), RR≥2 (_calc_tp_pips), daily cap
+    - cap ZRE_MAX_CONCURRENT/ทิศ, SL คงที่ default_sl_pips (v2)
+    - SHADOW log ทุก candidate (แม้ถูก skip) เพื่อวัด trigger/false-bounce ด้วย score จริง
+
+    Returns: จำนวน order ที่วางจริง (0 เสมอในโหมด SHADOW/OFF)
+    """
+    live   = getattr(_cfg, "ZONE_REENTRY_ENABLED", False)
+    shadow = getattr(_cfg, "ZONE_REENTRY_SHADOW", False)
+    if not (live or shadow):
+        return 0
+
+    srm = chart_data.get("sr_meta") or []
+    if not srm:
+        return 0
+
+    current = chart_data.get("indicators", {}).get("h4", {}).get("close", 0)
+    if not current:
+        tick    = mt5.symbol_info_tick(SYMBOL)
+        current = float(tick.bid) if tick else 0.0
+    if not current:
+        return 0
+
+    d1_trend = ((chart_data or {}).get("d1_trend") or "NEUTRAL").upper()
+    if getattr(_cfg, "ZRE_TREND_ALIGN_ONLY", True) and d1_trend not in ("BULLISH", "BEARISH"):
+        return 0
+
+    _capped, _cap_reason = daily_trade_cap_reached()
+    if _capped:
+        logger.info(f"[ZRE] {_cap_reason} — skip")
+        return 0
+
+    min_score = getattr(_cfg, "ZRE_MIN_SCORE", 78)
+    max_bars  = getattr(_cfg, "ZRE_MAX_BARS_SINCE", 3)
+    prox_pct  = getattr(_cfg, "ZRE_PROXIMITY_PCT", 0.4)
+    max_conc  = getattr(_cfg, "ZRE_MAX_CONCURRENT", 2)
+    counter_spike = float(getattr(_cfg, "COUNTER_SPIKE_PIPS", 500))
+
+    # candidate zones: grade A/B, score≥min, สด, ในระยะ — เรียง score สูงสุดก่อน
+    cands = []
+    for m in srm:
+        score = m.get("score")
+        lvl   = m.get("level")
+        bst   = m.get("bars_since_touch")
+        if (score is None or score < min_score or m.get("grade") not in ("A", "B")
+                or not lvl or bst is None or bst > max_bars):
+            continue
+        if abs(current - lvl) / current * 100 > prox_pct:
+            continue
+        cands.append((m, lvl, m.get("side"), score))
+    if not cands:
+        return 0
+    cands.sort(key=lambda c: c[3], reverse=True)
+
+    info      = mt5.symbol_info(SYMBOL)
+    point     = info.point if info else 0.01
+    min_dist  = current * MIN_DIST_FROM_PRICE
+    sl_pips   = MONEY_MANAGEMENT["default_sl_pips"]      # v2: SL คงที่
+    min_rr    = MONEY_MANAGEMENT["min_rr_ratio"]
+    fast      = float(chart_data.get("fast_move_pips", 0) or 0)
+    d1_sr     = _get_daily_sr()
+    sr_zones  = chart_data.get("sr_zones", {}) or {}
+    res_levels = _merge_levels([sr_zones.get("resistance", []), d1_sr.get("resistance", [])],
+                               current, "resistance", max_out=6)
+    sup_levels = _merge_levels([sr_zones.get("support", []), d1_sr.get("support", [])],
+                               current, "support", max_out=6)
+
+    existing_prices = [p["price"] for p in get_pending_orders()]
+    placed = 0
+    for m, lvl, side, score in cands:
+        direction = "SELL" if side == "R" else "BUY"
+        is_sell   = direction == "SELL"
+
+        # ── guards (reason=None → ผ่าน) ──
+        if _d1_counter(direction, chart_data):
+            reason = "d1_counter (สวนเทรนด์ D1)"
+        elif is_sell and lvl < current + min_dist:
+            reason = "R ต่ำกว่า/ชิดราคาเกินไป"
+        elif (not is_sell) and lvl > current - min_dist:
+            reason = "S สูงกว่า/ชิดราคาเกินไป"
+        elif is_sell and fast >= counter_spike:
+            reason = f"counter_spike +{fast:.0f}p (breakout ผ่าน R — ไม่ fade)"
+        elif (not is_sell) and fast <= -counter_spike:
+            reason = f"counter_spike {fast:.0f}p (breakdown ผ่าน S — ไม่ fade)"
+        elif _count_zre_pending(direction) + placed >= max_conc:
+            reason = f"ZRE cap {direction} เต็ม ({max_conc})"
+        elif _is_covered(lvl, existing_prices):
+            reason = "โซนนี้มี pending แล้ว"
+        else:
+            reason = None
+
+        tp_pips = _calc_tp_pips(lvl, sup_levels if is_sell else res_levels, point,
+                                MONEY_MANAGEMENT["default_tp_pips"], is_sell=is_sell)
+        rr = (tp_pips / sl_pips) if sl_pips > 0 else 0.0
+        if reason is None and rr < min_rr:
+            reason = f"RR {rr:.2f} < {min_rr}"
+
+        would_place = reason is None
+        _zre_shadow_write({
+            "at": datetime.now(timezone.utc).isoformat(),
+            "side": direction, "zone_level": lvl, "score": score, "grade": m.get("grade"),
+            "bars_since_touch": m.get("bars_since_touch"), "d1_trend": d1_trend,
+            "cur": round(current, 2), "sl_pips": sl_pips, "tp_pips": tp_pips, "rr": round(rr, 2),
+            "would_place": would_place, "skip_reason": reason, "live": live,
+        })
+        if not would_place or not live:
+            continue
+
+        res = place_pending_order(
+            pending_type = "SELL_LIMIT" if is_sell else "BUY_LIMIT",
+            price        = lvl,
+            sl_pips      = sl_pips,
+            tp_pips      = tp_pips,
+            comment      = f"{_ZRE_TAG}{direction[:4].upper()} {lvl:.0f}",
+            expiry_hours = 24,
+        )
+        if res.get("success"):
+            placed += 1
+            existing_prices.append(lvl)
+            logger.info(f"[ZRE] {direction}_LIMIT @ {lvl:.2f} score={score}/{m.get('grade')} | "
+                        f"SL={sl_pips}p TP={tp_pips}p RR={rr:.2f} (D1={d1_trend})")
+            _log(res, chart_data)
+        else:
+            logger.warning(f"[ZRE] {direction}_LIMIT @ {lvl:.2f} failed: {res.get('error')}")
+
+    return placed

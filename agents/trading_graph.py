@@ -241,7 +241,7 @@ def node_position_mgmt(state: TradingState) -> dict:
 
 def node_reporter(state: TradingState) -> dict:
     from agents.reporter import log_trade, print_summary, scan_manual_orders
-    from agents.pending_manager import auto_place_pending_orders, manage_range_pending, manage_sl_reentry, cancel_pending_on_breakdown
+    from agents.pending_manager import auto_place_pending_orders, manage_range_pending, manage_sl_reentry, cancel_pending_on_breakdown, manage_zone_reentry
     from utils.display import print_step, print_warning
     print_step(5, "running", "กำลังบันทึกผล...")
     chart     = state.get("chart_data") or {}
@@ -269,6 +269,11 @@ def node_reporter(state: TradingState) -> dict:
             if sr: print_warning(f"Post-SL: วาง {sr} re-entry order ที่ safe zone")
         except Exception as e:
             logger.error(f"Post-SL re-entry error: {e}")
+        try:
+            zr = manage_zone_reentry(chart)
+            if zr: print_warning(f"ZRE: วาง {zr} zone re-entry order ที่โซนเกรดสูง (RR≥2)")
+        except Exception as e:
+            logger.error(f"ZRE error: {e}")
         print_summary()
     except Exception as e:
         print_step(5, "error", str(e)[:60])
