@@ -278,7 +278,29 @@ def _last_trade_in_dir_lost(direction: str, recent_trades: list) -> bool:
     return (same_dir[-1].get("pnl") or 0) < 0
 
 
-def _news_gate_adjust(direction: str, base_floor: int) -> tuple[int, str | None]:
+def _news_contra_votes(direction: str, chart_data: dict, fast_thr: float) -> int:
+    """นับเสียง 'price/flow ยืนยันทิศไม้ = สวนข่าว' — momentum m15 STRONG + h1 + fast_move + volume tilt.
+    ใช้โดย NEWS contradiction dampener (ก): ยิ่งราคาสวนข่าวชัด ยิ่งลด oppose-penalty."""
+    cd   = chart_data or {}
+    mom  = cd.get("momentum_tf") or {}
+    m15  = mom.get("m15") or {}
+    h1   = mom.get("h1") or {}
+    want = "UP" if direction == "BUY" else "DOWN"
+    votes = 0
+    if m15.get("direction") == want and m15.get("strength") == "STRONG":
+        votes += 1
+    if h1.get("direction") == want:
+        votes += 1
+    fast = float(cd.get("fast_move_pips", 0) or 0)
+    if (direction == "BUY" and fast >= fast_thr) or (direction == "SELL" and fast <= -fast_thr):
+        votes += 1
+    tilt = (cd.get("volume_profile") or {}).get("tilt")
+    if (direction == "BUY" and tilt == "buy") or (direction == "SELL" and tilt == "sell"):
+        votes += 1
+    return votes
+
+
+def _news_gate_adjust(direction: str, base_floor: int, chart_data: dict | None = None) -> tuple[int, str | None]:
     """NEWS_GATE (flag, default OFF): ให้ News Impact score ปรับ 'conf floor' เท่านั้น —
     ข่าวสวนทิศไม้ → floor เข้มขึ้น (anti-fade), ข่าวหนุน → ผ่อนเล็กน้อยมีเพดาน.
     ห้ามแตะ money mgmt / HTF-direction / counter-spike. Fail-safe: ข้อมูลหาย/เก่า/น้อย
@@ -305,8 +327,22 @@ def _news_gate_adjust(direction: str, base_floor: int) -> tuple[int, str | None]
         agree  = (direction == "BUY"  and score >=  thr) or (direction == "SELL" and score <= -thr)
         oppose = (direction == "BUY"  and score <= -thr) or (direction == "SELL" and score >=  thr)
         if oppose:
-            adj = base_floor + int(getattr(_cfg, "NEWS_OPPOSE_PENALTY", 8))
-            return adj, f"ข่าวสวน {direction} (score {score:+.0f}, n={n}) → floor {base_floor}→{adj}"
+            penalty    = int(getattr(_cfg, "NEWS_OPPOSE_PENALTY", 8))
+            note_extra = ""
+            # (ก) contradiction dampener — ผ่อน penalty เมื่อ price/flow ยืนยันทิศไม้ (สวนข่าว)
+            if getattr(_cfg, "NEWS_CONTRA_ENABLED", False) and chart_data is not None:
+                votes = _news_contra_votes(direction, chart_data,
+                                           float(getattr(_cfg, "NEWS_CONTRA_FAST_PIPS", 300)))
+                if votes >= int(getattr(_cfg, "NEWS_CONTRA_STRONG", 3)):
+                    penalty, note_extra = 0, f" [contra {votes}v→penalty 0: ราคาสวนข่าวชัด]"
+                elif votes >= int(getattr(_cfg, "NEWS_CONTRA_SOME", 2)):
+                    penalty //= 2
+                    note_extra = f" [contra {votes}v→penalty {penalty}]"
+            adj = base_floor + penalty
+            if adj == base_floor:
+                return base_floor, (f"ข่าวสวน {direction} (score {score:+.0f}, n={n}) แต่ price ยืนยันไม้"
+                                    f"{note_extra} → floor คงเดิม {base_floor}")
+            return adj, f"ข่าวสวน {direction} (score {score:+.0f}, n={n}) → floor {base_floor}→{adj}{note_extra}"
         if agree:
             hard = int(getattr(_cfg, "NEWS_GATE_HARD_FLOOR", 58))
             adj  = max(hard, base_floor - int(getattr(_cfg, "NEWS_AGREE_RELAX", 5)))
@@ -644,7 +680,7 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     htf_zone = chart_data.get("htf_zone")
     _base_floor = _cfg.MIN_TECHNICAL_CONFIDENCE
     # NEWS_GATE (flag, default OFF): ข่าวปรับ floor นี้เท่านั้น — ไม่แตะ gate อื่น/money mgmt
-    _min_conf, _news_note = _news_gate_adjust(direction, _base_floor)
+    _min_conf, _news_note = _news_gate_adjust(direction, _base_floor, chart_data)
     if _news_note:
         logger.info(f"[NEWS_GATE] {_news_note}")
     # relax เป็น "ตัวตัดสิน" = ไม้นี้ผ่านเพราะข่าวลด floor เท่านั้น (conf ต่ำกว่า floor เดิม) →
