@@ -13,12 +13,28 @@ UHAS terminal ในรูปเป็น "institutional trade-desk simulation" 
 
 ## A. เทคนิคเทรด (NEW, ไม่ขัด logic เดิม)
 
-### A1. WTI-vs-gold divergence dampener  ·  ⭐ คุ้มสุด (ต่อยอด intermarket probe)
-- **ทำอะไร:** ให้ narrative "oil/inflation กดทอง" มีน้ำหนักเฉพาะเมื่อ **WTI ขยับยืนยันจริง**; ถ้าน้ำมัน
-  ไม่พุ่งตามข่าว → ถือว่าทอง overdone → fade/skip แทนตาม
-- **ทำไม:** live confirmation gate — กันการ react ข่าว inflation ที่ราคา driver จริง (น้ำมัน) ไม่ยืนยัน
-- **ต้นทุน/ขัด:** compute-in-code (ต้องดึง WTI ผ่าน `scripts/probe_intermarket.py` plumbing); ไม่ขัด (เพิ่ม gate ยืนยัน)
-- source: video @ ~1:40:45, ~1:56:30
+### A1. WTI-vs-gold divergence dampener  ·  ⭐ คุ้มสุด — DESIGN (รอ probe + อนุมัติ)
+> source: video @ ~1:40:45, ~1:56:30 · ต่อยอด `scripts/probe_intermarket.py`
+
+**1. ทำอะไร:** เมื่อมี narrative "oil/inflation กดทอง" → เช็คว่า WTI ขยับยืนยันจริงมั้ย ถ้าทองร่วงแรง
+แต่น้ำมันแทบไม่ขยับ (divergence) = ทอง overdone → ลดน้ำหนัก bearish / อนุญาต fade ตามเทคนิค.
+
+**2. ทำงานยังไง:**
+- WTI feed 2 ทาง: (a) MT5 symbol `USOIL`/`WTI`/`XTIUSD` (เร็ว, 0 token) — **ต้อง probe ยืนยันว่า broker มี**;
+  (b) AlphaVantage `WTI` (ช้า, 25/วัน) = fallback
+- compute-in-code: `gold_move% (fast)` vs `wti_move% (same window)` → flag `oil_divergence` เมื่อ
+  `|gold_move| ≥ G_THR` และ `|wti_move| ≤ W_THR` และทิศสวน expectation (ข่าว oil-bearish แต่ WTI ไม่ลง)
+- feed เป็น **1 vote เข้า (ก) NEWS-dampener** (enable แล้ว) — เพิ่มน้ำหนัก contradiction เมื่อ divergence
+
+**3. ผลกระทบ:** token 0 (MT5) · แตะ decision dampener = logic → อนุมัติ+replay · เสี่ยง: corr gold-WTI
+ไม่คงที่ (บางช่วง ~0) → probe วัด rolling corr ก่อน
+
+**4. Tunables (default):** `OIL_DIVERGENCE_ENABLED=false`, `OIL_G_THR=300p`, `OIL_W_THR=0.3%`, `OIL_WINDOW=M15×3`
+
+**5. ⚠️ PREREQUISITE (user ต้องรัน):** `& $PY scripts\probe_intermarket.py` ตอน MT5 เปิด →
+ยืนยัน (1) broker มี WTI symbol (2) corr gold-WTI valid. **ถ้า corr อ่อน = พับ A1**. ยังทำ code ไม่ได้จนกว่า probe ผ่าน.
+
+**6. Rollout:** flag OFF → probe ผ่าน → replay → shadow → enable (เหมือน ZRE/[[zre-news-dampener-live]])
 
 ### A2. Event-precedence dampening
 - **ทำอะไร:** event tier สูงที่มา**ก่อน** (เช่น rate decision) ลด impact ของ event เล็กที่ตามมา (เช่น NFP ถัดไป)
