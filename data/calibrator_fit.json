@@ -1,0 +1,80 @@
+{
+  "ok": true,
+  "n": 555,
+  "overall_wr": 0.4757,
+  "min_n_ok": true,
+  "reliability": [
+    {
+      "conf_lo": 55,
+      "conf_hi": 59,
+      "n": 238,
+      "wr": 0.4958
+    },
+    {
+      "conf_lo": 60,
+      "conf_hi": 64,
+      "n": 16,
+      "wr": 0.375
+    },
+    {
+      "conf_lo": 65,
+      "conf_hi": 69,
+      "n": 12,
+      "wr": 0.3333
+    },
+    {
+      "conf_lo": 70,
+      "conf_hi": 74,
+      "n": 68,
+      "wr": 0.4412
+    },
+    {
+      "conf_lo": 75,
+      "conf_hi": 79,
+      "n": 69,
+      "wr": 0.5362
+    },
+    {
+      "conf_lo": 80,
+      "conf_hi": 84,
+      "n": 58,
+      "wr": 0.4655
+    },
+    {
+      "conf_lo": 85,
+      "conf_hi": 100,
+      "n": 94,
+      "wr": 0.4468
+    }
+  ],
+  "brier": {
+    "raw_conf": 0.3189,
+    "isotonic": 0.2494,
+    "platt": 0.2493
+  },
+  "ece": {
+    "raw_conf": 0.2236,
+    "isotonic": 0.0,
+    "platt": 0.0
+  },
+  "isotonic_map": {
+    "x": [
+      57.0,
+      72.0,
+      77.0,
+      97.0
+    ],
+    "y": [
+      0.4731,
+      0.4731,
+      0.4796,
+      0.4796
+    ]
+  },
+  "platt": {
+    "coef": -0.003133,
+    "intercept": 0.121642
+  },
+  "source": "DB + logs/trades.json (taken SYSTEM trades, deduped) [DB:none + json:500 + calibration.json:bins(555)→ใช้แทน raw(32)]",
+  "caveats": "SELECTION BIAS (taken trades only); feature=confidence only; unbiased+multi-feature ต้องรอ decision_snapshots"
+}
