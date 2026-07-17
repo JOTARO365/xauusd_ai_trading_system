@@ -173,6 +173,9 @@ ZRE_MAX_CONCURRENT    = int(os.getenv("ZRE_MAX_CONCURRENT") or 2)
 # P1b — decision-snapshot shadow logging (add-only, 0 behavior change) → logs/decision_snapshots.jsonl
 # สะสม labeled feature vector ให้ evidence-based entry model (docs/DESIGN_evidence_based_entry.md §7.0)
 DECISION_SNAPSHOT     = os.getenv("DECISION_SNAPSHOT", "true").lower() != "false"
+# P1c — trade excursion (MFE/MAE) shadow sampling ต่อ cycle → logs/trade_excursions.jsonl
+# สะสม in-trade timeline ให้ statistical-exit model (docs/DESIGN_statistical_exit.md §5)
+TRADE_EXCURSION       = os.getenv("TRADE_EXCURSION", "true").lower() != "false"
 
 def reload_config():
     """อ่าน .env ใหม่และอัปเดตตัวแปรทั้งหมด — เรียกทุกต้น cycle เพื่อ pick up dashboard changes"""

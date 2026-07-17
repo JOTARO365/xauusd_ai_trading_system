@@ -242,6 +242,12 @@ def node_position_mgmt(state: TradingState) -> dict:
                 print_warning(_msg.format(_n))
         except Exception as e:
             logger.error(f"[GRAPH:position_mgmt] {_fn.__name__}: {e}")
+    # P1c shadow excursion sampling (add-only, fail-soft, 0 behavior change) — สะสม MFE/MAE
+    try:
+        from agents.trade_excursion import log_excursions
+        log_excursions()
+    except Exception as _exc_e:
+        logger.debug(f"[EXCURSION] hook fail-soft: {_exc_e}")
     return {}
 
 
