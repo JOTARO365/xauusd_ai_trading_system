@@ -4285,7 +4285,7 @@ function renderCalendarDetailed(events) {
     const remain = arr.filter(([e]) => !isRel(e)).length;
     html += `<div class="cal-day-group"><div class="cal-day-label ${isToday ? 'is-today' : ''}"><span class="cal-day-dot"></span>${label}${isToday ? ' · TODAY' : ''} <span style="color:var(--muted);font-weight:400;font-size:10px">· เหลือ ${remain}</span></div><div class="cal-cards">`;
     arr.forEach(([e, ts]) => {
-      const key = _scenarioKey(e.title), gold = !!key, rel = isRel(e);
+      const key = _scenarioKey(e.title), gold = !!key, rel = isRel(e), th = _thaiEventName(e.title);
       const timeStr = isNaN(ts) ? '--:--' : new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       const exp = gold ? expOf(key) : 0;
       const expStr = exp ? `<span class="cal-exp">±${exp.toFixed(2)}%</span>` : '';
@@ -4302,7 +4302,7 @@ function renderCalendarDetailed(events) {
           <span class="cal-time" style="min-width:40px">${timeStr}</span>
           <span class="cal-badge-inline ${impCls(e.impact)}">${impLbl(e.impact)}</span>
           <span class="cal-curr" style="margin:0">${gold ? '★ ' : ''}${e.currency || ''}</span>
-          <span class="cal-name" style="margin:0;padding:0;flex:1;min-width:120px">${e.title || ''}</span>
+          <span class="cal-name" style="margin:0;padding:0;flex:1;min-width:120px">${e.title || ''}${th ? `<span style="display:block;font-size:9px;color:var(--muted);font-weight:400;margin-top:1px">${th}</span>` : ''}</span>
           ${expStr}${cd}
         </div>
         <div class="cal-afp">
@@ -4314,6 +4314,26 @@ function renderCalendarDetailed(events) {
     });
     html += `</div></div>`;
   });
+
+  // ── ข่าวสำคัญที่กำลังจะมา (upcoming high-impact / gold-relevant + countdown) ──
+  const up = evs.map(e => [e, e.timestamp_iso ? Date.parse(e.timestamp_iso) : NaN])
+    .filter(([e, ts]) => !isNaN(ts) && ts > now && !isRel(e) && (((e.impact || '').toLowerCase().includes('high')) || _scenarioKey(e.title)))
+    .sort((a, b) => a[1] - b[1]).slice(0, 6);
+  if (up.length) {
+    html += `<div class="cal-day-group" style="margin-top:8px"><div class="cal-day-label" style="color:var(--gold)"><span class="cal-day-dot" style="background:var(--gold)"></span>ข่าวสำคัญที่กำลังจะมา</div><div style="display:flex;flex-direction:column;gap:4px">`;
+    up.forEach(([e, ts]) => {
+      const key = _scenarioKey(e.title), exp = key ? expOf(key) : 0, th = _thaiEventName(e.title);
+      html += `<div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;padding:5px 9px;background:var(--surface);border-radius:5px">
+        <span class="cal-badge-inline ${impCls(e.impact)}">${impLbl(e.impact)}</span>
+        <span style="color:var(--muted);min-width:34px">${e.currency || ''}</span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${key ? '★ ' : ''}${th || e.title || ''}</span>
+        ${exp ? `<span class="cal-exp">±${exp.toFixed(2)}%</span>` : ''}
+        <span class="es-cd" data-ts="${ts}" style="min-width:78px;text-align:right"><span class="es-cd-big" style="font-weight:800">—</span></span>
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
   el.innerHTML = html;
   _tickCountdowns();
 }
@@ -4340,6 +4360,31 @@ function _scenarioKey(title) {
   if (tl.includes('unemployment rate')) return 'UNEMPLOYMENT';   // ไม่จับ "Unemployment Claims" (weekly)
   if (tl.includes('fomc') || tl.includes('federal funds')) return 'FOMC';
   return null;
+}
+
+// Map a calendar event title → Thai name (keyword-based, most-specific first). '' = no match.
+function _thaiEventName(title) {
+  const t = (title || '').toLowerCase();
+  const MAP = [
+    ['core cpi', 'CPI พื้นฐาน (แกนหลัก)'], ['cpi y/y', 'ดัชนีราคาผู้บริโภค (รายปี)'], ['cpi', 'ดัชนีราคาผู้บริโภค CPI'],
+    ['core pce', 'ดัชนี PCE พื้นฐาน'], ['pce', 'ดัชนีราคา PCE'],
+    ['core ppi', 'ดัชนีราคาผู้ผลิตพื้นฐาน'], ['ppi', 'ดัชนีราคาผู้ผลิต PPI'],
+    ['non-farm', 'การจ้างงานนอกภาคเกษตร (NFP)'], ['nonfarm', 'การจ้างงานนอกภาคเกษตร (NFP)'], ['non farm', 'การจ้างงานนอกภาคเกษตร (NFP)'],
+    ['adp', 'การจ้างงานภาคเอกชน ADP'],
+    ['unemployment rate', 'อัตราการว่างงาน'], ['unemployment claims', 'ผู้ขอรับสวัสดิการว่างงาน'], ['jobless claims', 'ผู้ขอรับสวัสดิการว่างงาน'],
+    ['average hourly earning', 'ค่าจ้างรายชั่วโมงเฉลี่ย'],
+    ['ism manufacturing', 'ดัชนี PMI ภาคการผลิต (ISM)'], ['ism services', 'ดัชนี PMI ภาคบริการ (ISM)'], ['ism non-manufacturing', 'ดัชนี PMI ภาคบริการ (ISM)'],
+    ['manufacturing pmi', 'ดัชนี PMI ภาคการผลิต'], ['services pmi', 'ดัชนี PMI ภาคบริการ'],
+    ['core retail sales', 'ยอดค้าปลีกพื้นฐาน'], ['retail sales', 'ยอดค้าปลีก'],
+    ['fomc meeting minutes', 'รายงานการประชุม FOMC'], ['fomc statement', 'แถลงมติ FOMC'], ['fomc press conference', 'แถลงข่าว FOMC'],
+    ['federal funds rate', 'มติอัตราดอกเบี้ย Fed'], ['fomc', 'การประชุม FOMC'],
+    ['gdp', 'ผลิตภัณฑ์มวลรวม GDP'], ['fed chair', 'สุนทรพจน์ประธาน Fed'], ['powell', 'สุนทรพจน์ Powell (Fed)'],
+    ['consumer confidence', 'ความเชื่อมั่นผู้บริโภค'], ['consumer sentiment', 'ดัชนีความเชื่อมั่นผู้บริโภค'],
+    ['durable goods', 'ยอดสั่งซื้อสินค้าคงทน'], ['building permits', 'ใบอนุญาตก่อสร้าง'], ['housing starts', 'การเริ่มสร้างบ้าน'],
+    ['trade balance', 'ดุลการค้า'], ['treasury', 'ประมูลพันธบัตร'],
+  ];
+  for (let i = 0; i < MAP.length; i++) if (t.includes(MAP[i][0])) return MAP[i][1];
+  return '';
 }
 
 
