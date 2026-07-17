@@ -183,6 +183,12 @@ def node_decision(state: TradingState) -> dict:
     t = time.monotonic()
     try:
         data   = make_decision(state["chart_data"], state["sentiment_data"], state["advisor_data"])
+        # P1b shadow snapshot (add-only, fail-soft, 0 behavior change) — สะสม labeled data
+        try:
+            from agents.decision_snapshot import log_decision_snapshot
+            log_decision_snapshot(state["chart_data"], state["sentiment_data"], data)
+        except Exception as _snap_e:
+            logger.debug(f"[SNAPSHOT] hook fail-soft: {_snap_e}")
         lat    = int((time.monotonic() - t) * 1000)
         action = data.get("action", "SKIP")
         detail = f"EXECUTE {data.get('direction','')}" if action == "EXECUTE" else "SKIP"

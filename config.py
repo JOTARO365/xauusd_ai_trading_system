@@ -170,6 +170,10 @@ ZRE_PROXIMITY_PCT     = float(os.getenv("ZRE_PROXIMITY_PCT") or 0.4)
 ZRE_TREND_ALIGN_ONLY  = os.getenv("ZRE_TREND_ALIGN_ONLY", "true").lower() != "false"
 ZRE_MAX_CONCURRENT    = int(os.getenv("ZRE_MAX_CONCURRENT") or 2)
 
+# P1b — decision-snapshot shadow logging (add-only, 0 behavior change) → logs/decision_snapshots.jsonl
+# สะสม labeled feature vector ให้ evidence-based entry model (docs/DESIGN_evidence_based_entry.md §7.0)
+DECISION_SNAPSHOT     = os.getenv("DECISION_SNAPSHOT", "true").lower() != "false"
+
 def reload_config():
     """อ่าน .env ใหม่และอัปเดตตัวแปรทั้งหมด — เรียกทุกต้น cycle เพื่อ pick up dashboard changes"""
     global SYMBOL, START_BALANCE, LOT_MODE, FIXED_LOT, MIN_LOT, MAX_LOT
