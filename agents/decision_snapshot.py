@@ -60,7 +60,8 @@ def log_decision_snapshot(chart_data: dict, sentiment_data: dict | None,
         px = ((cd.get("price_info") or {}).get("bid")
               or cd.get("current_price")
               or ((cd.get("indicators") or {}).get("h1") or {}).get("close"))
-        direction = dr.get("direction") or cd.get("direction")
+        # candidate direction: บนไม้ที่ถูกบล็อก decision ไม่มี direction → ใช้ chart_watcher signal (top-level)
+        direction = dr.get("direction") or cd.get("direction") or cd.get("signal")
         news = _news_score()
         rec = {
             "at": datetime.now(timezone.utc).isoformat(),
@@ -72,7 +73,7 @@ def log_decision_snapshot(chart_data: dict, sentiment_data: dict | None,
             "tp_pips": plan.get("tp_pips") or cd.get("tp_pips"),
             # ── features F1..F7 (design §2) ──
             "f1_news_score": news["score"], "f1_news_n": news["n"], "f2_news_updated": news["updated"],
-            "f3_reversal": (cd.get("signals") or {}).get("reversal_confirm"),
+            "f3_reversal": cd.get("reversal_confirm") or (cd.get("signals") or {}).get("reversal_confirm"),
             "f4_mom_m15": (mom.get("m15") or {}).get("direction"),
             "f4_mom_m15_str": (mom.get("m15") or {}).get("strength"),
             "f4_mom_h1": (mom.get("h1") or {}).get("direction"),
