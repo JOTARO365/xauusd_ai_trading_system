@@ -1216,6 +1216,10 @@
       </div>
       <div class="ticker-cell"><span class="ticker-label">Session</span><span class="ticker-val" id="px-session">—</span></div>
       <div class="ticker-cell ticker-bias" id="px-bias-wrap"><span class="ticker-label">Bias</span><span class="ticker-val" id="px-bias">—</span></div>
+      <div class="ticker-cell tk-macro"><span class="ticker-label">DXY</span><span class="ticker-val" id="tk-dxy">—</span></div>
+      <div class="ticker-cell tk-macro"><span class="ticker-label">10Y</span><span class="ticker-val" id="tk-y10">—</span></div>
+      <div class="ticker-cell tk-macro"><span class="ticker-label">R.Yld</span><span class="ticker-val" id="tk-ry">—</span></div>
+      <div class="ticker-cell tk-macro"><span class="ticker-label">COT</span><span class="ticker-val" id="tk-cot">—</span></div>
     </div>
     <span id="last-update">Loading…</span>
   </div>
@@ -1269,6 +1273,45 @@
 
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div class="tab-content active" id="tab-overview">
+
+  <!-- INSTITUTIONAL TRADE DESK BRIEF (UHAS-style hero, 07-17) — display-only, data จาก /api/monitor -->
+  <style>
+    .tk-macro .ticker-val.up   { color: var(--green); }
+    .tk-macro .ticker-val.down { color: var(--red); }
+    .desk-brief { background: linear-gradient(180deg,var(--surface2),var(--surface)); border:1px solid var(--border2);
+                  border-left:3px solid var(--gold); border-radius:10px; padding:14px 16px; margin:0 0 14px; }
+    .desk-brief-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:10px; }
+    .desk-brief-title { font-family:var(--mono); font-size:11px; letter-spacing:1.5px; color:var(--gold); font-weight:700; }
+    .brief-status-pill { font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:1px;
+                         padding:3px 10px; border-radius:5px; border:1px solid; white-space:nowrap; }
+    .brief-status-pill.pending { color:var(--amber); border-color:var(--amber); background:rgba(245,166,35,0.08); }
+    .brief-status-pill.live    { color:var(--green); border-color:var(--green); background:var(--green-dim); }
+    .desk-cells { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; }
+    .desk-cell { border-left:1px solid var(--border2); padding-left:12px; min-width:0; }
+    .desk-cell:first-child { border-left:0; padding-left:0; }
+    .desk-lbl { font-family:var(--mono); font-size:9px; letter-spacing:1px; color:var(--muted);
+                text-transform:uppercase; margin-bottom:4px; white-space:nowrap; }
+    .desk-val, .brief-val { font-family:var(--mono); font-size:18px; font-weight:700; color:var(--text);
+                            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .brief-val.pos { color:var(--green); } .brief-val.neg { color:var(--red); } .brief-val.mut { color:var(--muted); }
+    .desk-cell.sl .desk-val { color:var(--red); } .desk-cell.tp .desk-val { color:var(--green); }
+    .desk-cell.rr .desk-val { color:var(--gold); }
+    @media(max-width:760px){ .desk-cells{ grid-template-columns:repeat(3,1fr); } .desk-val,.brief-val{ font-size:15px; } }
+  </style>
+  <div class="desk-brief">
+    <div class="desk-brief-head">
+      <span class="desk-brief-title">◆ INSTITUTIONAL TRADE DESK BRIEF · XAU/USD</span>
+      <span class="brief-status-pill pending" id="brief-status">—</span>
+    </div>
+    <div class="desk-cells">
+      <div class="desk-cell"><div class="desk-lbl">Snapshot</div><div class="desk-val" id="brief-snapshot">—</div></div>
+      <div class="desk-cell"><div class="desk-lbl">Signal</div><div class="brief-val mut" id="brief-signal">—</div></div>
+      <div class="desk-cell"><div class="desk-lbl">Entry / Watch Zone</div><div class="desk-val" id="brief-zone">—</div></div>
+      <div class="desk-cell sl"><div class="desk-lbl">Stop Loss</div><div class="desk-val" id="brief-sl">—</div></div>
+      <div class="desk-cell tp"><div class="desk-lbl">Target</div><div class="desk-val" id="brief-tp">—</div></div>
+      <div class="desk-cell rr"><div class="desk-lbl">Net R:R</div><div class="desk-val" id="brief-rr">—</div></div>
+    </div>
+  </div>
 
   <!-- READY MODE BANNER (top) -->
   <div class="ready-banner" id="ready-banner">
@@ -3071,9 +3114,85 @@ async function loadLivePrice() {
 
     // Pipeline live status
     updatePipelineFromStatus(bs);
+
+    // UHAS-style Trade Desk Brief (hero)
+    updateDeskBrief(bs);
   } catch (e) {
     console.error('loadLivePrice error:', e);
   }
+}
+
+// INSTITUTIONAL TRADE DESK BRIEF — populate hero from bot_status (display-only)
+function updateDeskBrief(bs) {
+  const px    = bs.price_info || {};
+  const sig   = bs.last_signal || {};
+  const plan  = bs.plan || {};
+  const zones = bs.zones || {};
+  const mid   = px.bid;
+  const setTxt = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+
+  setTxt('brief-snapshot', (mid != null) ? Number(mid).toFixed(2) : '—');
+
+  const dir = sig.direction || '—', conf = sig.confidence;
+  const sigEl = document.getElementById('brief-signal');
+  if (sigEl) {
+    sigEl.textContent = dir + ((conf != null) ? ` ${conf}%` : '');
+    sigEl.className = 'brief-val ' + (dir === 'BUY' ? 'pos' : (dir === 'SELL' ? 'neg' : 'mut'));
+  }
+
+  // Watch zone: ready-mode zone > HTF zone > signal S/R label
+  const rmZone = (bs.ready_mode || {}).zone;
+  const z = rmZone || zones.htf_zone;
+  setTxt('brief-zone', (z && z.level != null)
+    ? `${z.zone_type || ''} ${Number(z.level).toFixed(2)}`.trim()
+    : (sig.sr_zone || '—'));
+
+  // SL/TP prices from plan pips + direction (gold pip = 0.01)
+  const P = 0.01;
+  const slPips = (dir === 'SELL') ? plan.sell_sl_pips : plan.buy_sl_pips;
+  const tpPips = plan.tp_pips;
+  let slPrice = null, tpPrice = null, rr = null;
+  if (mid != null && slPips && tpPips) {
+    if (dir === 'SELL') { slPrice = mid + slPips * P; tpPrice = mid - tpPips * P; }
+    else                { slPrice = mid - slPips * P; tpPrice = mid + tpPips * P; }
+    rr = tpPips / slPips;
+  }
+  setTxt('brief-sl', (slPrice != null) ? slPrice.toFixed(2) : '—');
+  setTxt('brief-tp', (tpPrice != null) ? tpPrice.toFixed(2) : '—');
+  setTxt('brief-rr', (rr != null) ? rr.toFixed(2) + 'R' : '—');
+
+  const st = document.getElementById('brief-status');
+  if (st) {
+    const dec = (bs.decision || '').toUpperCase();
+    let label = dec || '—', cls = 'pending';
+    if (dec === 'SKIP' || bs.skip_ai) { label = 'STAND-DOWN'; cls = 'pending'; }
+    else if (/OPEN|BUY|SELL|ENTER/.test(dec)) { label = dec; cls = 'live'; }
+    st.textContent = label;
+    st.className = 'brief-status-pill ' + cls;
+  }
+}
+
+// Desk top-ticker macro cells — reuse existing /api/macro_strip + /api/cot (display-only)
+async function loadDeskTicker() {
+  try {
+    const [m, c] = await Promise.all([
+      fetch('/api/macro_strip').then(r => r.json()).catch(() => ({})),
+      fetch('/api/cot').then(r => r.json()).catch(() => ({})),
+    ]);
+    const set = (id, v, chg) => {
+      const e = document.getElementById(id); if (!e) return;
+      e.textContent = v;
+      if (chg != null) { e.classList.toggle('up', chg >= 0); e.classList.toggle('down', chg < 0); }
+    };
+    if (m && m.ok) {
+      if (m.dxy && m.dxy.val != null)               set('tk-dxy', Number(m.dxy.val).toFixed(2), m.dxy.chg);
+      if (m.y10 && m.y10.val != null)               set('tk-y10', Number(m.y10.val).toFixed(2) + '%', m.y10.chg);
+      if (m.real_yield && m.real_yield.val != null) set('tk-ry',  Number(m.real_yield.val).toFixed(2) + '%', m.real_yield.chg);
+    }
+    if (c && c.ok && c.net != null) {
+      set('tk-cot', (c.net >= 0 ? '+' : '') + (c.net / 1000).toFixed(0) + 'k', c.net_chg);
+    }
+  } catch (e) { console.error('loadDeskTicker error:', e); }
 }
 
 function updateReadyBanner(bs) {
@@ -5060,6 +5179,8 @@ function _bootstrap() {
   setInterval(loadRegimeState, 3600000); // regime_state.json updated daily — hourly poll sufficient
   setInterval(loadLivePrice, 5000);
   setInterval(loadMacroStrip, 3600000);  // macro data is daily — refresh hourly is sufficient
+  loadDeskTicker();
+  setInterval(loadDeskTicker, 3600000);  // desk top-ticker macro/COT — hourly poll (daily/weekly data)
   setInterval(loadCotCard, 3600000);     // COT data is weekly — hourly poll is sufficient
   setInterval(loadNewsImpact, 300000);   // refresh combined feed news every 5 min
   // Live tab panels (verdict/zones/pending) — refresh เฉพาะตอน tab เปิดอยู่
