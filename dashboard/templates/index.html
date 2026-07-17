@@ -1263,6 +1263,45 @@
   <!-- REGIME-STATE INDICATOR — C12-§3 /api/regime-state (shift-alert pill or muted stable line) -->
   <div id="regime-state-bar" style="display:none;margin:0 0 10px;padding:7px 14px;border-radius:8px;font-family:var(--mono,monospace);font-size:11px;align-items:center;gap:8px"></div>
 
+  <!-- UHAS LEFT SIDEBAR NAV (07-17) — CSS-only override, ไม่รื้อ DOM (switchTab เดิมทำงานปกติ) -->
+  <style>
+    .tab-nav {
+      position: fixed; left: 0; top: 0; bottom: 0; width: 176px;
+      display: flex; flex-direction: column; gap: 3px;
+      background: var(--bg2); border-right: 1px solid var(--border2); border-bottom: 0;
+      padding: 14px 10px; margin: 0; overflow-y: auto; z-index: 200;
+    }
+    .tab-nav::before {
+      content: "◆ GOLD DESK"; font-family: var(--mono); font-size: 12px; font-weight: 700;
+      letter-spacing: 1.5px; color: var(--gold); padding: 4px 8px 14px;
+      border-bottom: 1px solid var(--border); margin-bottom: 8px;
+    }
+    .tab-btn {
+      text-align: left; width: 100%; padding: 10px 12px; margin: 0; border: 0;
+      border-left: 2px solid transparent; border-bottom: 0; border-radius: 0 6px 6px 0;
+      color: var(--text-dim); font-size: 11px;
+    }
+    .tab-btn:hover { background: var(--surface); color: var(--text); }
+    .tab-btn.active {
+      color: var(--gold); background: var(--surface2);
+      border-left-color: var(--gold); border-bottom-color: transparent;
+    }
+    header, .container { margin-left: 176px; }
+    @media (max-width: 820px) {
+      .tab-nav {
+        position: static; inset: auto; flex-direction: row; width: auto; height: auto;
+        border-right: 0; border-bottom: 1px solid var(--border); overflow-x: auto;
+        z-index: 1; padding: 0; margin-bottom: 18px;
+      }
+      .tab-nav::before { display: none; }
+      .tab-btn {
+        width: auto; border-left: 0; border-bottom: 2px solid transparent; border-radius: 0;
+        text-align: center; padding: 9px 18px;
+      }
+      .tab-btn.active { border-left-color: transparent; border-bottom-color: var(--gold); background: none; }
+      header, .container { margin-left: 0; }
+    }
+  </style>
   <div class="tab-nav">
     <button class="tab-btn active" data-tab="overview"    onclick="switchTab('overview')">Dashboard</button>
     <button class="tab-btn"        data-tab="monitor"     onclick="switchTab('monitor')">Live</button>
@@ -1310,6 +1349,69 @@
       <div class="desk-cell sl"><div class="desk-lbl">Stop Loss</div><div class="desk-val" id="brief-sl">—</div></div>
       <div class="desk-cell tp"><div class="desk-lbl">Target</div><div class="desk-val" id="brief-tp">—</div></div>
       <div class="desk-cell rr"><div class="desk-lbl">Net R:R</div><div class="desk-val" id="brief-rr">—</div></div>
+    </div>
+  </div>
+
+  <!-- UHAS COMMAND DECK (07-17) — display-only, populate จาก bot_status (/api/monitor) -->
+  <style>
+    .cmd-deck { display:grid; grid-template-columns:1.2fr 1fr; gap:12px; margin:0 0 14px; }
+    .cmd-panel { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
+    .cmd-h { font-family:var(--mono); font-size:10px; letter-spacing:1.2px; color:var(--muted);
+             text-transform:uppercase; margin-bottom:10px; display:flex; justify-content:space-between; }
+    .deck-pills { display:flex; flex-wrap:wrap; gap:6px; }
+    .deck-pill { font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:0.5px;
+                 padding:4px 9px; border-radius:5px; border:1px solid var(--border2); }
+    .deck-pill.on  { color:var(--green); border-color:rgba(38,194,129,0.4); background:var(--green-dim); }
+    .deck-pill.off { color:var(--muted); border-color:var(--border2); }
+    .corridor { display:flex; flex-direction:column; gap:0; }
+    .corr-row { display:flex; align-items:center; justify-content:space-between; padding:7px 10px;
+                font-family:var(--mono); font-size:13px; font-weight:700; border-left:3px solid; }
+    .corr-row .corr-k { font-size:9px; letter-spacing:1px; color:var(--muted); font-weight:600; }
+    .corr-tp  { border-color:var(--green); background:var(--green-dim); color:var(--green); }
+    .corr-ent { border-color:var(--gold);  background:var(--gold-dim);  color:var(--gold);  }
+    .corr-sl  { border-color:var(--red);   background:var(--red-dim);   color:var(--red);   }
+    .corr-mid { border-left:3px dashed var(--border3); color:var(--text-dim); }
+    .blockers-list { list-style:none; font-family:var(--mono); font-size:12px; color:var(--text-dim); }
+    .blockers-list li { padding:5px 0 5px 16px; position:relative; border-bottom:1px solid var(--border); }
+    .blockers-list li:last-child { border-bottom:0; }
+    .blockers-list li::before { content:'▸'; position:absolute; left:0; color:var(--amber); }
+    .blockers-list li.clear::before { content:'✓'; color:var(--green); }
+    .scenario-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+    .scn { border:1px solid var(--border); border-top:2px solid; border-radius:8px; padding:10px; }
+    .scn-bull { border-top-color:var(--green); } .scn-base { border-top-color:var(--muted); }
+    .scn-bear { border-top-color:var(--red); }
+    .scn-k { font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:1px; margin-bottom:6px; }
+    .scn-bull .scn-k { color:var(--green); } .scn-base .scn-k { color:var(--text-dim); } .scn-bear .scn-k { color:var(--red); }
+    .scn-txt { font-family:var(--mono); font-size:11px; color:var(--text-dim); line-height:1.5; }
+    .consensus-bar { display:flex; height:24px; border-radius:6px; overflow:hidden; border:1px solid var(--border2); }
+    .cons-seg { display:flex; align-items:center; justify-content:center; font-family:var(--mono);
+                font-size:10px; font-weight:700; color:#07080a; transition:flex 0.4s; min-width:0; }
+    .cons-bull { background:var(--green); } .cons-bear { background:var(--red); } .cons-neut { background:var(--muted2); color:var(--muted); }
+    @media(max-width:900px){ .cmd-deck{ grid-template-columns:1fr; } }
+  </style>
+  <div class="cmd-deck">
+    <div class="cmd-panel">
+      <div class="cmd-h"><span>Desk Checklist</span><span id="deck-consensus-lbl" style="color:var(--muted)"></span></div>
+      <div class="deck-pills" id="deck-pills"></div>
+      <div class="cmd-h" style="margin:14px 0 8px"><span>Committee Consensus</span></div>
+      <div class="consensus-bar" id="deck-consensus"></div>
+      <div class="cmd-h" style="margin:14px 0 8px"><span>Bull / Base / Bear</span></div>
+      <div class="scenario-row">
+        <div class="scn scn-bull"><div class="scn-k">▲ BULL</div><div class="scn-txt" id="scn-bull">—</div></div>
+        <div class="scn scn-base"><div class="scn-k">◆ BASE</div><div class="scn-txt" id="scn-base">—</div></div>
+        <div class="scn scn-bear"><div class="scn-k">▼ BEAR</div><div class="scn-txt" id="scn-bear">—</div></div>
+      </div>
+    </div>
+    <div class="cmd-panel">
+      <div class="cmd-h"><span>Entry Corridor</span><span id="corr-dir" style="color:var(--muted)"></span></div>
+      <div class="corridor">
+        <div class="corr-row corr-tp"><span class="corr-k">TARGET</span><span id="corr-tp">—</span></div>
+        <div class="corr-row corr-mid"><span class="corr-k">SNAPSHOT</span><span id="corr-mid">—</span></div>
+        <div class="corr-row corr-ent"><span class="corr-k">ENTRY / WATCH</span><span id="corr-ent">—</span></div>
+        <div class="corr-row corr-sl"><span class="corr-k">STOP</span><span id="corr-sl">—</span></div>
+      </div>
+      <div class="cmd-h" style="margin:14px 0 8px"><span>Active Blockers · ทำไมยังไม่เข้า</span></div>
+      <ul class="blockers-list" id="deck-blockers"><li>—</li></ul>
     </div>
   </div>
 
@@ -1660,9 +1762,20 @@
       <div class="chart-card" style="padding:14px 18px">
         <div id="zone-ladder" style="font-family:var(--mono);font-size:12px">Loading…</div>
         <div id="fib-panel" style="font-family:var(--mono);margin-top:8px"></div>
-        <div id="liquidity-panel" style="font-family:var(--mono);margin-top:6px"></div>
-        <div id="volume-panel" style="font-family:var(--mono);margin-top:6px"></div>
-        <div id="signals-panel" style="font-family:var(--mono);margin-top:6px"></div>
+      </div>
+    </section>
+
+    <!-- TAPE / FLOW — แยก liquidity / volume / setups เป็น 3 card (07-17) -->
+    <style>
+      .tape-flow-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+      @media (max-width:900px){ .tape-flow-grid { grid-template-columns:1fr; } }
+    </style>
+    <section>
+      <div class="section-title">TAPE / FLOW &mdash; Liquidity &middot; Volume &middot; Setups</div>
+      <div class="tape-flow-grid">
+        <div class="chart-card" id="liquidity-card" style="padding:12px 14px"><div id="liquidity-panel" style="font-family:var(--mono)"></div></div>
+        <div class="chart-card" id="volume-card"    style="padding:12px 14px"><div id="volume-panel"    style="font-family:var(--mono)"></div></div>
+        <div class="chart-card" id="signals-card"   style="padding:12px 14px"><div id="signals-panel"   style="font-family:var(--mono)"></div></div>
       </div>
     </section>
 
@@ -1671,6 +1784,36 @@
       <div class="section-title">MACRO RADAR &mdash; Priors &amp; Projection</div>
       <div class="chart-card" style="padding:14px 18px">
         <div id="event-radar" style="font-family:var(--mono);font-size:12px">Loading…</div>
+      </div>
+    </section>
+
+    <!-- ECONOMIC CALENDAR — detailed day-grouped cards (07-17, UHAS-style) -->
+    <style>
+      #cal-detailed .cal-cards { flex-direction:column; gap:6px; }
+      #cal-detailed .cal-card { max-width:none; width:100%; flex:1 1 auto; }
+      #cal-detailed .cal-card.has-scenario { cursor:pointer; }
+      #cal-detailed .cal-card.has-scenario:hover { border-color:var(--gold); }
+      .cal-afp { font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:7px;
+                 display:flex; gap:14px; border-top:1px solid var(--border); padding-top:6px; }
+      .cal-afp b { font-weight:700; }
+      .cal-hd { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+      .cal-badge-inline { font-family:var(--mono); font-size:8px; font-weight:700; letter-spacing:1px; padding:2px 5px; border-radius:3px; }
+      .cal-badge-inline.impact-high   { background:rgba(233,69,96,0.18); color:var(--red); }
+      .cal-badge-inline.impact-medium { background:rgba(245,166,35,0.18); color:var(--amber); }
+      .cal-badge-inline.impact-low    { background:var(--surface3); color:var(--muted); }
+      .cal-exp { font-family:var(--mono); font-size:10px; font-weight:700; color:var(--gold); }
+      .cal-summary { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px; }
+      .cal-chip { font-family:var(--mono); font-size:10px; color:var(--text-dim); background:var(--surface);
+                  border:1px solid var(--border); border-radius:5px; padding:4px 9px; }
+      .cal-chip.gold { color:var(--gold); border-color:rgba(212,172,13,0.35); }
+      .cal-chip b { color:var(--text); }
+      .cal-legend { display:flex; gap:9px; align-items:center; font-size:9px; color:var(--muted); font-family:var(--mono); margin-left:auto; }
+      .cal-legend i { display:inline-block; width:10px; height:3px; border-radius:2px; margin-right:3px; vertical-align:middle; }
+    </style>
+    <section>
+      <div class="section-title">ECONOMIC CALENDAR &mdash; This Week (A/F/P)</div>
+      <div class="chart-card" style="padding:14px 16px">
+        <div id="cal-detailed" class="cal-container"><div style="color:var(--muted);font-size:12px;font-family:var(--mono)">Loading…</div></div>
       </div>
     </section>
 
@@ -3115,10 +3258,86 @@ async function loadLivePrice() {
     // Pipeline live status
     updatePipelineFromStatus(bs);
 
-    // UHAS-style Trade Desk Brief (hero)
+    // UHAS-style Trade Desk Brief (hero) + Command Deck
     updateDeskBrief(bs);
+    updateCommandDeck(bs);
   } catch (e) {
     console.error('loadLivePrice error:', e);
+  }
+}
+
+// UHAS COMMAND DECK — checklist pills / consensus / scenarios / corridor / blockers (display-only)
+function updateCommandDeck(bs) {
+  const mkt = bs.market || {}, sig = bs.last_signal || {}, zones = bs.zones || {};
+  const mom = mkt.momentum_tf || {}, plan = bs.plan || {}, px = bs.price_info || {};
+  const mid = px.bid, dir = (sig.direction || '').toUpperCase();
+  const setTxt = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  const num0 = (v) => (v != null ? Number(v).toFixed(0) : '?');
+
+  // 1. Desk checklist pills (observable conditions from bot_status)
+  const h = new Date().getUTCHours();
+  const m15 = (mom.m15 || {}).direction, h1 = (mom.h1 || {}).direction;
+  const pills = [
+    ['FEED',     mid != null],
+    ['TREND',    !!mkt.trend && mkt.trend !== 'SIDEWAYS'],
+    ['MOMENTUM', !!h1 && !!m15 && h1 === m15],
+    ['ZONE',     ['SUPPORT', 'RESISTANCE'].includes(sig.sr_zone)],
+    ['SESSION',  h >= 7 && h < 21],
+    ['REGIME',   !!mkt.d1_trend && mkt.d1_trend !== 'NEUTRAL'],
+  ];
+  const pc = document.getElementById('deck-pills');
+  if (pc) pc.innerHTML = pills.map(([k, ok]) =>
+    `<span class="deck-pill ${ok ? 'on' : 'off'}">${ok ? '●' : '○'} ${k}</span>`).join('');
+
+  // 2. Committee consensus — analyst(sentiment) / advisor(trend) / decision(direction)
+  const lean = (s) => { s = (s || '').toUpperCase();
+    return (s.includes('BULL') || s === 'BUY') ? 'B' : (s.includes('BEAR') || s === 'SELL') ? 'S' : 'N'; };
+  const votes = [lean(bs.sentiment), lean(mkt.trend), lean(dir)];
+  const nb = votes.filter(v => v === 'B').length, ns = votes.filter(v => v === 'S').length;
+  const nn = 3 - nb - ns;
+  const cons = document.getElementById('deck-consensus');
+  if (cons) {
+    const seg = (cls, n, lbl) => n ? `<div class="cons-seg ${cls}" style="flex:${n}">${lbl} ${n}</div>` : '';
+    cons.innerHTML = seg('cons-bull', nb, 'BULL') + seg('cons-neut', nn, 'WAIT') + seg('cons-bear', ns, 'BEAR');
+  }
+  setTxt('deck-consensus-lbl', `${nb}▲ ${ns}▼ ${nn}◆`);
+
+  // 3. Bull / Base / Bear — derived from actual zone levels (factual level mapping)
+  const R = (zones.resistance || []).filter(r => mid != null && r > mid).sort((a, b) => a - b);
+  const S = (zones.support || []).filter(s => mid != null && s < mid).sort((a, b) => b - a);
+  setTxt('scn-bull', R.length ? `Reclaim ${num0(R[0])} → target ${num0(R[1] ?? R[0])}` : '—');
+  setTxt('scn-base', (S[0] != null && R[0] != null) ? `Range ${num0(S[0])} – ${num0(R[0])}` : '—');
+  setTxt('scn-bear', S.length ? `Lose ${num0(S[0])} → target ${num0(S[1] ?? S[0])}` : '—');
+
+  // 4. Entry corridor (TARGET / SNAPSHOT / ENTRY / STOP)
+  const P = 0.01;
+  const slPips = dir === 'SELL' ? plan.sell_sl_pips : plan.buy_sl_pips, tpPips = plan.tp_pips;
+  const zEnt = ((bs.ready_mode || {}).zone) || zones.htf_zone;
+  let slPrice = null, tpPrice = null;
+  if (mid != null && slPips && tpPips) {
+    if (dir === 'SELL') { slPrice = mid + slPips * P; tpPrice = mid - tpPips * P; }
+    else                { slPrice = mid - slPips * P; tpPrice = mid + tpPips * P; }
+  }
+  setTxt('corr-dir', dir || 'FLAT');
+  setTxt('corr-tp',  tpPrice != null ? tpPrice.toFixed(2) : '—');
+  setTxt('corr-mid', mid != null ? Number(mid).toFixed(2) : '—');
+  setTxt('corr-ent', (zEnt && zEnt.level != null) ? Number(zEnt.level).toFixed(2) : (mid != null ? Number(mid).toFixed(2) : '—'));
+  setTxt('corr-sl',  slPrice != null ? slPrice.toFixed(2) : '—');
+
+  // 5. Active blockers (why no entry)
+  const bl = document.getElementById('deck-blockers');
+  if (bl) {
+    const dec = (bs.decision || '').toUpperCase();
+    const items = [];
+    if (bs.skip_ai) items.push('AI throttled — capital floor / session throttle');
+    if (dec === 'SKIP' || bs.skip_ai) {
+      if (sig.reason) items.push(sig.reason);
+      const conf = sig.confidence;
+      if (conf != null && !sig.reason) items.push(`Signal ${dir || '—'} ${conf}% — no qualifying gate pass`);
+      if (!items.length) items.push('No qualifying setup this cycle');
+    }
+    if (!items.length) { bl.innerHTML = '<li class="clear">Gates cleared — active intent</li>'; }
+    else { bl.innerHTML = items.slice(0, 4).map(t => `<li>${t}</li>`).join(''); }
   }
 }
 
@@ -4017,10 +4236,92 @@ async function fetchCalendar() {
     const data = await res.json();
     _calEvents = data.events || [];
     renderFeed();
+    renderCalendarDetailed(_calEvents);
   } catch(e) {
     const el = document.getElementById('feed-list');
     if (el) el.innerHTML = '<div style="color:var(--muted);font-size:12px;font-family:var(--mono)">Failed to load calendar: ' + e.message + '</div>';
   }
+}
+
+// Detailed economic calendar (UHAS-style) — summary chips, day groups + remaining count,
+// live countdown, gold★ tag, expected-impact %, A/F/P; click a gold event → expand scenario stats.
+function renderCalendarDetailed(events) {
+  const el = document.getElementById('cal-detailed');
+  if (!el) return;
+  const evs = (events || []).slice().sort((a, b) => (a.timestamp_iso || '').localeCompare(b.timestamp_iso || ''));
+  if (!evs.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:6px;font-family:var(--mono)">ไม่มี event สัปดาห์นี้</div>';
+    return;
+  }
+  const scMap = (_eventScenarios && _eventScenarios.scenarios) || {};
+  const now = Date.now();
+  const isRel = e => { const a = (e.actual || '').trim(); return !!a && a !== 'pending' && a !== '—'; };
+  const impCls = im => { im = (im || '').toLowerCase(); return im.includes('high') ? 'impact-high' : im.includes('med') ? 'impact-medium' : 'impact-low'; };
+  const impLbl = im => { im = (im || '').toLowerCase(); return im.includes('high') ? 'HIGH' : im.includes('med') ? 'MED' : im.includes('holiday') ? 'HOL' : 'LOW'; };
+  const expOf = key => { const s = scMap[key]; if (!s || !s.hot) return 0; return ((s.hot.magnitude_pct || 0) + ((s.cool && s.cool.magnitude_pct) || 0)) / 2; };
+
+  const usdN  = evs.filter(e => (e.currency || '') === 'USD').length;
+  const goldN = evs.filter(e => _scenarioKey(e.title)).length;
+  const unrel = evs.filter(e => !isRel(e)).length;
+  let html = `<div class="cal-summary">
+    <span class="cal-chip">ทั้งหมด <b>${evs.length}</b></span>
+    <span class="cal-chip">USD <b>${usdN}</b></span>
+    <span class="cal-chip gold">★ เกี่ยวกับทอง <b>${goldN}</b></span>
+    <span class="cal-chip">ยังไม่ออก <b>${unrel}</b></span>
+    <span class="cal-legend"><span><i style="background:var(--red)"></i>High</span><span><i style="background:var(--amber)"></i>Med</span><span><i style="background:var(--muted2)"></i>Low</span></span>
+  </div>`;
+
+  const dayKey = ms => { const d = new Date(ms); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const todayK = dayKey(now);
+  const groups = {};
+  evs.forEach(e => {
+    const ts = e.timestamp_iso ? Date.parse(e.timestamp_iso) : NaN;
+    const k = isNaN(ts) ? 'zzz-tba' : dayKey(ts);
+    (groups[k] = groups[k] || []).push([e, ts]);
+  });
+  Object.keys(groups).sort().forEach(k => {
+    const isToday = k === todayK, arr = groups[k], first = arr[0][1];
+    const label = isNaN(first) ? 'TBA' : new Date(first).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const remain = arr.filter(([e]) => !isRel(e)).length;
+    html += `<div class="cal-day-group"><div class="cal-day-label ${isToday ? 'is-today' : ''}"><span class="cal-day-dot"></span>${label}${isToday ? ' · TODAY' : ''} <span style="color:var(--muted);font-weight:400;font-size:10px">· เหลือ ${remain}</span></div><div class="cal-cards">`;
+    arr.forEach(([e, ts]) => {
+      const key = _scenarioKey(e.title), gold = !!key, rel = isRel(e);
+      const timeStr = isNaN(ts) ? '--:--' : new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const exp = gold ? expOf(key) : 0;
+      const expStr = exp ? `<span class="cal-exp">±${exp.toFixed(2)}%</span>` : '';
+      const cd = (!rel && !isNaN(ts) && ts > now)
+        ? `<span class="es-cd" data-ts="${ts}" style="margin-left:auto"><span class="es-cd-lbl" style="font-size:8px;color:var(--muted)"></span> <span class="es-cd-big" style="font-family:var(--mono);font-size:10px;font-weight:800">—</span></span>`
+        : (rel ? `<span style="margin-left:auto;font-size:9px;color:var(--muted);font-family:var(--mono)">ประกาศแล้ว</span>` : '');
+      const act = (e.actual || '').trim(), fc = e.forecast || '—', pv = e.previous || '—';
+      let actCol = 'var(--text)';
+      const an = parseFloat(act.replace(/[^0-9.\-]/g, '')), fn = parseFloat(String(fc).replace(/[^0-9.\-]/g, ''));
+      if (rel && !isNaN(an) && !isNaN(fn)) actCol = an > fn ? 'var(--green)' : an < fn ? 'var(--red)' : 'var(--text)';
+      const detail = gold ? `<div class="cal-detail" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px" onclick="event.stopPropagation()">${buildScenarioDetail(key, e)}</div>` : '';
+      html += `<div class="cal-card ${impCls(e.impact)} ${isToday ? 'is-today-card' : ''} ${gold ? 'has-scenario' : ''}"${gold ? ' onclick="_toggleCalCard(this)"' : ''}>
+        <div class="cal-hd">
+          <span class="cal-time" style="min-width:40px">${timeStr}</span>
+          <span class="cal-badge-inline ${impCls(e.impact)}">${impLbl(e.impact)}</span>
+          <span class="cal-curr" style="margin:0">${gold ? '★ ' : ''}${e.currency || ''}</span>
+          <span class="cal-name" style="margin:0;padding:0;flex:1;min-width:120px">${e.title || ''}</span>
+          ${expStr}${cd}
+        </div>
+        <div class="cal-afp">
+          <span>A <b style="color:${rel ? actCol : 'var(--muted)'}">${rel ? act : '·'}</b></span>
+          <span>F <b style="color:var(--text-dim)">${fc}</b></span>
+          <span>P <b style="color:var(--text-dim)">${pv}</b></span>
+          ${gold ? '<span style="color:var(--gold);font-size:9px;margin-left:auto">คลิกดูสถิติ ▾</span>' : ''}
+        </div>${detail}</div>`;
+    });
+    html += `</div></div>`;
+  });
+  el.innerHTML = html;
+  _tickCountdowns();
+}
+
+// Toggle a calendar event's expanded scenario-stats detail (reuses buildScenarioDetail).
+function _toggleCalCard(card) {
+  const d = card.querySelector('.cal-detail');
+  if (d) d.style.display = (d.style.display === 'none') ? 'block' : 'none';
 }
 
 // Map a calendar event title → scenario key (CPI/NFP/FOMC) or null.
@@ -4590,8 +4891,10 @@ function renderFib(bs) {
 function renderVolume(bs) {
   const el = document.getElementById('volume-panel');
   if (!el) return;
+  const card = document.getElementById('volume-card');
   const vp = bs.volume_profile || {}, wall = vp.wall, bp = vp.buy_pct;
-  if (!wall && bp == null) { el.innerHTML = ''; return; }
+  if (!wall && bp == null) { el.innerHTML = ''; if (card) card.style.display = 'none'; return; }
+  if (card) card.style.display = '';
   const wallStr = wall ? `กำแพง <b>${(+wall.level).toFixed(2)}</b> <span style="color:var(--muted)">(${wall.pct}% ของ vol)</span>` : '';
   let imb = '';
   if (bp != null) {
@@ -4607,8 +4910,10 @@ function renderVolume(bs) {
 function renderLiquidity(bs) {
   const el = document.getElementById('liquidity-panel');
   if (!el) return;
+  const card = document.getElementById('liquidity-card');
   const lp = bs.liquidity_pools || {}, bsl = lp.buy_side || [], ssl = lp.sell_side || [];
-  if (!bsl.length && !ssl.length) { el.innerHTML = ''; return; }
+  if (!bsl.length && !ssl.length) { el.innerHTML = ''; if (card) card.style.display = 'none'; return; }
+  if (card) card.style.display = '';
   const pool = (p, up) => `<span style="margin-right:10px"><span style="color:${up ? 'var(--red)' : 'var(--green)'}">${up ? '▲' : '▼'}</span> <b>${(+p.level).toFixed(2)}</b><span style="color:var(--muted)">×${p.count} (${p.dist_pct}%)</span></span>`;
   el.innerHTML =
     `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0">💧 STOP LIQUIDITY (H1 — sweep targets)</div>` +
@@ -4620,8 +4925,10 @@ function renderLiquidity(bs) {
 function renderSignals(bs) {
   const el = document.getElementById('signals-panel');
   if (!el) return;
+  const card = document.getElementById('signals-card');
   const s = bs.signals || {}, ms = s.market_structure, re = s.retrace_entry, rc = s.reversal_confirm, fvg = s.fvg || [], dp = s.double_pattern;
-  if (!ms && !re && !rc && !fvg.length && !dp) { el.innerHTML = ''; return; }
+  if (!ms && !re && !rc && !fvg.length && !dp) { el.innerHTML = ''; if (card) card.style.display = 'none'; return; }
+  if (card) card.style.display = '';
   let html = `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0">⚡ TAPE SETUPS · ref only</div>`;
   if (ms) {
     const col = ms.state === 'UPTREND' ? 'var(--green)' : ms.state === 'DOWNTREND' ? 'var(--red)'
