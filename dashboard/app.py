@@ -1336,6 +1336,22 @@ def api_regime_extra():
         return jsonify(_empty)
 
 
+@app.route("/api/risk-regime")
+def api_risk_regime():
+    """Cross-asset HMM risk regime (RISK-ON/NEUTRAL/RISK-OFF) from gold+VIX+DXY.
+    Data from data/risk_regime_now.json (scripts/fetch_risk_regime.py, daily).
+    — display-only, pass-through; validated vol/risk CONTEXT, not a directional signal."""
+    _empty = {"ok": True, "regime": None, "vix": None, "gold_ctx_yr": None, "updated": None}
+    try:
+        p = os.path.join(_BASE, "../data/risk_regime_now.json")
+        with open(p, "r", encoding="utf-8") as f:
+            return jsonify(json.load(f))
+    except FileNotFoundError:
+        return jsonify(_empty)
+    except Exception:
+        return jsonify(_empty)
+
+
 @app.route("/api/cot")
 def api_cot():
     """CFTC COT non-commercial gold positioning (weekly).

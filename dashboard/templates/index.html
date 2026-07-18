@@ -1710,6 +1710,11 @@
             <span id="rt-gsr-val" style="font-weight:600;color:var(--text,#DDE2EC);font-size:10px">—</span>
             <span class="rt-lbl" style="font-weight:600;font-size:9px;color:var(--muted,#6B7488)">—</span>
           </span>
+          <span class="regime-tile" id="rt-hmm" style="display:flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--gold,#F4C430);border-radius:6px" title="HMM cross-asset regime (gold+VIX+DXY, validated multi-feature); ทำนาย forward vol — risk context ไม่ใช่ entry signal">
+            <span style="color:var(--gold,#F4C430);font-size:9px;letter-spacing:0.5px">HMM</span>
+            <span id="rt-hmm-val" style="font-weight:700;font-size:10px;color:var(--muted,#6B7488)">—</span>
+            <span id="rt-hmm-ctx" style="font-size:9px;color:var(--muted,#6B7488)">—</span>
+          </span>
         </div>
         <div style="color:var(--muted,#6B7488);font-size:9px;margin-top:7px;line-height:1.45">
           drivers ผกผันกับทอง (ลง = หนุนทอง). <b style="color:var(--text-dim,#9aa3b8)">coincident/regime context — ไม่ใช่ intraday lead</b>
@@ -5540,6 +5545,28 @@ async function loadRegimeExtra() {
 }
 
 /* ════════════════════════════════════════════════════════════
+   HMM RISK REGIME — /api/risk-regime : cross-asset validated regime (context, not signal)
+   ════════════════════════════════════════════════════════════ */
+async function loadRiskRegime() {
+  try {
+    const res = await fetch('/api/risk-regime');
+    const d = await res.json();
+    if (!d.ok || !d.regime) return;
+    const color = d.regime === 'RISK-OFF' ? 'var(--red,#E94560)'
+                : d.regime === 'RISK-ON'  ? 'var(--green,#26C281)'
+                : 'var(--text-dim,#9aa3b8)';
+    const v = document.getElementById('rt-hmm-val');
+    if (v) { v.textContent = d.regime; v.style.color = color; }
+    const c = document.getElementById('rt-hmm-ctx');
+    if (c && d.gold_ctx_yr != null) {
+      c.textContent = `gold ${d.gold_ctx_yr >= 0 ? '+' : ''}${d.gold_ctx_yr}%/y`;
+    }
+  } catch (e) {
+    console.error('loadRiskRegime error:', e);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
    COT CARD — §3.5 /api/cot  (CFTC non-commercial gold positioning)
    ════════════════════════════════════════════════════════════ */
 async function loadCotCard() {
@@ -5625,6 +5652,7 @@ function _bootstrap() {
   loadRegimeState();
   loadMacroStrip();
   loadRegimeExtra();
+  loadRiskRegime();
   loadCotCard();
   loadNewsImpact();
   loadImpactCalibration();
