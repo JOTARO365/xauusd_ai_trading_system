@@ -108,6 +108,7 @@ def _bucket_feat(s):
         "F4_mom_m15": s.get("f4_mom_m15"),
         "F6_fast_move": s.get("f6_fast_move"),
         "F7_vol_tilt": s.get("f7_vol_tilt"),
+        "F8_risk_regime": s.get("f8_risk_regime"),
         "sr_strength": s.get("sr_strength"),
     }
 

@@ -33,6 +33,18 @@ def _news_score() -> dict:
         return {"score": None, "n": None, "updated": None}
 
 
+def _risk_regime():
+    """F8 — cross-asset HMM risk regime (RISK-ON/NEUTRAL/RISK-OFF) ณ ตอน decision.
+    อ่าน data/risk_regime_now.json (scripts/fetch_risk_regime.py, รายวัน). fail-soft → None.
+    = validated vol/risk context (ทำนาย forward vol) — ไม่ใช่ directional signal. เก็บไว้ validate."""
+    try:
+        p = Path(__file__).resolve().parent.parent / "data" / "risk_regime_now.json"
+        with open(p, encoding="utf-8") as f:
+            return (json.load(f) or {}).get("regime")
+    except Exception:
+        return None
+
+
 def _nearest_zone(chart_data: dict, price, direction: str) -> dict:
     """F5 — sr_meta zone ที่ใกล้ราคาสุดฝั่งที่เกี่ยว (BUY→Support / SELL→Resistance).
     ดึง bounce_pct/break_pct/n_tests/grade เป็น empirical prior."""
@@ -80,6 +92,7 @@ def log_decision_snapshot(chart_data: dict, sentiment_data: dict | None,
             "f5_zone": _nearest_zone(cd, px, direction),
             "f6_fast_move": cd.get("fast_move_pips"),
             "f7_vol_tilt": (cd.get("volume_profile") or {}).get("tilt"),
+            "f8_risk_regime": _risk_regime(),   # cross-asset HMM regime (add-only, validate ก่อน wire จริง)
             # ── context ──
             "sr_zone": cd.get("sr_zone"), "sr_strength": cd.get("sr_strength"),
             "trend": cd.get("trend"), "d1_trend": cd.get("d1_trend"), "conf": cd.get("confidence"),
