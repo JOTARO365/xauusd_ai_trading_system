@@ -1320,6 +1320,22 @@ def api_macro_strip():
         return jsonify(_empty)
 
 
+@app.route("/api/regime-extra")
+def api_regime_extra():
+    """Tier 2 regime context: VIX + gold/silver ratio (risk-on/off regime).
+    Data from data/regime_extra.json (scripts/fetch_regime_extra.py via Yahoo, daily).
+    — display-only, pass-through; file missing → empty payload not 500 (same pattern as macro-strip)."""
+    _empty = {"ok": True, "vix": None, "gsr": None, "updated": None}
+    try:
+        p = os.path.join(_BASE, "../data/regime_extra.json")
+        with open(p, "r", encoding="utf-8") as f:
+            return jsonify(json.load(f))
+    except FileNotFoundError:
+        return jsonify(_empty)
+    except Exception:
+        return jsonify(_empty)
+
+
 @app.route("/api/cot")
 def api_cot():
     """CFTC COT non-commercial gold positioning (weekly).

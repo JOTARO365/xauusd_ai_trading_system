@@ -1698,6 +1698,19 @@
             <span class="rt-effect" style="font-weight:600;font-size:10px;color:var(--muted,#6B7488)">—</span>
           </span>
         </div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:7px">
+          <span style="color:var(--muted,#6B7488);text-transform:uppercase;font-size:9px;letter-spacing:0.5px;flex-shrink:0">RISK REGIME</span>
+          <span class="regime-tile" id="rt-vix" style="display:flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--muted2,#3D4456);border-radius:6px" title="VIX = ความผันผวนตลาดหุ้น; สูง=risk-off→ทองได้ haven bid">
+            <span style="color:var(--muted,#6B7488);font-size:9px;letter-spacing:0.5px">VIX</span>
+            <span id="rt-vix-val" style="font-weight:600;color:var(--text,#DDE2EC);font-size:10px">—</span>
+            <span class="rt-lbl" style="font-weight:600;font-size:9px;color:var(--muted,#6B7488)">—</span>
+          </span>
+          <span class="regime-tile" id="rt-gsr" style="display:flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--muted2,#3D4456);border-radius:6px" title="Gold/Silver ratio; สูง=fear/risk-off (silver underperform)">
+            <span style="color:var(--muted,#6B7488);font-size:9px;letter-spacing:0.5px">G/S RATIO</span>
+            <span id="rt-gsr-val" style="font-weight:600;color:var(--text,#DDE2EC);font-size:10px">—</span>
+            <span class="rt-lbl" style="font-weight:600;font-size:9px;color:var(--muted,#6B7488)">—</span>
+          </span>
+        </div>
         <div style="color:var(--muted,#6B7488);font-size:9px;margin-top:7px;line-height:1.45">
           drivers ผกผันกับทอง (ลง = หนุนทอง). <b style="color:var(--text-dim,#9aa3b8)">coincident/regime context — ไม่ใช่ intraday lead</b>
           (deep research: DXY-นำ-ทอง ถูก refute). regime-unstable: real-yield link อ่อนหลัง 2022. sens ~+1.75% ต่อ −25bp 10Y (WGC).
@@ -5493,6 +5506,40 @@ async function loadMacroStrip() {
 }
 
 /* ════════════════════════════════════════════════════════════
+   REGIME EXTRA (Tier 2) — /api/regime-extra : VIX + gold/silver ratio
+   deep research: risk-on/off REGIME switch (context, ไม่ใช่ entry signal)
+   ════════════════════════════════════════════════════════════ */
+async function loadRegimeExtra() {
+  try {
+    const res  = await fetch('/api/regime-extra');
+    const data = await res.json();
+    if (!data.ok) return;
+    function _setLbl(id, txt, color) {
+      const el = document.querySelector('#' + id + ' .rt-lbl');
+      if (el) { el.textContent = txt; el.style.color = color; }
+    }
+    // VIX: <16 risk-on(calm) · 16-25 neutral · >25 risk-off (ทองได้ haven bid)
+    const vix = data.vix;
+    if (vix && vix.val != null) {
+      const v = document.getElementById('rt-vix-val'); if (v) v.textContent = vix.val.toFixed(1);
+      if (vix.val > 25)      _setLbl('rt-vix', 'RISK-OFF ↑haven', 'var(--gold,#F4C430)');
+      else if (vix.val < 16) _setLbl('rt-vix', 'RISK-ON',         'var(--muted,#6B7488)');
+      else                   _setLbl('rt-vix', 'NEUTRAL',         'var(--text-dim,#9aa3b8)');
+    }
+    // Gold/Silver ratio: <75 risk-on(silver แข็ง) · 75-85 neutral · >85 fear/risk-off
+    const gsr = data.gsr;
+    if (gsr && gsr.val != null) {
+      const g = document.getElementById('rt-gsr-val'); if (g) g.textContent = gsr.val.toFixed(1);
+      if (gsr.val > 85)      _setLbl('rt-gsr', 'FEAR/risk-off', 'var(--gold,#F4C430)');
+      else if (gsr.val < 75) _setLbl('rt-gsr', 'RISK-ON',       'var(--muted,#6B7488)');
+      else                   _setLbl('rt-gsr', 'NEUTRAL',       'var(--text-dim,#9aa3b8)');
+    }
+  } catch (e) {
+    console.error('loadRegimeExtra error:', e);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
    COT CARD — §3.5 /api/cot  (CFTC non-commercial gold positioning)
    ════════════════════════════════════════════════════════════ */
 async function loadCotCard() {
@@ -5577,6 +5624,7 @@ function _bootstrap() {
   loadRegime();
   loadRegimeState();
   loadMacroStrip();
+  loadRegimeExtra();
   loadCotCard();
   loadNewsImpact();
   loadImpactCalibration();
