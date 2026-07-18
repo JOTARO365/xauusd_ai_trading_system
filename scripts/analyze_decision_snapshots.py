@@ -32,7 +32,7 @@ except Exception:
 import numpy as np
 
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SNAP = os.path.join(_BASE, "logs", "decision_snapshots.jsonl")
+SNAP = os.environ.get("SNAP_FILE") or os.path.join(_BASE, "logs", "decision_snapshots.jsonl")
 M15 = os.path.join(_BASE, "data", "xau_m15.json")
 POINT = 0.01
 TIME_STOP = 192
@@ -157,17 +157,24 @@ def main():
         print("   → restart บอท (fix อยู่ในโค้ดแล้ว) เพื่อเก็บ snapshot ที่มี direction+F1-F7 ครบ.")
         return
 
-    # forward-label
+    # forward-label + drift/geometry control
     labeled = []
+    skills = []
     for s in snaps:
         d = s.get("direction")
         at = _epoch(s.get("at"))
         if d not in ("BUY", "SELL") or at is None:
             continue
-        nr = forward_label(m15, at, d, s.get("sl_pips"), s.get("tp_pips"), SPREAD_PIPS)
+        sl, tp = s.get("sl_pips"), s.get("tp_pips")
+        nr = forward_label(m15, at, d, sl, tp, SPREAD_PIPS)
         if nr is None:
             continue
         labeled.append((s, nr, 1 if nr > 0 else 0))
+        # drift/geometry control (บทเรียน null-test): baseline = ทิศ-neutral = avg ของ BUY กับ SELL
+        # จุดเดียวกัน = เก็บ drift+RR-geometry ไว้แต่ตัดข้อมูลทิศออก. skill = actual − baseline.
+        rb = forward_label(m15, at, "BUY", sl, tp, SPREAD_PIPS)
+        rs = forward_label(m15, at, "SELL", sl, tp, SPREAD_PIPS)
+        skills.append(nr - (rb + rs) / 2.0 if (rb is not None and rs is not None) else 0.0)
     n = len(labeled)
     print(f"\nlabelable: {n}/{len(snaps)}  (ต้องมี direction+SL/TP + xau_m15 ครอบเวลา snapshot)")
     if n == 0:
@@ -175,8 +182,16 @@ def main():
 
     nets = np.array([nr for _, nr, _ in labeled])
     wr = float(np.mean([w for _, _, w in labeled]) * 100)
-    print(f"\n── EV รวม (forward-label intrabar, net {SPREAD_PIPS}pt) ──")
+    print(f"\n── EV รวม RAW (forward-label intrabar, net {SPREAD_PIPS}pt) ──")
     print(f"  net {nets.sum():+.1f}R  avg {nets.mean():+.4f}R/ไม้  WR {wr:.0f}%")
+    print(f"  ⚠️ raw net-R มี DRIFT-BIAS (null-test พิสูจน์แล้ว: harness ทำเงินจาก uptrend ทองแม้ไม่มี edge) → ดูตัวล่าง")
+
+    # ── 🔬 DRIFT-CONTROLLED: หัก direction-neutral baseline (drift+geometry) = ตัวชี้ขาดจริง ──
+    sk = np.array(skills)
+    print(f"\n── 🔬 DRIFT-CONTROLLED (skill = actual − ทิศ-neutral baseline) ──")
+    print(f"  skill net {sk.sum():+.1f}R  avg {sk.mean():+.4f}R/ไม้  → "
+          f"{'ทิศ (F1-F7 selection) มี edge เหนือ drift ✅' if sk.mean() > 0.005 else 'ทิศไม่เพิ่ม edge เหนือ drift ❌ (raw net = drift artifact)'}")
+    print(f"  ← ตัวนี้ + AUC (ด้านล่าง) คือตัวชี้ขาด ไม่ใช่ raw net (drift-invariant ทั้งคู่)")
 
     if n < MIN_N:
         print(f"\n⚠️ N={n} < MIN_N={MIN_N} → **ยังไม่สรุป/ไม่ fit** (skill §6 min-N — ต่ำกว่านี้ = noise มี weight).")
@@ -215,8 +230,10 @@ def main():
             print("  (ไม่มี sklearn — ข้าม multi-feature AUC)")
 
     print("\n" + "=" * 72)
-    print("⚠️ forward-label counterfactual + intrabar + net cost. gate ที่ MIN_N. F5 bounce_pct = สมมติฐานหลัก.")
-    print("   ต้องผ่าน gauntlet เดียวกัน (DSR/PBO/holdout) ก่อนใช้จริง — นี่คือขั้นสำรวจ.")
+    print("🔑 VERDICT ยึด: (1) DRIFT-CONTROLLED skill net-R + (2) per-feature AUC — ทั้งคู่ drift-invariant.")
+    print("   **อย่าใช้ raw net-R ตัดสิน** (null-test พิสูจน์ว่ามี drift-bias). F5 bounce_pct = สมมติฐานหลัก.")
+    print("⚠️ forward-label counterfactual + intrabar + net cost. gate ที่ MIN_N. ต้องผ่าน gauntlet เต็ม")
+    print("   (DSR/PBO/holdout + null-test) ก่อนใช้จริง — นี่คือขั้นสำรวจ.")
 
 
 if __name__ == "__main__":
