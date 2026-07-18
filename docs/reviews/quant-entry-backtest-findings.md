@@ -83,12 +83,25 @@ DSR/PBO/OOS บอกแค่ "marginal/อ่อนลง" — null-test **ฟ
 🔑 **IMPLICATION (โหลดแบก):** การ forward-label intrabar ใดๆ (รวม `analyze_decision_snapshots.py`) มี
 **drift-bias เดียวกัน** → เจอ +0.03R หลอกได้ → **ต้องรัน null-test/drift-control คู่เสมอ** ก่อนเชื่อ net-R บวกใดๆ.
 
+## M15/H1 intermarket lead probe (`scripts/probe_gold_lead.py`) — 2026-07-18 (i): coincident, ไม่มี lead
+deep research เหลือ open question เดียว: M15/H1 band (refute แค่ tick + monthly). ทดสอบด้วย driver จาก
+**MT5 feed เดียวกับทอง** (`scripts/export_drivers.py` — EURUSD/USDJPY/DXY/XAG, แก้ปัญหา timezone alignment).
+
+**ผล (M15 + H1):** ทุก driver **best lead = sync (lag 0) = coincident ล้วน**; ρ_pred(driver[t]→gold[t+1]) ≈ 0
+ทุกตัว (max \|0.018\|); ตัวที่ขึ้น "driver นำ" corr แค่ ~0.02 = noise; **ไม่มีตัวไหน exp-move > spread 30pt**
+(ตรง Huth&Abergel: lead จริงโดน bid/ask กิน). → **ยืนยัน deep research ด้วย data broker เราเอง: external =
+coincident ไม่ใช่ intraday lead. ปิดช่องสุดท้าย.**
+
+ผลพลอยได้: contemp corr สมเหตุผล + ตรง sign ของ dashboard GOLD REGIME panel (EURUSD +0.39 H1 = tailwind,
+USDJPY −0.31 = headwind) → **ยืนยัน external ใช้เป็น regime/context filter ได้จริง (ไม่ใช่ intraday trigger)**.
+
 ## Data regeneration (blob ไม่ commit — regenerable)
 ```
 & $PY scripts/fetch_btc.py                 # BTC 1yr → data/btc_{daily,hourly}_raw.json
 & $PY scripts/fetch_btc.py PAXGUSDT        # gold-proxy 1yr
 # 3yr / full: ปรับ days ใน fetcher หรือ inline (ดู git log commit นี้)
 python scripts/export_xau_history.py GOLD#   # XAUUSD หลาย TF จาก MT5 (user รัน, terminal เปิด) → data/xau_*.json
+python scripts/export_drivers.py             # EURUSD/USDJPY/DXY/XAG M15+H1 (feed เดียวกัน) → data/drv_*.json
 ```
 
 เกี่ยว: skill `quant-systematic-trading` (§6 validation rigor), `docs/VALIDATION_CHECKLIST.md`,
