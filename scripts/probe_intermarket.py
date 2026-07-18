@@ -29,6 +29,7 @@ GROUPS = {
     "GOLD":   ["XAU", "GOLD"],
     "DXY":    ["DXY", "USDX", "USIDX", "DOLLAR", "USDOLLAR", "USDIDX"],
     "SILVER": ["XAG", "SILVER"],
+    "BTC":    ["BTC", "XBT", "BITCOIN"],   # BTC module + gold intermarket feature (F8)
     "US10Y":  ["US10", "UST10", "TNOTE", "US10YR", "US10Y", "USTBOND", "T10Y", "USTNOTE", "US10YB", "TN10"],
     "OIL":    ["WTI", "USOIL", "XTIUSD", "CRUDE", "USCRUDE", "OILUSD"],
     "BRENT":  ["BRENT", "UKOIL", "XBRUSD", "BRENTOIL"],
@@ -111,7 +112,7 @@ def main():
     hits, total = find_symbols()
     print(f"\n[1] SYMBOL DISCOVERY  (broker มี {total} symbols ทั้งหมด)")
     gold = None
-    for grp in ["GOLD", "DXY", "SILVER", "US10Y", "OIL", "BRENT", "REALYLD"]:
+    for grp in ["GOLD", "DXY", "SILVER", "BTC", "US10Y", "OIL", "BRENT", "REALYLD"]:
         got = hits.get(grp, [])
         mark = "✅" if got else "❌"
         print(f"   {mark} {grp:8s}: {', '.join(got) if got else '— ไม่พบ —'}")
@@ -129,7 +130,7 @@ def main():
 
     # ตัวขับที่จะเทียบ (เอาตัวแรกของแต่ละกลุ่มที่เจอ)
     drivers = []
-    for grp in ["DXY", "SILVER", "US10Y", "OIL", "BRENT"]:
+    for grp in ["DXY", "SILVER", "BTC", "US10Y", "OIL", "BRENT"]:
         if hits.get(grp):
             drivers.append((grp, hits[grp][0]))
     if not drivers:
