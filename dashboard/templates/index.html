@@ -1675,6 +1675,36 @@
       </div>
     </section>
 
+    <!-- GOLD REGIME CONTEXT — deep-research interpretation of macro_strip (display-only, computed-in-code, 0 API)
+         drivers ผกผันกับทอง (DXY/10Y/real-yield ลง = หนุนทอง). regime/context filter ไม่ใช่ intraday signal. -->
+    <section id="gold-regime-section" style="margin-bottom:10px">
+      <div style="border:1px solid var(--border2,#2a3142);border-left:3px solid var(--gold,#F4C430);border-radius:8px;padding:8px 14px;font-family:var(--mono);font-size:11px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:7px">
+          <span style="color:var(--gold,#F4C430);font-weight:700;letter-spacing:1px;flex-shrink:0">GOLD REGIME</span>
+          <span id="gold-tilt-badge" style="padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:0.5px;background:var(--muted2,#3D4456);color:var(--muted,#6B7488)">—</span>
+          <span style="margin-left:auto;color:var(--muted,#6B7488);font-size:9px;letter-spacing:0.3px">context filter · not an entry signal</span>
+        </div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap">
+          <span class="regime-tile" id="rt-dxy" style="display:flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--muted2,#3D4456);border-radius:6px">
+            <span style="color:var(--muted,#6B7488);text-transform:uppercase;font-size:9px;letter-spacing:0.5px">DXY (USD)</span>
+            <span class="rt-effect" style="font-weight:600;font-size:10px;color:var(--muted,#6B7488)">—</span>
+          </span>
+          <span class="regime-tile" id="rt-y10" style="display:flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--muted2,#3D4456);border-radius:6px">
+            <span style="color:var(--muted,#6B7488);text-transform:uppercase;font-size:9px;letter-spacing:0.5px">10Y YIELD</span>
+            <span class="rt-effect" style="font-weight:600;font-size:10px;color:var(--muted,#6B7488)">—</span>
+          </span>
+          <span class="regime-tile" id="rt-real" style="display:flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--muted2,#3D4456);border-radius:6px">
+            <span style="color:var(--muted,#6B7488);text-transform:uppercase;font-size:9px;letter-spacing:0.5px">REAL YIELD <span style="color:#C9843E" title="ความสัมพันธ์อ่อนลงหลัง 2022 (central-bank buying กลบ) — deep research">⚠</span></span>
+            <span class="rt-effect" style="font-weight:600;font-size:10px;color:var(--muted,#6B7488)">—</span>
+          </span>
+        </div>
+        <div style="color:var(--muted,#6B7488);font-size:9px;margin-top:7px;line-height:1.45">
+          drivers ผกผันกับทอง (ลง = หนุนทอง). <b style="color:var(--text-dim,#9aa3b8)">coincident/regime context — ไม่ใช่ intraday lead</b>
+          (deep research: DXY-นำ-ทอง ถูก refute). regime-unstable: real-yield link อ่อนหลัง 2022. sens ~+1.75% ต่อ −25bp 10Y (WGC).
+        </div>
+      </div>
+    </section>
+
     <!-- PRICE CHART + AI ZONES OVERLAY (07-03) -->
     <section>
       <div class="section-title" style="display:flex;align-items:center">
@@ -5427,6 +5457,35 @@ async function loadMacroStrip() {
       updEl.textContent = data.updated
         ? 'Updated: ' + data.updated.slice(0, 10)
         : 'No data — run scripts/fetch_macro_strip.py';
+    }
+
+    // ── GOLD REGIME CONTEXT (deep-research interpretation, computed-in-code, 0 API) ──
+    // drivers ผกผันกับทอง: chg < 0 (ตัวขับลง) => tailwind (หนุนทอง) ; chg > 0 => headwind
+    function _goldEffect(chg) {
+      if (chg === null || chg === undefined) return { txt: '—', tilt: 0, color: 'var(--muted,#6B7488)' };
+      if (chg < -0.0001) return { txt: '▼ tailwind', tilt: 1,  color: 'var(--green,#26C281)' };
+      if (chg >  0.0001) return { txt: '▲ headwind', tilt: -1, color: 'var(--red,#E94560)' };
+      return { txt: '→ neutral', tilt: 0, color: 'var(--muted,#6B7488)' };
+    }
+    function _setTile(id, chg) {
+      const eff = _goldEffect(chg);
+      const el = document.querySelector('#' + id + ' .rt-effect');
+      if (el) { el.textContent = eff.txt; el.style.color = eff.color; }
+      return eff.tilt;
+    }
+    let _tilt = 0;
+    _tilt += _setTile('rt-dxy',  dxy ? dxy.chg : null);
+    _tilt += _setTile('rt-y10',  y10 ? y10.chg : null);
+    _tilt += _setTile('rt-real', ry  ? ry.chg  : null);
+    const badge = document.getElementById('gold-tilt-badge');
+    if (badge) {
+      let label, bg, fg;
+      if (_tilt >= 2)       { label = 'BULLISH context'; bg = 'rgba(38,194,129,0.18)'; fg = 'var(--green,#26C281)'; }
+      else if (_tilt <= -2) { label = 'BEARISH context'; bg = 'rgba(233,69,96,0.18)';  fg = 'var(--red,#E94560)'; }
+      else                  { label = 'MIXED context';   bg = 'var(--muted2,#3D4456)'; fg = 'var(--text-dim,#9aa3b8)'; }
+      badge.textContent = label;
+      badge.style.background = bg;
+      badge.style.color = fg;
     }
   } catch (e) {
     console.error('loadMacroStrip error:', e);
