@@ -68,6 +68,29 @@ PENDING_TYPE_MAP = {
 }
 
 
+def _apply_regime_sizing(lot: float) -> float:
+    """Regime-aware vol-target sizing (flag REGIME_SIZING, user-approved 2026-07-18):
+    ลด lot ตอน RISK-OFF (vol สูง) = ลด risk-of-ruin. NEUTRAL/RISK-ON ไม่แตะ (pure reduction).
+    อ่าน data/risk_regime_now.json fail-soft — error/flag OFF → lot เดิม (0 behavior change)."""
+    if not getattr(_cfg, "REGIME_SIZING", False):
+        return lot
+    try:
+        import json as _json
+        import os as _os
+        p = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+                          "data", "risk_regime_now.json")
+        with open(p, encoding="utf-8") as f:
+            regime = (_json.load(f) or {}).get("regime")
+        if regime == "RISK-OFF":
+            scale = max(0.1, min(1.0, getattr(_cfg, "REGIME_OFF_SCALE", 0.5)))
+            new = round(lot * scale, 2)
+            logger.warning(f"[REGIME_SIZING] RISK-OFF → lot {lot} × {scale} = {new} (ลด risk-of-ruin)")
+            return new
+    except Exception as e:  # noqa: BLE001
+        logger.debug(f"[REGIME_SIZING] fail-soft: {e}")
+    return lot
+
+
 def calculate_lot_size(account_balance: float, sl_pips: float,
                        confidence_scale: float = 1.0) -> float:
     """คำนวณ lot size โดยปรับตาม confidence_scale (0.5–1.0)
@@ -92,6 +115,7 @@ def calculate_lot_size(account_balance: float, sl_pips: float,
             risk_amount = _max_risk
         lot = round(risk_amount / (sl_pips * pip_value_lot), 2)
 
+    lot = _apply_regime_sizing(lot)   # regime-aware vol-target sizing (flag REGIME_SIZING)
     clamped = max(_cfg.MIN_LOT, min(lot, _cfg.MAX_LOT))
     actual_risk = clamped * sl_pips * pip_value_lot if _cfg.LOT_MODE != "fixed" else 0
     if _cfg.LOT_MODE != "fixed":

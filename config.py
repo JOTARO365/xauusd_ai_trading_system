@@ -331,6 +331,13 @@ LESSON_LEARNING = os.getenv("LESSON_LEARNING", "true").lower() != "false"
 # ── DRY_RUN mode — mock MT5 execution, log "would have placed" ─
 DRY_RUN = os.getenv("DRY_RUN", "false").lower() == "true"
 
+# ── Regime-aware vol-target sizing (user-approved 2026-07-18) ─
+# ลด lot ตอน RISK-OFF (vol สูง, ทองอ่อน −10%/yr) = ลด risk-of-ruin (ช่วย survival). ไม่แตะ direction/gate.
+# อ่าน data/risk_regime_now.json (scripts/fetch_risk_regime.py). OFF = 0 behavior change; เปิดผ่าน .env.
+# = pure risk-reduction (regime validated ทำนาย forward vol) ไม่ใช่ directional edge.
+REGIME_SIZING    = os.getenv("REGIME_SIZING", "false").lower() == "true"
+REGIME_OFF_SCALE = float(os.getenv("REGIME_OFF_SCALE", "0.5"))   # RISK-OFF → lot × ค่านี้
+
 # ── NNLB mode (No-Risk-No-Lamborghini) ───────────────────────
 # true  = ข้าม money management / gates ทั้งหมด — lot scale ตาม equity tier
 # false = ปกติ (แนะนำ)
