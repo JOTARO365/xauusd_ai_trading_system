@@ -23,6 +23,7 @@ _SCRIPTS = [
     ("build_event_scenarios.py",  60),
     ("review_calibration.py",     60),
     ("fetch_macro_strip.py",     120),   # AlphaVantage REST (โควตาฟรี)
+    ("fetch_regime_extra.py",     60),   # Yahoo VIX + gold/silver ratio (ฟรี, ไม่ต้อง key)
     ("fetch_cot.py",             120),   # CFTC public
     ("report_ride_cohort.py",     90),   # MT5
     ("report_news_gate.py",       90),   # MT5
