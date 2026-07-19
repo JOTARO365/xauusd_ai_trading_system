@@ -158,6 +158,12 @@ GUARDIAN_INTERVAL_SEC = int(os.getenv("GUARDIAN_INTERVAL_SEC") or 4)     # poll 
 SPECIALIST_SHADOW     = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
 SPECIALIST_ENABLED    = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"
 
+# REGIME_SHADOW = minimal-AI regime router (deterministic entry design ใหม่) รัน SHADOW: log ว่า
+# "จะเข้าไม้ไหน" ต่อ H1 bar → logs/regime_shadow.jsonl. 0 LLM, 0 order, return {} (ไม่แตะ decision).
+# *** DEFAULT OFF *** — entry algos P2-พิสูจน์ −EV; เก็บ track record live-forward ก่อน validate/flip.
+# ดู docs/DESIGN_regime_shadow.md. Kill switch = REGIME_SHADOW=false (live-reload).
+REGIME_SHADOW         = os.getenv("REGIME_SHADOW", "false").lower() == "true"
+
 # ZRE = Zone Re-Entry RR≥2 (v2 fixed-SL). วาง LIMIT ดักเด้งที่โซนเกรดสูงเชิงรุก (RR≥2, SL คงที่).
 # เกราะสุด (replay 2026-07-16): trend-align-only (ตัด SIDEWAYS ที่ replay ขาดทุน −0.6R),
 # grade A/B + score≥ZRE_MIN_SCORE, สด ≤ZRE_MAX_BARS_SINCE, ในระยะ ZRE_PROXIMITY_PCT%,
@@ -246,9 +252,10 @@ def reload_config():
     TREND_CONT_MAX_DIST_PCT  = float(os.getenv("TREND_CONT_MAX_DIST_PCT") or 0.3)
     NNLB_FASTPATH            = os.getenv("NNLB_FASTPATH", "true").lower() != "false"
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
-    global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT
+    global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT, REGIME_SHADOW
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
     SPECIALIST_ENABLED       = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"
+    REGIME_SHADOW            = os.getenv("REGIME_SHADOW", "false").lower() == "true"
 
     global ZONE_REENTRY_ENABLED, ZONE_REENTRY_SHADOW, ZRE_MIN_SCORE, ZRE_MAX_BARS_SINCE
     global ZRE_PROXIMITY_PCT, ZRE_TREND_ALIGN_ONLY, ZRE_MAX_CONCURRENT

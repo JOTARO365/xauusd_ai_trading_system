@@ -380,6 +380,23 @@ def node_specialist(state: TradingState) -> dict:
         return {}
 
 
+def node_regime_shadow(state: TradingState) -> dict:
+    """Minimal-AI regime router — SHADOW capture (flag REGIME_SHADOW). fetch H1 bars เอง
+    (regime engine ต้องการ OHLC arrays ไม่ใช่ chart_data) → regime_lib.route() → log ว่า "จะเข้าไม้ไหน".
+    0 LLM, 0 order, return {} (ไม่แตะ decision). flag OFF (default) = passthrough. ดู docs/DESIGN_regime_shadow.md."""
+    import config as _cfg
+    if not getattr(_cfg, "REGIME_SHADOW", False):
+        return {}
+    try:
+        from agents.regime_shadow import run_regime_shadow
+        rec = run_regime_shadow()
+        if rec:
+            logger.info(f"[REGIME-SHADOW] {rec['regime']} sig={rec.get('signal')}")
+    except Exception as e:
+        logger.error(f"[GRAPH:regime_shadow] {e}")
+    return {}
+
+
 # ── Routing ────────────────────────────────────────────────────────────────────
 
 def route_entry(state: TradingState) -> str:
@@ -413,6 +430,7 @@ def build_trading_graph():
     g.add_node("_entry",        node_entry)
     g.add_node("chart",         node_chart)
     g.add_node("specialist",    node_specialist)
+    g.add_node("regime_shadow", node_regime_shadow)
     g.add_node("advisor",       node_advisor)
     g.add_node("news",          node_news)
     g.add_node("analyst",       node_analyst)
@@ -426,8 +444,9 @@ def build_trading_graph():
         "chart":         "chart",
         "position_mgmt": "position_mgmt",
     })
-    g.add_edge("chart",      "specialist")
-    g.add_edge("specialist", "advisor")
+    g.add_edge("chart",         "specialist")
+    g.add_edge("specialist",    "regime_shadow")
+    g.add_edge("regime_shadow", "advisor")
     g.add_conditional_edges("advisor", route_after_advisor, {
         "news":          "news",
         "position_mgmt": "position_mgmt",   # net_degraded: ยังต้องดูแลไม้ก่อนจบ cycle
