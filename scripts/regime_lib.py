@@ -141,7 +141,7 @@ def detect_regime(er, adx_v, volpct):
     return "NEUTRAL"
 
 
-REGIME_ALGO = {"TREND": "momentum_breakout"}   # RANGE→STAND-DOWN (mean_reversion ตัด: P2 OOS −EV). ONE ต่อ regime
+REGIME_ALGO = {"TREND": "momentum_breakout"}   # display/analytics map (sync กับ STRATEGIES ด้านล่าง)
 
 
 # ─────────────────────────── algorithm library (EXECUTION — deterministic, ONE/regime) ───────────────────────────
@@ -183,15 +183,28 @@ def algo_mean_reversion(i, close, atr_v):
             "max_hold_bars": max(1, round(TIME_STOP_K * hl))}   # OU time-stop: ไม่ revert ใน ~3×half-life → thesis ตาย (≥1 bar)
 
 
+# ── strategy registry: regime → กลยุทธ์ที่เหมาะ (เลือกกลยุทธ์+เครื่องมือให้เหมาะแต่ละสภาพตลาด) ──
+# แต่ละ strategy รับ context ครบ (high/low/close/atr/er/adx/volpct) → ใช้ "เครื่องมือ" ไหนก็ได้ที่เหมาะ regime นั้น.
+# เพิ่มกลยุทธ์ต่อ regime ได้ที่นี่ — แต่ **ต้องผ่าน gauntlet (backtest OOS+null) ก่อน** ค่อยเสียบเข้า routing จริง.
+# validated ปัจจุบัน: TREND→momentum เท่านั้น. RANGE/RISK-OFF/NEUTRAL = STAND-DOWN จนเจอกลยุทธ์ที่ผ่าน (mean_rev ตัดแล้ว).
+def _strat_momentum(i, high, low, close, atr_v, er, adx_v, volpct):
+    return algo_momentum_breakout(i, high, low, close, atr_v)
+
+
+STRATEGIES = {
+    "TREND": _strat_momentum,
+    # "RANGE":    _strat_xxx,   # รอกลยุทธ์ range ใหม่ผ่าน gauntlet (mean_reversion −EV แล้ว)
+    # "RISK-OFF": _strat_xxx,   # รอกลยุทธ์ป้องกัน/vol ที่ผ่าน
+    # "NEUTRAL":  _strat_xxx,
+}
+
+
 def route(i, high, low, close, atr_v, er, adx_v, volpct):
-    """SELECTION: regime → ONE algo → signal|STAND-DOWN. (AI จะเลือก regime แทน rule นี้ใน P3)."""
+    """SELECTION: regime → กลยุทธ์ที่เหมาะ (STRATEGIES) → signal | STAND-DOWN.
+    (P3: AI/sentiment จากข่าวจะช่วยเลือก regime แทน detect_regime แบบ rule)."""
     regime = detect_regime(er[i], adx_v[i], volpct[i])
-    algo = REGIME_ALGO.get(regime)
-    if algo == "momentum_breakout":
-        return regime, algo_momentum_breakout(i, high, low, close, atr_v)
-    if algo == "mean_reversion":
-        return regime, algo_mean_reversion(i, close, atr_v)
-    return regime, None       # RISK-OFF / NEUTRAL / WARMUP = STAND-DOWN
+    strat = STRATEGIES.get(regime)
+    return regime, (strat(i, high, low, close, atr_v, er, adx_v, volpct) if strat else None)
 
 
 # ─────────────────────────── demo / sanity-check (ยังไม่ใช่ validation) ───────────────────────────
