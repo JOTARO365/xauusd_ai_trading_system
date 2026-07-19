@@ -3145,7 +3145,7 @@ function renderPage() {
       <td>${analysisHtml}</td>
       <td class="num">${fmtPnl(t.pnl)}</td>
       <td>${closeReasonHtml}</td>
-      <td class="center"><span class="badge badge-${status}">${t.status || '—'}</span> ${result}${t.status === 'OPEN' && t.ticket ? `<button onclick="closePosition(${t.ticket}, ${t.pnl || 0})" style="margin-left:6px;padding:4px 9px;font-size:10px;background:var(--red);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--mono);letter-spacing:0.5px">✕ Close</button>` : ''}</td>
+      <td class="center"><span class="badge badge-${status}">${t.status || '—'}</span> ${result}${t.status === 'OPEN' && t.ticket ? `<button onclick="modifyPosition(${t.ticket})" style="margin-left:6px;padding:4px 9px;font-size:10px;background:var(--gold);color:#111;border:none;border-radius:4px;cursor:pointer;font-family:var(--mono)">✎ SL/TP</button><button onclick="closePosition(${t.ticket}, ${t.pnl || 0})" style="margin-left:4px;padding:4px 9px;font-size:10px;background:var(--red);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--mono);letter-spacing:0.5px">✕ Close</button>` : ''}</td>
     </tr>`;
   }).join('');
 }
@@ -3164,6 +3164,22 @@ async function closePosition(ticket, pnl) {
     const j = await res.json();
     if (j.ok) { alert(`✅ ปิดแล้ว #${ticket}\nP/L: ${j.closed_pnl} THB`); fetchData(); }
     else alert('❌ ปิดไม่สำเร็จ: ' + (j.error || 'unknown'));
+  } catch (e) { alert('error: ' + e.message); }
+}
+
+async function modifyPosition(ticket) {
+  const sl = prompt(`ปรับ SL ของ #${ticket} (ราคา; 0 = ไม่ตั้ง)`);
+  if (sl === null) return;
+  const tp = prompt(`ปรับ TP ของ #${ticket} (ราคา; 0 = ไม่ตั้ง)`);
+  if (tp === null) return;
+  try {
+    const res = await fetch('/api/modify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticket, sl: parseFloat(sl) || 0, tp: parseFloat(tp) || 0 })
+    });
+    const j = await res.json();
+    if (j.ok) { alert(`✅ ปรับแล้ว #${ticket}\nSL: ${j.sl}  TP: ${j.tp}`); fetchData(); }
+    else alert('❌ ปรับไม่สำเร็จ: ' + (j.error || 'unknown'));
   } catch (e) { alert('error: ' + e.message); }
 }
 
