@@ -2046,6 +2046,8 @@
       </div>
       <div class="section-title" style="margin-top:14px">สรุปรายสัปดาห์ (shadow)</div>
       <div id="ra-weekly" style="font-size:12px;font-family:var(--mono);color:var(--muted)">—</div>
+      <div class="section-title" style="margin-top:14px">Live Monitor — ALGO trades จริง (N-gauge + decay)</div>
+      <div id="ra-monitor" style="font-size:12px;font-family:var(--mono);color:var(--muted)">—</div>
       <div id="ra-updated" style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-top:8px">—</div>
     </section>
 
@@ -3869,6 +3871,20 @@ async function loadRegimeAnalytics() {
     if (up) up.textContent = d.generated
       ? 'Updated: ' + d.generated.slice(0, 16).replace('T', ' ') + ' UTC · ' + (d.historical ? d.historical.bars : 0) + ' bars, cost ' + (d.historical ? d.historical.cost_pips : 0) + 'p (intrabar, net)'
       : '';
+    // Live monitor (N-gauge + decay) จากผล ALGO trades จริง
+    try {
+      const mr = await (await fetch('/api/regime-monitor')).json();
+      const mel = document.getElementById('ra-monitor');
+      if (mel) {
+        if (!mr.ok) { mel.textContent = mr.error || 'no data'; }
+        else {
+          const dec = mr.decay && mr.decay.decaying;
+          const col = dec ? 'var(--red)' : ((mr.n || 0) >= 389 ? 'var(--green)' : 'var(--muted)');
+          mel.innerHTML = `<span style="color:${col};font-weight:600">${mr.verdict || ''}</span>` +
+            ((mr.n || 0) ? `<br>N=${mr.n} · WR=${((mr.wr || 0) * 100).toFixed(0)}% · expR=${mr.exp_R != null ? mr.exp_R : '—'} · PnL=${mr.pnl || 0}฿` : '');
+        }
+      }
+    } catch (_e) {}
   } catch (e) {
     const tb = document.getElementById('ra-tbody');
     if (tb) tb.innerHTML = '<tr><td colspan="8" style="padding:8px;color:var(--muted)">' + e.message + '</td></tr>';

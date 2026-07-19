@@ -1093,6 +1093,20 @@ def api_ride_stats():
     return jsonify(_cached("ride-stats", _compute, ttl=60))
 
 
+@app.route("/api/regime-monitor")
+def api_regime_monitor():
+    """weekly monitor ของ algo-live (N-gauge + decay) — pass-through data/regime_monitor.json
+    (precompute by scripts/regime_monitor.py จากผล ALGO trades จริงใน MT5). 0 LLM."""
+    try:
+        p = os.path.join(_BASE, "../data/regime_monitor.json")
+        with open(p, "r", encoding="utf-8") as f:
+            return jsonify({"ok": True, **json.load(f)})
+    except FileNotFoundError:
+        return jsonify({"ok": False, "error": "ยังไม่ได้รัน scripts/regime_monitor.py (หรือยังไม่มีไม้ ALGO)"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
+
 @app.route("/api/regime-analytics")
 def api_regime_analytics():
     """สรุป regime router (Analytics tab): regime ไหนของทองเหมาะ algo ไหน + score + weekly.
