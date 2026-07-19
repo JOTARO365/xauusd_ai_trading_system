@@ -45,6 +45,22 @@ finding session นี้: (ก) LLM confidence **ไม่ informative** เร
    EV GATE → SIZING → EXIT → EXECUTION  (ทั้งหมด deterministic)
 ```
 
+## 2.5 Execution model — 3 timescales (user directive 2026-07-19)
+แยกความถี่การทำงานตาม cost/latency — นี่คือผลลัพธ์ตรงของ minimal-AI (entry ไม่พึ่ง LLM → รัน realtime ได้):
+
+| timescale | ทำอะไร | ความถี่ | ใช้ LLM? |
+|-----------|--------|---------|---------|
+| **1. Sentiment (SELECTION context)** | LLM อ่านข่าว → sentiment → เขียน regime/sentiment **cache** | **เฉพาะตอนมีโพส/ข่าวใหม่** (event-driven) | ✅ (รันน้อยมาก) |
+| **2. Regime + algo levels** | ER/ADX/vol + Donchian levels / z-score bands / ATR SL-TP | ต่อ **แท่งปิด** (M15/H1) | ❌ deterministic |
+| **3. Entry trigger (EXECUTION)** | เช็คเงื่อนไขเข้า (ราคาทะลุ level / z-score เกิน) → algo → trade | **ทุกติ๊ก (REALTIME)** | ❌ deterministic |
+
+**flow:** `[ข่าวใหม่] → LLM → sentiment/regime cache`  ‖  `[แท่งปิด] → regime + algo levels`  ‖  `[ทุกติ๊ก] → เช็ค trigger → algo → trade`
+
+**ผลลัพธ์:**
+- **LLM แพง/ช้า → รันเฉพาะข่าวใหม่** = token cost ต่ำสุด (จ่ายต่อข่าว ไม่ใช่ต่อ cycle/ไม้)
+- **algo ถูก/เร็ว → รันทุกติ๊ก** = **entry realtime** (ดีกว่า design เดิมที่ช้าเพราะรอ LLM ทุก cycle)
+- fast loop (per-tick) อ่าน **cache** ของ sentiment/regime (จาก LLM ครั้งล่าสุด) — ไม่เรียก LLM เอง
+
 ## 3. Components
 
 ### 3.1 AI regime/context layer (= minimal AI, จุดเดียว)

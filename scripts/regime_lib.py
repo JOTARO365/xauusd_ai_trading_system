@@ -40,6 +40,8 @@ ATR_WIN, ATR_SL, RR = 14, 1.5, 2.0
 MR_WIN = 20                         # mean-reversion window
 S_ENTRY = 1.25                      # Avellaneda s-score entry (verified 3-0)
 MR_HALFLIFE_MAX = 10               # OU gate: half-life < 1/2 window (Avellaneda: reversion เร็วพอ)
+S_STOP = 2.5                       # zone-based SL: วางเลย band ที่ S_STOP·std (กัน stop-hunt — QTA S/R zone)
+TIME_STOP_K = 3                    # OU time-stop: max-hold = TIME_STOP_K × half-life bars (QTA stop-loss model 6)
 # regime thresholds
 ADX_TREND, ADX_RANGE = 25.0, 20.0
 ER_TREND, ER_RANGE = 0.35, 0.25
@@ -57,11 +59,15 @@ def efficiency_ratio(close, n=ER_WIN):
 
 
 def atr(high, low, close, n=ATR_WIN):
+    """Wilder ATR (RMA smoothing = นิยามมาตรฐาน "ATR(14)"; สอดคล้องกับ adx() ที่ Wilder-smooth TR ภายใน).
+    (เดิมใช้ simple-mean = "โมเดลดินเหนียว" ที่คอร์ส QTA วิจารณ์ + inconsistent กับ adx เราเอง)."""
     tr = np.maximum(high[1:] - low[1:], np.maximum(abs(high[1:] - close[:-1]), abs(low[1:] - close[:-1])))
-    tr = np.concatenate([[np.nan], tr])
+    tr = np.concatenate([[np.nan], tr])                # tr[0]=nan, tr[i]=TR ของ bar i (i≥1)
     out = np.full(len(close), np.nan)
-    for i in range(n, len(close)):
-        out[i] = np.nanmean(tr[i - n + 1:i + 1])
+    if len(close) > n:
+        out[n] = np.nanmean(tr[1:n + 1])               # seed = simple mean ของ n TR แรก
+        for i in range(n + 1, len(close)):
+            out[i] = (out[i - 1] * (n - 1) + tr[i]) / n  # Wilder RMA
     return out
 
 
@@ -155,7 +161,8 @@ def algo_mean_reversion(i, close, atr_v):
     if i < MR_WIN or np.isnan(atr_v[i]) or atr_v[i] == 0:
         return None
     w = close[i - MR_WIN + 1:i + 1]
-    if ou_halflife(w) > MR_HALFLIFE_MAX:               # gate: reversion เร็วพอเท่านั้น
+    hl = ou_halflife(w)
+    if hl > MR_HALFLIFE_MAX:                            # gate: reversion เร็วพอเท่านั้น
         return None
     m, sd = w.mean(), w.std()
     if sd == 0:
@@ -164,9 +171,14 @@ def algo_mean_reversion(i, close, atr_v):
     d = "BUY" if s < -S_ENTRY else ("SELL" if s > S_ENTRY else None)
     if d is None:
         return None
-    sl_pips = round(ATR_SL * atr_v[i] / POINT)
-    tp_pips = max(round(abs(close[i] - m) / POINT), sl_pips)   # TP = กลับสู่ mean
-    return {"algo": "mean_reversion", "dir": d, "s": round(float(s), 2), "sl_pips": sl_pips, "tp_pips": tp_pips}
+    # zone-based SL: วางเลย band ที่ S_STOP·std (entry ที่ z-extreme คือเป้า stop-hunt), floor ด้วย ATR กันแคบเกิน
+    sl_price = m - S_STOP * sd if d == "BUY" else m + S_STOP * sd
+    atr_floor = round(ATR_SL * atr_v[i] / POINT)
+    sl_pips = max(round(abs(close[i] - sl_price) / POINT), atr_floor)
+    tp_pips = max(round(abs(close[i] - m) / POINT), atr_floor)             # TP = กลับสู่ mean
+    return {"algo": "mean_reversion", "dir": d, "s": round(float(s), 2),
+            "sl_pips": sl_pips, "tp_pips": tp_pips,
+            "max_hold_bars": max(1, round(TIME_STOP_K * hl))}   # OU time-stop: ไม่ revert ใน ~3×half-life → thesis ตาย (≥1 bar)
 
 
 def route(i, high, low, close, atr_v, er, adx_v, volpct):
