@@ -1093,6 +1093,20 @@ def api_ride_stats():
     return jsonify(_cached("ride-stats", _compute, ttl=60))
 
 
+@app.route("/api/regime-analytics")
+def api_regime_analytics():
+    """สรุป regime router (Analytics tab): regime ไหนของทองเหมาะ algo ไหน + score + weekly.
+    Pass-through data/regime_analytics.json (precompute by scripts/regime_analytics.py — 0 LLM)."""
+    try:
+        p = os.path.join(_BASE, "../data/regime_analytics.json")
+        with open(p, "r", encoding="utf-8") as f:
+            return jsonify({"ok": True, **json.load(f)})
+    except FileNotFoundError:
+        return jsonify({"ok": False, "error": "ยังไม่ได้รัน scripts/regime_analytics.py"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
+
 _TF_MAP = {}
 if _MT5_AVAILABLE:
     _TF_MAP = {"M15": mt5.TIMEFRAME_M15, "H1": mt5.TIMEFRAME_H1,

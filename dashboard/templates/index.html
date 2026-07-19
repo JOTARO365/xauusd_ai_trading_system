@@ -2018,6 +2018,24 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-backtest">
 
+    <!-- REGIME ROUTER ANALYTICS — regime ไหนของทองเหมาะ algo ไหน + score + weekly (scripts/regime_analytics.py) -->
+    <section id="regime-analytics-section" style="margin-bottom:18px">
+      <div class="section-title">Regime Router — สภาพตลาดทอง × กลยุทธ์ + Score</div>
+      <div id="ra-verdict" style="font-size:12px;font-family:var(--mono);color:var(--muted);margin:6px 0 10px">—</div>
+      <div style="overflow-x:auto">
+        <table id="ra-table" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
+          <thead><tr style="text-align:right;color:var(--muted);border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:4px 8px">Regime</th><th style="text-align:left">Algo</th>
+            <th>ทองอยู่สภาพนี้</th><th>N</th><th>WR</th><th>Expectancy</th><th>Score</th><th>Grade</th>
+          </tr></thead>
+          <tbody id="ra-tbody"><tr><td colspan="8" style="padding:8px;color:var(--muted)">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="section-title" style="margin-top:14px">สรุปรายสัปดาห์ (shadow)</div>
+      <div id="ra-weekly" style="font-size:12px;font-family:var(--mono);color:var(--muted)">—</div>
+      <div id="ra-updated" style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-top:8px">—</div>
+    </section>
+
     <!-- SUMMARY -->
     <section>
       <div class="section-title">Analytics Overview</div>
@@ -3194,7 +3212,7 @@ function switchTab(name) {
   if (name === 'settings')   loadConfig();
   if (name === 'accounting') loadAccounting();
   if (name === 'monitor')    loadMonitor();
-  if (name === 'backtest')   loadBacktest();
+  if (name === 'backtest') { loadBacktest(); loadRegimeAnalytics(); }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -3786,6 +3804,51 @@ async function loadBurn() {
 /* ════════════════════════════════════════════════════════════
    CALIBRATION CARD — §3.5 /api/calibration
    ════════════════════════════════════════════════════════════ */
+async function loadRegimeAnalytics() {
+  try {
+    const res = await fetch('/api/regime-analytics');
+    const d   = await res.json();
+    const tb  = document.getElementById('ra-tbody');
+    const vv  = document.getElementById('ra-verdict');
+    if (!d.ok) { if (tb) tb.innerHTML = '<tr><td colspan="8" style="padding:8px;color:var(--muted)">' + (d.error || 'no data') + '</td></tr>'; return; }
+    if (vv) vv.textContent = '⚖ ' + (d.verdict || '');
+    const gcol = g => g === 'A' ? 'var(--green)' : (g === 'B' ? 'var(--gold)' : (g === 'C' ? 'var(--red)' : 'var(--muted)'));
+    const rows = (d.historical && d.historical.regimes) || [];
+    if (tb) tb.innerHTML = rows.map(r => {
+      const wr = r.wr != null ? (r.wr * 100).toFixed(1) + '%' : '—';
+      const ex = r.exp_R != null ? (r.exp_R >= 0 ? '+' : '') + r.exp_R.toFixed(3) + 'R' : '—';
+      const sc = r.score != null ? r.score : '—';
+      const exCol = r.exp_R != null ? (r.exp_R >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--muted)';
+      return `<tr style="text-align:right;border-bottom:1px solid var(--border)">
+        <td style="text-align:left;padding:4px 8px;font-weight:600">${r.regime}</td>
+        <td style="text-align:left;color:var(--muted)">${r.algo}</td>
+        <td>${r.freq_pct}%</td><td>${r.n || '—'}</td><td>${wr}</td>
+        <td style="color:${exCol}">${ex}</td>
+        <td style="font-weight:600">${sc}</td>
+        <td style="color:${gcol(r.grade)};font-weight:700">${r.grade}</td></tr>`;
+    }).join('');
+    const wk = d.weekly || {};
+    const wl = document.getElementById('ra-weekly');
+    if (wl) {
+      if (!wk.weeks || !wk.weeks.length) {
+        wl.textContent = wk.note || 'ยังไม่มี shadow data';
+      } else {
+        wl.innerHTML = wk.weeks.map(w => {
+          const parts = Object.keys(w).filter(k => k !== 'week').map(k => `${k}:${w[k].bars}b/${w[k].signals}s`).join('  ');
+          return `<div>${w.week} — ${parts}</div>`;
+        }).join('');
+      }
+    }
+    const up = document.getElementById('ra-updated');
+    if (up) up.textContent = d.generated
+      ? 'Updated: ' + d.generated.slice(0, 16).replace('T', ' ') + ' UTC · ' + (d.historical ? d.historical.bars : 0) + ' bars, cost ' + (d.historical ? d.historical.cost_pips : 0) + 'p (intrabar, net)'
+      : '';
+  } catch (e) {
+    const tb = document.getElementById('ra-tbody');
+    if (tb) tb.innerHTML = '<tr><td colspan="8" style="padding:8px;color:var(--muted)">' + e.message + '</td></tr>';
+  }
+}
+
 async function loadCalibration() {
   try {
     const res  = await fetch('/api/calibration');
