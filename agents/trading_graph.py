@@ -260,6 +260,14 @@ def node_position_mgmt(state: TradingState) -> dict:
                           f"SL={_r['signal']['sl_pips']}p TP={_r['signal']['tp_pips']}p")
     except Exception as _ae:
         logger.error(f"[GRAPH:regime_executor] {_ae}")
+    # REGIME_PENDING: algo วาง pending straddle ล่วงหน้า (safety cancel + MAX_OPEN guard ในตัว). fail-soft.
+    try:
+        from agents.regime_pending import manage_algo_pending
+        _p = manage_algo_pending()
+        if _p:
+            print_warning(f"[ALGO-PENDING] วาง {_p} pending straddle ที่ Donchian level")
+    except Exception as _pe:
+        logger.error(f"[GRAPH:regime_pending] {_pe}")
     return {}
 
 

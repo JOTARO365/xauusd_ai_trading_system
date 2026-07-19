@@ -51,6 +51,8 @@ def _tick() -> None:
     """เรียกทุก interval. เช็คราคา vs level → เข้า order ถ้าทะลุ. fail-soft (thread ต้องไม่ตาย)."""
     if not (getattr(config, "REGIME_LIVE", False) and getattr(config, "REGIME_LIVE_TICK", False)):
         return
+    if getattr(config, "REGIME_PENDING", False):        # pending mode จัดการ entry แล้ว → tick ไม่เข้าซ้ำ
+        return
     global _last_traded_hour
     try:
         import MetaTrader5 as mt5

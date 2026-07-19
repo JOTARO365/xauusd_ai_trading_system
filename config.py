@@ -177,6 +177,12 @@ REGIME_LIVE           = os.getenv("REGIME_LIVE", "false").lower() == "true"
 REGIME_LIVE_TICK      = os.getenv("REGIME_LIVE_TICK", "false").lower() == "true"
 REGIME_TICK_INTERVAL_SEC = int(os.getenv("REGIME_TICK_INTERVAL_SEC") or 3)
 
+# REGIME_PENDING = algo วาง STOP order ล่วงหน้าที่ Donchian level (straddle: BUY_STOP@high + SELL_STOP@low)
+# แทน market entry — MT5 fill เองตอนราคาแตะ. refresh ต่อ H1 bar. mode ที่ 3 (market executors ปิดเมื่อเปิดตัวนี้).
+# safety: มีไม้ ALGO เปิด → cancel pending ที่เหลือทุก cycle (กัน whipsaw fill 2 ทาง). ต้องมี REGIME_LIVE=true.
+# ⚠️ LIVE MONEY — default OFF. kill = REGIME_PENDING=false.
+REGIME_PENDING        = os.getenv("REGIME_PENDING", "false").lower() == "true"
+
 # ZRE = Zone Re-Entry RR≥2 (v2 fixed-SL). วาง LIMIT ดักเด้งที่โซนเกรดสูงเชิงรุก (RR≥2, SL คงที่).
 # เกราะสุด (replay 2026-07-16): trend-align-only (ตัด SIDEWAYS ที่ replay ขาดทุน −0.6R),
 # grade A/B + score≥ZRE_MIN_SCORE, สด ≤ZRE_MAX_BARS_SINCE, ในระยะ ZRE_PROXIMITY_PCT%,
@@ -266,13 +272,14 @@ def reload_config():
     NNLB_FASTPATH            = os.getenv("NNLB_FASTPATH", "true").lower() != "false"
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
     global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT, REGIME_SHADOW
-    global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC
+    global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
     SPECIALIST_ENABLED       = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"
     REGIME_SHADOW            = os.getenv("REGIME_SHADOW", "false").lower() == "true"
     REGIME_LIVE              = os.getenv("REGIME_LIVE", "false").lower() == "true"       # kill switch live-reload
     REGIME_LIVE_TICK         = os.getenv("REGIME_LIVE_TICK", "false").lower() == "true"
     REGIME_TICK_INTERVAL_SEC = int(os.getenv("REGIME_TICK_INTERVAL_SEC") or 3)
+    REGIME_PENDING           = os.getenv("REGIME_PENDING", "false").lower() == "true"
 
     global ZONE_REENTRY_ENABLED, ZONE_REENTRY_SHADOW, ZRE_MIN_SCORE, ZRE_MAX_BARS_SINCE
     global ZRE_PROXIMITY_PCT, ZRE_TREND_ALIGN_ONLY, ZRE_MAX_CONCURRENT
