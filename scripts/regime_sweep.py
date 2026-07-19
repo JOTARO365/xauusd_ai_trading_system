@@ -83,6 +83,9 @@ def main():
 
     for algo in ("momentum_breakout", "mean_reversion"):
         results, valid = sweep_algo(algo, ctx, split_idx)
+        if not valid:
+            print(f"\n── {algo} ── ไม่มี trade (algo ตัดออกจาก routing แล้ว) — ข้าม")
+            continue
         n_trials = len(results)
         default = next(r for r in results if r["params"] == DEFAULTS[algo])
         best = max(valid, key=lambda r: r["exp_train"])            # เลือกจาก TRAIN เท่านั้น
