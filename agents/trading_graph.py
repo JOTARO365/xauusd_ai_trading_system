@@ -155,14 +155,33 @@ async def node_news(state: TradingState) -> dict:
         return {"news_data": {"tweets": [], "count": 0}}
 
 
+_last_news_sig = None       # event-driven analyst: ยิง LLM เฉพาะมีข่าว/โพสใหม่ (vision owner)
+_last_sentiment = None
+
+
+def _news_sig(news_data: dict):
+    tweets = (news_data or {}).get("tweets", []) or []
+    keys = tuple(sorted(str((t.get("id") if isinstance(t, dict) else None) or
+                            (t.get("text") if isinstance(t, dict) else t))[:80] for t in tweets))
+    return hash(keys)
+
+
 def node_analyst(state: TradingState) -> dict:
     from agents.analyst import analyze_sentiment
     from utils.display import print_step, print_sentiment_box
+    global _last_news_sig, _last_sentiment
+    # event-driven: ไม่มีข่าวใหม่ → reuse sentiment (ข้าม Claude call) = near-0 token
+    sig = _news_sig(state.get("news_data") or {})
+    if sig == _last_news_sig and _last_sentiment is not None:
+        print_step(3, "done", f"{_last_sentiment.get('sentiment','NEUTRAL')} (cached — ไม่มีข่าวใหม่)")
+        return {"sentiment_data": {**_last_sentiment, "cached": True}}
     print_step(3, "running", "กำลังวิเคราะห์ sentiment...")
     t = time.monotonic()
     try:
         data  = _to_native(analyze_sentiment(state["news_data"], state["chart_data"]))
         data["news_count"] = state["news_data"].get("count", 0)
+        _last_news_sig = sig
+        _last_sentiment = data
         lat   = int((time.monotonic() - t) * 1000)
         sent  = data.get("sentiment", "NEUTRAL")
         sconf = data.get("confidence", 0)
