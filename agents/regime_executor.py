@@ -46,6 +46,9 @@ def run_regime_executor():
     sig = rec.get("signal")
     if not sig or sig.get("algo") != "momentum_breakout":   # เข้าเฉพาะ momentum ใน TREND (mean_rev ตัดแล้ว)
         return None
+    from agents.regime_adaptive import is_enabled                 # weekly auto-disable (decay kill switch)
+    if not is_enabled("momentum_breakout"):
+        return None
     if rec["bar_ts"] and rec["bar_ts"] == _last_bar:        # บาร์นี้เข้าไปแล้ว → ไม่ซ้ำ
         return None
     try:                                                    # ไม่ stack: มีไม้ ALGO เปิดอยู่ = ข้าม

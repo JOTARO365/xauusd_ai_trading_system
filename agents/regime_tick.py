@@ -53,6 +53,9 @@ def _tick() -> None:
         return
     if getattr(config, "REGIME_PENDING", False):        # pending mode จัดการ entry แล้ว → tick ไม่เข้าซ้ำ
         return
+    from agents.regime_adaptive import is_enabled        # weekly auto-disable (decay kill switch)
+    if not is_enabled("momentum_breakout"):
+        return
     global _last_traded_hour
     try:
         import MetaTrader5 as mt5

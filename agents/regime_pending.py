@@ -52,6 +52,10 @@ def manage_algo_pending():
         return 0
     global _last_bar_hour
     try:
+        from agents.regime_adaptive import is_enabled            # weekly auto-disable (decay kill switch)
+        if not is_enabled("momentum_breakout"):
+            _cancel_algo_pendings()                              # disabled → ยกเลิก pending ค้าง
+            return 0
         import MetaTrader5 as mt5
         from connectors.mt5_connector import get_open_positions, place_pending_order
         from agents.regime_shadow import _bars_from_feed
