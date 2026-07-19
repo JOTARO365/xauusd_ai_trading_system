@@ -1663,6 +1663,18 @@
       <div style="font-size:10px;color:var(--muted);margin-top:4px">SELECTION = guide เลือก regime/กลยุทธ์ · EXECUTION (entry/ทิศ) = algo คำนวณจาก data เอง ไม่ให้ LLM ตัดสิน</div>
     </section>
 
+    <!-- PRICE CLUSTER decision-support — บอทคำนวณ dwell-zone S/R ให้ owner ตัดสินใจ (กฎ fade อัตโนมัติไม่มี edge; วิจารณญาณ owner มี) -->
+    <section id="cluster-map-section" style="margin-bottom:10px">
+      <div class="section-title">Price Cluster S/R — decision-support (owner ตัดสินใจ, บอทคำนวณ)</div>
+      <div id="cluster-hint" style="font-size:12px;font-family:var(--mono);color:var(--gold);margin:4px 0 8px">—</div>
+      <div style="display:flex;gap:26px;flex-wrap:wrap;font-family:var(--mono);font-size:12px">
+        <div><span style="color:var(--muted);font-size:10px">แนวต้าน cluster</span><br><span id="cluster-res" style="color:var(--red);font-weight:600">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">ราคา · momentum</span><br><span id="cluster-px">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">แนวรับ cluster</span><br><span id="cluster-sup" style="color:var(--green);font-weight:600">—</span></div>
+      </div>
+      <div id="cluster-list" style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-top:6px">—</div>
+    </section>
+
     <!-- MACRO STRIP — §3.5 macro_strip.json (display-only, daily via scripts/fetch_macro_strip.py) -->
     <section id="macro-strip-section" style="margin-bottom:10px">
       <div id="macro-strip" style="display:flex;align-items:center;gap:16px;padding:7px 14px;border:1px solid var(--border2,#2a3142);border-left:3px solid var(--cyan,#00B4D8);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--text-dim,#9aa3b8);flex-wrap:wrap">
@@ -3298,6 +3310,7 @@ async function loadLivePrice() {
       setT('ai-sent-tweets', (bs.sent_tweets || 0) + ' โพสต์');
       setT('ai-sent-summary', bs.sent_summary || '—');
     }
+    loadClusterMap();   // Price-Cluster decision-support (throttled, server-cached)
 
     // Live ticker
     const bidEl  = document.getElementById('px-bid');
@@ -3832,6 +3845,26 @@ async function loadBurn() {
 /* ════════════════════════════════════════════════════════════
    CALIBRATION CARD — §3.5 /api/calibration
    ════════════════════════════════════════════════════════════ */
+let _clusterLast = 0;
+async function loadClusterMap() {
+  if (Date.now() - _clusterLast < 15000) return;   // throttle (server cache 20s)
+  _clusterLast = Date.now();
+  try {
+    const d = await (await fetch('/api/cluster-map')).json();
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    const hintEl = document.getElementById('cluster-hint');
+    if (!d.ok) { if (hintEl) hintEl.textContent = d.error || '—'; return; }
+    if (hintEl) hintEl.textContent = d.hint || 'ราคายังไม่ใกล้ cluster สำคัญ — รอจังหวะ';
+    set('cluster-res', d.resistance ? `${d.resistance.level} · ${d.resistance.touches} touch · ${d.resistance.dist_atr} ATR` : '—');
+    set('cluster-sup', d.support ? `${d.support.level} · ${d.support.touches} touch · ${d.support.dist_atr} ATR` : '—');
+    const mcol = d.momentum === 'up' ? 'var(--green)' : (d.momentum === 'down' ? 'var(--red)' : 'var(--muted)');
+    const pxEl = document.getElementById('cluster-px');
+    if (pxEl) pxEl.innerHTML = `${d.price} · <span style="color:${mcol}">${d.momentum}</span>`;
+    const le = document.getElementById('cluster-list');
+    if (le) le.innerHTML = 'dwell zones: ' + (d.clusters || []).map(c => `${c.level}(${c.touches})`).join('  ');
+  } catch (_e) {}
+}
+
 async function loadRegimeAnalytics() {
   try {
     const res = await fetch('/api/regime-analytics');

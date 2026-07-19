@@ -1093,6 +1093,16 @@ def api_ride_stats():
     return jsonify(_cached("ride-stats", _compute, ttl=60))
 
 
+@app.route("/api/cluster-map")
+def api_cluster_map():
+    """Price-Cluster decision-support (Monitor tab) — คำนวณสด dwell-zone S/R จาก MT5 H1.
+    บอทคำนวณให้ owner ตัดสินใจ (กฎ fade อัตโนมัติไม่มี edge; วิจารณญาณ owner มี). display-only, 0 token."""
+    def _c():
+        from agents.cluster_map import from_mt5
+        return from_mt5()
+    return jsonify(_cached("cluster-map", _c, ttl=20))
+
+
 @app.route("/api/regime-monitor")
 def api_regime_monitor():
     """weekly monitor ของ algo-live (N-gauge + decay) — pass-through data/regime_monitor.json
