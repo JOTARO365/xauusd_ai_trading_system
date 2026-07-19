@@ -1650,6 +1650,19 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-monitor">
 
+    <!-- AI SENTIMENT (SELECTION layer) — LLM อ่านข่าว X + ตัวเลขเศรษฐกิจ → guide เลือก regime (display-only, 0 token) -->
+    <section id="ai-sentiment-section" style="margin-bottom:10px">
+      <div class="section-title">AI Sentiment (SELECTION) — LLM อ่านข่าว/ตัวเลข · algo ตัดสิน entry เอง</div>
+      <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:9px 14px;border:1px solid var(--border);border-left:3px solid var(--cyan,#00B4D8);border-radius:8px;font-family:var(--mono);font-size:12px">
+        <div><span style="color:var(--muted);font-size:10px">SENTIMENT</span><br><span id="ai-sent-val" style="font-weight:700;font-size:15px">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">CONF</span><br><span id="ai-sent-conf">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">BIAS</span><br><span id="ai-sent-bias">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">โพสต์</span><br><span id="ai-sent-tweets">—</span></div>
+        <div style="flex:1;min-width:220px"><span style="color:var(--muted);font-size:10px">บทวิเคราะห์ (LLM)</span><br><span id="ai-sent-summary" style="color:var(--text-dim,#9aa3b8)">—</span></div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">SELECTION = guide เลือก regime/กลยุทธ์ · EXECUTION (entry/ทิศ) = algo คำนวณจาก data เอง ไม่ให้ LLM ตัดสิน</div>
+    </section>
+
     <!-- MACRO STRIP — §3.5 macro_strip.json (display-only, daily via scripts/fetch_macro_strip.py) -->
     <section id="macro-strip-section" style="margin-bottom:10px">
       <div id="macro-strip" style="display:flex;align-items:center;gap:16px;padding:7px 14px;border:1px solid var(--border2,#2a3142);border-left:3px solid var(--cyan,#00B4D8);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--text-dim,#9aa3b8);flex-wrap:wrap">
@@ -3270,6 +3283,19 @@ async function loadLivePrice() {
     if (!data.ok) return;
     const bs = data.bot_status || {};
     const px = bs.price_info || {};
+
+    // AI Sentiment (SELECTION layer) — LLM อ่านข่าว X+ตัวเลข (display-only, algo ตัดสิน entry เอง)
+    const _sv = document.getElementById('ai-sent-val');
+    if (_sv) {
+      const s = String(bs.sentiment || 'NEUTRAL');
+      _sv.textContent = s;
+      _sv.style.color = /BULL/i.test(s) ? 'var(--green)' : (/BEAR/i.test(s) ? 'var(--red)' : 'var(--muted)');
+      const setT = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+      setT('ai-sent-conf', (bs.sent_conf || 0) + '%');
+      setT('ai-sent-bias', bs.sent_bias || 'NEUTRAL');
+      setT('ai-sent-tweets', (bs.sent_tweets || 0) + ' โพสต์');
+      setT('ai-sent-summary', bs.sent_summary || '—');
+    }
 
     // Live ticker
     const bidEl  = document.getElementById('px-bid');

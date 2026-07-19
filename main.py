@@ -135,6 +135,9 @@ def _write_bot_status(chart_data: dict, sentiment_data: dict, decision: dict, sk
             },
             "sentiment":    sentiment_data.get("sentiment", "NEUTRAL"),
             "sent_conf":    sentiment_data.get("confidence", 0),
+            "sent_bias":    sentiment_data.get("bias", "NEUTRAL"),        # SELECTION layer: LLM อ่านข่าว X+ตัวเลข
+            "sent_summary": sentiment_data.get("summary", ""),           # เหตุผล/บทวิเคราะห์ (display-only 0-token)
+            "sent_tweets":  sentiment_data.get("tweet_count", 0),
             "price_info":   price_info,
             "ready_mode":   ready_mode,
             "market":       market,
