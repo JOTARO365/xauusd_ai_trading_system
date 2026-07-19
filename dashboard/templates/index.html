@@ -3886,6 +3886,7 @@ async function loadClusterMap() {
     if (pxEl) pxEl.innerHTML = `${d.price} · <span style="color:${mcol}">${d.momentum}</span>`;
     const le = document.getElementById('cluster-list');
     if (le) le.innerHTML = 'dwell zones: ' + (d.clusters || []).map(c => `${c.level}(${c.touches})`).join('  ');
+    drawClusterLines(d);   // overlay cluster S/R + Donchian บนกราฟ candle
   } catch (_e) {}
 }
 
@@ -5274,7 +5275,7 @@ function renderZones(bs) {
 }
 
 /* ── Price Chart + AI Zones overlay (07-03) — lightweight-charts, data จาก MT5 ── */
-let _chart = null, _candleSeries = null, _zoneLines = [], _chartTf = 'M15', _lastCandleLoad = 0;
+let _chart = null, _candleSeries = null, _zoneLines = [], _clusterLines = [], _chartTf = 'M15', _lastCandleLoad = 0;
 
 function initChart() {
   if (_chart || !window.LightweightCharts) return;
@@ -5311,6 +5312,21 @@ function setChartTf(tf) {
   _chartTf = tf;
   document.querySelectorAll('.tf-btn').forEach(b => b.classList.toggle('active', b.dataset.tf === tf));
   loadCandles(true);
+}
+
+// overlay ระบบใหม่: cluster S/R (dwell-zone) + Donchian levels ที่ algo ใช้ (จาก /api/cluster-map)
+function drawClusterLines(d) {
+  if (!_candleSeries || !d || !d.ok) return;
+  _clusterLines.forEach(l => { try { _candleSeries.removePriceLine(l); } catch (e) {} });
+  _clusterLines = [];
+  const add = (price, color, title, style) => { if (price != null) _clusterLines.push(_candleSeries.createPriceLine({
+    price, color, lineWidth: 2, lineStyle: style, axisLabelVisible: true, title })); };
+  if (d.resistance) add(d.resistance.level, 'rgba(233,69,96,0.9)', `C·R ${d.resistance.touches}t`, LightweightCharts.LineStyle.Solid);
+  if (d.support) add(d.support.level, 'rgba(38,194,129,0.9)', `C·S ${d.support.touches}t`, LightweightCharts.LineStyle.Solid);
+  if (d.donchian) {
+    add(d.donchian.buy, 'rgba(212,172,13,0.85)', 'Donchian BUY', LightweightCharts.LineStyle.Dashed);
+    add(d.donchian.sell, 'rgba(212,172,13,0.85)', 'Donchian SELL', LightweightCharts.LineStyle.Dashed);
+  }
 }
 
 function drawZoneLines(bs) {

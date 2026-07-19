@@ -59,9 +59,11 @@ def compute_cluster_map(high, low, close, lookback=LOOKBACK, min_touch=MIN_TOUCH
         hint = f"ราคาใกล้แนวต้าน cluster {nearest_res['touches']} touch — momentum {mom} (พิจารณา SELL ตามวิจารณญาณ)"
     elif near and nearest_sup and (px - nearest_sup["level"]) <= 0.5 * atr and mom != "down":
         hint = f"ราคาใกล้แนวรับ cluster {nearest_sup['touches']} touch — momentum {mom} (พิจารณา BUY ตามวิจารณญาณ)"
+    lv = R.momentum_levels(n - 2, high, low, close, atr_v)   # Donchian levels ที่ algo ใช้ (สำหรับ overlay กราฟ)
+    donchian = {"buy": round(lv["buy_level"], 2), "sell": round(lv["sell_level"], 2)} if lv else None
     return {"ok": True, "price": round(px, 2), "atr": round(atr, 2), "momentum": mom,
             "resistance": enrich(nearest_res), "support": enrich(nearest_sup),
-            "near": near, "hint": hint,
+            "near": near, "hint": hint, "donchian": donchian,
             "clusters": [enrich(c) for c in clusters][:14]}
 
 
