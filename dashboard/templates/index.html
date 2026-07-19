@@ -1389,7 +1389,7 @@
     .cons-bull { background:var(--green); } .cons-bear { background:var(--red); } .cons-neut { background:var(--muted2); color:var(--muted); }
     @media(max-width:900px){ .cmd-deck{ grid-template-columns:1fr; } }
   </style>
-  <div class="cmd-deck">
+  <div class="cmd-deck legacy-llm" id="legacy-cmddeck">
     <div class="cmd-panel">
       <div class="cmd-h"><span>Desk Checklist</span><span id="deck-consensus-lbl" style="color:var(--muted)"></span></div>
       <div class="deck-pills" id="deck-pills"></div>
@@ -1462,7 +1462,7 @@
   </section>
 
   <!-- AGENT PIPELINE -->
-  <section>
+  <section id="legacy-pipeline" class="legacy-llm">
     <div class="section-title">EXECUTION DESK</div>
     <div class="pipeline" id="pipeline-container">
       <div class="pipeline-step" data-step="chart_watcher">
@@ -1786,7 +1786,7 @@
     </section>
 
     <!-- WHY NO ENTRY — gate blocks สด (07-03) -->
-    <section>
+    <section id="legacy-gateblocks" class="legacy-llm">
       <div class="section-title">STAND-DOWN LOG &mdash; Gate Blocks</div>
       <div class="table-card">
         <div class="table-wrap" style="max-height:260px;overflow-y:auto">
@@ -1826,7 +1826,7 @@
     </section>
 
     <!-- AI VERDICT — multi-TF (UHAS-style ชิ้น 2, 07-03) -->
-    <section>
+    <section id="legacy-tape" class="legacy-llm">
       <div class="section-title">THE TAPE &mdash; Multi-TF Read</div>
       <div class="chart-card">
         <div id="verdict-tf-strip" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
@@ -1977,7 +1977,7 @@
     </section>
 
     <!-- LAST DECISION DETAIL -->
-    <section>
+    <section id="legacy-ticket" class="legacy-llm">
       <div class="section-title">LAST TICKET &mdash; Detail</div>
       <div class="chart-card">
         <div class="detail-grid">
@@ -3864,6 +3864,8 @@ async function loadAlgoStatus() {
     const dis = (d.disabled || []).length ? ('⚠ disabled: ' + d.disabled.join(', '))
       : 'algo = ตัวเดียวที่เทรด · LLM = sentiment เท่านั้น';
     set('as-note', dis);
+    // REGIME_LIVE: ซ่อน panel LLM-entry เก่าที่ stale (chart/advisor/decision ถูก gate off)
+    document.querySelectorAll('.legacy-llm').forEach(el => { el.style.display = live ? 'none' : ''; });
   } catch (_e) {}
 }
 
