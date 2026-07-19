@@ -531,7 +531,7 @@ def _clamp_stops_level(price, sl, tp, is_buy, no_tp, stops_min, point):
 
 def open_order(direction: str, sl_pips: float, tp_pips: float,
                comment: str = "", min_rr: float | None = None,
-               confidence_scale: float = 1.0) -> dict:
+               confidence_scale: float = 1.0, lot: float | None = None) -> dict:
     if _cfg.DRY_RUN:
         tick = mt5.symbol_info_tick(SYMBOL)
         price = (tick.ask if direction.upper() == "BUY" else tick.bid) if tick else 0.0
@@ -560,7 +560,10 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
     point      = sym_info.point
     stops_min  = sym_info.trade_stops_level * point   # ระยะ SL/TP ขั้นต่ำจากราคาปัจจุบัน
 
-    if _cfg.NNLB_MODE:
+    if lot is not None and lot > 0:                   # P-E: algo risk-based lot override (ยังผ่าน clamp+guards ด้านล่าง)
+        lot = max(_cfg.MIN_LOT, min(float(lot), _cfg.MAX_LOT))
+        logger.info(f"Lot override (algo sizing เหมาะทุน): {lot}")
+    elif _cfg.NNLB_MODE:
         lot, err = _nnlb_lot_and_check(account.equity, sl_pips)
         if err:
             return {"success": False, "error": err}
@@ -803,7 +806,7 @@ def daily_trade_cap_reached() -> tuple[bool, str]:
 
 
 def place_pending_order(pending_type: str, price: float, sl_pips: float, tp_pips: float,
-                        comment: str = "", expiry_hours: int = 48) -> dict:
+                        comment: str = "", expiry_hours: int = 48, lot: float | None = None) -> dict:
     """วาง pending order ที่ level ที่กำหนด ใช้ TRADE_ACTION_PENDING"""
     if _cfg.DRY_RUN:
         logger.warning(f"[DRY_RUN] would have placed {pending_type} @ {price:.2f} SL={sl_pips}p TP={tp_pips}p")
@@ -824,7 +827,9 @@ def place_pending_order(pending_type: str, price: float, sl_pips: float, tp_pips
     point     = info.point
     stops_min = info.trade_stops_level * point
 
-    if _cfg.NNLB_MODE:
+    if lot is not None and lot > 0:                   # P-E: algo risk-based lot override
+        lot = max(_cfg.MIN_LOT, min(float(lot), _cfg.MAX_LOT))
+    elif _cfg.NNLB_MODE:
         lot, err = _nnlb_lot_and_check(account.equity, sl_pips)
         if err:
             return {"success": False, "error": err}

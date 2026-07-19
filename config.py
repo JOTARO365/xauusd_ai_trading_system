@@ -183,6 +183,27 @@ REGIME_TICK_INTERVAL_SEC = int(os.getenv("REGIME_TICK_INTERVAL_SEC") or 3)
 # ⚠️ LIVE MONEY — default OFF. kill = REGIME_PENDING=false.
 REGIME_PENDING        = os.getenv("REGIME_PENDING", "false").lower() == "true"
 
+# REGIME_SR_ENTRY = algo v2 P-B: entry_gate (fade S/R + indicator + vol/mom) → **journal shadow เท่านั้น**
+# (ยัง 0 order — weights ยังไม่ fit; เก็บ counterfactual outcome ไป fit ก่อน flip live). ดู docs/DESIGN_algo_v2.md.
+# ⚠️ default OFF. kill = REGIME_SR_ENTRY=false (live-reload).
+REGIME_SR_ENTRY       = os.getenv("REGIME_SR_ENTRY", "false").lower() == "true"
+
+# REGIME_PENDING_FADE = algo v2 P-C: RANGE fade LIMIT (BUY_LIMIT@support / SELL_LIMIT@resistance) วางจริง
+# + vol/momentum gate (cancel เมื่อราคาใกล้ + momentum break). ⚠️ RANGE-fade ยังไม่ผ่าน validation (naive fade −EV)
+# → เปิดหลัง journal (REGIME_SR_ENTRY) พิสูจน์ edge เท่านั้น. default OFF. ต้องมี REGIME_LIVE=true. kill = false.
+REGIME_PENDING_FADE   = os.getenv("REGIME_PENDING_FADE", "false").lower() == "true"
+
+# REGIME_SR_EXIT = algo v2 P-D: exit ตาม S/R — TP ตามความสำคัญแนว (pick_tp_target แทน RR2 คงที่) +
+# trailing = vol + S/R buffer (SL ใต้ support/เหนือ resistance − buffer·ATR) สำหรับไม้ ALGO. default OFF.
+# ต้องมี REGIME_LIVE=true. kill = REGIME_SR_EXIT=false (live-reload). ดู docs/DESIGN_algo_v2.md.
+REGIME_SR_EXIT        = os.getenv("REGIME_SR_EXIT", "false").lower() == "true"
+
+# REGIME_SR_SIZING = algo v2 P-E: lot ไม้ ALGO = risk-based ตามทุน (equity × RISK_PCT / sl_pips, cap MAX_RISK_PCT
+# + clamp MIN/MAX_LOT) แทน fixed 0.01 → risk คงที่ต่อทุน (โตตามพอร์ต, floor ที่ MIN_LOT). default OFF.
+# ต้องมี REGIME_LIVE=true. ⚠️ แตะ lot จริง — เปิด = พี่ควบคุมเอง. kill = REGIME_SR_SIZING=false.
+REGIME_SR_SIZING      = os.getenv("REGIME_SR_SIZING", "false").lower() == "true"
+REGIME_SR_RISK_PCT    = float(os.getenv("REGIME_SR_RISK_PCT") or 0.005)   # risk ต่อไม้ ALGO (0.5% ของ equity)
+
 # ZRE = Zone Re-Entry RR≥2 (v2 fixed-SL). วาง LIMIT ดักเด้งที่โซนเกรดสูงเชิงรุก (RR≥2, SL คงที่).
 # เกราะสุด (replay 2026-07-16): trend-align-only (ตัด SIDEWAYS ที่ replay ขาดทุน −0.6R),
 # grade A/B + score≥ZRE_MIN_SCORE, สด ≤ZRE_MAX_BARS_SINCE, ในระยะ ZRE_PROXIMITY_PCT%,
@@ -272,7 +293,8 @@ def reload_config():
     NNLB_FASTPATH            = os.getenv("NNLB_FASTPATH", "true").lower() != "false"
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
     global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT, REGIME_SHADOW
-    global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING
+    global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING, REGIME_SR_ENTRY, REGIME_PENDING_FADE, REGIME_SR_EXIT
+    global REGIME_SR_SIZING, REGIME_SR_RISK_PCT
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
     SPECIALIST_ENABLED       = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"
     REGIME_SHADOW            = os.getenv("REGIME_SHADOW", "false").lower() == "true"
@@ -280,6 +302,11 @@ def reload_config():
     REGIME_LIVE_TICK         = os.getenv("REGIME_LIVE_TICK", "false").lower() == "true"
     REGIME_TICK_INTERVAL_SEC = int(os.getenv("REGIME_TICK_INTERVAL_SEC") or 3)
     REGIME_PENDING           = os.getenv("REGIME_PENDING", "false").lower() == "true"
+    REGIME_SR_ENTRY          = os.getenv("REGIME_SR_ENTRY", "false").lower() == "true"  # P-B fade shadow
+    REGIME_PENDING_FADE      = os.getenv("REGIME_PENDING_FADE", "false").lower() == "true"  # P-C RANGE fade LIMIT
+    REGIME_SR_EXIT           = os.getenv("REGIME_SR_EXIT", "false").lower() == "true"       # P-D S/R TP + trailing
+    REGIME_SR_SIZING         = os.getenv("REGIME_SR_SIZING", "false").lower() == "true"     # P-E risk-based lot
+    REGIME_SR_RISK_PCT       = float(os.getenv("REGIME_SR_RISK_PCT") or 0.005)
 
     global ZONE_REENTRY_ENABLED, ZONE_REENTRY_SHADOW, ZRE_MIN_SCORE, ZRE_MAX_BARS_SINCE
     global ZRE_PROXIMITY_PCT, ZRE_TREND_ALIGN_ONLY, ZRE_MAX_CONCURRENT

@@ -78,7 +78,11 @@ def _tick() -> None:
             if str(getattr(p, "comment", "") or "").startswith("ALGO"):
                 return
         _last_traded_hour = hour
-        res = open_order(d, _cache["sl_pips"], _cache["tp_pips"], comment="ALGO-mom")
+        from agents.algo_exit import sr_tp_pips                    # P-D: TP ตามแนว S/R (flag OFF → RR2 เดิม)
+        from agents.algo_sizing import algo_lot                    # P-E: lot risk-based (flag OFF → fixed เดิม)
+        _entry_px = tick.ask if d == "BUY" else tick.bid
+        _tp_pips = sr_tp_pips(d, _entry_px, _cache["sl_pips"], _cache["tp_pips"])
+        res = open_order(d, _cache["sl_pips"], _tp_pips, comment="ALGO-mom", lot=algo_lot(_cache["sl_pips"]))
         from agents.regime_executor import _log
         _log({"ts_hour": hour, "via": "tick", "regime": "TREND",
               "signal": {"algo": "momentum_breakout", "dir": d,

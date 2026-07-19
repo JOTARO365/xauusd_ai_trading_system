@@ -291,6 +291,25 @@ def node_position_mgmt(state: TradingState) -> dict:
             print_warning(f"[ALGO-PENDING] วาง {_p} pending straddle ที่ Donchian level")
     except Exception as _pe:
         logger.error(f"[GRAPH:regime_pending] {_pe}")
+    # REGIME_SR_EXIT: trailing SL ไม้ ALGO ตาม vol + S/R แข็ง (only-tighten). fail-soft.
+    try:
+        from agents.algo_exit import manage_algo_trailing
+        _t = manage_algo_trailing()
+        if _t:
+            print_warning(f"[ALGO-EXIT] เลื่อน SL {_t} ไม้ ตาม S/R + vol")
+    except Exception as _te:
+        logger.error(f"[GRAPH:algo_exit] {_te}")
+    # counterfactual journal: บันทึกทุก signal ที่ algo พิจารณา + resolve ผลลัพธ์จริง (0 token/order). fail-soft.
+    try:
+        from agents.algo_journal import journal_tick
+        _j = journal_tick()
+        if _j:
+            _ctx = (f"regime={_j['regime']}" if _j.get("kind") == "signal"
+                    else f"fade@{_j.get('at')} {_j.get('significance')} p={_j.get('p_edge')}")
+            logger.info(f"[ALGO-JOURNAL] {_j.get('kind','signal')} ใหม่ {_j['dir']} @ {_j['entry']} "
+                        f"SL={_j['sl']} TP={_j['tp']} ({_ctx}) — รอ resolve")
+    except Exception as _je:
+        logger.error(f"[GRAPH:algo_journal] {_je}")
     return {}
 
 
