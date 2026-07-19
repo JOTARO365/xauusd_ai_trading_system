@@ -193,6 +193,17 @@ def manage_algo_pending():
         i = n - 2
         atr = float(atr_a[i])
         regime = R.detect_regime(er[i], adx[i], vp[i])
+        # algo_state → terminal panel (pending mode ชัด แทน HAND-OFF จาก executor)
+        _fade_on = regime == "RANGE" and getattr(_cfg, "REGIME_PENDING_FADE", False)
+        _stop_on = regime == "TREND" and getattr(_cfg, "REGIME_PENDING", False)
+        try:
+            from agents.algo_state import write_state
+            _pd = ("วาง LIMIT fade แนวแข็ง" if _fade_on else
+                   "วาง STOP breakout Donchian" if _stop_on else "ยืนดู (regime ไม่ตรง pending mode)")
+            write_state("PENDING" if (_fade_on or _stop_on) else "STAND-DOWN",
+                        regime=regime, via="pending", detail=f"regime={regime} — {_pd}")
+        except Exception:
+            pass
         st = _bot_status()
         market = dict(st.get("market") or {})
         market.setdefault("fast_move_pips", (st.get("last_signal") or {}).get("fast_move_pips", 0))
