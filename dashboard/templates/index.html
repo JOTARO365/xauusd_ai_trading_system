@@ -1650,6 +1650,16 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-monitor">
 
+    <!-- SYSTEM STATUS — สถานะระบบ algo ใหม่ (REGIME_LIVE mode / regime / signal) -->
+    <section id="algo-status-section" style="margin-bottom:10px">
+      <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;padding:10px 14px;border:1px solid var(--border);border-left:3px solid var(--gold);border-radius:8px;font-family:var(--mono);font-size:12px">
+        <div><span style="color:var(--muted);font-size:10px">ALGO ENTRY</span><br><span id="as-mode" style="font-weight:700;font-size:14px">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">REGIME</span><br><span id="as-regime" style="font-weight:600">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">ALGO SIGNAL</span><br><span id="as-signal">—</span></div>
+        <div style="flex:1;min-width:200px"><span style="color:var(--muted);font-size:10px">STATUS</span><br><span id="as-note" style="color:var(--muted)">—</span></div>
+      </div>
+    </section>
+
     <!-- AI SENTIMENT (SELECTION layer) — LLM อ่านข่าว X + ตัวเลขเศรษฐกิจ → guide เลือก regime (display-only, 0 token) -->
     <section id="ai-sentiment-section" style="margin-bottom:10px">
       <div class="section-title">AI Sentiment (SELECTION) — LLM อ่านข่าว/ตัวเลข · algo ตัดสิน entry เอง</div>
@@ -3306,6 +3316,7 @@ async function loadLivePrice() {
       setT('ai-sent-summary', bs.sent_summary || '—');
     }
     loadClusterMap();   // Price-Cluster decision-support (throttled, server-cached)
+    loadAlgoStatus();   // System status — algo mode / regime / signal
 
     // Live ticker
     const bidEl  = document.getElementById('px-bid');
@@ -3840,6 +3851,22 @@ async function loadBurn() {
 /* ════════════════════════════════════════════════════════════
    CALIBRATION CARD — §3.5 /api/calibration
    ════════════════════════════════════════════════════════════ */
+async function loadAlgoStatus() {
+  try {
+    const d = await (await fetch('/api/algo-status')).json();
+    if (!d.ok) return;
+    const set = (id, v, c) => { const e = document.getElementById(id); if (e) { e.textContent = v; if (c) e.style.color = c; } };
+    const live = d.regime_live;
+    set('as-mode', live ? ('LIVE · ' + d.mode) : 'OFF', live ? 'var(--green)' : 'var(--muted)');
+    const rc = d.regime === 'TREND' ? 'var(--green)' : (d.regime === 'RISK-OFF' ? 'var(--red)' : 'var(--muted)');
+    set('as-regime', d.regime || '—', rc);
+    set('as-signal', d.signal ? (d.signal.dir + ' ' + d.signal.algo) : 'STAND-DOWN');
+    const dis = (d.disabled || []).length ? ('⚠ disabled: ' + d.disabled.join(', '))
+      : 'algo = ตัวเดียวที่เทรด · LLM = sentiment เท่านั้น';
+    set('as-note', dis);
+  } catch (_e) {}
+}
+
 let _clusterLast = 0;
 async function loadClusterMap() {
   if (Date.now() - _clusterLast < 15000) return;   // throttle (server cache 20s)

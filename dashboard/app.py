@@ -1093,6 +1093,36 @@ def api_ride_stats():
     return jsonify(_cached("ride-stats", _compute, ttl=60))
 
 
+@app.route("/api/algo-status")
+def api_algo_status():
+    """สถานะระบบใหม่ (header): REGIME_LIVE mode + regime ปัจจุบัน + algo signal + disabled. 0 token."""
+    def _c():
+        import config as _cfg
+        try:
+            _cfg.reload_config()
+        except Exception:
+            pass
+        live = getattr(_cfg, "REGIME_LIVE", False)
+        mode = ("pending" if getattr(_cfg, "REGIME_PENDING", False)
+                else ("per-tick" if getattr(_cfg, "REGIME_LIVE_TICK", False) else "per-cycle")) if live else "OFF"
+        regime = None; signal = None
+        try:
+            from agents.regime_shadow import _bars_from_feed, compute_shadow_signal
+            bars = _bars_from_feed()
+            if bars:
+                rec = compute_shadow_signal(*bars)
+                regime = rec.get("regime"); signal = rec.get("signal")
+        except Exception:
+            pass
+        try:
+            from agents.regime_adaptive import disabled_strategies
+            disabled = disabled_strategies()
+        except Exception:
+            disabled = []
+        return {"regime_live": live, "mode": mode, "regime": regime, "signal": signal, "disabled": disabled}
+    return jsonify(_cached("algo-status", _c, ttl=15))
+
+
 @app.route("/api/cluster-map")
 def api_cluster_map():
     """Price-Cluster decision-support (Monitor tab) — คำนวณสด dwell-zone S/R จาก MT5 H1.
