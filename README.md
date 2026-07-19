@@ -976,10 +976,16 @@ Lot progression with this preset: equity $28 (profit $3) → `lot 0.01`; equity 
   pipeline but disabled (`SWING_ENABLED=false`) and additionally gated by
   `SWING_MIN_EQUITY`. It has not been validated on historical or live data; the
   bounded-risk guarantee rests on a single shared structural SL.
-- **No automated backtest harness.** `backtest/monte_carlo.py` runs a Monte Carlo
-  on *assumed* win-rate/RR parameters, not a replay of the live strategy over
-  historical candles. Strategy validation is done by replaying gates over closed
-  trades (`scripts/diagnose_trades.py`), not by bar-by-bar simulation.
+- **No automated backtest harness for the *live* strategy.** `backtest/monte_carlo.py`
+  runs a Monte Carlo on *assumed* win-rate/RR parameters, and live-strategy validation
+  is done by replaying gates over closed trades (`scripts/diagnose_trades.py`), not by
+  bar-by-bar simulation of the LLM pipeline. A separate **offline** bar-by-bar gauntlet
+  (`scripts/regime_backtest.py`) does exist — but only for the R&D minimal-AI regime
+  algos (`scripts/regime_lib.py`), which are flag-OFF and not wired to live. It replays
+  intrabar (H/L, not close-path) net of cost with PSR + a null-first stance; its first
+  run found **no directional edge** in the Donchian-breakout / z-score-fade entries on
+  gold H1 (both −EV after cost) — consistent with this project's finding that gold
+  *volatility/regime* is predictable but *direction* is not.
 - **Two sources of "default".** `config.py` fallbacks and `.env.example` starter
   values differ for several keys (SYMBOL, START_BALANCE, HEDGE_BUFFER_PIPS,
   PENDING_EXPIRY_HOURS, BE_TRIGGER_R, MIN_AI_EQUITY). What you actually run is your
