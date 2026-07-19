@@ -1655,17 +1655,24 @@ SR_ZONE: SUPPORT หรือ RESISTANCE หรือ NONE
 SR_STRENGTH: STRONG หรือ NORMAL
 ENTRY_TYPE: SR_ZONE หรือ ENGULFING หรือ STRUCTURE_PULLBACK หรือ BREAKOUT_RETEST หรือ EMA_PULLBACK หรือ MOMENTUM_BREAKOUT หรือ DOJI_AT_ZONE หรือ NONE"""
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=1000,   # block-first summary + เหตุผลสั้น (เดิม 800 → report markdown ยาวถูก truncate ก่อนถึงสรุป → parse fail)
-        system=[{"type": "text", "text": SYSTEM_PROMPT,
-                 "cache_control": {"type": "ephemeral"}}],
-        messages=[{"role": "user", "content": user_message}],
-    )
-    _last_usage = response.usage
-
-    analysis_text = response.content[0].text
-    logger.info(f"Chart result: {analysis_text[:200]}")
+    import config as _cfg
+    if getattr(_cfg, "REGIME_LIVE", False):
+        # near-0 token: REGIME_LIVE = algo คำนวณ entry เอง → ข้าม chart LLM call.
+        # เก็บ Python-computed data ทั้งหมด (zones/indicators/FVG/momentum) ไว้ให้ dashboard. signal=default NO_TRADE.
+        analysis_text = ""
+        _last_usage = None
+        logger.info("Chart: REGIME_LIVE → skip LLM (algo entry, Python data only)")
+    else:
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1000,   # block-first summary + เหตุผลสั้น (เดิม 800 → report markdown ยาวถูก truncate ก่อนถึงสรุป → parse fail)
+            system=[{"type": "text", "text": SYSTEM_PROMPT,
+                     "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": user_message}],
+        )
+        _last_usage = response.usage
+        analysis_text = response.content[0].text
+        logger.info(f"Chart result: {analysis_text[:200]}")
 
     # ── Fast-move (news-spike) detector — net M15 move ~45min, signed (+ = ขึ้น) ──
     # ใช้ใน decision_maker เป็น counter-spike guard: ห้ามเข้าสวนการสไปก์แรง (มักเป็นข่าว)

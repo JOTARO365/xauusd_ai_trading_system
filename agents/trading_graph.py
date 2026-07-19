@@ -99,6 +99,10 @@ def node_chart(state: TradingState) -> dict:
 
 
 def node_advisor(state: TradingState) -> dict:
+    import config as _cfg
+    if getattr(_cfg, "REGIME_LIVE", False):
+        # near-0 token: algo หา regime เอง (ER/ADX/vol จาก MT5) → ข้าม market_advisor LLM
+        return {"advisor_data": {}, "net_degraded": False}
     from agents.market_advisor import analyze_market_regime
     from utils.display import print_step, print_advisor_box
     print_step(1, "running", "กำลังวิเคราะห์ market regime...")
