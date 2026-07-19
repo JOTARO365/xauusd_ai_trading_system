@@ -40,11 +40,15 @@ def _refresh_levels(hour: int) -> None:
     i = n - 2                                          # แท่งปิดล่าสุด (n-1 = กำลังก่อตัว)
     regime = R.detect_regime(er[i], adx_v[i], volpct[i])
     lv = R.momentum_levels(i, high, low, close, atr_v) if regime == "TREND" else None
+    from agents.algo_state import write_state
     if lv:
         _cache.update(hour=hour, armed=True, buy=lv["buy_level"], sell=lv["sell_level"],
                       sl_pips=lv["sl_pips"], tp_pips=lv["tp_pips"])
+        write_state("ARMED", regime="TREND", via="tick",
+                    detail=f"เฝ้าทะลุ BUY>{lv['buy_level']:.1f} / SELL<{lv['sell_level']:.1f}")
     else:
         _cache.update(hour=hour, armed=False)
+        write_state("STAND-DOWN", regime=regime, via="tick", detail=f"regime={regime} (ไม่ใช่ TREND → ยืนดู)")
 
 
 def _tick() -> None:
@@ -90,6 +94,9 @@ def _tick() -> None:
               "price": tick.ask if d == "BUY" else tick.bid,
               "level": _cache["buy"] if d == "BUY" else _cache["sell"], "order": res})
         logger.warning(f"[REGIME-TICK] เข้า {d} ทะลุ level {res}")
+        from agents.algo_state import write_state
+        write_state("ENTER", regime="TREND", via="tick",
+                    detail=f"{d} ทะลุ level {_cache['buy'] if d=='BUY' else _cache['sell']:.1f}")
     except Exception as e:
         logger.debug(f"[REGIME-TICK] tick error: {e}")
 

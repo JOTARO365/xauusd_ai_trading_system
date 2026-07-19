@@ -126,6 +126,94 @@ def _fib_display(fib: dict) -> str:
             f"({arrow} {fib['swing_low']}─{fib['swing_high']})")
 
 
+_REGIME_COLOR = {"TREND": GREEN, "RANGE": CYAN, "RISK-OFF": RED, "NEUTRAL": DIM, "WARMUP": DIM}
+_STATE_COLOR  = {"ENTER": GREEN, "ARMED": GOLD, "HOLD": CYAN, "STAND-DOWN": DIM,
+                 "DISABLED": RED, "HAND-OFF": DIM, "NO-BARS": RED, "NO-SIGNAL": DIM}
+
+
+def print_regime_panel(open_positions: list | None = None):
+    """ALGO v2 status panel (REGIME_LIVE) — regime/algo state + S/R + sentiment guide + journal.
+    อ่านจากไฟล์ (bot_status, algo_state, algo_journal.summary) — display-only, 0 token, fail-soft."""
+    import os
+    import json as _json
+    import config as _cfg
+    _base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    def _read(p):
+        try:
+            with open(os.path.join(_base, p), encoding="utf-8") as f:
+                return _json.load(f)
+        except Exception:
+            return {}
+
+    st = _read(os.path.join("logs", "bot_status.json"))
+    try:
+        from agents.algo_state import read_state
+        astate = read_state()
+    except Exception:
+        astate = {}
+    try:
+        from agents.algo_journal import summary as _jsum
+        js = _jsum()
+    except Exception:
+        js = {}
+
+    lines: list[str] = []
+    # ── 1. regime → algo state ──
+    regime = astate.get("regime") or "—"
+    state  = astate.get("state") or "—"
+    rc = _REGIME_COLOR.get(regime, WHITE); sc = _STATE_COLOR.get(state, WHITE)
+    detail = astate.get("detail") or ""
+    lines.append(f"  [{rc}]{regime:<9}[/] → [{sc}]{state}[/]   [dim]{detail}[/dim]")
+    # ── 2. mode + flags ──
+    tick = "on" if getattr(_cfg, "REGIME_LIVE_TICK", False) else "off"
+    loop = int(os.getenv("REGIME_LOOP_SECS") or 15)
+    fl = lambda name, on: f"[{GREEN}]{name}[/]" if on else f"[dim]{name}[/dim]"
+    flags = " ".join([
+        fl("SR_ENTRY", getattr(_cfg, "REGIME_SR_ENTRY", False)),
+        fl("SR_EXIT",  getattr(_cfg, "REGIME_SR_EXIT", False)),
+        fl("SR_SIZE",  getattr(_cfg, "REGIME_SR_SIZING", False)),
+        fl("PEND",     getattr(_cfg, "REGIME_PENDING", False)),
+        fl("FADE",     getattr(_cfg, "REGIME_PENDING_FADE", False)),
+    ])
+    lines.append(f"  [dim]entry[/dim] tick {tick} 3s · [dim]loop[/dim] {loop}s   {flags}")
+    # ── 3. price + nearest S/R ──
+    px = (st.get("price_info") or {}).get("bid")
+    srm = ((st.get("zones") or {}).get("sr_meta")) or []
+    if px is not None:
+        res = [z for z in srm if z.get("side") == "R" and z.get("level", 0) > px]
+        sup = [z for z in srm if z.get("side") == "S" and z.get("level", 0) < px]
+        nr = min(res, key=lambda z: z["level"] - px) if res else None
+        ns = max(sup, key=lambda z: z["level"]) if sup else None
+        rtxt = f"[{RED}]R {nr['level']:.1f}[/]([dim]{nr.get('tf','')}·{nr.get('grade','')}[/dim])" if nr else "[dim]R —[/dim]"
+        stxt = f"[{GREEN}]S {ns['level']:.1f}[/]([dim]{ns.get('tf','')}·{ns.get('grade','')}[/dim])" if ns else "[dim]S —[/dim]"
+        lines.append(f"  [dim]price[/dim] [bold]{px:.1f}[/bold]   {rtxt}  {stxt}")
+    # ── 4. sentiment (guide only) ──
+    sent = st.get("sentiment", "—"); sconf = st.get("sent_conf", 0)
+    sbias = st.get("sent_bias", ""); stw = st.get("sent_tweets", 0)
+    sent_c = GREEN if sent == "BULLISH" else (RED if sent == "BEARISH" else DIM)
+    lines.append(f"  [dim]sentiment[/dim] [{sent_c}]{sent} {sconf}%[/] [dim]guide[/dim] {sbias} · {stw} tweets")
+    # ── 5. positions ──
+    if open_positions is not None:
+        algo = [p for p in open_positions if str(p.get("comment") or "").startswith("ALGO")]
+        legacy = [p for p in open_positions if not str(p.get("comment") or "").startswith("ALGO")]
+        pnl = sum(float(p.get("profit", 0) or 0) for p in open_positions)
+        pc = GREEN if pnl >= 0 else RED
+        lines.append(f"  [dim]positions[/dim] ALGO {len(algo)} · legacy {len(legacy)}   [{pc}]{pnl:+.0f}฿[/]")
+    # ── 6. journal counterfactual ──
+    mom = js.get("momentum") or {}; fade = js.get("fade") or {}
+
+    def _jline(tag, d):
+        if not d or d.get("n_closed", 0) == 0:
+            return f"[dim]{tag} n=0[/dim]"
+        exp = d.get("exp_R", 0); ec = GREEN if exp > 0 else RED
+        return f"{tag} n={d['n_closed']} [{ec}]exp{exp:+.2f}R[/] wr{int(d.get('win_rate',0)*100)}%"
+    lines.append(f"  [dim]journal[/dim] {_jline('mom', mom)} · {_jline('fade', fade)} [dim](shadow)[/dim]")
+
+    console.print(Panel("\n".join(lines), title=f"[bold {GOLD}]ALGO v2 · REGIME_LIVE[/]",
+                        border_style=GOLD, padding=(0, 1), box=box.ROUNDED))
+
+
 def print_signal_box(chart_data: dict):
     signal     = chart_data.get("signal", "NO_TRADE")
     conf       = chart_data.get("confidence", 0)

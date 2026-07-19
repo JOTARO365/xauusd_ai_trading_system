@@ -30,10 +30,15 @@ def _log(rec):
         pass
 
 
-def _hb(state, detail=""):
-    """Heartbeat: log ว่า algo executor ยังหายใจ + ตัดสินใจอะไร (DEBUG, 0 token, 0 order).
-    ให้แยกออกว่า 'ยืนดูถูกต้อง' vs 'พังเงียบ'. grep '[ALGO]' ใน system.log เพื่อดู."""
+def _hb(state, detail="", regime=None):
+    """Heartbeat: log ว่า algo executor ยังหายใจ + ตัดสินใจอะไร (DEBUG, 0 token, 0 order) + เขียน algo_state
+    ให้ terminal/dashboard อ่าน. แยก 'ยืนดูถูกต้อง' vs 'พังเงียบ'. grep '[ALGO]' ใน system.log."""
     logger.debug(f"[ALGO] {state}" + (f" — {detail}" if detail else ""))
+    try:
+        from agents.algo_state import write_state
+        write_state(state, regime=regime, detail=detail, via="cycle")
+    except Exception:
+        pass
 
 
 def run_regime_executor():
@@ -57,7 +62,7 @@ def run_regime_executor():
     regime = rec.get("regime")
     sig = rec.get("signal")
     if not sig or sig.get("algo") != "momentum_breakout":   # เข้าเฉพาะ momentum ใน TREND (mean_rev ตัดแล้ว)
-        _hb("STAND-DOWN", f"regime={regime} (ไม่ใช่ TREND → ยืนดู)")
+        _hb("STAND-DOWN", f"regime={regime} (ไม่ใช่ TREND → ยืนดู)", regime=regime)
         return None
     from agents.regime_adaptive import is_enabled                 # weekly auto-disable (decay kill switch)
     if not is_enabled("momentum_breakout"):
@@ -74,7 +79,7 @@ def run_regime_executor():
                 return None
     except Exception:
         pass
-    _hb("ENTER", f"regime=TREND {sig.get('dir')} SL={sig.get('sl_pips')}p TP={sig.get('tp_pips')}p → วาง order")
+    _hb("ENTER", f"{sig.get('dir')} SL={sig.get('sl_pips')}p TP={sig.get('tp_pips')}p → วาง order", regime="TREND")
     _last_bar = rec["bar_ts"]
     from connectors.mt5_connector import open_order
     from agents.algo_exit import sr_tp_pips                  # P-D: TP ตามแนว S/R (flag OFF → RR2 เดิม)

@@ -18,7 +18,7 @@ from agents.pending_manager import (
 from agents.trading_graph import TRADING_APP, GRAPH_CONFIG, EMPTY_STATE, TradingState
 from utils.display import (
     console, print_header, print_cycle_start, print_cycle_end,
-    print_warning, print_error, print_ready_mode_banner,
+    print_warning, print_error, print_ready_mode_banner, print_regime_panel,
 )
 from utils.market_clock import next_interval, market_sleep_status
 import config
@@ -44,6 +44,9 @@ READY_AI_MIN_SECS     = 300   # Ready Mode / near-HTF: ไม่ยิง AI ถ
 # default true (07-03 Track-1 cost): ตลาดเงียบจริง + ไม่มีไม้บอท → ยืดเป็น 30 นาที
 AI_IDLE_GATE          = os.getenv("AI_IDLE_GATE", "true").lower() != "false"
 AI_QUIET_INTERVAL_SECS= int(os.getenv("AI_QUIET_INTERVAL_SECS") or 1800)  # idle + เงียบจริง → ยืด throttle (default 30 นาที)
+# REGIME_LIVE fast-loop: cap main loop ให้สั้น เพื่อ trailing/journal/gate responsive (entry เป็น 3s tick แยก;
+# AI ยัง throttle ด้วย AI_MIN_INTERVAL แยก → token คงเดิม). ไม่แตะ net-degraded backoff. default 15s.
+REGIME_LOOP_SECS      = int(os.getenv("REGIME_LOOP_SECS") or 15)
 # MIN_AI_EQUITY ย้ายไป config.py (live-reload ได้) — อ่านผ่าน config.MIN_AI_EQUITY
 _last_ai_mono:  float = 0.0   # monotonic time ของ AI cycle ล่าสุด
 _last_ai_price: float = 0.0   # bid price ตอน AI cycle ล่าสุด
@@ -634,6 +637,12 @@ async def main():
                             print_ready_mode_banner(None, "EXIT")
                             logger.info("[READY] ออก Ready Mode — zone ออกจากระยะ")
 
+                    # REGIME_LIVE fast-loop: cap ให้ trailing/journal/gate responsive (entry 3s tick แยก;
+                    # AI throttle 900s แยก → token คงเดิม). net-degraded คนละ branch = ไม่โดน cap.
+                    if getattr(config, "REGIME_LIVE", False) and interval > REGIME_LOOP_SECS:
+                        interval = REGIME_LOOP_SECS
+                        reason   = f"REGIME_LIVE fast-loop {REGIME_LOOP_SECS}s — {reason}"
+
                     logger.info(f"Next interval: {interval}s — {reason}")
 
             # ── Weekly calendar pending (จันทร์เช้า) — รันเสมอไม่ขึ้นกับ slots ──
@@ -649,6 +658,12 @@ async def main():
                 else:
                     logger.info("Weekly calendar pending: ไม่วาง order (ดู system.log)")
 
+            # ALGO v2 terminal panel — สถานะระบบใหม่ทุกรอบ (regime/algo/S-R/sentiment guide/journal). display-only.
+            if getattr(config, "REGIME_LIVE", False):
+                try:
+                    print_regime_panel(open_positions=open_pos)
+                except Exception as _pe:
+                    logger.debug(f"[regime_panel] {_pe}")
             print_cycle_end(interval, reason)
             await asyncio.sleep(interval)
     except KeyboardInterrupt:

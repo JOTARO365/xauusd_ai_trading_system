@@ -217,7 +217,9 @@ def node_decision(state: TradingState) -> dict:
         detail = f"EXECUTE {data.get('direction','')}" if action == "EXECUTE" else "SKIP"
         status = "done" if action == "EXECUTE" else "skip"
         print_step(4, status, detail)
-        print_decision_box(data)
+        import config as _dcfg                          # REGIME_LIVE: SKIP box = noise (algo คุม entry) → ซ่อน
+        if action == "EXECUTE" or not getattr(_dcfg, "REGIME_LIVE", False):
+            print_decision_box(data)
         return {
             "decision": data,
             "latencies": {**state.get("latencies", {}), "decision_maker": lat},
