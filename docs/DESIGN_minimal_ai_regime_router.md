@@ -5,6 +5,13 @@
 **แยกจาก** **EXECUTION** (สูตร deterministic ตายตัว). ตรง skill `quant-systematic-trading` §5 + first-principles
 (AI ไม่มี edge เรื่องทิศ แต่มี edge เรื่องอ่านข่าว/regime).
 
+## 🔒 CORE INVARIANT (user directive 2026-07-19 — ห้ามละเมิดทุกกรณี)
+1. **การตัดสินใจเข้า order = ไม่ prediction** — **คำนวณจาก data ที่ได้เท่านั้น** (deterministic math บนราคา/โครงสร้าง)
+   ไม่มีการ "ทำนายว่าราคาจะไปทางไหน". ทิศ/entry/SL/TP มาจากสูตร ไม่ใช่การเดา.
+2. **ข่าว/AI = บอก sentiment เท่านั้น** → เป็น **guide ในการเลือก algo (regime routing)** — **ไม่ตัดสินทิศ/เข้า order**.
+   AI อยู่ชั้น SELECTION เท่านั้น, ไม่แตะ EXECUTION.
+→ ทุก component ต้องผ่าน invariant นี้. ถ้า design/code ไหนให้ AI หรือ prediction ตัดสิน entry = ผิด, ต้องแก้.
+
 ---
 
 ## 1. Motivation
