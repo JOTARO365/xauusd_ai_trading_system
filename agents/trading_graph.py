@@ -215,6 +215,7 @@ def node_position_mgmt(state: TradingState) -> dict:
     from agents.swing_manager import manage_swing_campaign   # inert จน SWING_ENABLED=true + equity≥min
     from agents.reporter import scan_manual_orders
     from utils.display import print_warning
+    import config as _cfg
     chart = state.get("chart_data") or {}
     # scan manual orders every cycle (including skip_ai) so they're never missed
     try:
@@ -235,6 +236,8 @@ def node_position_mgmt(state: TradingState) -> dict:
         (manage_trailing_stop,   (),        "Trailing Stop: ขยับ SL {} position"),
         (manage_swing_campaign,  (chart,),  "SWING: {} action(s) (long-term campaign)"),
     )
+    if getattr(_cfg, "REGIME_LIVE", False):   # algo mode: ปิด swing entry (algo วาง order เอง) — protective ที่เหลือคงไว้
+        _mgmt = tuple(m for m in _mgmt if m[0].__name__ != "manage_swing_campaign")
     for _fn, _args, _msg in _mgmt:
         try:
             _n = _fn(*_args)
@@ -248,6 +251,15 @@ def node_position_mgmt(state: TradingState) -> dict:
         log_excursions()
     except Exception as _exc_e:
         logger.debug(f"[EXCURSION] hook fail-soft: {_exc_e}")
+    # REGIME_LIVE: algo entry executor — วาง order จริงจาก momentum breakout (deterministic). รันทุก cycle. fail-soft.
+    try:
+        from agents.regime_executor import run_regime_executor
+        _r = run_regime_executor()
+        if _r and isinstance(_r.get("order"), dict) and _r["order"].get("success"):
+            print_warning(f"[ALGO] เข้า {_r['signal']['dir']} momentum breakout "
+                          f"SL={_r['signal']['sl_pips']}p TP={_r['signal']['tp_pips']}p")
+    except Exception as _ae:
+        logger.error(f"[GRAPH:regime_executor] {_ae}")
     return {}
 
 
@@ -255,6 +267,7 @@ def node_reporter(state: TradingState) -> dict:
     from agents.reporter import log_trade, print_summary, scan_manual_orders
     from agents.pending_manager import auto_place_pending_orders, manage_range_pending, manage_sl_reentry, cancel_pending_on_breakdown, manage_zone_reentry
     from utils.display import print_step, print_warning
+    import config as _cfg
     print_step(5, "running", "กำลังบันทึกผล...")
     chart     = state.get("chart_data") or {}
     decision  = state.get("decision") or {}
@@ -265,27 +278,31 @@ def node_reporter(state: TradingState) -> dict:
         print_step(5, "done", "done" + (f" (+{n} manual)" if n else ""))
         if n: print_warning(f"พบ manual order {n} รายการ — บันทึก context แล้ว")
         try:
-            cb = cancel_pending_on_breakdown(chart)
+            cb = cancel_pending_on_breakdown(chart)   # cancel = safety รันเสมอ
             if cb: print_warning(f"Breakdown: ยกเลิก {cb} AP pending ที่จะ fill สวน momentum")
-            p = auto_place_pending_orders(chart, sentiment)
-            if p: print_warning(f"Auto-pending: วาง {p} order ที่ key S/R levels (H4+Daily)")
         except Exception as e:
-            logger.error(f"Auto-pending error: {e}")
-        try:
-            rp = manage_range_pending(chart)
-            if rp: print_warning(f"Range pending: วาง {rp} order ที่กรอบ sideways")
-        except Exception as e:
-            logger.error(f"Range pending error: {e}")
-        try:
-            sr = manage_sl_reentry(chart)
-            if sr: print_warning(f"Post-SL: วาง {sr} re-entry order ที่ safe zone")
-        except Exception as e:
-            logger.error(f"Post-SL re-entry error: {e}")
-        try:
-            zr = manage_zone_reentry(chart)
-            if zr: print_warning(f"ZRE: วาง {zr} zone re-entry order ที่โซนเกรดสูง (RR≥2)")
-        except Exception as e:
-            logger.error(f"ZRE error: {e}")
+            logger.error(f"Cancel-pending error: {e}")
+        if not getattr(_cfg, "REGIME_LIVE", False):   # REGIME_LIVE: algo วาง order เอง → ปิด pending/reentry/ZRE ทั้งหมด
+            try:
+                p = auto_place_pending_orders(chart, sentiment)
+                if p: print_warning(f"Auto-pending: วาง {p} order ที่ key S/R levels (H4+Daily)")
+            except Exception as e:
+                logger.error(f"Auto-pending error: {e}")
+            try:
+                rp = manage_range_pending(chart)
+                if rp: print_warning(f"Range pending: วาง {rp} order ที่กรอบ sideways")
+            except Exception as e:
+                logger.error(f"Range pending error: {e}")
+            try:
+                sr = manage_sl_reentry(chart)
+                if sr: print_warning(f"Post-SL: วาง {sr} re-entry order ที่ safe zone")
+            except Exception as e:
+                logger.error(f"Post-SL re-entry error: {e}")
+            try:
+                zr = manage_zone_reentry(chart)
+                if zr: print_warning(f"ZRE: วาง {zr} zone re-entry order ที่โซนเกรดสูง (RR≥2)")
+            except Exception as e:
+                logger.error(f"ZRE error: {e}")
         print_summary()
     except Exception as e:
         print_step(5, "error", str(e)[:60])

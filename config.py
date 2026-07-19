@@ -164,6 +164,13 @@ SPECIALIST_ENABLED    = os.getenv("SPECIALIST_ENABLED", "false").lower() == "tru
 # ดู docs/DESIGN_regime_shadow.md. Kill switch = REGIME_SHADOW=false (live-reload).
 REGIME_SHADOW         = os.getenv("REGIME_SHADOW", "false").lower() == "true"
 
+# REGIME_LIVE = algo ตัดสินใจ entry เอง (แทน LLM) → วาง order จริง lot จิ๋ว ผ่าน open_order เดิม
+# (DRY_RUN + daily-cap + SL/TP + fixed-lot 0.01 ครบในตัว). LLM → sentiment-only (decision_maker หยุดเปิดไม้).
+# ⚠️ LIVE MONEY — default OFF. เปิด = พี่ควบคุมเอง (set .env REGIME_LIVE=true + restart). แนะนำ DRY_RUN verify ก่อน.
+# entry algo = momentum_breakout ใน TREND เท่านั้น (P2: ยังไม่มี validated edge → lot จิ๋ว เก็บ data จริง).
+# kill switch = REGIME_LIVE=false (live-reload). หมายเหตุ: pending/ZRE/swing เป็น path แยก (ปิดเองถ้าจะ algo-only ล้วน).
+REGIME_LIVE           = os.getenv("REGIME_LIVE", "false").lower() == "true"
+
 # ZRE = Zone Re-Entry RR≥2 (v2 fixed-SL). วาง LIMIT ดักเด้งที่โซนเกรดสูงเชิงรุก (RR≥2, SL คงที่).
 # เกราะสุด (replay 2026-07-16): trend-align-only (ตัด SIDEWAYS ที่ replay ขาดทุน −0.6R),
 # grade A/B + score≥ZRE_MIN_SCORE, สด ≤ZRE_MAX_BARS_SINCE, ในระยะ ZRE_PROXIMITY_PCT%,

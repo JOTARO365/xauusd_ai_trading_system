@@ -779,6 +779,12 @@ def make_decision(chart_data: dict, sentiment_data: dict, advisor_data: dict | N
     global _last_usage
     _last_usage = None
 
+    # REGIME_LIVE (algo entry mode): LLM = sentiment only — decision_maker หยุดเปิดไม้ใหม่ทั้งหมด.
+    # entry เป็นหน้าที่ของ regime_executor (algo deterministic). analyst/advisor ยังรันป้อน sentiment→dashboard.
+    if getattr(_cfg, "REGIME_LIVE", False):
+        return {"action": "SKIP", "reason": "REGIME_LIVE: algo entry mode (LLM sentiment only)",
+                "trade_quality": "C", "confidence_score": 0}
+
     account = get_account_info()
     history = get_trade_history_summary()
 
