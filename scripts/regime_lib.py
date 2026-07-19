@@ -9,9 +9,10 @@ regime_lib.py — P1: deterministic regime detector + ONE-algo-per-regime librar
 REGIME DETECTOR (deterministic fusion): Efficiency Ratio (Kaufman) + ADX (Wilder 14) + realized-vol percentile
   → TREND / RANGE / RISK-OFF / NEUTRAL
 
-ALGO LIBRARY — ONE ต่อ regime (math จาก research):
-  • TREND    → momentum_breakout : Donchian ทะลุ + ATR SL/TP           [TSMOM verified 3-0]
-  • RANGE    → mean_reversion    : z-score |s|>1.25 + OU half-life gate  [Avellaneda verified 3-0]
+ALGO LIBRARY (หลัง P2 OOS validation — ตัดตัวที่พิสูจน์แล้วแพ้):
+  • TREND    → momentum_breakout : Donchian ทะลุ + ATR SL/TP  [trend-bet; shadow forward-test ตัดสิน]
+  • RANGE    → STAND-DOWN (mean_reversion ตัดออก 07-19: P2 OOS พิสูจน์ −EV both periods 0/27 combos;
+                          ฟังก์ชัน algo_mean_reversion คงไว้อ้างอิง backtest เท่านั้น ไม่อยู่ใน routing)
   • RISK-OFF → STAND-DOWN (ทอง −10%/yr ใน high-vol — HMM เรา)
   • NEUTRAL  → STAND-DOWN
 
@@ -140,7 +141,7 @@ def detect_regime(er, adx_v, volpct):
     return "NEUTRAL"
 
 
-REGIME_ALGO = {"TREND": "momentum_breakout", "RANGE": "mean_reversion"}   # ONE ต่อ regime
+REGIME_ALGO = {"TREND": "momentum_breakout"}   # RANGE→STAND-DOWN (mean_reversion ตัด: P2 OOS −EV). ONE ต่อ regime
 
 
 # ─────────────────────────── algorithm library (EXECUTION — deterministic, ONE/regime) ───────────────────────────
@@ -157,7 +158,8 @@ def algo_momentum_breakout(i, high, low, close, atr_v):
 
 
 def algo_mean_reversion(i, close, atr_v):
-    """RANGE: z-score fade |s|>1.25 (Avellaneda) + OU half-life gate. entry = คำนวณจาก data (ไม่ prediction)."""
+    """[DEPRECATED จาก routing 07-19 — P2 OOS พิสูจน์ −EV both periods] คงไว้อ้างอิง backtest เท่านั้น.
+    RANGE: z-score fade |s|>1.25 (Avellaneda) + OU half-life gate. entry = คำนวณจาก data (ไม่ prediction)."""
     if i < MR_WIN or np.isnan(atr_v[i]) or atr_v[i] == 0:
         return None
     w = close[i - MR_WIN + 1:i + 1]
