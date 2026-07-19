@@ -33,6 +33,8 @@ def run_regime_executor():
     บาร์ปิดใหม่ + momentum signal + ไม่มีไม้ ALGO ค้าง → open_order (lot config, SL/TP จาก algo)."""
     if not getattr(_cfg, "REGIME_LIVE", False):
         return None
+    if getattr(_cfg, "REGIME_LIVE_TICK", False):        # per-tick thread จัดการแล้ว → per-cycle ไม่ต้องเข้าซ้ำ
+        return None
     global _last_bar
     bars = _bars_from_feed()
     if bars is None:

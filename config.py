@@ -171,6 +171,12 @@ REGIME_SHADOW         = os.getenv("REGIME_SHADOW", "false").lower() == "true"
 # kill switch = REGIME_LIVE=false (live-reload). หมายเหตุ: pending/ZRE/swing เป็น path แยก (ปิดเองถ้าจะ algo-only ล้วน).
 REGIME_LIVE           = os.getenv("REGIME_LIVE", "false").lower() == "true"
 
+# REGIME_LIVE_TICK = per-tick executor (daemon thread) — เช็ค breakout ทุก ~Ns (realtime) แทนรอ bar-close cycle.
+# level คำนวณต่อ bar-close (cache), ต่อ tick แค่เทียบราคา vs level (0 LLM, 0 recompute). ต้องมี REGIME_LIVE=true ด้วย.
+# ⚠️ LIVE MONEY — default OFF. kill = REGIME_LIVE_TICK=false. เปิด = per-cycle executor ปิดอัตโนมัติ (กันเข้าซ้ำ).
+REGIME_LIVE_TICK      = os.getenv("REGIME_LIVE_TICK", "false").lower() == "true"
+REGIME_TICK_INTERVAL_SEC = int(os.getenv("REGIME_TICK_INTERVAL_SEC") or 3)
+
 # ZRE = Zone Re-Entry RR≥2 (v2 fixed-SL). วาง LIMIT ดักเด้งที่โซนเกรดสูงเชิงรุก (RR≥2, SL คงที่).
 # เกราะสุด (replay 2026-07-16): trend-align-only (ตัด SIDEWAYS ที่ replay ขาดทุน −0.6R),
 # grade A/B + score≥ZRE_MIN_SCORE, สด ≤ZRE_MAX_BARS_SINCE, ในระยะ ZRE_PROXIMITY_PCT%,
@@ -260,9 +266,13 @@ def reload_config():
     NNLB_FASTPATH            = os.getenv("NNLB_FASTPATH", "true").lower() != "false"
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
     global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT, REGIME_SHADOW
+    global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
     SPECIALIST_ENABLED       = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"
     REGIME_SHADOW            = os.getenv("REGIME_SHADOW", "false").lower() == "true"
+    REGIME_LIVE              = os.getenv("REGIME_LIVE", "false").lower() == "true"       # kill switch live-reload
+    REGIME_LIVE_TICK         = os.getenv("REGIME_LIVE_TICK", "false").lower() == "true"
+    REGIME_TICK_INTERVAL_SEC = int(os.getenv("REGIME_TICK_INTERVAL_SEC") or 3)
 
     global ZONE_REENTRY_ENABLED, ZONE_REENTRY_SHADOW, ZRE_MIN_SCORE, ZRE_MAX_BARS_SINCE
     global ZRE_PROXIMITY_PCT, ZRE_TREND_ALIGN_ONLY, ZRE_MAX_CONCURRENT

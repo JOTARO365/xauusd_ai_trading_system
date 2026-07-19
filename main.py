@@ -467,6 +467,11 @@ async def main():
     if start_guardian():
         console.print(f"  [green]✓[/green]  Position-Guardian thread: ON\n")
 
+    # ── Regime per-tick executor thread (default OFF; REGIME_LIVE_TICK=true + REGIME_LIVE=true) ──
+    from agents.regime_tick import start_regime_tick
+    if start_regime_tick():
+        console.print(f"  [green]✓[/green]  Regime per-tick executor: ON (algo entry realtime)\n")
+
     # ── DB connectivity check ──────────────────────────────────
     from db.connection import is_available, get_url
     if is_available():
@@ -651,6 +656,8 @@ async def main():
     finally:
         from agents.position_guardian import stop_guardian
         stop_guardian()        # หยุด guardian ก่อน disconnect MT5 (กัน guardian เรียก mt5 หลังตัด)
+        from agents.regime_tick import stop_regime_tick
+        stop_regime_tick()     # หยุด per-tick thread ก่อน disconnect MT5 เช่นกัน
         disconnect_mt5()
 
 

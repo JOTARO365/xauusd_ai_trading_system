@@ -157,6 +157,19 @@ def algo_momentum_breakout(i, high, low, close, atr_v):
     return {"algo": "momentum_breakout", "dir": d, "sl_pips": sl_pips, "tp_pips": round(sl_pips * RR)}
 
 
+def momentum_levels(i, high, low, close, atr_v):
+    """ระดับ Donchian breakout สำหรับ **แท่งที่กำลังก่อตัว** (per-tick): ราคาต้องทะลุเพื่อเข้า.
+    i = แท่งปิดล่าสุด → level = max/min ของ BRK_WIN แท่งปิดล่าสุด (จบที่ i). คืน None ถ้า data ไม่พอ.
+    ใช้คู่ detect_regime (เข้าเฉพาะ TREND). SL/TP = ATR เดียวกับ algo_momentum_breakout."""
+    if i < BRK_WIN or np.isnan(atr_v[i]) or atr_v[i] == 0:
+        return None
+    hh = high[i - BRK_WIN + 1:i + 1].max()
+    ll = low[i - BRK_WIN + 1:i + 1].min()
+    sl_pips = round(ATR_SL * atr_v[i] / POINT)
+    return {"buy_level": float(hh), "sell_level": float(ll),
+            "sl_pips": sl_pips, "tp_pips": round(sl_pips * RR)}
+
+
 def algo_mean_reversion(i, close, atr_v):
     """[DEPRECATED จาก routing 07-19 — P2 OOS พิสูจน์ −EV both periods] คงไว้อ้างอิง backtest เท่านั้น.
     RANGE: z-score fade |s|>1.25 (Avellaneda) + OU half-life gate. entry = คำนวณจาก data (ไม่ prediction)."""
