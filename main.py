@@ -291,7 +291,8 @@ def _should_skip_ai() -> tuple[bool, str]:
 
     # 0. Capital floor — ทุนต่ำกว่าเกณฑ์ → ไม่รัน AI เลย (override ทุกอย่าง รวม spike/first cycle)
     #    pos mgmt ยังทำงานผ่าน graph; ประหยัด token ตอนพอร์ตเล็กเกินกว่าจะเทรดมีความหมาย
-    if config.MIN_AI_EQUITY > 0:
+    #    ⚠️ shadow mode (REGIME_SHADOW_FILL): paper-trade เก็บ data → ทุนไม่เกี่ยว → รัน AI ต่อแม้ทุนไม่พอ (user 07-20)
+    if config.MIN_AI_EQUITY > 0 and not getattr(config, "REGIME_SHADOW_FILL", False):
         try:
             _eq = get_account_info().get("equity")
             if _eq is not None and _eq < config.MIN_AI_EQUITY:

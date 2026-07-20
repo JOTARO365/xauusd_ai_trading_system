@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import sys
+from datetime import datetime, timezone
 
 import config as _cfg
 
@@ -95,11 +96,12 @@ def _gate_cancel_fades(price, atr, market):
     return n
 
 
-def _place_trend_straddle(positions, i, high, low, close, atr, hour):
+def _place_trend_straddle(positions, i, high, low, close, atr, hour, bar_ts=None):
     """TREND: STOP straddle breakout ที่ Donchian level (momentum). MAX_OPEN guard ต่อทิศ."""
     from connectors.mt5_connector import place_pending_order
     from agents.algo_exit import sr_tp_pips                   # P-D: TP ตามแนว S/R (flag OFF → RR2 เดิม)
     from agents.algo_sizing import algo_lot                   # P-E: lot risk-based (flag OFF → fixed เดิม)
+    from agents.algo_journal import record_pending            # เก็บ lifecycle pending (placed→fill→TP/SL)
     lv = R.momentum_levels(i, high, low, close, atr)
     if not lv:
         return 0
@@ -112,6 +114,7 @@ def _place_trend_straddle(positions, i, high, low, close, atr, hour):
         if place_pending_order("BUY_STOP", lv["buy_level"], lv["sl_pips"], _btp,
                                comment="ALGO-P", expiry_hours=2, lot=_lot, shadow=_sh).get("success"):
             placed += 1
+            record_pending("BUY_STOP", lv["buy_level"], lv["sl_pips"], _btp or lv["tp_pips"], "STOP", "TREND", bar_ts)
     else:
         logger.info("[REGIME-PENDING] ข้าม BUY_STOP — BUY เต็ม MAX_OPEN")
     if _same_dir_count(positions, "SELL") < limit:
@@ -119,6 +122,7 @@ def _place_trend_straddle(positions, i, high, low, close, atr, hour):
         if place_pending_order("SELL_STOP", lv["sell_level"], lv["sl_pips"], _stp,
                                comment="ALGO-P", expiry_hours=2, lot=_lot, shadow=_sh).get("success"):
             placed += 1
+            record_pending("SELL_STOP", lv["sell_level"], lv["sl_pips"], _stp or lv["tp_pips"], "STOP", "TREND", bar_ts)
     else:
         logger.info("[REGIME-PENDING] ข้าม SELL_STOP — SELL เต็ม MAX_OPEN")
     if placed:
@@ -130,13 +134,14 @@ def _place_trend_straddle(positions, i, high, low, close, atr, hour):
     return placed
 
 
-def _place_range_fade(positions, sr_view, atr, hour):
+def _place_range_fade(positions, sr_view, atr, hour, bar_ts=None):
     """RANGE: LIMIT fade ที่ S/R แข็ง (veto อ่อน). BUY_LIMIT@support / SELL_LIMIT@resistance. MAX_OPEN guard."""
     if not sr_view.get("ok"):
         return 0
     from connectors.mt5_connector import place_pending_order
     from agents.sr_engine import pick_tp_target
     from agents.entry_gate import W
+    from agents.algo_journal import record_pending            # เก็บ lifecycle pending (placed→fill→TP/SL)
     limit = _max_open_limit()
     sl_pips = max(1, round(0.6 * atr / R.POINT))             # SL 0.6·ATR เลย level (กัน stop-hunt เบื้องต้น; P-E refine)
     placed = 0
@@ -154,6 +159,7 @@ def _place_range_fade(positions, sr_view, atr, hour):
         if place_pending_order(otype, lvl, sl_pips, tp_pips, comment="ALGO-PF", expiry_hours=6,
                                lot=algo_lot(sl_pips), shadow=getattr(_cfg, "REGIME_SHADOW_FILL", False)).get("success"):
             placed += 1
+            record_pending(otype, lvl, sl_pips, tp_pips, "FADE", "RANGE", bar_ts, grade=lvl_obj.get("grade"))
             logger.warning(f"[REGIME-FADE] {otype}@{lvl:.2f} SL={sl_pips}p TP={tp_pips}p (RR={tp['rr']}) grade={lvl_obj.get('grade')}")
 
     _one(sr_view.get("support"), "BUY", "BUY_LIMIT")         # fade: ซื้อที่แนวรับ
@@ -193,6 +199,10 @@ def manage_algo_pending():
         vp = R.vol_percentile(close); atr_a = R.atr(high, low, close)
         i = n - 2
         atr = float(atr_a[i])
+        try:
+            _bar_ts = datetime.fromtimestamp(int(_t[i]), timezone.utc).isoformat()
+        except Exception:
+            _bar_ts = None
         regime = R.detect_regime(er[i], adx[i], vp[i])
         # algo_state → terminal panel (pending mode ชัด แทน HAND-OFF จาก executor)
         _fade_on = regime == "RANGE" and getattr(_cfg, "REGIME_PENDING_FADE", False)
@@ -223,10 +233,10 @@ def manage_algo_pending():
             from agents.regime_adaptive import is_enabled
             if not is_enabled("momentum_breakout"):
                 return 0
-            return _place_trend_straddle(positions, i, high, low, close, atr_a, hour)
+            return _place_trend_straddle(positions, i, high, low, close, atr_a, hour, _bar_ts)
         # RANGE → LIMIT fade
         if regime == "RANGE" and getattr(_cfg, "REGIME_PENDING_FADE", False):
-            return _place_range_fade(positions, _sr_view(high, low, close, atr, st), atr, hour)
+            return _place_range_fade(positions, _sr_view(high, low, close, atr, st), atr, hour, _bar_ts)
         return 0
     except Exception as e:
         logger.error(f"[REGIME-PENDING] {e}")

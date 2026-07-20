@@ -128,6 +128,113 @@ def _close(rec, result, r_gross, bars, exit_px, exit_ts, mfe, mae):
     return True
 
 
+_PENDING_EXPIRY_BARS = {"STOP": 2, "FADE": 6}    # sync expiry_hours ใน regime_pending (H1 bar)
+
+
+def _idx_of(bar_ts, times):
+    """หา index ของ bar_ts ใน times (None ถ้าหลุด window)."""
+    if not bar_ts:
+        return None
+    for k in range(len(times)):
+        try:
+            if datetime.fromtimestamp(int(times[k]), timezone.utc).isoformat() == bar_ts:
+                return k
+        except (ValueError, OSError, OverflowError):
+            continue
+    return None
+
+
+def record_pending(otype, level, sl_pips, tp_pips, mode, regime, bar_ts, grade=None):
+    """บันทึก pending order (real/shadow) ตอนวาง → resolve lifecycle ทีหลัง. dedup 1/(otype,level) ที่ยัง unresolved.
+    mode='STOP'(breakout)/'FADE'. bar_ts=แท่งปิดล่าสุด (ref สำหรับ resolve). fail-soft."""
+    if not getattr(_cfg, "REGIME_LIVE", False):
+        return
+    try:
+        rows = _rows()
+        lv = round(float(level), 1)
+        done = ("TP", "SL", "TIMEOUT", "EXPIRED")
+        openp = {(r["otype"], round(float(r["level"]), 1)) for r in rows
+                 if r.get("kind") == "pending" and (r.get("outcome") or {}).get("result") not in done}
+        if (otype, lv) in openp:
+            return
+        direction = "BUY" if str(otype).startswith("BUY") else "SELL"
+        sign = 1 if direction == "BUY" else -1
+        entry = float(level)
+        rows.append({
+            "kind": "pending", "logged_at": datetime.now(timezone.utc).isoformat(), "bar_ts": bar_ts,
+            "otype": otype, "mode": mode, "dir": direction, "level": round(entry, 2),
+            "sl": round(entry - sign * sl_pips * POINT, 2), "tp": round(entry + sign * tp_pips * POINT, 2),
+            "sl_pips": sl_pips, "tp_pips": tp_pips, "regime": regime, "grade": grade,
+            "filled": False, "fill_ts": None, "outcome": None,
+        })
+        _write(rows)
+    except Exception:
+        pass
+
+
+def _resolve_pending(rec, high, low, close, times):
+    """2 เฟส: (1) fill เมื่อราคาแตะ level, (2) หลัง fill → TP/SL first-touch. EXPIRED ถ้าไม่ fill. คืน True ถ้าเปลี่ยน."""
+    entry = float(rec["level"]); direction = rec["dir"]; is_stop = "STOP" in rec["otype"]
+    risk = rec["sl_pips"] * POINT
+    if risk <= 0:
+        return False
+    i0 = _idx_of(rec.get("bar_ts"), times)
+    if i0 is None:
+        return False
+    sign = 1 if direction == "BUY" else -1
+    sl = entry - sign * rec["sl_pips"] * POINT
+    tp = entry + sign * rec["tp_pips"] * POINT
+    expiry = _PENDING_EXPIRY_BARS.get(rec.get("mode"), 6)
+    fill_j = _idx_of(rec.get("fill_ts"), times) if rec.get("filled") else None
+
+    # ── เฟส 1: หา fill (LIMIT รอราคาย้อนแตะ · STOP รอทะลุ) ──
+    if not rec.get("filled"):
+        for j in range(i0 + 1, len(close)):
+            hi, lo = float(high[j]), float(low[j])
+            if direction == "BUY":
+                filled = (hi >= entry) if is_stop else (lo <= entry)
+            else:
+                filled = (lo <= entry) if is_stop else (hi >= entry)
+            if filled:
+                rec["filled"] = True
+                try:
+                    rec["fill_ts"] = datetime.fromtimestamp(int(times[j]), timezone.utc).isoformat()
+                except Exception:
+                    rec["fill_ts"] = None
+                fill_j = j
+                break
+            if (j - i0) >= expiry:
+                rec["outcome"] = {"result": "EXPIRED", "bars_held": j - i0, "note": "ไม่ fill ใน expiry — ยกเลิก"}
+                return True
+        if not rec.get("filled"):
+            prev = rec.get("outcome")
+            rec["outcome"] = {"result": "WAITING", "bars_held": len(close) - 1 - i0}
+            return rec["outcome"] != prev
+
+    # ── เฟส 2: outcome จาก fill bar → TP/SL first-touch (entry = level) ──
+    if fill_j is None:
+        return False                                         # fill bar หลุด window (น่าจะ resolve ไปแล้ว)
+    mfe = (rec.get("outcome") or {}).get("mfe_R", 0.0) or 0.0
+    mae = (rec.get("outcome") or {}).get("mae_R", 0.0) or 0.0
+    for j in range(fill_j + 1, len(close)):
+        hi, lo = float(high[j]), float(low[j])
+        fav = (hi - entry) if direction == "BUY" else (entry - lo)
+        adv = (entry - lo) if direction == "BUY" else (hi - entry)
+        mfe = max(mfe, fav / risk); mae = min(mae, -adv / risk)
+        hit_sl = (lo <= sl) if direction == "BUY" else (hi >= sl)
+        hit_tp = (hi >= tp) if direction == "BUY" else (lo <= tp)
+        if hit_sl:
+            return _close(rec, "SL", -1.0, j - fill_j, close[j], times[j], mfe, mae)
+        if hit_tp:
+            return _close(rec, "TP", rec["tp_pips"] / rec["sl_pips"], j - fill_j, close[j], times[j], mfe, mae)
+        if (j - fill_j) >= MAX_HOLD_BARS:
+            return _close(rec, "TIMEOUT", sign * (float(close[j]) - entry) / risk, j - fill_j, close[j], times[j], mfe, mae)
+    prev = rec.get("outcome")
+    rec["outcome"] = {"result": "FILLED", "bars_held": len(close) - 1 - fill_j,
+                      "mfe_R": round(mfe, 3), "mae_R": round(mae, 3)}
+    return rec["outcome"] != prev
+
+
 def _capture_fade(rows, high, low, close, times):
     """P-B shadow: อ่าน sr_meta (bot_status) + cluster (MT5) → entry_gate.entry_direction → fade record.
     dedup: 1 OPEN fade / (dir, level). คืน record ใหม่ หรือ None. fail-soft."""
@@ -240,14 +347,15 @@ def journal_tick(bars=None):
         except Exception:
             pass
 
-    # ── 2. resolve OPEN records จาก forward bars (momentum signal + fade) ──
+    # ── 2. resolve OPEN records จาก forward bars (momentum signal + fade + pending lifecycle) ──
     for r in rows:
-        if r.get("kind") not in ("signal", "fade"):
+        k = r.get("kind")
+        if k not in ("signal", "fade", "pending"):
             continue
         oc = r.get("outcome")
-        if oc and oc.get("result") in ("TP", "SL", "TIMEOUT"):
+        if oc and oc.get("result") in ("TP", "SL", "TIMEOUT", "EXPIRED"):
             continue                                   # ปิดแล้ว
-        if _resolve(r, high, low, close, times):
+        if (_resolve_pending if k == "pending" else _resolve)(r, high, low, close, times):
             changed = True
 
     if changed:
@@ -274,24 +382,32 @@ def _summ(closed, open_n):
 
 
 def summary():
-    """สรุป offline แยกตาม kind (momentum signal / fade) + รวม. 0 token.
+    """สรุป offline แยก momentum signal / fade / pending (จริง lifecycle) + รวม. 0 token.
     เทียบ needed-N (σ≈1.41): δ=0.2R→389, δ=0.3R→173. counterfactual net cost 30p."""
-    allrows = [r for r in _rows() if r.get("kind") in ("signal", "fade") and r.get("outcome")]
+    all_ = [r for r in _rows() if r.get("outcome")]
+    sf = [r for r in all_ if r.get("kind") in ("signal", "fade")]
 
-    def split(kind):
-        rr = [r for r in allrows if r.get("kind") == kind]
-        closed = [r for r in rr if r["outcome"].get("result") in ("TP", "SL", "TIMEOUT")]
-        open_n = sum(1 for r in rr if r["outcome"].get("result") == "OPEN")
+    def split(rows_k):
+        closed = [r for r in rows_k if r["outcome"].get("result") in ("TP", "SL", "TIMEOUT")]
+        open_n = sum(1 for r in rows_k if r["outcome"].get("result") in ("OPEN", "WAITING", "FILLED"))
         return _summ(closed, open_n)
 
-    closed_all = [r for r in allrows if r["outcome"].get("result") in ("TP", "SL", "TIMEOUT")]
-    open_all = sum(1 for r in allrows if r["outcome"].get("result") == "OPEN")
+    # pending: filled+resolved = closed trades · EXPIRED/WAITING/FILLED แยก
+    pend = [r for r in all_ if r.get("kind") == "pending"]
+    pclosed = [r for r in pend if r["outcome"].get("result") in ("TP", "SL", "TIMEOUT")]
+    pend_summ = _summ(pclosed, sum(1 for r in pend if r["outcome"].get("result") in ("WAITING", "FILLED")))
+    pend_summ["expired"] = sum(1 for r in pend if r["outcome"].get("result") == "EXPIRED")
+    pend_summ["by_mode"] = {m: sum(1 for r in pclosed if r.get("mode") == m) for m in ("STOP", "FADE")}
+
+    closed_all = [r for r in sf if r["outcome"].get("result") in ("TP", "SL", "TIMEOUT")]
+    open_all = sum(1 for r in sf if r["outcome"].get("result") == "OPEN")
     return {
-        "momentum": split("signal"),                        # TREND breakout (executor/tick)
-        "fade": split("fade"),                              # P-B entry_gate (RANGE fade shadow)
+        "momentum": split([r for r in sf if r.get("kind") == "signal"]),   # TREND breakout signal counterfactual
+        "fade": split([r for r in sf if r.get("kind") == "fade"]),         # P-B entry_gate fade counterfactual
+        "pending": pend_summ,                                              # pending order จริง (placed→fill→TP/SL)
         "combined": _summ(closed_all, open_all),
         "needed_n": {"δ=0.2": 389, "δ=0.3": 173},
-        "note": "counterfactual (รวมไม้ที่ไม่ได้ fill จริง) net cost 30p — พิสูจน์ edge ก่อน flip live",
+        "note": "counterfactual (signal) + pending (lifecycle จริง placed→fill→TP/SL) net cost 30p",
     }
 
 
