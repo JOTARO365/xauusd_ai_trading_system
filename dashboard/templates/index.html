@@ -1707,6 +1707,12 @@
       <div id="liq-bars" style="margin-top:6px;font-size:11px;font-family:var(--mono)">—</div>
     </section>
 
+    <!-- ALGO TRADE SCORE — journal (momentum/fade/pending lifecycle) realtime -->
+    <section id="algo-journal-section" style="margin-bottom:10px">
+      <div class="section-title">Trade Score — algo journal (win-rate · exp_R · realtime · counterfactual+pending)</div>
+      <div id="aj-body" style="font-family:var(--mono);font-size:12px">—</div>
+    </section>
+
     <!-- MACRO STRIP — §3.5 macro_strip.json (display-only, daily via scripts/fetch_macro_strip.py) -->
     <section id="macro-strip-section" style="margin-bottom:10px">
       <div id="macro-strip" style="display:flex;align-items:center;gap:16px;padding:7px 14px;border:1px solid var(--border2,#2a3142);border-left:3px solid var(--cyan,#00B4D8);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--text-dim,#9aa3b8);flex-wrap:wrap">
@@ -3356,6 +3362,7 @@ async function loadLivePrice() {
     loadClusterMap();   // Price-Cluster decision-support (throttled, server-cached)
     loadMacroQuant();   // Macro/News quant — ข่าว+เศรษฐกิจ → gold bias (throttled, server-cached)
     loadLiquidityProxy();   // Liquidity/order-flow proxy (throttled, server-cached)
+    loadAlgoJournal();      // Trade score — algo journal win-rate/exp_R (throttled, server-cached)
     loadAlgoStatus();   // System status — algo mode / regime / signal
 
     // Live ticker
@@ -3991,6 +3998,36 @@ async function loadLiquidityProxy() {
     }).join('');
     const el = document.getElementById('liq-bars');
     if (el) el.innerHTML = bars || '—';
+  } catch (_e) {}
+}
+
+let _ajLast = 0;
+async function loadAlgoJournal() {
+  if (Date.now() - _ajLast < 12000) return;   // throttle (server cache 15s)
+  _ajLast = Date.now();
+  try {
+    const d = await (await fetch('/api/algo-journal')).json();
+    const el = document.getElementById('aj-body');
+    if (!el) return;
+    if (!d.ok) { el.textContent = d.error || '—'; return; }
+    const row = (label, s) => {
+      const lab = `<span style="color:var(--muted);width:74px;display:inline-block">${label}</span>`;
+      if (!s || (s.n_closed || 0) === 0)
+        return `<div style="margin:2px 0">${lab}<span style="color:var(--muted)">n=0 (รอเก็บ)</span>${s && s.n_open ? ` · open ${s.n_open}` : ''}</div>`;
+      const ec = s.exp_R > 0 ? 'var(--green)' : 'var(--red)';
+      return `<div style="margin:2px 0">${lab}n=${s.n_closed} · WR ${Math.round(s.win_rate * 100)}% · `
+           + `<span style="color:${ec}">exp ${s.exp_R > 0 ? '+' : ''}${s.exp_R}R</span> · ΣR ${s.sum_R}`
+           + `${s.n_open ? ` · open ${s.n_open}` : ''}</div>`;
+    };
+    let html = row('momentum', d.momentum) + row('fade', d.fade);
+    const p = d.pending || {};
+    html += row('pending', p);
+    if (p.expired || p.by_mode)
+      html += `<div style="margin:2px 0 4px;color:var(--muted);font-size:11px">&nbsp;&nbsp;pending: expired ${p.expired || 0} · STOP ${(p.by_mode || {}).STOP || 0} · FADE ${(p.by_mode || {}).FADE || 0}</div>`;
+    html += `<div style="margin-top:4px;border-top:1px solid #333;padding-top:4px">${row('รวม', d.combined)}</div>`;
+    if (d.needed_n)
+      html += `<div style="color:var(--muted);font-size:10px;margin-top:3px">needed-N พิสูจน์ edge: δ0.2R→${d.needed_n['δ=0.2']} · δ0.3R→${d.needed_n['δ=0.3']} ไม้</div>`;
+    el.innerHTML = html;
   } catch (_e) {}
 }
 
@@ -5935,6 +5972,7 @@ function _bootstrap() {
   loadMacroStrip();
   loadMacroQuant();
   loadLiquidityProxy();
+  loadAlgoJournal();
   loadRegimeExtra();
   loadRiskRegime();
   loadCotCard();
@@ -5952,6 +5990,7 @@ function _bootstrap() {
   setInterval(loadMacroStrip, 3600000);  // macro data is daily — refresh hourly is sufficient
   setInterval(loadMacroQuant, 15000);    // Macro/News quant — realtime (news updates per cycle)
   setInterval(loadLiquidityProxy, 15000);   // Liquidity/order-flow proxy — realtime
+  setInterval(loadAlgoJournal, 15000);      // Trade score — algo journal — realtime
   loadDeskTicker();
   setInterval(loadDeskTicker, 3600000);  // desk top-ticker macro/COT — hourly poll (daily/weekly data)
   setInterval(loadCotCard, 3600000);     // COT data is weekly — hourly poll is sufficient

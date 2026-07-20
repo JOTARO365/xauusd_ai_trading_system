@@ -1143,6 +1143,16 @@ def api_macro_quant():
     return jsonify(_cached("macro-quant", _c, ttl=15))
 
 
+@app.route("/api/algo-journal")
+def api_algo_journal():
+    """Trade score realtime — สรุป algo journal (momentum signal / fade / pending lifecycle จริง):
+    win-rate + exp_R + n + pending by_mode/expired. counterfactual + real pending. 0 token."""
+    def _c():
+        from agents.algo_journal import summary
+        return {"ok": True, **summary()}
+    return jsonify(_cached("algo-journal", _c, ttl=15))
+
+
 @app.route("/api/liquidity-proxy")
 def api_liquidity_proxy():
     """Liquidity/order-flow proxy (volume-profile + cluster + COT). ⚠️ proxy — XAUUSD retail ไม่มี book จริง.
