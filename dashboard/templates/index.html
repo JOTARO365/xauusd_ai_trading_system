@@ -1685,6 +1685,17 @@
       <div id="cluster-list" style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-top:6px">—</div>
     </section>
 
+    <!-- MACRO/NEWS QUANT — ข่าว + เศรษฐกิจ → gold bias score (realtime, SELECTION guide, 0 token) -->
+    <section id="macro-quant-section" style="margin-bottom:10px">
+      <div class="section-title">Macro/News Quant — ข่าว + เศรษฐกิจ → gold bias (SELECTION guide · 0 token)</div>
+      <div style="display:flex;gap:26px;align-items:baseline;flex-wrap:wrap;font-family:var(--mono)">
+        <div><span id="mq-score" style="font-size:28px;font-weight:700">—</span> <span id="mq-bias" style="font-size:13px">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">stance</span><br><span id="mq-stance" style="font-size:12px">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">driver · conf · coverage</span><br><span id="mq-meta" style="font-size:12px;color:var(--muted)">—</span></div>
+      </div>
+      <div id="mq-bars" style="margin-top:8px;font-size:11px;font-family:var(--mono)">—</div>
+    </section>
+
     <!-- MACRO STRIP — §3.5 macro_strip.json (display-only, daily via scripts/fetch_macro_strip.py) -->
     <section id="macro-strip-section" style="margin-bottom:10px">
       <div id="macro-strip" style="display:flex;align-items:center;gap:16px;padding:7px 14px;border:1px solid var(--border2,#2a3142);border-left:3px solid var(--cyan,#00B4D8);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--text-dim,#9aa3b8);flex-wrap:wrap">
@@ -3332,6 +3343,7 @@ async function loadLivePrice() {
       setT('ai-sent-summary', bs.sent_summary || '—');
     }
     loadClusterMap();   // Price-Cluster decision-support (throttled, server-cached)
+    loadMacroQuant();   // Macro/News quant — ข่าว+เศรษฐกิจ → gold bias (throttled, server-cached)
     loadAlgoStatus();   // System status — algo mode / regime / signal
 
     // Live ticker
@@ -3903,6 +3915,38 @@ async function loadClusterMap() {
     const le = document.getElementById('cluster-list');
     if (le) le.innerHTML = 'dwell zones: ' + (d.clusters || []).map(c => `${c.level}(${c.touches})`).join('  ');
     drawClusterLines(d);   // overlay cluster S/R + Donchian บนกราฟ candle
+  } catch (_e) {}
+}
+
+let _mqLast = 0;
+async function loadMacroQuant() {
+  if (Date.now() - _mqLast < 12000) return;   // throttle (server cache 15s)
+  _mqLast = Date.now();
+  try {
+    const d = await (await fetch('/api/macro-quant')).json();
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    if (!d.ok) { set('mq-score', '—'); set('mq-stance', d.error || '—'); return; }
+    const col = d.score > 15 ? 'var(--green)' : (d.score < -15 ? 'var(--red)' : 'var(--muted)');
+    const se = document.getElementById('mq-score');
+    if (se) { se.textContent = (d.score > 0 ? '+' : '') + d.score; se.style.color = col; }
+    const be = document.getElementById('mq-bias');
+    if (be) { be.textContent = d.bias; be.style.color = col; }
+    set('mq-stance', d.stance || '—');
+    set('mq-meta', `${d.driver || '—'} · ${Math.round((d.confidence || 0) * 100)}% · ${d.coverage || ''}`
+                   + (d.stale && d.stale.length ? ` · ⚠stale:${d.stale.join(',')}` : ''));
+    const comps = d.components || {};
+    const vals = Object.values(comps).map(v => Math.abs(v));
+    const maxAbs = Math.max(0.01, ...vals);
+    const bars = Object.entries(comps).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).map(([k, v]) => {
+      const c = v >= 0 ? 'var(--green)' : 'var(--red)';
+      const w = Math.round(Math.abs(v) / maxAbs * 90);
+      return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0">`
+           + `<span style="width:92px;color:var(--muted)">${k}</span>`
+           + `<span style="display:inline-block;height:8px;width:${w}px;background:${c};border-radius:2px"></span>`
+           + `<span style="color:${c}">${v > 0 ? '+' : ''}${v}</span></div>`;
+    }).join('');
+    const el = document.getElementById('mq-bars');
+    if (el) el.innerHTML = bars || '—';
   } catch (_e) {}
 }
 
@@ -5845,6 +5889,7 @@ function _bootstrap() {
   loadRegime();
   loadRegimeState();
   loadMacroStrip();
+  loadMacroQuant();
   loadRegimeExtra();
   loadRiskRegime();
   loadCotCard();
@@ -5860,6 +5905,7 @@ function _bootstrap() {
   setInterval(loadRegimeState, 3600000); // regime_state.json updated daily — hourly poll sufficient
   setInterval(loadLivePrice, 5000);
   setInterval(loadMacroStrip, 3600000);  // macro data is daily — refresh hourly is sufficient
+  setInterval(loadMacroQuant, 15000);    // Macro/News quant — realtime (news updates per cycle)
   loadDeskTicker();
   setInterval(loadDeskTicker, 3600000);  // desk top-ticker macro/COT — hourly poll (daily/weekly data)
   setInterval(loadCotCard, 3600000);     // COT data is weekly — hourly poll is sufficient

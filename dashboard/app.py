@@ -1133,6 +1133,16 @@ def api_cluster_map():
     return jsonify(_cached("cluster-map", _c, ttl=20))
 
 
+@app.route("/api/macro-quant")
+def api_macro_quant():
+    """Macro/News quant (ข่าว + เศรษฐกิจ → gold bias score) — รวมตัวเลขที่ scored ไว้เป็น analysis เดียว.
+    news_impact + macro_strip + regime_extra + cot → weighted gold-directional score + breakdown. 0 token."""
+    def _c():
+        from agents.macro_quant import gold_macro_score
+        return gold_macro_score()
+    return jsonify(_cached("macro-quant", _c, ttl=15))
+
+
 @app.route("/api/regime-monitor")
 def api_regime_monitor():
     """weekly monitor ของ algo-live (N-gauge + decay) — pass-through data/regime_monitor.json
