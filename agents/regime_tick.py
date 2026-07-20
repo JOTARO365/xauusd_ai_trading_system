@@ -86,7 +86,8 @@ def _tick() -> None:
         from agents.algo_sizing import algo_lot                    # P-E: lot risk-based (flag OFF → fixed เดิม)
         _entry_px = tick.ask if d == "BUY" else tick.bid
         _tp_pips = sr_tp_pips(d, _entry_px, _cache["sl_pips"], _cache["tp_pips"])
-        res = open_order(d, _cache["sl_pips"], _tp_pips, comment="ALGO-mom", lot=algo_lot(_cache["sl_pips"]))
+        res = open_order(d, _cache["sl_pips"], _tp_pips, comment="ALGO-mom", lot=algo_lot(_cache["sl_pips"]),
+                         shadow=getattr(config, "REGIME_SHADOW_FILL", False))
         from agents.regime_executor import _log
         _log({"ts_hour": hour, "via": "tick", "regime": "TREND",
               "signal": {"algo": "momentum_breakout", "dir": d,

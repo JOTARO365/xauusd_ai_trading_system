@@ -105,18 +105,19 @@ def _place_trend_straddle(positions, i, high, low, close, atr, hour):
         return 0
     limit = _max_open_limit()
     _lot = algo_lot(lv["sl_pips"])
+    _sh = getattr(_cfg, "REGIME_SHADOW_FILL", False)
     placed = 0
     if _same_dir_count(positions, "BUY") < limit:
         _btp = sr_tp_pips("BUY", lv["buy_level"], lv["sl_pips"], lv["tp_pips"])
         if place_pending_order("BUY_STOP", lv["buy_level"], lv["sl_pips"], _btp,
-                               comment="ALGO-P", expiry_hours=2, lot=_lot).get("success"):
+                               comment="ALGO-P", expiry_hours=2, lot=_lot, shadow=_sh).get("success"):
             placed += 1
     else:
         logger.info("[REGIME-PENDING] ข้าม BUY_STOP — BUY เต็ม MAX_OPEN")
     if _same_dir_count(positions, "SELL") < limit:
         _stp = sr_tp_pips("SELL", lv["sell_level"], lv["sl_pips"], lv["tp_pips"])
         if place_pending_order("SELL_STOP", lv["sell_level"], lv["sl_pips"], _stp,
-                               comment="ALGO-P", expiry_hours=2, lot=_lot).get("success"):
+                               comment="ALGO-P", expiry_hours=2, lot=_lot, shadow=_sh).get("success"):
             placed += 1
     else:
         logger.info("[REGIME-PENDING] ข้าม SELL_STOP — SELL เต็ม MAX_OPEN")
@@ -150,8 +151,8 @@ def _place_range_fade(positions, sr_view, atr, hour):
             return
         tp_pips = max(1, round(abs(tp["tp"] - lvl) / R.POINT))
         from agents.algo_sizing import algo_lot               # P-E: lot risk-based (flag OFF → fixed เดิม)
-        if place_pending_order(otype, lvl, sl_pips, tp_pips, comment="ALGO-PF",
-                               expiry_hours=6, lot=algo_lot(sl_pips)).get("success"):
+        if place_pending_order(otype, lvl, sl_pips, tp_pips, comment="ALGO-PF", expiry_hours=6,
+                               lot=algo_lot(sl_pips), shadow=getattr(_cfg, "REGIME_SHADOW_FILL", False)).get("success"):
             placed += 1
             logger.warning(f"[REGIME-FADE] {otype}@{lvl:.2f} SL={sl_pips}p TP={tp_pips}p (RR={tp['rr']}) grade={lvl_obj.get('grade')}")
 

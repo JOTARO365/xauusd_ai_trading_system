@@ -86,7 +86,8 @@ def run_regime_executor():
     from agents.algo_sizing import algo_lot                  # P-E: lot risk-based (flag OFF → fixed เดิม)
     tp_pips = sr_tp_pips(sig["dir"], rec["close"], sig["sl_pips"], sig["tp_pips"])
     res = open_order(sig["dir"], sig["sl_pips"], tp_pips, comment="ALGO-mom",
-                     lot=algo_lot(sig["sl_pips"]))          # DRY_RUN/cap/lot-clamp ในตัว
+                     lot=algo_lot(sig["sl_pips"]),          # DRY_RUN/cap/lot-clamp ในตัว
+                     shadow=getattr(_cfg, "REGIME_SHADOW_FILL", False))
     out = {"ts": datetime.now(timezone.utc).isoformat(), "bar_ts": rec["bar_ts"],
            "regime": rec["regime"], "close": rec["close"], "signal": sig, "order": res}
     _log(out)

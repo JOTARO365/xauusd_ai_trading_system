@@ -204,6 +204,11 @@ REGIME_SR_EXIT        = os.getenv("REGIME_SR_EXIT", "false").lower() == "true"
 REGIME_SR_SIZING      = os.getenv("REGIME_SR_SIZING", "false").lower() == "true"
 REGIME_SR_RISK_PCT    = float(os.getenv("REGIME_SR_RISK_PCT") or 0.005)   # risk ต่อไม้ ALGO (0.5% ของ equity)
 
+# REGIME_SHADOW_FILL = algo เข้า order แบบ paper/shadow (เฉพาะไม้ ALGO) — วาง order ได้แม้ไม่มีทุน/margin
+# (open_order/place_pending_order จำลอง return success ไม่วางจริง). ไม้จริง legacy บริหารปกติ (DRY_RUN=false).
+# journal ยังเก็บ counterfactual outcome. เปิด = เก็บ data ก่อนเติมทุน. default OFF. kill = false (live-reload).
+REGIME_SHADOW_FILL    = os.getenv("REGIME_SHADOW_FILL", "false").lower() == "true"
+
 # ZRE = Zone Re-Entry RR≥2 (v2 fixed-SL). วาง LIMIT ดักเด้งที่โซนเกรดสูงเชิงรุก (RR≥2, SL คงที่).
 # เกราะสุด (replay 2026-07-16): trend-align-only (ตัด SIDEWAYS ที่ replay ขาดทุน −0.6R),
 # grade A/B + score≥ZRE_MIN_SCORE, สด ≤ZRE_MAX_BARS_SINCE, ในระยะ ZRE_PROXIMITY_PCT%,
@@ -294,7 +299,7 @@ def reload_config():
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
     global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT, REGIME_SHADOW
     global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING, REGIME_SR_ENTRY, REGIME_PENDING_FADE, REGIME_SR_EXIT
-    global REGIME_SR_SIZING, REGIME_SR_RISK_PCT
+    global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
     SPECIALIST_ENABLED       = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"
     REGIME_SHADOW            = os.getenv("REGIME_SHADOW", "false").lower() == "true"
@@ -307,6 +312,7 @@ def reload_config():
     REGIME_SR_EXIT           = os.getenv("REGIME_SR_EXIT", "false").lower() == "true"       # P-D S/R TP + trailing
     REGIME_SR_SIZING         = os.getenv("REGIME_SR_SIZING", "false").lower() == "true"     # P-E risk-based lot
     REGIME_SR_RISK_PCT       = float(os.getenv("REGIME_SR_RISK_PCT") or 0.005)
+    REGIME_SHADOW_FILL       = os.getenv("REGIME_SHADOW_FILL", "false").lower() == "true"   # algo paper-fill
 
     global ZONE_REENTRY_ENABLED, ZONE_REENTRY_SHADOW, ZRE_MIN_SCORE, ZRE_MAX_BARS_SINCE
     global ZRE_PROXIMITY_PCT, ZRE_TREND_ALIGN_ONLY, ZRE_MAX_CONCURRENT

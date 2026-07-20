@@ -531,13 +531,15 @@ def _clamp_stops_level(price, sl, tp, is_buy, no_tp, stops_min, point):
 
 def open_order(direction: str, sl_pips: float, tp_pips: float,
                comment: str = "", min_rr: float | None = None,
-               confidence_scale: float = 1.0, lot: float | None = None) -> dict:
-    if _cfg.DRY_RUN:
+               confidence_scale: float = 1.0, lot: float | None = None,
+               shadow: bool = False) -> dict:
+    if _cfg.DRY_RUN or shadow:                        # shadow = algo paper-fill (ไม่ใช้ทุน, ไม่วางจริง)
         tick = mt5.symbol_info_tick(SYMBOL)
         price = (tick.ask if direction.upper() == "BUY" else tick.bid) if tick else 0.0
-        logger.warning(f"[DRY_RUN] would have opened {direction} @ {price:.2f} SL={sl_pips}p TP={tp_pips}p")
+        tag = "SHADOW" if shadow and not _cfg.DRY_RUN else "DRY_RUN"
+        logger.warning(f"[{tag}] would have opened {direction} @ {price:.2f} SL={sl_pips}p TP={tp_pips}p")
         return {"success": True, "ticket": 0, "direction": direction,
-                "lot": 0.0, "price": price, "sl": 0.0, "tp": 0.0, "dry_run": True}
+                "lot": 0.0, "price": price, "sl": 0.0, "tp": 0.0, "dry_run": True, "shadow": bool(shadow)}
 
     # Daily trade cap — safety net จุดเดียวคุมทุก market entry รวม path ที่ข้าม gates
     # (zone-break re-entry เรียก open_order ตรง) — gate ใน _run_gates ตัดก่อนถึงนี่อยู่แล้ว
@@ -806,12 +808,14 @@ def daily_trade_cap_reached() -> tuple[bool, str]:
 
 
 def place_pending_order(pending_type: str, price: float, sl_pips: float, tp_pips: float,
-                        comment: str = "", expiry_hours: int = 48, lot: float | None = None) -> dict:
-    """วาง pending order ที่ level ที่กำหนด ใช้ TRADE_ACTION_PENDING"""
-    if _cfg.DRY_RUN:
-        logger.warning(f"[DRY_RUN] would have placed {pending_type} @ {price:.2f} SL={sl_pips}p TP={tp_pips}p")
+                        comment: str = "", expiry_hours: int = 48, lot: float | None = None,
+                        shadow: bool = False) -> dict:
+    """วาง pending order ที่ level ที่กำหนด ใช้ TRADE_ACTION_PENDING. shadow=paper (ไม่วางจริง, ไม่ใช้ทุน)."""
+    if _cfg.DRY_RUN or shadow:
+        tag = "SHADOW" if shadow and not _cfg.DRY_RUN else "DRY_RUN"
+        logger.warning(f"[{tag}] would have placed {pending_type} @ {price:.2f} SL={sl_pips}p TP={tp_pips}p")
         return {"success": True, "ticket": 0, "pending_type": pending_type,
-                "price": price, "sl": 0.0, "tp": 0.0, "dry_run": True}
+                "price": price, "sl": 0.0, "tp": 0.0, "dry_run": True, "shadow": bool(shadow)}
 
     if pending_type not in PENDING_TYPE_MAP:
         return {"success": False, "error": f"Invalid pending_type: {pending_type}"}
