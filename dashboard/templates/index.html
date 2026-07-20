@@ -5991,6 +5991,7 @@ function _bootstrap() {
   setInterval(loadMacroQuant, 15000);    // Macro/News quant — realtime (news updates per cycle)
   setInterval(loadLiquidityProxy, 15000);   // Liquidity/order-flow proxy — realtime
   setInterval(loadAlgoJournal, 15000);      // Trade score — algo journal — realtime
+  setInterval(loadRegimeAnalytics, 60000);  // regime analytics + ALGO monitor (N-gauge) — compute live, refresh 60s
   loadDeskTicker();
   setInterval(loadDeskTicker, 3600000);  // desk top-ticker macro/COT — hourly poll (daily/weekly data)
   setInterval(loadCotCard, 3600000);     // COT data is weekly — hourly poll is sufficient

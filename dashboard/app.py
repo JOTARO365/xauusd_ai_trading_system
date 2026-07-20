@@ -1168,32 +1168,50 @@ def api_liquidity_proxy():
     return jsonify(_cached("liquidity-proxy", _c, ttl=15))
 
 
+def _scripts_path():
+    _sd = os.path.join(_BASE, "../scripts")
+    if _sd not in sys.path:
+        sys.path.insert(0, _sd)
+
+
+def _file_fallback(name):
+    """อ่านไฟล์ precompute (fallback ถ้า compute live fail) + mark stale."""
+    try:
+        with open(os.path.join(_BASE, "../data", name), encoding="utf-8") as f:
+            return {"ok": True, "stale": True, **json.load(f)}
+    except Exception as e:
+        return {"ok": False, "error": f"compute+file ไม่ได้: {e}"}
+
+
 @app.route("/api/regime-monitor")
 def api_regime_monitor():
-    """weekly monitor ของ algo-live (N-gauge + decay) — pass-through data/regime_monitor.json
-    (precompute by scripts/regime_monitor.py จากผล ALGO trades จริงใน MT5). 0 LLM."""
-    try:
-        p = os.path.join(_BASE, "../data/regime_monitor.json")
-        with open(p, "r", encoding="utf-8") as f:
-            return jsonify({"ok": True, **json.load(f)})
-    except FileNotFoundError:
-        return jsonify({"ok": False, "error": "ยังไม่ได้รัน scripts/regime_monitor.py (หรือยังไม่มีไม้ ALGO)"})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)})
+    """Live Monitor — ALGO trades จริง (N-gauge + decay). **compute live** จากไม้ ALGO ใน MT5
+    (ไม่อ่านไฟล์ stale). N=0 = ยังไม่มีไม้ ALGO (สดจริง ไม่ใช่ค้าง). 0 LLM."""
+    def _c():
+        from datetime import datetime, timezone
+        _scripts_path()
+        try:
+            import regime_monitor as RM
+            return {"ok": True, "generated": datetime.now(timezone.utc).isoformat(),
+                    "strategy": "momentum_breakout (TREND)", "sigma_R": RM.SIGMA_R,
+                    **RM.analyze(RM.fetch_algo_trades())}
+        except Exception:
+            return _file_fallback("regime_monitor.json")
+    return jsonify(_cached("regime-monitor", _c, ttl=30))
 
 
 @app.route("/api/regime-analytics")
 def api_regime_analytics():
-    """สรุป regime router (Analytics tab): regime ไหนของทองเหมาะ algo ไหน + score + weekly.
-    Pass-through data/regime_analytics.json (precompute by scripts/regime_analytics.py — 0 LLM)."""
-    try:
-        p = os.path.join(_BASE, "../data/regime_analytics.json")
-        with open(p, "r", encoding="utf-8") as f:
-            return jsonify({"ok": True, **json.load(f)})
-    except FileNotFoundError:
-        return jsonify({"ok": False, "error": "ยังไม่ได้รัน scripts/regime_analytics.py"})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)})
+    """สรุป regime router + weekly (shadow). **compute live** (build_report) — historical backtest +
+    weekly shadow สด (ไม่อ่านไฟล์ stale). cache 5 นาที (backtest หนัก). 0 LLM."""
+    def _c():
+        _scripts_path()
+        try:
+            import regime_analytics as RA
+            return {"ok": True, **RA.build_report()}
+        except Exception:
+            return _file_fallback("regime_analytics.json")
+    return jsonify(_cached("regime-analytics", _c, ttl=300))
 
 
 _TF_MAP = {}
