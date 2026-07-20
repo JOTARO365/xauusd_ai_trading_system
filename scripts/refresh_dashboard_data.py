@@ -23,9 +23,12 @@ _SCRIPTS = [
     ("build_event_scenarios.py",  60),
     ("review_calibration.py",     60),
     ("fetch_macro_strip.py",     120),   # AlphaVantage REST (โควตาฟรี)
+    ("update_regime.py",         150),   # AV CPI/Fed/10Y → regime_state.json + macro_regime.md (ก่อนค้าง — เพิ่ม 07-20)
     ("fetch_regime_extra.py",     60),   # Yahoo VIX + gold/silver ratio (ฟรี, ไม่ต้อง key)
     ("fetch_risk_regime.py",      90),   # cross-asset HMM risk-on/off (gold+VIX+DXY, ฟรี)
     ("fetch_cot.py",             120),   # CFTC public
+    ("regime_analytics.py",      120),   # backtest → regime_analytics.json (fallback ให้ endpoint compute-live)
+    ("regime_monitor.py",         90),   # MT5 ALGO trades N-gauge → regime_monitor.json (fallback)
     ("report_ride_cohort.py",     90),   # MT5
     ("report_news_gate.py",       90),   # MT5
     ("realized_move_logger.py",   90),   # MT5

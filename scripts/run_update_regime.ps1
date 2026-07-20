@@ -12,10 +12,14 @@ if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out
 $log = Join-Path $logDir "regime_update.log"
 $ts  = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 
+# python is NOT on PATH on this host - use the full interpreter path (fallback to PATH).
+$py = "C:\Users\pornnatcha\AppData\Local\Microsoft\WindowsApps\python.exe"
+if (-not (Test-Path $py)) { $py = "python" }
+
 # Run python with native-stderr capture; don't let EAP=Stop throw on native stderr.
 $prev = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
-$out  = (& python scripts/update_regime.py 2>&1 | Out-String)
+$out  = (& $py scripts/update_regime.py 2>&1 | Out-String)
 $code = $LASTEXITCODE
 $ErrorActionPreference = $prev
 
