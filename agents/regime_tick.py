@@ -78,9 +78,11 @@ def _tick() -> None:
         else:
             return
         from connectors.mt5_connector import get_open_positions, open_order
-        for p in (get_open_positions() or []):         # no-stack: มีไม้ ALGO เปิดอยู่ = ข้าม
-            if str(getattr(p, "comment", "") or "").startswith("ALGO"):
-                return
+        # stack guard: ถือครบ ALGO_MAX_STACK ไม้ = ข้าม (dict-safe — get_open_positions คืน dict)
+        _algo_open = sum(1 for p in (get_open_positions() or [])
+                         if str((p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or "").startswith("ALGO"))
+        if _algo_open >= getattr(config, "ALGO_MAX_STACK", 1):
+            return
         _last_traded_hour = hour
         from agents.algo_exit import sr_tp_pips                    # P-D: TP ตามแนว S/R (flag OFF → RR2 เดิม)
         from agents.algo_sizing import algo_lot                    # P-E: lot risk-based (flag OFF → fixed เดิม)

@@ -181,8 +181,9 @@ def manage_algo_pending():
         from connectors.mt5_connector import get_open_positions
         from agents.regime_shadow import _bars_from_feed
         positions = get_open_positions() or []
-        # SAFETY 1: มีไม้ ALGO เปิด → cancel ALGO-P* ที่เหลือ (กัน fill ฝั่งตรงข้าม)
-        if any(str(p.get("comment") or "").startswith("ALGO") for p in positions):
+        # SAFETY 1: ถือครบ ALGO_MAX_STACK ไม้ → cancel ALGO-P* ที่เหลือ + ไม่วางเพิ่ม (no over-stack)
+        _algo_open = sum(1 for p in positions if str(p.get("comment") or "").startswith("ALGO"))
+        if _algo_open >= getattr(_cfg, "ALGO_MAX_STACK", 1):
             _cancel_algo_pendings("ALGO-P")
             return 0
         tick = mt5.symbol_info_tick(_cfg.SYMBOL)

@@ -71,12 +71,13 @@ def run_regime_executor():
     if rec["bar_ts"] and rec["bar_ts"] == _last_bar:        # บาร์นี้เข้าไปแล้ว → ไม่ซ้ำ
         _hb("ARMED", f"regime=TREND {sig.get('dir')} · เข้าไม้บาร์นี้แล้ว (รอบาร์ถัดไป)")
         return None
-    try:                                                    # ไม่ stack: มีไม้ ALGO เปิดอยู่ = ข้าม
+    try:                                                    # stack guard: ถือครบ ALGO_MAX_STACK = ข้าม (dict-safe)
         from connectors.mt5_connector import get_open_positions
-        for p in (get_open_positions() or []):
-            if str(getattr(p, "comment", "") or "").startswith("ALGO"):
-                _hb("HOLD", f"regime=TREND {sig.get('dir')} · มีไม้ ALGO เปิดอยู่ → ไม่ stack")
-                return None
+        _algo_open = sum(1 for p in (get_open_positions() or [])
+                         if str((p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or "").startswith("ALGO"))
+        if _algo_open >= getattr(_cfg, "ALGO_MAX_STACK", 1):
+            _hb("HOLD", f"regime=TREND {sig.get('dir')} · ถือครบ {_algo_open} ไม้ ALGO → ไม่ stack")
+            return None
     except Exception:
         pass
     _hb("ENTER", f"{sig.get('dir')} SL={sig.get('sl_pips')}p TP={sig.get('tp_pips')}p → วาง order", regime="TREND")
