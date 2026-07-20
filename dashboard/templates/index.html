@@ -3489,8 +3489,11 @@ function updateCommandDeck(bs) {
   if (bl) {
     const dec = (bs.decision || '').toUpperCase();
     const items = [];
-    if (bs.skip_ai) items.push('AI throttled — capital floor / session throttle');
-    if (dec === 'SKIP' || bs.skip_ai) {
+    if (bs.skip_ai) {
+      // ระบบใหม่: entry=algo deterministic (ไม่ใช่ LLM gate) → ไม่โชว์ "Signal 0% no gate pass" vestigial
+      items.push('ALGO mode — entry deterministic (LLM entry off)');
+      if (sig.reason) items.push(sig.reason);
+    } else if (dec === 'SKIP') {
       if (sig.reason) items.push(sig.reason);
       const conf = sig.confidence;
       if (conf != null && !sig.reason) items.push(`Signal ${dir || '—'} ${conf}% — no qualifying gate pass`);
@@ -3515,7 +3518,8 @@ function updateDeskBrief(bs) {
   const dir = sig.direction || '—', conf = sig.confidence;
   const sigEl = document.getElementById('brief-signal');
   if (sigEl) {
-    sigEl.textContent = dir + ((conf != null) ? ` ${conf}%` : '');
+    // ระบบใหม่ (skip_ai): entry=algo deterministic → ไม่โชว์ conf% เดิม (0 vestigial)
+    sigEl.textContent = bs.skip_ai ? 'ALGO' : (dir + ((conf != null) ? ` ${conf}%` : ''));
     sigEl.className = 'brief-val ' + (dir === 'BUY' ? 'pos' : (dir === 'SELL' ? 'neg' : 'mut'));
   }
 
@@ -3634,17 +3638,22 @@ function updatePipelineFromStatus(bs) {
   setMeta(3, `<span style="color:var(--text-dim)">Entry</span> <span style="color:var(--text)">${entry}</span>`);
   setStatus(3, 'status-done', 'DONE');
 
-  // Step 4: Decision Maker
+  // Step 4: Decision Maker — ระบบใหม่ (skip_ai): entry = algo deterministic ไม่ใช่ LLM conf → ไม่โชว์ conf 0 vestigial
   let sigColor = 'var(--text)';
   if (signal === 'BUY') sigColor = 'var(--green)';
   else if (signal === 'SELL') sigColor = 'var(--red)';
-  setMeta(4, `<span style="color:${sigColor};font-weight:600">${signal || '—'}</span> · <span style="color:var(--text-dim)">${conf}%</span>`);
-  if (decision === 'EXECUTE' || decision === 'BUY' || decision === 'SELL') {
-    setStatus(4, 'status-active', 'EXECUTE');
-  } else if (decision === 'SKIP' || decision === 'NO_TRADE') {
-    setStatus(4, 'status-waiting', 'SKIP');
+  if (bs.skip_ai) {
+    setMeta(4, `<span style="color:var(--gold)">ALGO deterministic</span> · <span style="color:var(--text-dim)">LLM entry off</span>`);
+    setStatus(4, 'status-active', 'ALGO');
   } else {
-    setStatus(4, 'status-ready', 'READY');
+    setMeta(4, `<span style="color:${sigColor};font-weight:600">${signal || '—'}</span> · <span style="color:var(--text-dim)">${conf}%</span>`);
+    if (decision === 'EXECUTE' || decision === 'BUY' || decision === 'SELL') {
+      setStatus(4, 'status-active', 'EXECUTE');
+    } else if (decision === 'SKIP' || decision === 'NO_TRADE') {
+      setStatus(4, 'status-waiting', 'SKIP');
+    } else {
+      setStatus(4, 'status-ready', 'READY');
+    }
   }
 
   // Step 5: Reporter
