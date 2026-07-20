@@ -83,8 +83,12 @@ def node_chart(state: TradingState) -> dict:
         lat  = int((time.monotonic() - t) * 1000)
         sig  = data.get("signal", "NO_TRADE")
         conf = data.get("confidence", 0)
-        print_step(0, "done", f"{sig}  ({conf}%)")
-        print_signal_box(data)
+        import config as _ccfg                          # REGIME_LIVE: signal/conf = vestigial (LLM off) → ไม่โชว์ box
+        if getattr(_ccfg, "REGIME_LIVE", False):
+            print_step(0, "done", "Python TA (algo entry)")
+        else:
+            print_step(0, "done", f"{sig}  ({conf}%)")
+            print_signal_box(data)                      # Technical Signal box — เฉพาะโหมด LLM เดิม
         return {
             "chart_data": data,
             "latencies":  {**state.get("latencies", {}), "chart_watcher": lat},

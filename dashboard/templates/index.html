@@ -2133,7 +2133,7 @@
       <div class="section-title">Performance Breakdown</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
 
-        <div class="table-card">
+        <div class="table-card legacy-llm">
           <div class="table-toolbar"><h3>Confidence Tier (System)</h3></div>
           <table><thead><tr>
             <th>Tier</th><th class="num">Trades</th><th class="num">WR%</th><th class="num">P&amp;L</th>
@@ -2231,8 +2231,8 @@
       </div>
     </section>
 
-    <!-- CALIBRATION CARD — §3.5 calibration.json -->
-    <section id="calibration-section">
+    <!-- CALIBRATION CARD — §3.5 calibration.json (LLM confidence — vestigial ในระบบ deterministic) -->
+    <section id="calibration-section" class="legacy-llm">
       <div class="section-title">Confidence Calibration (Predicted vs Realized Win-Rate)</div>
       <div class="card" style="overflow-x:auto">
         <div class="label" style="margin-bottom:8px">Per-bin: n trades / realized WR% / total PnL &mdash; bar = realized, line = predicted midpoint</div>
