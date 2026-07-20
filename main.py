@@ -98,6 +98,7 @@ def _write_bot_status(chart_data: dict, sentiment_data: dict, decision: dict, sk
             "trend":          chart_data.get("trend"),
             "d1_trend":       chart_data.get("d1_trend"),
             "fast_move_pips": chart_data.get("fast_move_pips"),
+            "rsi":            chart_data.get("indicators", {}).get("h1", {}).get("rsi"),  # P-B: RSI-confirm (entry_gate fade)
             "momentum_tf": {
                 tf: {"direction": (m or {}).get("direction"), "strength": (m or {}).get("strength")}
                 for tf, m in _mom_raw.items()

@@ -274,7 +274,7 @@ def _capture_fade(rows, high, low, close, times):
     market = dict(st.get("market") or {})
     market.setdefault("fast_move_pips", (st.get("last_signal") or {}).get("fast_move_pips", 0))
     market["volume_profile"] = st.get("volume_profile")
-    dec = entry_direction(sr_view, market)                  # rsi=None (ไม่มีใน bot_status) → graceful
+    dec = entry_direction(sr_view, market, rsi=market.get("rsi"))   # P-B: RSI-confirm (bot_status market.rsi)
     if not dec.get("dir"):
         return None
     lvl = round(float(dec["level"]), 1)
