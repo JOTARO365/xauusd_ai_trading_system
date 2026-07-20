@@ -1696,6 +1696,17 @@
       <div id="mq-bars" style="margin-top:8px;font-size:11px;font-family:var(--mono)">—</div>
     </section>
 
+    <!-- LIQUIDITY / ORDER-FLOW PROXY — volume-profile + cluster + COT (⚠️ proxy, retail ไม่มี book จริง) -->
+    <section id="liq-proxy-section" style="margin-bottom:10px">
+      <div class="section-title">Liquidity/Order-Flow — proxy ⚠️ (volume-profile + cluster + COT · retail ไม่มี book จริง)</div>
+      <div style="display:flex;gap:26px;align-items:baseline;flex-wrap:wrap;font-family:var(--mono)">
+        <div><span id="liq-score" style="font-size:24px;font-weight:700">—</span> <span id="liq-tilt" style="font-size:13px">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">confidence (proxy)</span><br><span id="liq-conf" style="font-size:11px;color:var(--muted)">—</span></div>
+      </div>
+      <div id="liq-magnets" style="margin-top:6px;font-size:11px;font-family:var(--mono);color:var(--muted)">—</div>
+      <div id="liq-bars" style="margin-top:6px;font-size:11px;font-family:var(--mono)">—</div>
+    </section>
+
     <!-- MACRO STRIP — §3.5 macro_strip.json (display-only, daily via scripts/fetch_macro_strip.py) -->
     <section id="macro-strip-section" style="margin-bottom:10px">
       <div id="macro-strip" style="display:flex;align-items:center;gap:16px;padding:7px 14px;border:1px solid var(--border2,#2a3142);border-left:3px solid var(--cyan,#00B4D8);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--text-dim,#9aa3b8);flex-wrap:wrap">
@@ -3344,6 +3355,7 @@ async function loadLivePrice() {
     }
     loadClusterMap();   // Price-Cluster decision-support (throttled, server-cached)
     loadMacroQuant();   // Macro/News quant — ข่าว+เศรษฐกิจ → gold bias (throttled, server-cached)
+    loadLiquidityProxy();   // Liquidity/order-flow proxy (throttled, server-cached)
     loadAlgoStatus();   // System status — algo mode / regime / signal
 
     // Live ticker
@@ -3946,6 +3958,38 @@ async function loadMacroQuant() {
            + `<span style="color:${c}">${v > 0 ? '+' : ''}${v}</span></div>`;
     }).join('');
     const el = document.getElementById('mq-bars');
+    if (el) el.innerHTML = bars || '—';
+  } catch (_e) {}
+}
+
+let _liqLast = 0;
+async function loadLiquidityProxy() {
+  if (Date.now() - _liqLast < 12000) return;   // throttle (server cache 15s)
+  _liqLast = Date.now();
+  try {
+    const d = await (await fetch('/api/liquidity-proxy')).json();
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    if (!d.ok) { set('liq-score', '—'); set('liq-magnets', d.error || '—'); return; }
+    const col = d.score > 12 ? 'var(--green)' : (d.score < -12 ? 'var(--red)' : 'var(--muted)');
+    const se = document.getElementById('liq-score');
+    if (se) { se.textContent = (d.score > 0 ? '+' : '') + d.score; se.style.color = col; }
+    const te = document.getElementById('liq-tilt');
+    if (te) { te.textContent = d.tilt; te.style.color = col; }
+    set('liq-conf', `${Math.round((d.confidence || 0) * 100)}% · ${d.coverage || ''} · ${d.caveat || ''}`);
+    const m = d.magnets || {};
+    const fmt = (x) => x ? `${x.level}${x.pct ? '(' + x.pct + '%)' : (x.count ? '×' + x.count : '')}` : '—';
+    set('liq-magnets', `wall ${fmt(m.wall)} · HVN↑ ${fmt(m.hvn_above)} · HVN↓ ${fmt(m.hvn_below)} · stops↓ ${(m.stop_pools_below || []).map(p => p.level).join(',') || '—'}`);
+    const comps = d.components || {};
+    const maxAbs = Math.max(0.01, ...Object.values(comps).map(v => Math.abs(v)));
+    const bars = Object.entries(comps).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).map(([k, v]) => {
+      const c = v >= 0 ? 'var(--green)' : 'var(--red)';
+      const w = Math.round(Math.abs(v) / maxAbs * 90);
+      return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0">`
+           + `<span style="width:92px;color:var(--muted)">${k}</span>`
+           + `<span style="display:inline-block;height:8px;width:${w}px;background:${c};border-radius:2px"></span>`
+           + `<span style="color:${c}">${v > 0 ? '+' : ''}${v}</span></div>`;
+    }).join('');
+    const el = document.getElementById('liq-bars');
     if (el) el.innerHTML = bars || '—';
   } catch (_e) {}
 }
@@ -5890,6 +5934,7 @@ function _bootstrap() {
   loadRegimeState();
   loadMacroStrip();
   loadMacroQuant();
+  loadLiquidityProxy();
   loadRegimeExtra();
   loadRiskRegime();
   loadCotCard();
@@ -5906,6 +5951,7 @@ function _bootstrap() {
   setInterval(loadLivePrice, 5000);
   setInterval(loadMacroStrip, 3600000);  // macro data is daily — refresh hourly is sufficient
   setInterval(loadMacroQuant, 15000);    // Macro/News quant — realtime (news updates per cycle)
+  setInterval(loadLiquidityProxy, 15000);   // Liquidity/order-flow proxy — realtime
   loadDeskTicker();
   setInterval(loadDeskTicker, 3600000);  // desk top-ticker macro/COT — hourly poll (daily/weekly data)
   setInterval(loadCotCard, 3600000);     // COT data is weekly — hourly poll is sufficient

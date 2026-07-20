@@ -1143,6 +1143,21 @@ def api_macro_quant():
     return jsonify(_cached("macro-quant", _c, ttl=15))
 
 
+@app.route("/api/liquidity-proxy")
+def api_liquidity_proxy():
+    """Liquidity/order-flow proxy (volume-profile + cluster + COT). ⚠️ proxy — XAUUSD retail ไม่มี book จริง.
+    flow tilt + liquidity magnets (walls/pools). SELECTION guide เท่านั้น, 0 token."""
+    def _c():
+        from agents.liquidity_proxy import liquidity_score
+        try:
+            from agents.cluster_map import from_mt5
+            cl = from_mt5()
+        except Exception:
+            cl = None
+        return liquidity_score(cluster=cl if (cl or {}).get("ok") else None)
+    return jsonify(_cached("liquidity-proxy", _c, ttl=15))
+
+
 @app.route("/api/regime-monitor")
 def api_regime_monitor():
     """weekly monitor ของ algo-live (N-gauge + decay) — pass-through data/regime_monitor.json
