@@ -49,7 +49,15 @@ def _sr_view_now():
         if not atr or atr <= 0:
             return None
         sr_view = build_sr_view(sr_meta, float(close[-1]), float(atr), cluster)
-        return (sr_view, float(atr)) if sr_view.get("ok") else None
+        if not sr_view.get("ok"):
+            return None
+        try:                                                # regime (สำหรับ R:R vol/TF-aware)
+            er = R.efficiency_ratio(close); adx = R.adx(high, low, close); vp = R.vol_percentile(close)
+            i = len(close) - 2
+            regime = R.detect_regime(er[i], adx[i], vp[i])
+        except Exception:
+            regime = None
+        return (sr_view, float(atr), regime, cluster)
     except Exception:
         return None
 
@@ -63,14 +71,15 @@ def sr_tp_pips(direction, entry_price, sl_pips, default_tp_pips=None, min_rr=1.5
         res = _sr_view_now()
         if not res:
             return default_tp_pips
-        sr_view, _atr = res
-        from agents.sr_engine import pick_tp_target
-        tp = pick_tp_target(sr_view, direction, float(entry_price), sl_pips, min_rr)
-        if not tp:
+        sr_view, atr, regime, cluster = res
+        from agents.sr_engine import compute_rr_plan
+        plan = compute_rr_plan(sr_view, direction, float(entry_price), sl_pips, atr,
+                               regime=regime, cluster=cluster)   # R:R vol + S/R + TF-aware
+        if not plan:
             return default_tp_pips
-        tpp = max(1, round(abs(tp["tp"] - float(entry_price)) / R.POINT))
-        logger.debug(f"[ALGO-EXIT] TP→แนว {tp.get('level')} ({tp.get('tf')} {tp.get('entry_sig')}) "
-                     f"tp={tpp}p RR={tp.get('rr')} src={tp.get('source')}")
+        tpp = max(1, round(abs(plan["tp"] - float(entry_price)) / R.POINT))
+        logger.debug(f"[ALGO-EXIT] TP mode={plan.get('mode')} sig={plan.get('entry_sig')} "
+                     f"tp={tpp}p RR={plan.get('rr')} sr_ref={plan.get('sr_ref') or plan.get('level')}")
         return tpp
     except Exception:
         return default_tp_pips
@@ -90,7 +99,7 @@ def manage_algo_trailing():
         res = _sr_view_now()
         if not res:
             return 0
-        sr_view, atr = res
+        sr_view, atr, _regime, _cluster = res
         from agents.sr_engine import sr_trailing_stop
         tick = mt5.symbol_info_tick(_cfg.SYMBOL)
         if not tick:

@@ -125,6 +125,49 @@ def pick_tp_target(sr_view, direction, entry, sl_pips, min_rr=1.5):
             "rr": round(abs(tp - entry) / risk, 2), "source": "sr_target", "entry_sig": sig}
 
 
+def _in_dense_cluster(price, cluster, atr, min_touches=8):
+    """ราคาอยู่ในโซน dwell cluster หนา (sideways/congested)? — ใช้เลือกโหมด R:R."""
+    for c in ((cluster or {}).get("clusters") or []):
+        lv = c.get("level")
+        if lv is not None and (c.get("touches", 0) or 0) >= min_touches and abs(lv - price) <= 0.5 * atr:
+            return True
+    return False
+
+
+# R:R bounds สำหรับ sideways/small-TF (vol-based) — TREND/MAJOR ใช้ S/R target (ไกลได้)
+RANGE_RR_MIN, RANGE_RR_MAX = 1.0, 2.0
+
+
+def compute_rr_plan(sr_view, direction, entry, sl_pips, atr, regime=None, cluster=None):
+    """R:R vol + S/R + TF-aware (directive owner 07-20):
+    • เข้าแนวใหญ่ (MAJOR: W1/D1/cluster หนา + confluence) และ **ไม่** sideways → TP ไกลตาม large-TF S/R (RR สูงได้)
+    • เข้าโซน sideways cluster / แนวเล็ก (MINOR/MID) → **R:R คำนวณจาก vol (ATR)** modest, TP แนวถัดไป cap [MIN,MAX]
+    คืน {tp, rr, mode, sr_ref, entry_sig}. deterministic."""
+    if not sr_view.get("ok"):
+        return None
+    entry = float(entry)
+    risk = sl_pips * R.POINT
+    if risk <= 0:
+        return None
+    entry_lvl = sr_view.get("support") if direction == "BUY" else sr_view.get("resistance")
+    sig = level_significance(entry_lvl)
+    sideways = (regime in ("RANGE", "NEUTRAL")) or _in_dense_cluster(entry, cluster, atr)
+    sign = 1 if direction == "BUY" else -1
+
+    if sig == "MAJOR" and not sideways:                     # แนวใหญ่ trending → TP ไกลตาม S/R large-TF
+        tp = pick_tp_target(sr_view, direction, entry, sl_pips, min_rr=1.5)
+        if tp:
+            return {**tp, "mode": "SR_MAJOR_TF"}
+
+    # sideways / small-TF → R:R จาก vol: cap RR ของแนวถัดไปให้อยู่ใน [MIN,MAX] (เหมาะช่วงไร้ทิศ)
+    tp0 = pick_tp_target(sr_view, direction, entry, sl_pips, min_rr=RANGE_RR_MIN)
+    rr = tp0["rr"] if tp0 else RANGE_RR_MIN
+    rr = max(RANGE_RR_MIN, min(rr, RANGE_RR_MAX))           # vol/range cap
+    tp = entry + sign * rr * risk                           # vol-scaled (risk = ATR-multiple → TP = vol-based)
+    return {"tp": round(tp, 2), "rr": round(rr, 2), "mode": "VOL_RANGE",
+            "sr_ref": (tp0 or {}).get("level"), "entry_sig": sig}
+
+
 def sr_trailing_stop(sr_view, direction, atr=None, buffer_atr=0.3):
     """Trailing SL จาก S/R แข็งแรง + vol buffer: long → ใต้ support เล็กน้อย, short → เหนือ resistance.
     ตั้งต่ำกว่าแนวเล็กน้อย (buffer_atr·ATR) กันราคาแกว่งชน. คืน price หรือ None."""
