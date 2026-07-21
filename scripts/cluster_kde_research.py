@@ -64,82 +64,92 @@ def kde_zones(high, low, close, vol, atr):
     return sorted(p for p, _ in peaks)
 
 
-def _reaction(zones, high, low, close, atr, band):
-    """forward: วัด **directional respect vs break** (discriminate โซนจริงจากสุ่ม).
-    support test (ราคาลงมาจากบน): respect = เด้งขึ้น ≥R·ATR ก่อนปิดหลุดล่าง · break = ปิดหลุด >band.
-    resistance test (ขึ้นมาจากล่าง): กลับกัน. คืน (n_zones, respects, breaks)."""
-    n_z = len(zones); respects = 0; breaks = 0
-    for z in zones:
-        hit = None
-        for j in range(1, len(close)):
-            if low[j] <= z + band and high[j] >= z - band:    # แตะโซน
-                hit = j; break
-        if hit is None:
-            continue
-        from_above = close[hit - 1] > z                        # approach จากบน = test support
-        seg_hi = high[hit:hit + BOUNCE_K]; seg_lo = low[hit:hit + BOUNCE_K]
-        seg_c = close[hit:hit + BOUNCE_K]
-        if len(seg_hi) == 0:
-            continue
-        if from_above:                                         # SUPPORT test
-            broke = np.any(seg_c < z - band)                   # ปิดหลุดล่าง = break
-            bounced = seg_hi.max() >= z + BOUNCE_R * atr       # เด้งขึ้น = respect
-        else:                                                  # RESISTANCE test
-            broke = np.any(seg_c > z + band)
-            bounced = seg_lo.min() <= z - BOUNCE_R * atr
-        if bounced and not broke:
-            respects += 1
-        elif broke:
-            breaks += 1
-    return n_z, respects, breaks
+def _zone_touches(z, high, low, band):
+    """ความแข็งโซน = จำนวนแท่งใน lookback ที่แตะโซน (±band)."""
+    return int(np.count_nonzero((low <= z + band) & (high >= z - band)))
 
 
-def evaluate(high, low, close, vol, method_fn, n_anchors=300, seed=0):
-    """rolling OOS: สุ่ม anchors → detect zones บน lookback → วัด reaction บน forward. + null (random levels)."""
+def _zone_outcome(z, fh, fl, fc, atr, band):
+    """forward: 'respect' (react ถูกทางก่อนทะลุ) / 'break' (ปิดทะลุ) / None (ไม่ถูก test/ไม่ชี้ขาด)."""
+    hit = None
+    for j in range(1, len(fc)):
+        if fl[j] <= z + band and fh[j] >= z - band:
+            hit = j; break
+    if hit is None:
+        return None
+    from_above = fc[hit - 1] > z                                # ลงมาจากบน = test support
+    seg_hi = fh[hit:hit + BOUNCE_K]; seg_lo = fl[hit:hit + BOUNCE_K]; seg_c = fc[hit:hit + BOUNCE_K]
+    if len(seg_hi) == 0:
+        return None
+    if from_above:
+        broke = bool(np.any(seg_c < z - band)); bounced = seg_hi.max() >= z + BOUNCE_R * atr
+    else:
+        broke = bool(np.any(seg_c > z + band)); bounced = seg_lo.min() <= z - BOUNCE_R * atr
+    return "respect" if (bounced and not broke) else ("break" if broke else None)
+
+
+_BUCKETS = [(6, 9, "6-9 อ่อน"), (10, 15, "10-15 กลาง"), (16, 25, "16-25 แข็ง"), (26, 9999, "26+ แข็งมาก")]
+
+
+def evaluate(high, low, close, vol, method_fn, n_anchors=400, seed=0):
+    """rolling OOS: detect zones → **stratify ตาม touches** → respect% ต่อ bucket + null."""
     rng = np.random.RandomState(seed)
     atr_a = R.atr(high, low, close)
     n = len(close)
     anchors = rng.randint(LOOKBACK, n - FWD, size=n_anchors)
-    Z = Re = Br = 0; nRe = nBr = 0
+    rec = {b[2]: [0, 0] for b in _BUCKETS}          # label → [respect, break]
+    nrec = {b[2]: [0, 0] for b in _BUCKETS}
+
+    def _bucket(tch):
+        for lo, hi, lab in _BUCKETS:
+            if lo <= tch <= hi:
+                return lab
+        return None
+
     for t in anchors:
         atr = float(atr_a[t])
         if not np.isfinite(atr) or atr <= 0:
             continue
         win = slice(t - LOOKBACK, t)
-        zones = method_fn(high[win], low[win], close[win], vol[win], atr)
+        hw, lw, cw, vw = high[win], low[win], close[win], vol[win]
+        zones = method_fn(hw, lw, cw, vw, atr)
         if not zones:
             continue
         band = HIST_BW_ATR * atr
         fh, fl, fc = high[t:t + FWD], low[t:t + FWD], close[t:t + FWD]
-        z, re, br = _reaction(zones, fh, fl, fc, atr, band)
-        Z += z; Re += re; Br += br
-        rlo, rhi = close[win].min(), close[win].max()            # null: โซนสุ่มจำนวนเท่ากัน
-        rnd = sorted(rng.uniform(rlo, rhi, size=len(zones)))
-        _, re2, br2 = _reaction(rnd, fh, fl, fc, atr, band)
-        nRe += re2; nBr += br2
-    respect = Re / (Re + Br) if (Re + Br) else 0                 # respect เมื่อถูก test (respect vs break)
-    null_r = nRe / (nRe + nBr) if (nRe + nBr) else 0
-    return {
-        "zones/anchor": round(Z / n_anchors, 2),
-        "tested": Re + Br,                                       # จำนวน test ที่ชี้ขาด (respect หรือ break)
-        "respect_rate": round(respect, 3),                      # คุณภาพโซน: react ถูกทางก่อนทะลุ
-        "null_respect": round(null_r, 3),                       # โซนสุ่ม (baseline)
-        "edge_vs_null": round(respect - null_r, 3),             # โซนดีกว่าสุ่มแค่ไหน (ต้อง > 0 ชัด)
-    }
+        rlo, rhi = cw.min(), cw.max()
+        for z in zones:
+            lab = _bucket(_zone_touches(z, hw, lw, band))
+            if lab:
+                o = _zone_outcome(z, fh, fl, fc, atr, band)
+                if o == "respect": rec[lab][0] += 1
+                elif o == "break": rec[lab][1] += 1
+            zr = sorted(rng.uniform(rlo, rhi, 1))[0]              # null: 1 random level/zone, bucket by touches
+            lab2 = _bucket(_zone_touches(zr, hw, lw, band))
+            if lab2:
+                o2 = _zone_outcome(zr, fh, fl, fc, atr, band)
+                if o2 == "respect": nrec[lab2][0] += 1
+                elif o2 == "break": nrec[lab2][1] += 1
+    return rec, nrec
 
 
 def main():
     print("โหลด xau_h1 (70k H1 bars)...")
     high, low, close, vol = _load()
-    print(f"bars={len(close)}  price {close.min():.0f}–{close.max():.0f}\n")
-    print(f"{'method':>12} | {'zones/anc':>9} {'tested':>7} {'respect%':>8} | {'null%':>7} {'edge':>8}")
-    print("-" * 62)
+    print(f"bars={len(close)}\n")
     for name, fn in (("histogram", histogram_zones), ("KDE", kde_zones)):
-        r = evaluate(high, low, close, vol, fn)
-        print(f"{name:>12} | {r['zones/anchor']:>9} {r['tested']:>7} {r['respect_rate']*100:>7.1f}% | "
-              f"{r['null_respect']*100:>6.1f}% {r['edge_vs_null']*100:>+7.1f}%")
-    print("\nrespect% = ถูก test แล้ว react ถูกทาง (เด้ง) ก่อนทะลุ · edge = respect% − null(random level)")
-    print("KDE ชนะ = respect% สูงกว่า histogram + edge > 0 ชัด. edge ≈ 0 = โซนไม่ต่างจากสุ่ม (สอดคล้อง finding เดิม)")
+        rec, nrec = evaluate(high, low, close, vol, fn)
+        print(f"=== {name} — respect% แยกตามความแข็งโซน (touches) ===")
+        print(f"  {'bucket':>14} | {'tested':>6} {'respect%':>8} | {'null%':>6} {'edge':>7}  (breakeven fade RR1=50%)")
+        for _lo, _hi, lab in _BUCKETS:
+            re, br = rec[lab]; nr, nb = nrec[lab]
+            tot = re + br; ntot = nr + nb
+            rr = re / tot if tot else 0; nn = nr / ntot if ntot else 0
+            flag = " ← > breakeven!" if rr > 0.50 and tot >= 30 else ""
+            print(f"  {lab:>14} | {tot:>6} {rr*100:>7.1f}% | {nn*100:>5.1f}% {(rr-nn)*100:>+6.1f}%{flag}")
+        print()
+    print("อ่าน: ถ้า respect% เพิ่มตามความแข็ง + bucket แข็ง>50% (RR1) = โซนแข็งมี edge fade ได้ (validate _weak veto)")
+    print("ถ้าแบนทุก bucket ~39% = ความแข็งไม่ทำนาย respect → ทองไม่มี mechanical S/R edge (จบเรื่อง fade)")
 
 
 if __name__ == "__main__":
