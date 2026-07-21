@@ -118,14 +118,15 @@ def breakout_baserate(high, low, close, atr, er, adx):
 
 
 def main():
-    o, high, low, close = _load("h1")
+    tf = sys.argv[1] if len(sys.argv) > 1 else "h1"
+    o, high, low, close = _load(tf)
     er = R.efficiency_ratio(close, R.VOL_WIN); adx = R.adx(high, low, close); atr = R.atr(high, low, close)
     lr = np.zeros(len(close)); lr[1:] = np.diff(np.log(close))
     sigma = np.array([lr[max(0, j - N_VOL):j].std() if j >= N_VOL else 0.0 for j in range(len(close))])
     entries = gen_entries(high, low, close, er, adx)
 
     print("=" * 92)
-    print(f"TRAILING + SWING-TP + VOL-REMOVAL — 4-way ablation | gold H1 | entries={len(entries)} (momentum breakout)")
+    print(f"TRAILING + SWING-TP + VOL-REMOVAL — 4-way ablation | gold {tf.upper()} | entries={len(entries)} (momentum breakout)")
     print("=" * 92)
     print(f"{'mode':<26}{'N':>6}{'WR':>7}{'expR':>9}{'Sharpe':>8}{'PSR':>6}{'sumR':>8}{'TPrem':>7}")
     print("-" * 92)
