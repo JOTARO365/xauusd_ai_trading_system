@@ -181,6 +181,9 @@ def manage_algo_pending():
     if not (getattr(_cfg, "REGIME_LIVE", False)
             and (getattr(_cfg, "REGIME_PENDING", False) or getattr(_cfg, "REGIME_PENDING_FADE", False))):
         return 0
+    if getattr(_cfg, "TSMOM_LIVE", False):                  # TSMOM = engine เดียว → fade pending งดวาง
+        _cancel_algo_pendings("ALGO-P")                     # เก็บ pending fade ที่ค้างออก
+        return 0
     global _last_bar_hour
     try:
         import MetaTrader5 as mt5

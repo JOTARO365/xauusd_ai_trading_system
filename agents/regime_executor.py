@@ -46,6 +46,9 @@ def run_regime_executor():
     บาร์ปิดใหม่ + momentum signal + ไม่มีไม้ ALGO ค้าง → open_order (lot config, SL/TP จาก algo)."""
     if not getattr(_cfg, "REGIME_LIVE", False):
         return None
+    if getattr(_cfg, "TSMOM_LIVE", False):                  # TSMOM = directional engine → momentum intraday ยืนดู
+        _hb("HAND-OFF", "TSMOM-D1 เป็น directional engine → momentum intraday งดเข้า")
+        return None
     if getattr(_cfg, "REGIME_LIVE_TICK", False) or getattr(_cfg, "REGIME_PENDING", False):
         _hb("HAND-OFF", "per-tick/pending ควบคุม entry แล้ว → per-cycle หยุดทำงาน")
         return None                                     # per-tick / pending จัดการ entry แล้ว → per-cycle ไม่เข้าซ้ำ

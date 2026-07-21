@@ -297,6 +297,14 @@ def node_position_mgmt(state: TradingState) -> dict:
             print_warning(f"[ALGO-PENDING] ส่งคำสั่ง {_p} pending straddle ที่ Donchian level")
     except Exception as _pe:
         logger.error(f"[GRAPH:regime_pending] {_pe}")
+    # TSMOM-D1: directional engine รายวัน (validated edge). act เฉพาะแท่ง D1 ใหม่. fail-soft.
+    try:
+        from agents.tsmom_manager import manage_tsmom
+        _tm = manage_tsmom()
+        if _tm:
+            print_warning(f"[TSMOM] target={_tm['target']} (D1 ensemble){' · SHADOW' if _tm['shadow'] else ''}")
+    except Exception as _tme:
+        logger.error(f"[GRAPH:tsmom] {_tme}")
     # REGIME_SR_EXIT: trailing SL ไม้ ALGO ตาม vol + S/R แข็ง (only-tighten). fail-soft.
     try:
         from agents.algo_exit import manage_algo_trailing

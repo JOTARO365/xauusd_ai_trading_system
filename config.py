@@ -219,6 +219,14 @@ ALGO_MAX_STACK        = int(os.getenv("ALGO_MAX_STACK") or 1)
 ALGO_SIZE_STANDDOWN     = os.getenv("ALGO_SIZE_STANDDOWN", "true").lower() == "true"
 ALGO_MAX_TRADE_RISK_PCT = float(os.getenv("ALGO_MAX_TRADE_RISK_PCT") or 0.02)   # เพดาน risk/ไม้ ALGO (2%)
 
+# TSMOM-D1 = time-series momentum รายวัน (DESIGN_tsmom_integration.md) — edge เดียวที่ validated (~31 กลยุทธ์).
+# position-based daily overlay: signal ensemble sign(close_D1 − close_D1[L]) majority vote, vol-target lot,
+# exit=flip, SL=chandelier. ⚠️ TSMOM_LIVE → ปิด momentum intraday + fade (กัน conflict). default OFF. kill=false.
+TSMOM_LIVE       = os.getenv("TSMOM_LIVE", "false").lower() == "true"
+TSMOM_SHADOW     = os.getenv("TSMOM_SHADOW", "false").lower() == "true"      # log target เฉยๆ ไม่วาง order
+TSMOM_LOOKBACKS  = os.getenv("TSMOM_LOOKBACKS", "63,126,252")                # ensemble lookback (วัน D1)
+TSMOM_SL_ATR     = float(os.getenv("TSMOM_SL_ATR") or 3.0)                   # chandelier disaster SL (× ATR D1)
+
 # ZRE = Zone Re-Entry RR≥2 (v2 fixed-SL). วาง LIMIT ดักเด้งที่โซนเกรดสูงเชิงรุก (RR≥2, SL คงที่).
 # เกราะสุด (replay 2026-07-16): trend-align-only (ตัด SIDEWAYS ที่ replay ขาดทุน −0.6R),
 # grade A/B + score≥ZRE_MIN_SCORE, สด ≤ZRE_MAX_BARS_SINCE, ในระยะ ZRE_PROXIMITY_PCT%,
@@ -311,6 +319,7 @@ def reload_config():
     global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING, REGIME_SR_ENTRY, REGIME_PENDING_FADE, REGIME_SR_EXIT
     global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK
     global ALGO_SIZE_STANDDOWN, ALGO_MAX_TRADE_RISK_PCT
+    global TSMOM_LIVE, TSMOM_SHADOW, TSMOM_LOOKBACKS, TSMOM_SL_ATR
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
     SPECIALIST_ENABLED       = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"
     REGIME_SHADOW            = os.getenv("REGIME_SHADOW", "false").lower() == "true"
@@ -327,6 +336,10 @@ def reload_config():
     ALGO_MAX_STACK           = int(os.getenv("ALGO_MAX_STACK") or 1)                        # ไม้ ALGO พร้อมกัน
     ALGO_SIZE_STANDDOWN      = os.getenv("ALGO_SIZE_STANDDOWN", "true").lower() == "true"    # small-acct guard
     ALGO_MAX_TRADE_RISK_PCT  = float(os.getenv("ALGO_MAX_TRADE_RISK_PCT") or 0.02)           # เพดาน risk/ไม้
+    TSMOM_LIVE               = os.getenv("TSMOM_LIVE", "false").lower() == "true"            # TSMOM directional engine
+    TSMOM_SHADOW             = os.getenv("TSMOM_SHADOW", "false").lower() == "true"
+    TSMOM_LOOKBACKS          = os.getenv("TSMOM_LOOKBACKS", "63,126,252")
+    TSMOM_SL_ATR             = float(os.getenv("TSMOM_SL_ATR") or 3.0)
 
     global ZONE_REENTRY_ENABLED, ZONE_REENTRY_SHADOW, ZRE_MIN_SCORE, ZRE_MAX_BARS_SINCE
     global ZRE_PROXIMITY_PCT, ZRE_TREND_ALIGN_ONLY, ZRE_MAX_CONCURRENT
