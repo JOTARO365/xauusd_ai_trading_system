@@ -52,15 +52,18 @@ def _why_loss(t):
     return " · ".join(reasons) or "ราคาไปสวนทาง (SL)"
 
 
-def build_daily_summary(days=30):
-    """คืน {days:[...], totals:{...}} — สรุปต่อวัน (ล่าสุดก่อน). 0 token, fail-soft."""
+def build_daily_summary(days=30, tech="all"):
+    """คืน {days, totals, techniques_all, filter} — สรุปต่อวัน (ล่าสุดก่อน). tech=filter เทคนิค. 0 token, fail-soft."""
     try:
         d = json.load(open(os.path.join(_BASE, "logs", "trades.json"), encoding="utf-8"))
         trades = d if isinstance(d, list) else d.get("trades", [])
     except (OSError, json.JSONDecodeError):
-        return {"days": [], "totals": {}}
+        return {"days": [], "totals": {}, "techniques_all": [], "filter": tech}
     closed = [t for t in trades if t.get("status") == "CLOSED" and t.get("pnl") is not None
               and t.get("timestamp")]
+    techs_all = sorted({_tech(t)[0] for t in closed})
+    if tech and tech != "all":                              # filter เฉพาะเทคนิคที่เลือก
+        closed = [t for t in closed if _tech(t)[0] == tech]
     byday = defaultdict(list)
     for t in closed:
         byday[str(t["timestamp"])[:10]].append(t)
@@ -93,8 +96,9 @@ def build_daily_summary(days=30):
         })
     tot_pnl = sum(x["net_pnl"] for x in out)
     tot_n = sum(x["n"] for x in out); tot_w = sum(x["wins"] for x in out)
-    return {"days": out, "totals": {"n": tot_n, "net_pnl": round(tot_pnl, 2),
-                                    "win_rate": round(tot_w / tot_n, 3) if tot_n else 0}}
+    return {"days": out, "techniques_all": techs_all, "filter": tech,
+            "totals": {"n": tot_n, "net_pnl": round(tot_pnl, 2),
+                       "win_rate": round(tot_w / tot_n, 3) if tot_n else 0}}
 
 
 if __name__ == "__main__":
@@ -103,7 +107,9 @@ if __name__ == "__main__":
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
-    s = build_daily_summary()
+    _tf = sys.argv[1] if len(sys.argv) > 1 else "all"     # filter เทคนิค (arg) เช่น "Manual (owner)"
+    s = build_daily_summary(tech=_tf)
+    print(f"filter: {_tf}  |  เทคนิคที่มี: {', '.join(s.get('techniques_all', []))}\n")
     print(f"{'date':>11} {'n':>3} {'W/L':>6} {'net฿':>9}  {'regime':>7}  technique · why-loss")
     print("-" * 90)
     for x in s["days"][:20]:

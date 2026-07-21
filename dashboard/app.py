@@ -1156,10 +1156,11 @@ def api_algo_journal():
 @app.route("/api/daily-summary")
 def api_daily_summary():
     """สรุปเทรดรายวัน (Analytics): เทคนิค · regime · กำไร/ขาดทุน · ทำไมเข้า/ขาดทุน. จาก trades.json. 0 token."""
+    tech = request.args.get("tech", "all")
     def _c():
         from agents.daily_summary import build_daily_summary
-        return {"ok": True, **build_daily_summary(days=45)}
-    return jsonify(_cached("daily-summary", _c, ttl=60))
+        return {"ok": True, **build_daily_summary(days=45, tech=tech)}
+    return jsonify(_cached(f"daily-summary:{tech}", _c, ttl=60))
 
 
 @app.route("/api/liquidity-proxy")

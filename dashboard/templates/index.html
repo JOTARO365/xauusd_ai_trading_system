@@ -2084,7 +2084,13 @@
     <!-- REGIME ROUTER ANALYTICS — regime ไหนของทองเหมาะ algo ไหน + score + weekly (scripts/regime_analytics.py) -->
     <!-- DAILY TRADE SUMMARY — เทคนิค · regime · กำไร/ขาดทุน · ทำไมเข้า/ขาดทุน -->
     <section id="daily-summary-section" style="margin-bottom:18px">
-      <div class="section-title">สรุปเทรดรายวัน — เทคนิค · สภาพตลาด · กำไร/ขาดทุน · เหตุผล</div>
+      <div class="section-title" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span>สรุปเทรดรายวัน — เทคนิค · สภาพตลาด · กำไร/ขาดทุน · เหตุผล</span>
+        <select id="ds-filter" onchange="loadDailySummary(this.value)"
+                style="font-size:11px;font-family:var(--mono);background:var(--bg,#161a2e);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 6px">
+          <option value="all">ทุกเทคนิค</option>
+        </select>
+      </div>
       <div id="ds-totals" style="font-size:12px;font-family:var(--mono);color:var(--muted);margin:6px 0 10px">—</div>
       <div style="overflow-x:auto">
         <table id="ds-table" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
@@ -4056,11 +4062,17 @@ async function loadAlgoJournal() {
   } catch (_e) {}
 }
 
-async function loadDailySummary() {
+async function loadDailySummary(tech) {
   try {
-    const d = await (await fetch('/api/daily-summary')).json();
+    const q = tech && tech !== 'all' ? ('?tech=' + encodeURIComponent(tech)) : '';
+    const d = await (await fetch('/api/daily-summary' + q)).json();
     const tb = document.getElementById('ds-tbody');
     if (!tb) return;
+    // populate dropdown ครั้งแรก (จาก techniques_all)
+    const sel = document.getElementById('ds-filter');
+    if (sel && sel.options.length <= 1 && (d.techniques_all || []).length) {
+      d.techniques_all.forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = k; sel.appendChild(o); });
+    }
     if (!d.ok || !(d.days || []).length) {
       tb.innerHTML = '<tr><td colspan="7" style="padding:8px;color:var(--muted)">ไม่มีข้อมูล</td></tr>'; return;
     }
