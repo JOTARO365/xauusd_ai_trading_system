@@ -2082,6 +2082,22 @@
   <div class="tab-content" id="tab-backtest">
 
     <!-- REGIME ROUTER ANALYTICS — regime ไหนของทองเหมาะ algo ไหน + score + weekly (scripts/regime_analytics.py) -->
+    <!-- DAILY TRADE SUMMARY — เทคนิค · regime · กำไร/ขาดทุน · ทำไมเข้า/ขาดทุน -->
+    <section id="daily-summary-section" style="margin-bottom:18px">
+      <div class="section-title">สรุปเทรดรายวัน — เทคนิค · สภาพตลาด · กำไร/ขาดทุน · เหตุผล</div>
+      <div id="ds-totals" style="font-size:12px;font-family:var(--mono);color:var(--muted);margin:6px 0 10px">—</div>
+      <div style="overflow-x:auto">
+        <table id="ds-table" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
+          <thead><tr style="text-align:right;color:var(--muted);border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:4px 8px">วันที่</th><th>ไม้</th><th>W/L</th>
+            <th>net ฿</th><th style="text-align:left">regime</th><th style="text-align:left">เทคนิค</th>
+            <th style="text-align:left">ทำไมขาดทุน</th>
+          </tr></thead>
+          <tbody id="ds-tbody"><tr><td colspan="7" style="padding:8px;color:var(--muted)">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
     <section id="regime-analytics-section" style="margin-bottom:18px">
       <div class="section-title">Regime Router — สภาพตลาดทอง × กลยุทธ์ + Score</div>
       <div id="ra-verdict" style="font-size:12px;font-family:var(--mono);color:var(--muted);margin:6px 0 10px">—</div>
@@ -3288,7 +3304,7 @@ function switchTab(name) {
   if (name === 'settings')   loadConfig();
   if (name === 'accounting') loadAccounting();
   if (name === 'monitor')    loadMonitor();
-  if (name === 'backtest') { loadBacktest(); loadRegimeAnalytics(); }
+  if (name === 'backtest') { loadBacktest(); loadRegimeAnalytics(); loadDailySummary(); }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -4037,6 +4053,33 @@ async function loadAlgoJournal() {
     if (d.needed_n)
       html += `<div style="color:var(--muted);font-size:10px;margin-top:3px">needed-N พิสูจน์ edge: δ0.2R→${d.needed_n['δ=0.2']} · δ0.3R→${d.needed_n['δ=0.3']} ไม้</div>`;
     el.innerHTML = html;
+  } catch (_e) {}
+}
+
+async function loadDailySummary() {
+  try {
+    const d = await (await fetch('/api/daily-summary')).json();
+    const tb = document.getElementById('ds-tbody');
+    if (!tb) return;
+    if (!d.ok || !(d.days || []).length) {
+      tb.innerHTML = '<tr><td colspan="7" style="padding:8px;color:var(--muted)">ไม่มีข้อมูล</td></tr>'; return;
+    }
+    const t = d.totals || {};
+    const tot = document.getElementById('ds-totals');
+    if (tot) tot.innerHTML = `รวม ${t.n} ไม้ · net <span style="color:${t.net_pnl >= 0 ? 'var(--green)' : 'var(--red)'}">`
+      + `${t.net_pnl >= 0 ? '+' : ''}${t.net_pnl}฿</span> · WR ${Math.round((t.win_rate || 0) * 100)}%`;
+    tb.innerHTML = d.days.map(x => {
+      const pc = x.net_pnl >= 0 ? 'var(--green)' : 'var(--red)';
+      const techs = Object.entries(x.techniques || {}).map(([k, v]) => `${k}×${v}`).join(', ');
+      const why = Object.keys(x.why_loss || {}).join(' / ') || '—';
+      return `<tr style="text-align:right;border-bottom:1px solid var(--border)">`
+        + `<td style="text-align:left;padding:4px 8px">${x.date}</td>`
+        + `<td>${x.n}</td><td>${x.wins}/${x.losses}</td>`
+        + `<td style="color:${pc}">${x.net_pnl >= 0 ? '+' : ''}${x.net_pnl}</td>`
+        + `<td style="text-align:left">${x.regime}</td>`
+        + `<td style="text-align:left;color:var(--muted)">${techs}</td>`
+        + `<td style="text-align:left;color:var(--muted);max-width:300px">${why}</td></tr>`;
+    }).join('');
   } catch (_e) {}
 }
 

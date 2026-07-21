@@ -1153,6 +1153,15 @@ def api_algo_journal():
     return jsonify(_cached("algo-journal", _c, ttl=15))
 
 
+@app.route("/api/daily-summary")
+def api_daily_summary():
+    """สรุปเทรดรายวัน (Analytics): เทคนิค · regime · กำไร/ขาดทุน · ทำไมเข้า/ขาดทุน. จาก trades.json. 0 token."""
+    def _c():
+        from agents.daily_summary import build_daily_summary
+        return {"ok": True, **build_daily_summary(days=45)}
+    return jsonify(_cached("daily-summary", _c, ttl=60))
+
+
 @app.route("/api/liquidity-proxy")
 def api_liquidity_proxy():
     """Liquidity/order-flow proxy (volume-profile + cluster + COT). ⚠️ proxy — XAUUSD retail ไม่มี book จริง.
