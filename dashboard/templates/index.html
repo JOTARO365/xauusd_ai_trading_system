@@ -2085,21 +2085,20 @@
     <!-- DAILY TRADE SUMMARY — เทคนิค · regime · กำไร/ขาดทุน · ทำไมเข้า/ขาดทุน -->
     <section id="daily-summary-section" style="margin-bottom:18px">
       <div class="section-title" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <span>สรุปเทรดรายวัน — เทคนิค · สภาพตลาด · กำไร/ขาดทุน · เหตุผล</span>
-        <select id="ds-filter" onchange="loadDailySummary(this.value)"
+        <span>สรุปเทรดรายวัน — เลือกวัน (แสดงต่อไม้: เทคนิค · ทำไมเข้า · ทำไมขาดทุน)</span>
+        <select id="ds-day" onchange="renderDay(this.value)"
                 style="font-size:11px;font-family:var(--mono);background:var(--bg,#161a2e);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 6px">
-          <option value="all">ทุกเทคนิค</option>
+          <option value="">—</option>
         </select>
       </div>
       <div id="ds-totals" style="font-size:12px;font-family:var(--mono);color:var(--muted);margin:6px 0 10px">—</div>
       <div style="overflow-x:auto">
         <table id="ds-table" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
           <thead><tr style="text-align:right;color:var(--muted);border-bottom:1px solid var(--border)">
-            <th style="text-align:left;padding:4px 8px">วันที่</th><th>ไม้</th><th>W/L</th>
-            <th>net ฿</th><th style="text-align:left">regime</th><th style="text-align:left">เทคนิค</th>
-            <th style="text-align:left">ทำไมขาดทุน</th>
+            <th style="text-align:left;padding:4px 8px">เวลา</th><th style="text-align:left">เทคนิค</th>
+            <th>ทิศ</th><th>P/L ฿</th><th style="text-align:left">ทำไมเข้า</th><th style="text-align:left">ทำไมออก/ขาดทุน</th>
           </tr></thead>
-          <tbody id="ds-tbody"><tr><td colspan="7" style="padding:8px;color:var(--muted)">Loading…</td></tr></tbody>
+          <tbody id="ds-tbody"><tr><td colspan="6" style="padding:8px;color:var(--muted)">Loading…</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -4062,37 +4061,42 @@ async function loadAlgoJournal() {
   } catch (_e) {}
 }
 
-async function loadDailySummary(tech) {
+let _dsData = null;
+async function loadDailySummary() {
   try {
-    const q = tech && tech !== 'all' ? ('?tech=' + encodeURIComponent(tech)) : '';
-    const d = await (await fetch('/api/daily-summary' + q)).json();
-    const tb = document.getElementById('ds-tbody');
-    if (!tb) return;
-    // populate dropdown ครั้งแรก (จาก techniques_all)
-    const sel = document.getElementById('ds-filter');
-    if (sel && sel.options.length <= 1 && (d.techniques_all || []).length) {
-      d.techniques_all.forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = k; sel.appendChild(o); });
-    }
-    if (!d.ok || !(d.days || []).length) {
-      tb.innerHTML = '<tr><td colspan="7" style="padding:8px;color:var(--muted)">ไม่มีข้อมูล</td></tr>'; return;
-    }
-    const t = d.totals || {};
-    const tot = document.getElementById('ds-totals');
-    if (tot) tot.innerHTML = `รวม ${t.n} ไม้ · net <span style="color:${t.net_pnl >= 0 ? 'var(--green)' : 'var(--red)'}">`
-      + `${t.net_pnl >= 0 ? '+' : ''}${t.net_pnl}฿</span> · WR ${Math.round((t.win_rate || 0) * 100)}%`;
-    tb.innerHTML = d.days.map(x => {
-      const pc = x.net_pnl >= 0 ? 'var(--green)' : 'var(--red)';
-      const techs = Object.entries(x.techniques || {}).map(([k, v]) => `${k}×${v}`).join(', ');
-      const why = Object.keys(x.why_loss || {}).join(' / ') || '—';
-      return `<tr style="text-align:right;border-bottom:1px solid var(--border)">`
-        + `<td style="text-align:left;padding:4px 8px">${x.date}</td>`
-        + `<td>${x.n}</td><td>${x.wins}/${x.losses}</td>`
-        + `<td style="color:${pc}">${x.net_pnl >= 0 ? '+' : ''}${x.net_pnl}</td>`
-        + `<td style="text-align:left">${x.regime}</td>`
-        + `<td style="text-align:left;color:var(--muted)">${techs}</td>`
-        + `<td style="text-align:left;color:var(--muted);max-width:300px">${why}</td></tr>`;
-    }).join('');
+    const d = await (await fetch('/api/daily-summary')).json();
+    if (!d.ok) return;
+    _dsData = d;
+    const sel = document.getElementById('ds-day');
+    if (sel) sel.innerHTML = (d.days || []).map(x =>
+      `<option value="${x.date}">${x.date} (${x.n}ไม้ ${x.net_pnl >= 0 ? '+' : ''}${x.net_pnl}฿)</option>`
+    ).join('') || '<option value="">ไม่มีข้อมูล</option>';
+    if ((d.days || []).length) renderDay(d.days[0].date);   // default: วันล่าสุด
   } catch (_e) {}
+}
+
+function renderDay(date) {
+  if (!_dsData) return;
+  const day = (_dsData.days || []).find(x => x.date === date);
+  const tb = document.getElementById('ds-tbody');
+  const tot = document.getElementById('ds-totals');
+  if (!tb) return;
+  if (!day) { tb.innerHTML = '<tr><td colspan="6" style="padding:8px;color:var(--muted)">—</td></tr>'; return; }
+  const pc = day.net_pnl >= 0 ? 'var(--green)' : 'var(--red)';
+  const techs = Object.entries(day.techniques || {}).map(([k, v]) => `${k}×${v}`).join(', ');
+  if (tot) tot.innerHTML = `<b>${day.date}</b> · regime <b>${day.regime}</b> · ${day.n}ไม้ ${day.wins}/${day.losses} `
+    + `(WR ${Math.round(day.win_rate * 100)}%) · net <span style="color:${pc}">${day.net_pnl >= 0 ? '+' : ''}${day.net_pnl}฿</span> · ${techs}`;
+  tb.innerHTML = (day.trades || []).map(t => {
+    const tp = t.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    const dc = t.dir === 'BUY' ? 'var(--green)' : (t.dir === 'SELL' ? 'var(--red)' : 'var(--muted)');
+    return `<tr style="text-align:right;border-bottom:1px solid var(--border)">`
+      + `<td style="text-align:left;padding:4px 8px">${t.time}</td>`
+      + `<td style="text-align:left;color:var(--muted)">${t.tech}</td>`
+      + `<td style="color:${dc}">${t.dir || '—'}</td>`
+      + `<td style="color:${tp}">${t.pnl >= 0 ? '+' : ''}${t.pnl}</td>`
+      + `<td style="text-align:left;color:var(--muted);max-width:220px">${t.why_in}</td>`
+      + `<td style="text-align:left;color:var(--muted);max-width:260px">${t.why_out}</td></tr>`;
+  }).join('') || '<tr><td colspan="6" style="padding:8px;color:var(--muted)">ไม่มีไม้</td></tr>';
 }
 
 async function loadRegimeAnalytics() {

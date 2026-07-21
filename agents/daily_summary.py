@@ -81,6 +81,13 @@ def build_daily_summary(days=30, tech="all"):
                         key=lambda t: float(t.get("pnl") or 0))
         worst = losers[0] if losers else None
         why_agg = Counter(_why_loss(t) for t in losers)
+        detail = [{
+            "time": str(t.get("timestamp"))[11:16],
+            "tech": _tech(t)[0], "dir": t.get("direction"),
+            "pnl": round(float(t.get("pnl") or 0), 2),
+            "why_in": (t.get("manual_reason") or t.get("entry_type") or "—"),   # ทำไมเข้า
+            "why_out": (_why_loss(t) if float(t.get("pnl") or 0) <= 0 else "กำไร (TP/manual)"),  # ทำไมออก/ขาดทุน
+        } for t in sorted(rows, key=lambda t: str(t.get("timestamp")))]
         out.append({
             "date": date,
             "n": len(rows), "wins": len(wins), "losses": len(losses),
@@ -93,6 +100,7 @@ def build_daily_summary(days=30, tech="all"):
             "worst": ({"technique": _tech(worst)[0], "pnl": round(float(worst.get("pnl") or 0), 2),
                        "dir": worst.get("direction"), "why": _why_loss(worst)} if worst else None),
             "why_loss": dict(why_agg.most_common(3)),
+            "trades": detail,
         })
     tot_pnl = sum(x["net_pnl"] for x in out)
     tot_n = sum(x["n"] for x in out); tot_w = sum(x["wins"] for x in out)
