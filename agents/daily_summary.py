@@ -14,6 +14,7 @@ _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # entry_type / comment → (technique, regime-hint)
 _TECH = {
+    "ALGO-TSMOM": ("TSMOM-D1 (momentum รายวัน)", "TREND"),
     "ALGO-mom": ("Momentum breakout", "TREND"),
     "ALGO-P": ("Momentum breakout (pending)", "TREND"),
     "ALGO-PF": ("Fade S/R (pending)", "RANGE"),

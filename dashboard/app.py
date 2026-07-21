@@ -794,7 +794,8 @@ def api_tsmom():
     # ── signal ensemble จาก xau_d1.json (บอทอัปเดตไฟล์) ──
     try:
         import numpy as np
-        d = np.array(json.load(open(os.path.join(_BASE, "..", "data", "xau_d1.json"))), dtype=float)
+        with open(os.path.join(_BASE, "..", "data", "xau_d1.json")) as _f:
+            d = np.array(json.load(_f), dtype=float)
         close, high, low = d[:, 4], d[:, 2], d[:, 3]
         Ls = [int(x) for x in str(getattr(_cfg, "TSMOM_LOOKBACKS", "63,126,252")).split(",")]
         ci = -2; votes_sum = 0
@@ -843,7 +844,8 @@ def api_tsmom():
             pass
     # ── state ล่าสุด (algo_state.json ถ้าเป็น TSMOM-*) ──
     try:
-        st = json.load(open(os.path.join(_BASE, "..", "data", "algo_state.json"), encoding="utf-8"))
+        with open(os.path.join(_BASE, "..", "data", "algo_state.json"), encoding="utf-8") as _f:
+            st = json.load(_f)
         if str(st.get("state") or "").startswith("TSMOM"):
             out["state"] = {"state": st.get("state"), "detail": st.get("detail"), "ts": st.get("ts")}
     except Exception:
@@ -1171,8 +1173,10 @@ def api_algo_status():
         except Exception:
             pass
         live = getattr(_cfg, "REGIME_LIVE", False)
-        mode = ("pending" if getattr(_cfg, "REGIME_PENDING", False)
-                else ("per-tick" if getattr(_cfg, "REGIME_LIVE_TICK", False) else "per-cycle")) if live else "OFF"
+        tsmom = getattr(_cfg, "TSMOM_LIVE", False)          # TSMOM = engine → momentum/fade stand-down
+        mode = "TSMOM-D1 (daily)" if tsmom else (
+            ("pending" if getattr(_cfg, "REGIME_PENDING", False)
+             else ("per-tick" if getattr(_cfg, "REGIME_LIVE_TICK", False) else "per-cycle")) if live else "OFF")
         regime = None; signal = None
         try:
             from agents.regime_shadow import _bars_from_feed, compute_shadow_signal
@@ -1187,6 +1191,9 @@ def api_algo_status():
             disabled = disabled_strategies()
         except Exception:
             disabled = []
+        if tsmom:                                            # โหมด TSMOM: momentum/fade ปิด → ไม่โชว์ signal เก่า
+            signal = None
+            disabled = list(disabled) + ["momentum-intraday", "fade-pending"]
         return {"regime_live": live, "mode": mode, "regime": regime, "signal": signal, "disabled": disabled}
     return jsonify(_cached("algo-status", _c, ttl=15))
 

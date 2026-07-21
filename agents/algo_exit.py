@@ -93,7 +93,8 @@ def manage_algo_trailing():
         import MetaTrader5 as mt5
         from connectors.mt5_connector import get_open_positions, _set_sl_tp
         positions = [p for p in (get_open_positions() or [])
-                     if str(p.get("comment") or "").startswith("ALGO")]
+                     if str(p.get("comment") or "").startswith("ALGO")
+                     and not str(p.get("comment") or "").startswith("ALGO-TSMOM")]  # TSMOM จัดการ exit เอง (chandelier+flip)
         if not positions:
             return 0
         res = _sr_view_now()
