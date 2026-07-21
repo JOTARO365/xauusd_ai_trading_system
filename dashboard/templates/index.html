@@ -1662,7 +1662,7 @@
 
     <!-- AI SENTIMENT (SELECTION layer) — LLM อ่านข่าว X + ตัวเลขเศรษฐกิจ → guide เลือก regime (display-only, 0 token) -->
     <section id="ai-sentiment-section" style="margin-bottom:10px">
-      <div class="section-title">AI Sentiment (SELECTION) — LLM อ่านข่าว/ตัวเลข · algo ตัดสิน entry เอง</div>
+      <div class="section-title">AI Sentiment (SELECTION) — LLM อ่านข่าว/ตัวเลข · algo ตัดสิน entry ด้วยตนเอง</div>
       <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:9px 14px;border:1px solid var(--border);border-left:3px solid var(--cyan,#00B4D8);border-radius:8px;font-family:var(--mono);font-size:12px">
         <div><span style="color:var(--muted);font-size:10px">SENTIMENT</span><br><span id="ai-sent-val" style="font-weight:700;font-size:15px">—</span></div>
         <div><span style="color:var(--muted);font-size:10px">CONF</span><br><span id="ai-sent-conf">—</span></div>
@@ -1670,7 +1670,7 @@
         <div><span style="color:var(--muted);font-size:10px">โพสต์</span><br><span id="ai-sent-tweets">—</span></div>
         <div style="flex:1;min-width:220px"><span style="color:var(--muted);font-size:10px">บทวิเคราะห์ (LLM)</span><br><span id="ai-sent-summary" style="color:var(--text-dim,#9aa3b8)">—</span></div>
       </div>
-      <div style="font-size:10px;color:var(--muted);margin-top:4px">SELECTION = guide เลือก regime/กลยุทธ์ · EXECUTION (entry/ทิศ) = algo คำนวณจาก data เอง ไม่ให้ LLM ตัดสิน</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">SELECTION = guide เลือก regime/กลยุทธ์ · EXECUTION (entry/ทิศ) = algo คำนวณจาก data ด้วยตนเอง ไม่ให้ LLM ตัดสิน</div>
     </section>
 
     <!-- OWNER-GATE ADVISORY — เตือนเมื่อ mid-vol / manual short (regime ที่ owner เสียต่อเนื่อง). ไม่ปิด/ไม่บล็อก -->
@@ -1958,14 +1958,14 @@
         </div>
       </div>
       <div class="card" style="margin-top:8px">
-        <div class="label" style="margin-bottom:8px">คลิกรายการเพื่อกางรายละเอียด <span style="font-size:10px;color:var(--muted)">(📅 ปฏิทิน = scenario · 📰 ข่าว = เนื้อหาเต็ม · rubric ยังไม่ validate)</span></div>
+        <div class="label" style="margin-bottom:8px">คลิกที่รายการเพื่อดูรายละเอียด <span style="font-size:10px;color:var(--muted)">(📅 ปฏิทิน = scenario · 📰 ข่าว = เนื้อหาเต็ม · rubric ยังไม่ได้ validate)</span></div>
         <div id="feed-list" style="font-size:11px;color:var(--muted)">Loading…</div>
       </div>
     </section>
 
     <!-- NEWS_GATE COHORT — ไม้ที่ผ่านเพราะ news relax ตัดสิน (validate ผลจริง) -->
     <section id="news-gate-section">
-      <div class="section-title">NEWS_GATE Cohort &mdash; ไม้ที่ข่าวผ่อน floor ให้เข้า</div>
+      <div class="section-title">NEWS_GATE Cohort &mdash; ออเดอร์ที่ข่าวผ่อน floor ให้เข้าได้</div>
       <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
         <div class="card"><div class="label">Trades (closed)</div><div class="value" id="ng-n">&mdash;</div><div class="sub" id="ng-open">&mdash;</div></div>
         <div class="card"><div class="label">Win Rate</div><div class="value" id="ng-wr">&mdash;</div><div class="sub" id="ng-wl">&mdash;</div></div>
@@ -1973,8 +1973,8 @@
         <div class="card"><div class="label">Verdict</div><div class="value" id="ng-verdict" style="font-size:13px">&mdash;</div><div class="sub" id="ng-updated" style="font-size:9px">&mdash;</div></div>
       </div>
       <div class="card" style="margin-top:8px">
-        <div class="label" style="margin-bottom:6px">ไม้ที่ NEWS_GATE relax แทรกแซง <span style="font-size:10px;color:var(--muted)">(tag NG · n&lt;20 = ยังตัดสินไม่ได้)</span></div>
-        <div id="ng-trades" style="font-size:11px;font-family:var(--mono);color:var(--muted)">ยังไม่มีไม้ที่ relax ตัดสิน (เปิด NEWS_GATE ก่อน)</div>
+        <div class="label" style="margin-bottom:6px">ออเดอร์ที่ NEWS_GATE relax แทรกแซง <span style="font-size:10px;color:var(--muted)">(tag NG · n&lt;20 = ยังไม่สามารถตัดสินได้)</span></div>
+        <div id="ng-trades" style="font-size:11px;font-family:var(--mono);color:var(--muted)">ยังไม่มีออเดอร์ที่ relax ตัดสิน (โปรดเปิดใช้งาน NEWS_GATE ก่อน)</div>
       </div>
     </section>
 
@@ -2088,7 +2088,7 @@
     <!-- REGIME ROUTER ANALYTICS — regime ไหนของทองเหมาะ algo ไหน + score + weekly (scripts/regime_analytics.py) -->
     <!-- OWNER EDGE — วิจารณญาณ owner × vol/market regime (alpha จริง) -->
     <section id="owner-edge-section" style="margin-bottom:18px">
-      <div class="section-title">Owner Edge — วิจารณญาณพี่ × สภาพตลาด (alpha จริงอยู่ที่ไหน)</div>
+      <div class="section-title">Owner Edge — วิจารณญาณของ owner × สภาพตลาด (alpha จริงอยู่ที่ใด)</div>
       <div id="oe-overall" style="font-size:12px;font-family:var(--mono);color:var(--muted);margin:6px 0 8px">—</div>
       <div id="oe-body" style="font-size:12px;font-family:var(--mono)">Loading…</div>
     </section>
@@ -2096,7 +2096,7 @@
     <!-- DAILY TRADE SUMMARY — เทคนิค · regime · กำไร/ขาดทุน · ทำไมเข้า/ขาดทุน -->
     <section id="daily-summary-section" style="margin-bottom:18px">
       <div class="section-title" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <span>สรุปเทรดรายวัน — เลือกวัน (แสดงต่อไม้: เทคนิค · ทำไมเข้า · ทำไมขาดทุน)</span>
+        <span>สรุปเทรดรายวัน — เลือกวัน (แสดงต่อออเดอร์: เทคนิค · เหตุผลเข้า · เหตุผลขาดทุน)</span>
         <select id="ds-day" onchange="renderDay(this.value)"
                 style="font-size:11px;font-family:var(--mono);background:var(--bg,#161a2e);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 6px">
           <option value="">—</option>
@@ -2107,7 +2107,7 @@
         <table id="ds-table" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
           <thead><tr style="text-align:right;color:var(--muted);border-bottom:1px solid var(--border)">
             <th style="text-align:left;padding:4px 8px">เวลา</th><th style="text-align:left">เทคนิค</th>
-            <th>ทิศ</th><th>P/L ฿</th><th style="text-align:left">ทำไมเข้า</th><th style="text-align:left">ทำไมออก/ขาดทุน</th>
+            <th>ทิศ</th><th>P/L ฿</th><th style="text-align:left">เหตุผลเข้า</th><th style="text-align:left">เหตุผลออก/ขาดทุน</th>
           </tr></thead>
           <tbody id="ds-tbody"><tr><td colspan="6" style="padding:8px;color:var(--muted)">Loading…</td></tr></tbody>
         </table>
@@ -2121,7 +2121,7 @@
         <table id="ra-table" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
           <thead><tr style="text-align:right;color:var(--muted);border-bottom:1px solid var(--border)">
             <th style="text-align:left;padding:4px 8px">Regime</th><th style="text-align:left">Algo</th>
-            <th>ทองอยู่สภาพนี้</th><th>N</th><th>WR</th><th>Expectancy</th><th>Score</th><th>Grade</th>
+            <th>ทองในสภาวะนี้</th><th>N</th><th>WR</th><th>Expectancy</th><th>Score</th><th>Grade</th>
           </tr></thead>
           <tbody id="ra-tbody"><tr><td colspan="8" style="padding:8px;color:var(--muted)">Loading…</td></tr></tbody>
         </table>
@@ -2525,12 +2525,12 @@
             <div class="field">
               <label>BE Max Trigger (pips)</label>
               <input type="number" id="cfg-BE_MAX_TRIGGER_PIPS" step="100" min="0" max="10000">
-              <div class="field-help">เพดาน trigger — ไม้ SL กว้างจะ lock กำไรเมื่อถึง X pips ไม่ว่า R เท่าไร (1500)</div>
+              <div class="field-help">เพดาน trigger — ออเดอร์ SL กว้างจะ lock กำไรเมื่อถึง X pips ไม่ว่า R เท่าใด (1500)</div>
             </div>
             <div class="field">
               <label>SL Min Gap (pips)</label>
               <input type="number" id="cfg-SL_MIN_GAP_PIPS" step="100" min="0" max="5000">
-              <div class="field-help">ทุกการเลื่อน SL (BE/force-BE/dyn-TP) ห้ามชิดราคากว่านี้ (800 = $8, 0 = ปิด)</div>
+              <div class="field-help">ทุกการเลื่อน SL (BE/force-BE/dyn-TP) ห้ามชิดราคากว่านี้ (800 = $8, 0 = ปิดใช้งาน)</div>
             </div>
           </div>
         </div>
@@ -2596,7 +2596,7 @@
             <div class="toggle-row">
               <div>
                 <div class="toggle-label-text">HTF Direction Block (D1)</div>
-                <div class="toggle-label-sub">ห้ามเข้าสวนเทรนด์ D1 — replay: มิ.ย. พลิก −220→+22 (ปิดเมื่อ regime เด้งแรง)</div>
+                <div class="toggle-label-sub">ห้ามเข้าสวนเทรนด์ D1 — replay: มิ.ย. พลิก −220→+22 (ปิดเมื่อ regime กลับตัวแรง)</div>
               </div>
               <label class="toggle">
                 <input type="checkbox" id="cfg-HTF_DIRECTION_BLOCK">
@@ -2607,7 +2607,7 @@
             <div class="toggle-row">
               <div>
                 <div class="toggle-label-text">Momentum Ride</div>
-                <div class="toggle-label-sub">โหมดชนะยุคทอง: M15-STRONG+H1+H4 เรียงแถว → ยกเว้น counter-spike/HTF-direction (ไม้ติด tag RIDE)</div>
+                <div class="toggle-label-sub">โหมดทำกำไรช่วงเทรนด์แรง: M15-STRONG+H1+H4 เรียงแถว → ยกเว้น counter-spike/HTF-direction (ออเดอร์ติด tag RIDE)</div>
               </div>
               <label class="toggle">
                 <input type="checkbox" id="cfg-MOMENTUM_RIDE">
@@ -2618,7 +2618,7 @@
             <div class="toggle-row">
               <div>
                 <div class="toggle-label-text">Auto SL Protect</div>
-                <div class="toggle-label-sub">ตั้ง SL ให้ไม้ที่ไม่มี SL อัตโนมัติทุก cycle (SYSTEM+MANUAL)</div>
+                <div class="toggle-label-sub">ตั้ง SL ให้ออเดอร์ที่ไม่มี SL อัตโนมัติทุก cycle (SYSTEM+MANUAL)</div>
               </div>
               <label class="toggle">
                 <input type="checkbox" id="cfg-AUTO_SL_PROTECT">
@@ -2662,7 +2662,7 @@
             <div class="toggle-row">
               <div>
                 <div class="toggle-label-text">News Override Trend</div>
-                <div class="toggle-label-sub">Option C — เข้าสวน H4 ได้ถ้าตรงข่าว + PA ยืนยัน</div>
+                <div class="toggle-label-sub">Option C — สามารถเข้าสวน H4 ได้หากตรงข่าว + PA ยืนยัน</div>
               </div>
               <label class="toggle">
                 <input type="checkbox" id="cfg-NEWS_OVERRIDE_TREND">
@@ -2685,12 +2685,12 @@
               <div class="field">
                 <label>Max Trades / Day</label>
                 <input type="number" id="cfg-MAX_TRADES_PER_DAY" step="1" min="0" max="50">
-                <div class="field-help">เบรกวันพายุ — ไม้ #7+ ของวัน replay −411 (0 = ปิด)</div>
+                <div class="field-help">จำกัดจำนวนออเดอร์วันผันผวนสูง — ออเดอร์ #7+ ของวัน replay −411 (0 = ปิดใช้งาน)</div>
               </div>
               <div class="field">
                 <label>Auto-SL Width (pips)</label>
                 <input type="number" id="cfg-AUTO_SL_PIPS" step="100" min="0" max="10000">
-                <div class="field-help">ความกว้าง SL ที่ตั้งให้ไม้ไร้ SL — 0 = ใช้ Default SL; เทรดมือแล้วรู้สึกชิด → เพิ่มเป็น 2000-3000</div>
+                <div class="field-help">ความกว้าง SL ที่ตั้งให้ออเดอร์ไร้ SL — 0 = ใช้ Default SL; หากเทรดมือแล้วเห็นว่าชิดเกินไป → เพิ่มเป็น 2000-3000</div>
               </div>
               <div class="field">
                 <label>Min Tech Confidence (%)</label>
@@ -2705,12 +2705,12 @@
               <div class="field">
                 <label>Min AI Equity</label>
                 <input type="number" id="cfg-MIN_AI_EQUITY" step="10" min="0">
-                <div class="field-help">equity ต่ำกว่านี้ไม่เรียก AI เลย (150, 0 = ปิด)</div>
+                <div class="field-help">equity ต่ำกว่านี้จะไม่เรียก AI (150, 0 = ปิดใช้งาน)</div>
               </div>
               <div class="field">
                 <label>Counter-spike (pips)</label>
                 <input type="number" id="cfg-COUNTER_SPIKE_PIPS" step="50" min="0" max="5000">
-                <div class="field-help">ห้ามเข้าสวน fast move ≥ นี้ (500, 0 = ปิด)</div>
+                <div class="field-help">ห้ามเข้าสวน fast move ≥ นี้ (500, 0 = ปิดใช้งาน)</div>
               </div>
               <div class="field">
                 <label>News Bias Min Conf (%)</label>
@@ -2730,7 +2730,7 @@
               <div class="field">
                 <label>HTF Reversal Min Conf (%)</label>
                 <input type="number" id="cfg-HTF_REVERSAL_MIN_CONF" step="1" min="0" max="999">
-                <div class="field-help">gate 4 exception ที่ D1/W1 zone (70, 999 = ปิด)</div>
+                <div class="field-help">gate 4 exception ที่ D1/W1 zone (70, 999 = ปิดใช้งาน)</div>
               </div>
               <div class="field">
                 <label>Trend-cont Conf</label>
@@ -2880,7 +2880,7 @@
       <button class="save-btn" onclick="saveConfig()">Save Configuration</button>
       <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);font-family:var(--mono);cursor:pointer">
         <input type="checkbox" id="cfg-restart-pm2" style="cursor:pointer">
-        restart bot ด้วย (ปกติไม่ต้อง — ค่า config live-reload ทุก cycle)
+        restart bot ด้วย (โดยปกติไม่จำเป็น — ค่า config live-reload ทุก cycle)
       </label>
       <span id="cfg-status" style="font-size:11px;color:var(--muted);font-family:var(--mono);letter-spacing:0.5px"></span>
     </div>
@@ -3222,8 +3222,8 @@ async function closePosition(ticket, pnl) {
       body: JSON.stringify({ ticket })
     });
     const j = await res.json();
-    if (j.ok) { alert(`✅ ปิดแล้ว #${ticket}\nP/L: ${j.closed_pnl} THB`); fetchData(); }
-    else alert('❌ ปิดไม่สำเร็จ: ' + (j.error || 'unknown'));
+    if (j.ok) { alert(`ปิดออเดอร์สำเร็จ #${ticket}\nP/L: ${j.closed_pnl} THB`); fetchData(); }
+    else alert('ปิดออเดอร์ไม่สำเร็จ: ' + (j.error || 'unknown'));
   } catch (e) { alert('error: ' + e.message); }
 }
 
@@ -3238,8 +3238,8 @@ async function modifyPosition(ticket) {
       body: JSON.stringify({ ticket, sl: parseFloat(sl) || 0, tp: parseFloat(tp) || 0 })
     });
     const j = await res.json();
-    if (j.ok) { alert(`✅ ปรับแล้ว #${ticket}\nSL: ${j.sl}  TP: ${j.tp}`); fetchData(); }
-    else alert('❌ ปรับไม่สำเร็จ: ' + (j.error || 'unknown'));
+    if (j.ok) { alert(`ปรับสำเร็จ #${ticket}\nSL: ${j.sl}  TP: ${j.tp}`); fetchData(); }
+    else alert('ปรับไม่สำเร็จ: ' + (j.error || 'unknown'));
   } catch (e) { alert('error: ' + e.message); }
 }
 
@@ -3251,8 +3251,8 @@ async function cancelPending(ticket) {
       body: JSON.stringify({ ticket })
     });
     const j = await res.json();
-    if (j.ok) { alert(`✅ ยกเลิกแล้ว #${ticket}`); loadMonitor(); }
-    else alert('❌ ยกเลิกไม่สำเร็จ: ' + (j.error || 'unknown'));
+    if (j.ok) { alert(`ยกเลิกสำเร็จ #${ticket}`); loadMonitor(); }
+    else alert('ยกเลิกไม่สำเร็จ: ' + (j.error || 'unknown'));
   } catch (e) { alert('error: ' + e.message); }
 }
 
@@ -3951,7 +3951,7 @@ async function loadAlgoStatus() {
     set('as-regime', d.regime || '—', rc);
     set('as-signal', d.signal ? (d.signal.dir + ' ' + d.signal.algo) : 'STAND-DOWN');
     const dis = (d.disabled || []).length ? ('⚠ disabled: ' + d.disabled.join(', '))
-      : 'algo = ตัวเดียวที่เทรด · LLM = sentiment เท่านั้น';
+      : 'algo = ระบบเดียวที่เข้าเทรด · LLM = sentiment เท่านั้น';
     set('as-note', dis);
     // REGIME_LIVE: ซ่อน panel LLM-entry เก่าที่ stale (chart/advisor/decision ถูก gate off)
     document.querySelectorAll('.legacy-llm').forEach(el => { el.style.display = live ? 'none' : ''; });
@@ -3988,7 +3988,7 @@ async function loadOwnerGate() {
     b.style.display = 'block';
     b.innerHTML = `<span style="color:var(--red,#E94560);font-weight:700">⚠ OWNER-GATE</span> `
       + ws.map(w => `<span style="color:var(--gold)">[${w.tag}]</span> ${w.msg}`).join('<br>')
-      + `<div style="color:var(--muted);font-size:10px;margin-top:3px">advisory เท่านั้น — พี่ตัดสินใจเอง (ไม่ปิด/ไม่บล็อก)</div>`;
+      + `<div style="color:var(--muted);font-size:10px;margin-top:3px">advisory เท่านั้น — owner เป็นผู้ตัดสินใจ (ไม่ปิด/ไม่บล็อก)</div>`;
   } catch (_e) {}
 }
 
@@ -4068,7 +4068,7 @@ async function loadAlgoJournal() {
     const row = (label, s) => {
       const lab = `<span style="color:var(--muted);width:74px;display:inline-block">${label}</span>`;
       if (!s || (s.n_closed || 0) === 0)
-        return `<div style="margin:2px 0">${lab}<span style="color:var(--muted)">n=0 (รอเก็บ)</span>${s && s.n_open ? ` · open ${s.n_open}` : ''}</div>`;
+        return `<div style="margin:2px 0">${lab}<span style="color:var(--muted)">n=0 (รอเก็บข้อมูล)</span>${s && s.n_open ? ` · open ${s.n_open}` : ''}</div>`;
       const ec = s.exp_R > 0 ? 'var(--green)' : 'var(--red)';
       return `<div style="margin:2px 0">${lab}n=${s.n_closed} · WR ${Math.round(s.win_rate * 100)}% · `
            + `<span style="color:${ec}">exp ${s.exp_R > 0 ? '+' : ''}${s.exp_R}R</span> · ΣR ${s.sum_R}`
@@ -4081,7 +4081,7 @@ async function loadAlgoJournal() {
       html += `<div style="margin:2px 0 4px;color:var(--muted);font-size:11px">&nbsp;&nbsp;pending: expired ${p.expired || 0} · STOP ${(p.by_mode || {}).STOP || 0} · FADE ${(p.by_mode || {}).FADE || 0}</div>`;
     html += `<div style="margin-top:4px;border-top:1px solid #333;padding-top:4px">${row('รวม', d.combined)}</div>`;
     if (d.needed_n)
-      html += `<div style="color:var(--muted);font-size:10px;margin-top:3px">needed-N พิสูจน์ edge: δ0.2R→${d.needed_n['δ=0.2']} · δ0.3R→${d.needed_n['δ=0.3']} ไม้</div>`;
+      html += `<div style="color:var(--muted);font-size:10px;margin-top:3px">needed-N พิสูจน์ edge: δ0.2R→${d.needed_n['δ=0.2']} · δ0.3R→${d.needed_n['δ=0.3']} ออเดอร์</div>`;
     el.innerHTML = html;
   } catch (_e) {}
 }
@@ -4094,14 +4094,14 @@ async function loadOwnerEdge() {
     if (!d.ok) { bd.textContent = d.error || 'ไม่มีข้อมูล'; return; }
     const o = d.overall || {};
     const ov = document.getElementById('oe-overall');
-    if (ov) ov.innerHTML = `รวม ${o.n} ไม้ · WR ${Math.round((o.win_rate || 0) * 100)}% · net `
+    if (ov) ov.innerHTML = `รวม ${o.n} ออเดอร์ · WR ${Math.round((o.win_rate || 0) * 100)}% · net `
       + `<span style="color:${o.net >= 0 ? 'var(--green)' : 'var(--red)'}">${o.net >= 0 ? '+' : ''}${o.net}฿</span> · PF ${o.pf} `
       + `<span style="color:var(--muted)">(map vol ${d.n_mapped}/${d.n_manual})</span>`;
     const tbl = (title, rows) => {
       if (!(rows || []).length) return '';
       const body = rows.map(r => {
         const nc = r.net >= 0 ? 'var(--green)' : 'var(--red)';
-        const out = (r.top3_pct != null && r.top3_pct > 60) ? ` <span style="color:var(--gold)" title="net ${r.top3_pct}% มาจาก 3 ไม้ใหญ่ = outlier">⚠${r.top3_pct}%</span>` : '';
+        const out = (r.top3_pct != null && r.top3_pct > 60) ? ` <span style="color:var(--gold)" title="net ${r.top3_pct}% มาจาก 3 ออเดอร์ใหญ่ = outlier">⚠${r.top3_pct}%</span>` : '';
         return `<tr style="text-align:right"><td style="text-align:left;padding:2px 8px">${r.key}</td>`
           + `<td>${r.n}</td><td>${Math.round(r.win_rate * 100)}%</td>`
           + `<td style="color:${nc}">${r.net >= 0 ? '+' : ''}${r.net}${out}</td><td>${r.avg}</td><td>${r.pf}</td></tr>`;
@@ -4123,7 +4123,7 @@ async function loadDailySummary() {
     _dsData = d;
     const sel = document.getElementById('ds-day');
     if (sel) sel.innerHTML = (d.days || []).map(x =>
-      `<option value="${x.date}">${x.date} (${x.n}ไม้${x.open ? ' · ' + x.open + ' open' : ''} · net ${x.net_pnl >= 0 ? '+' : ''}${x.net_pnl}฿)</option>`
+      `<option value="${x.date}">${x.date} (${x.n} ออเดอร์${x.open ? ' · ' + x.open + ' open' : ''} · net ${x.net_pnl >= 0 ? '+' : ''}${x.net_pnl}฿)</option>`
     ).join('') || '<option value="">ไม่มีข้อมูล</option>';
     if ((d.days || []).length) renderDay(d.days[0].date);   // default: วันล่าสุด
   } catch (_e) {}
@@ -4140,7 +4140,7 @@ function renderDay(date) {
   const techs = Object.entries(day.techniques || {}).map(([k, v]) => `${k}×${v}`).join(', ');
   const openTxt = (day.open ? ` · <span style="color:var(--gold)">${day.open} open</span> (float ${day.float_pnl >= 0 ? '+' : ''}${day.float_pnl}฿)` : '')
     + (day.pending ? ` · <span style="color:var(--cyan,#4fd1e0)">${day.pending} pending (algo รอ fill)</span>` : '');
-  if (tot) tot.innerHTML = `<b>${day.date}</b> · regime <b>${day.regime}</b> · ${day.n}ไม้ ${day.wins}/${day.losses} `
+  if (tot) tot.innerHTML = `<b>${day.date}</b> · regime <b>${day.regime}</b> · ${day.n} ออเดอร์ ${day.wins}/${day.losses} `
     + `(WR ${Math.round(day.win_rate * 100)}%) · net <span style="color:${pc}">${day.net_pnl >= 0 ? '+' : ''}${day.net_pnl}฿</span>${openTxt} · ${techs}`;
   tb.innerHTML = (day.trades || []).map(t => {
     const isOpen = t.status === 'OPEN', isPend = t.status === 'PENDING';
@@ -4157,7 +4157,7 @@ function renderDay(date) {
       + `<td style="color:${tp}">${pnlTxt}</td>`
       + `<td style="text-align:left;color:var(--muted);max-width:220px">${t.why_in}</td>`
       + `<td style="text-align:left;color:var(--muted);max-width:260px">${t.why_out}</td></tr>`;
-  }).join('') || '<tr><td colspan="6" style="padding:8px;color:var(--muted)">ไม่มีไม้</td></tr>';
+  }).join('') || '<tr><td colspan="6" style="padding:8px;color:var(--muted)">ไม่มีออเดอร์</td></tr>';
 }
 
 async function loadRegimeAnalytics() {
@@ -4275,7 +4275,7 @@ async function loadCalibration() {
     if (sgEl) {
       if (!sg || sg.status === 'insufficient') {
         sgEl.innerHTML = '<div style="font-size:10px;color:var(--muted)">💡 conf-floor: ' +
-          ((sg && sg.note) || 'ข้อมูลไม่พอ') + '</div>';
+          ((sg && sg.note) || 'ข้อมูลไม่เพียงพอ') + '</div>';
       } else {
         const style = {
           ok_keep:               { c: 'var(--green)', bg: 'rgba(38,166,91,0.10)',  icon: '✓' },
@@ -4291,7 +4291,7 @@ async function loadCalibration() {
             ';border-radius:4px;padding:7px 10px;font-size:11px">' +
             '<div style="color:' + style.c + ';font-weight:700;margin-bottom:2px">' + style.icon + ' ' + head + '</div>' +
             '<div style="color:var(--muted);font-size:10px;line-height:1.4">' + (sg.note || '') +
-              ' <span style="opacity:.7">(n=' + (sg.total_n || 0) + ', เกณฑ์ EV/ไม้ · advisory)</span></div>' +
+              ' <span style="opacity:.7">(n=' + (sg.total_n || 0) + ', เกณฑ์ EV/ออเดอร์ · advisory)</span></div>' +
           '</div>';
       }
     }
@@ -4319,8 +4319,8 @@ async function loadNewsGate() {
     const vEl = document.getElementById('ng-verdict');
     if (vEl) {
       if (n < 20) { vEl.textContent = 'collecting'; vEl.style.color = 'var(--muted)'; }
-      else if (pnl > 0) { vEl.textContent = 'relax ช่วย ✓'; vEl.style.color = 'var(--green)'; }
-      else { vEl.textContent = 'relax ทำร้าย ✗'; vEl.style.color = 'var(--red)'; }
+      else if (pnl > 0) { vEl.textContent = 'relax ได้ผล ✓'; vEl.style.color = 'var(--green)'; }
+      else { vEl.textContent = 'relax ให้ผลเสีย ✗'; vEl.style.color = 'var(--red)'; }
     }
     if (d.updated) set('ng-updated', d.updated.slice(0, 16).replace('T', ' '));
     const t = document.getElementById('ng-trades');
@@ -4332,7 +4332,7 @@ async function loadNewsGate() {
         return '<div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.05);padding:3px 0">' +
           '<span>' + r.time + ' · ' + r.dir + st + '</span>' +
           '<span style="color:' + col + '">' + (r.pnl > 0 ? '+' : '') + r.pnl.toFixed(0) + '฿</span></div>';
-      }).join('') : 'ยังไม่มีไม้ที่ relax ตัดสิน (เปิด NEWS_GATE ก่อน)';
+      }).join('') : 'ยังไม่มีออเดอร์ที่ relax ตัดสิน (โปรดเปิดใช้งาน NEWS_GATE ก่อน)';
     }
   } catch (e) { console.error('loadNewsGate error:', e); }
 }
@@ -4443,7 +4443,7 @@ async function loadImpactCalibration() {
         statusEl.textContent = 'calibrated';
         statusEl.style.color = 'var(--green)';
       } else {
-        statusEl.textContent = 'rubric — ยังไม่ validate (collecting)';
+        statusEl.textContent = 'rubric — ยังไม่ได้ validate (collecting)';
         statusEl.style.color = 'var(--muted)';
       }
     }
@@ -4570,7 +4570,7 @@ async function saveConfig() {
     const data = await res.json();
     if (data.ok) {
       if (!data.restarted) {
-        status.textContent = '✓ Saved — live-reload ภายใน 1 cycle (ไม่ restart)';
+        status.textContent = '✓ Saved — live-reload ภายใน 1 cycle (ไม่ต้อง restart)';
         status.style.color = 'var(--green)';
       } else if (data.pm2_ok) {
         status.textContent = '✓ Saved — ' + data.pm2_msg;
@@ -4944,7 +4944,7 @@ function _esReactionsHtml(reactions) {
   ).join('');
   return `
     <div style="font-size:10px;color:var(--muted);margin-bottom:5px">reaction ต่อการประกาศ 12 ครั้งล่าสุด
-      <span style="font-size:9px">· เขียว=ทองขึ้น แดง=ลง · เข้ม=โมเมนตัมโตกว่าครั้งก่อน</span></div>
+      <span style="font-size:9px">· เขียว=ทองขึ้น แดง=ลง · เข้ม=โมเมนตัมสูงกว่าครั้งก่อน</span></div>
     <div style="position:relative;display:flex;gap:3px;align-items:stretch;background:rgba(0,0,0,0.18);border-radius:6px;padding:6px 6px 2px">
       <div style="position:absolute;left:6px;right:6px;top:calc(6px + ${H}px);border-top:1px dashed rgba(255,255,255,0.18)"></div>
       ${bars}
@@ -5650,7 +5650,7 @@ async function loadGateBlocks() {
     const tbody = document.getElementById('gate-blocks-tbody');
     if (!tbody) return;
     const rows = d.blocks || [];
-    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="no-data">ไม่มี block — บอทยังไม่เจอ setup</td></tr>'; return; }
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="no-data">ไม่มี block — บอทยังไม่พบ setup</td></tr>'; return; }
     const gateColors = { htf_direction: 'var(--violet,#8b5cf6)', counter_spike: 'var(--red)', session: 'var(--amber,#f59e0b)',
                          counter_trend: 'var(--red)', sideways: 'var(--muted)', trade_cap: 'var(--gold)', no_trade: 'var(--muted)' };
     tbody.innerHTML = rows.map(b => {
@@ -5678,14 +5678,14 @@ async function loadRideStats() {
     if (!d.ok) return;
     document.getElementById('ride-n').textContent = `${d.n_closed} / ${d.n_open}`;
     const wrEl = document.getElementById('ride-wr');
-    wrEl.textContent = d.wr === null ? 'รอไม้แรก' : d.wr + '%';
+    wrEl.textContent = d.wr === null ? 'รอออเดอร์แรก' : d.wr + '%';
     wrEl.className = 'value ' + (d.wr === null ? '' : d.wr >= 50 ? 'green' : 'red');
     const pnlEl = document.getElementById('ride-pnl');
     pnlEl.textContent = (d.pnl >= 0 ? '+' : '') + d.pnl.toFixed(2);
     pnlEl.className = 'value ' + (d.pnl > 0 ? 'green' : d.pnl < 0 ? 'red' : 'gold');
     document.getElementById('ride-recent').innerHTML = (d.recent || []).length
       ? d.recent.map(t => `${t.time.slice(5)} ${t.dir} ${t.pnl >= 0 ? '+' : ''}${t.pnl}${t.closed ? '' : ' (open)'}`).join('<br>')
-      : 'ยังไม่มีไม้ RIDE — รอ setup แรก';
+      : 'ยังไม่มีออเดอร์ RIDE — รอ setup แรก';
   } catch (e) {}
 }
 

@@ -45,10 +45,10 @@ def _refresh_levels(hour: int) -> None:
         _cache.update(hour=hour, armed=True, buy=lv["buy_level"], sell=lv["sell_level"],
                       sl_pips=lv["sl_pips"], tp_pips=lv["tp_pips"])
         write_state("ARMED", regime="TREND", via="tick",
-                    detail=f"เฝ้าทะลุ BUY>{lv['buy_level']:.1f} / SELL<{lv['sell_level']:.1f}")
+                    detail=f"เฝ้าการทะลุแนว BUY>{lv['buy_level']:.1f} / SELL<{lv['sell_level']:.1f}")
     else:
         _cache.update(hour=hour, armed=False)
-        write_state("STAND-DOWN", regime=regime, via="tick", detail=f"regime={regime} (ไม่ใช่ TREND → ยืนดู)")
+        write_state("STAND-DOWN", regime=regime, via="tick", detail=f"regime={regime} (ไม่ใช่ TREND → งดเข้าออเดอร์)")
 
 
 def _tick() -> None:
@@ -87,11 +87,11 @@ def _tick() -> None:
         _skip, _si = standdown_for_size(_cache["sl_pips"])
         if _skip:
             _last_traded_hour = hour                              # ถือว่าจัดการชั่วโมงนี้แล้ว (กัน log ซ้ำทุก tick)
-            logger.info(f"[REGIME-TICK] SIZE-STANDDOWN {d}: min-lot เสี่ยง {_si.get('risk_pct',0)*100:.1f}% "
-                        f"> เพดาน {_si.get('ceiling',0)*100:.0f}% (SL {_cache['sl_pips']}p ทุนเล็กเกิน) → ข้าม")
+            logger.info(f"[REGIME-TICK] SIZE-STANDDOWN {d}: min-lot มีความเสี่ยง {_si.get('risk_pct',0)*100:.1f}% "
+                        f"> เพดาน {_si.get('ceiling',0)*100:.0f}% (SL {_cache['sl_pips']}p เงินทุนไม่เพียงพอ) → ข้าม")
             from agents.algo_state import write_state
             write_state("SIZE-STANDDOWN", regime="TREND", via="tick",
-                        detail=f"min-lot เสี่ยง {_si.get('risk_pct',0)*100:.1f}% > เพดาน (SL {_cache['sl_pips']}p ทุนเล็กเกิน)")
+                        detail=f"min-lot มีความเสี่ยง {_si.get('risk_pct',0)*100:.1f}% > เพดาน (SL {_cache['sl_pips']}p เงินทุนไม่เพียงพอ)")
             return
         _last_traded_hour = hour
         from agents.algo_exit import sr_tp_pips                    # P-D: TP ตามแนว S/R (flag OFF → RR2 เดิม)
@@ -106,10 +106,10 @@ def _tick() -> None:
                          "sl_pips": _cache["sl_pips"], "tp_pips": _cache["tp_pips"]},
               "price": tick.ask if d == "BUY" else tick.bid,
               "level": _cache["buy"] if d == "BUY" else _cache["sell"], "order": res})
-        logger.warning(f"[REGIME-TICK] เข้า {d} ทะลุ level {res}")
+        logger.warning(f"[REGIME-TICK] เข้าออเดอร์ {d} ทะลุแนว {res}")
         from agents.algo_state import write_state
         write_state("ENTER", regime="TREND", via="tick",
-                    detail=f"{d} ทะลุ level {_cache['buy'] if d=='BUY' else _cache['sell']:.1f}")
+                    detail=f"{d} ทะลุแนว {_cache['buy'] if d=='BUY' else _cache['sell']:.1f}")
     except Exception as e:
         logger.debug(f"[REGIME-TICK] tick error: {e}")
 

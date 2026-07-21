@@ -960,7 +960,7 @@ def api_close_position():
     pos  = pos_list[0]
     tick = mt5.symbol_info_tick(pos.symbol)
     if tick is None:
-        return jsonify({"ok": False, "error": "ดึงราคาไม่ได้"}), 503
+        return jsonify({"ok": False, "error": "ไม่สามารถดึงราคาได้"}), 503
 
     is_buy = pos.type == 0
     modes  = _filling_modes_for(pos.symbol)

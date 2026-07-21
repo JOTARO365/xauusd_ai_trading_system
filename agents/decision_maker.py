@@ -121,15 +121,15 @@ def _counter_spike_reason(direction: str, chart_data: dict) -> str | None:
         return None
     if _momentum_ride_active(direction, chart_data):
         _f = chart_data.get("fast_move_pips", 0)
-        logger.info(f"[RIDE] counter-spike waived: {direction} fast={_f:+.0f}p แต่ M15-STRONG+H1+H4 เรียงแถว")
+        logger.info(f"[RIDE] counter-spike waived: {direction} fast={_f:+.0f}p แต่ M15-STRONG+H1+H4 เรียงตัว")
         return None
     fast = float(chart_data.get("fast_move_pips", 0) or 0)
     if abs(fast) < _cfg.COUNTER_SPIKE_PIPS:
         return None
     if fast > 0 and direction == "SELL":
-        return f"Counter-spike: ราคาพุ่งขึ้น {fast:.0f}p (น่าจะข่าว) — ห้าม SELL สวนการเด้ง"
+        return f"Counter-spike: ราคาพุ่งขึ้น {fast:.0f}p (คาดว่าจากข่าว) — ห้าม SELL สวนการเด้ง"
     if fast < 0 and direction == "BUY":
-        return f"Counter-spike: ราคาดิ่งลง {abs(fast):.0f}p (น่าจะข่าว) — ห้าม BUY สวนการร่วง"
+        return f"Counter-spike: ราคาดิ่งลง {abs(fast):.0f}p (คาดว่าจากข่าว) — ห้าม BUY สวนการร่วง"
     return None
 
 
@@ -146,7 +146,7 @@ def _news_bias_dir(sentiment_data: dict, advisor_data: dict | None) -> tuple[str
     adv_dir = {"BULLISH": "BUY", "BEARISH": "SELL"}.get(
         (advisor_data or {}).get("bias", "NEUTRAL"), "NEUTRAL")
     if adv_dir in ("BUY", "SELL") and adv_dir != a_bias:
-        return None, f"analyst={a_bias} ขัด regime={adv_dir} — ไม่บังคับทิศ"
+        return None, f"analyst={a_bias} ขัดแย้งกับ regime={adv_dir} — ไม่บังคับทิศ"
     return a_bias, f"analyst conf {a_conf:.0f}%≥{_cfg.NEWS_BIAS_MIN_CONF:.0f}"
 
 
@@ -179,11 +179,11 @@ def _htf_direction_reason(direction: str, chart_data: dict) -> str | None:
     if not getattr(_cfg, "HTF_DIRECTION_BLOCK", True):
         return None
     if _momentum_ride_active(direction, chart_data):
-        logger.info(f"[RIDE] HTF-direction waived: {direction} (D1 lag) — M15-STRONG+H1+H4 เรียงแถว")
+        logger.info(f"[RIDE] HTF-direction waived: {direction} (D1 lag) — M15-STRONG+H1+H4 เรียงตัว")
         return None
     d1 = (chart_data.get("d1_trend") or "NEUTRAL").upper()
     if d1 == "BEARISH" and direction == "BUY":
-        return "HTF-direction: BUY สวน D1 BEARISH — counter-D1 replay −248 (มิ.ย. −242, conf สูงก็แพ้)"
+        return "HTF-direction: BUY สวน D1 BEARISH — counter-D1 replay −248 (มิ.ย. −242, conf สูงก็ขาดทุน)"
     if d1 == "BULLISH" and direction == "SELL":
         return "HTF-direction: SELL สวน D1 BULLISH — counter-D1 replay −248"
     return None
@@ -340,7 +340,7 @@ def _news_gate_adjust(direction: str, base_floor: int, chart_data: dict | None =
                     note_extra = f" [contra {votes}v→penalty {penalty}]"
             adj = base_floor + penalty
             if adj == base_floor:
-                return base_floor, (f"ข่าวสวน {direction} (score {score:+.0f}, n={n}) แต่ price ยืนยันไม้"
+                return base_floor, (f"ข่าวสวน {direction} (score {score:+.0f}, n={n}) แต่ price ยืนยันออเดอร์"
                                     f"{note_extra} → floor คงเดิม {base_floor}")
             return adj, f"ข่าวสวน {direction} (score {score:+.0f}, n={n}) → floor {base_floor}→{adj}{note_extra}"
         if agree:
@@ -652,7 +652,7 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
         # (Asian gate เกิดจาก "ไม้ Asian conf ต่ำ = noise" — แต่คืน event/trend จริง เช่น
         # NFP follow-through 07-02 ตลาด Asian วิ่งเป็นเทรนด์ ไม้ RIDE conf 62 โดนกันไว้)
         if _momentum_ride_active(direction, chart_data):
-            logger.info(f"[RIDE] session floor ผ่อน: {_q_min:.0f}→{_cfg.MIN_TECHNICAL_CONFIDENCE} ({_sess_lbl})")
+            logger.info(f"[RIDE] session floor ผ่อนปรน: {_q_min:.0f}→{_cfg.MIN_TECHNICAL_CONFIDENCE} ({_sess_lbl})")
             _q_min = float(_cfg.MIN_TECHNICAL_CONFIDENCE)
         # Asian 0-7 UTC: ทุก entry ต้อง conf ≥ ASIAN_MIN_CONF — replay 489 ไม้:
         # Asian = −4,380 (avg −115/ไม้); บล็อก conf<72 ตัด −4,506 เสียกำไรดีแค่ +57
@@ -1058,9 +1058,9 @@ Account — Today: {history['today_pnl']:+.2f} USD ({history['today_trades']} tr
                 retcode = order_result.get("retcode", 0)
                 hint = ""
                 if retcode in (10026, 10027):
-                    hint = " → เปิดปุ่ม Algo Trading ใน MT5 toolbar"
+                    hint = " → เปิดใช้งานปุ่ม Algo Trading ใน MT5 toolbar"
                 elif retcode == 10019:
-                    hint = " → margin ไม่พอ ตรวจสอบ equity"
+                    hint = " → margin ไม่เพียงพอ ตรวจสอบ equity"
                 elif retcode in (10004, 10021):
                     hint = " → requote ถี่ ตรวจสอบ connection หรือ spread"
                 logger.warning(

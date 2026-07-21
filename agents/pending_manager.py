@@ -25,7 +25,7 @@ _MANUAL_RANGE_MAX_AGE_DAYS = int(os.getenv("MANUAL_RANGE_MAX_AGE_DAYS") or 5)
 
 def _expire_manual_range(reason: str) -> None:
     """ลบไฟล์ manual range ที่หมดอายุครั้งเดียว (กัน log ซ้ำทุก cycle) แล้วปล่อยให้ตกไป auto-detect."""
-    logger.warning(f"Manual Range หมดอายุ ({reason}) — ลบไฟล์ กลับไปใช้ auto-detect")
+    logger.warning(f"Manual Range หมดอายุ ({reason}) — ลบไฟล์และกลับไปใช้ auto-detect")
     try:
         os.remove(_MANUAL_RANGE_FILE)
     except OSError:
@@ -120,7 +120,7 @@ def _get_daily_sr() -> dict:
     """ดึง swing S/R จาก D1 — แนวรับแนวต้านระดับใหญ่"""
     rates = get_ohlcv(timeframe=mt5.TIMEFRAME_D1, count=60)
     if rates is None:
-        logger.warning("ดึง D1 data ไม่ได้ — ข้าม Daily S/R")
+        logger.warning("ไม่สามารถดึง D1 data ได้ — ข้าม Daily S/R")
         return {"resistance": [], "support": []}
     return _find_swing_levels_from_rates(rates, window=3, max_levels=5)
 
@@ -228,7 +228,7 @@ def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = No
     # conf<=0 = parser fail/data invalid (เคยวาง pending มั่ว conf=0/zone=NONE → fill → โดน SL)
     _chart_conf = chart_data.get("confidence", 0) or 0
     if _chart_conf <= 0:
-        logger.info(f"Auto-pending: chart confidence={_chart_conf} (parser ไม่ให้ค่า/data invalid) — skip")
+        logger.info(f"Auto-pending: chart confidence={_chart_conf} (parser ไม่คืนค่า/data invalid) — skip")
         return 0
 
     # Daily trade cap — วันพายุห้าม replenish pending เพิ่ม (fill = ไม้ #N+1 ของวัน)
@@ -326,7 +326,7 @@ def auto_place_pending_orders(chart_data: dict, sentiment_data: dict | None = No
     sup_levels = [s for s in sup_levels if s < current - sup_min]
 
     if not res_levels and not sup_levels:
-        logger.info("ไม่พบ key S/R level ที่เหมาะสำหรับ pending")
+        logger.info("ไม่พบ key S/R level ที่เหมาะสมสำหรับ pending")
         return 0
 
     info  = mt5.symbol_info(SYMBOL)
@@ -432,7 +432,7 @@ def cancel_pending_on_breakdown(chart_data: dict) -> int:
     if cancelled:
         logger.warning(
             f"[BREAKDOWN] fast_move {fast:+.0f}p ≥ {thr} — ยกเลิก {cancelled} {target} AP pending "
-            f"(กัน fill สวน momentum / zone แตก)"
+            f"(ป้องกัน fill สวน momentum / zone แตก)"
         )
     return cancelled
 
@@ -738,7 +738,7 @@ def manage_range_pending(chart_data: dict) -> int:
     MIN_WIDTH_PIPS = 2000
     if range_width_pips < MIN_WIDTH_PIPS:
         logger.info(
-            f"Range pending: width={range_width_pips}p < {MIN_WIDTH_PIPS}p — กรอบแคบเกิน ข้าม"
+            f"Range pending: width={range_width_pips}p < {MIN_WIDTH_PIPS}p — กรอบแคบเกินไป ข้าม"
         )
         return 0
 
@@ -927,7 +927,7 @@ def manage_sl_reentry(chart_data: dict) -> int:
 
         if orig_dir == "BUY":
             if trend == "BEARISH":
-                logger.info("Post-SL BUY: ข้ามเพราะ trend=BEARISH (counter-trend)")
+                logger.info("Post-SL BUY: ข้ามเนื่องจาก trend=BEARISH (counter-trend)")
                 continue
             if _d1_counter("BUY", chart_data):
                 logger.info("Post-SL BUY: ข้าม — D1 BEARISH (counter-D1; re-entry สวนเทรนด์ใหญ่ = revenge)")
@@ -971,7 +971,7 @@ def manage_sl_reentry(chart_data: dict) -> int:
 
         else:   # SELL
             if trend == "BULLISH":
-                logger.info("Post-SL SELL: ข้ามเพราะ trend=BULLISH (counter-trend)")
+                logger.info("Post-SL SELL: ข้ามเนื่องจาก trend=BULLISH (counter-trend)")
                 continue
             if _d1_counter("SELL", chart_data):
                 logger.info("Post-SL SELL: ข้าม — D1 BULLISH (counter-D1)")

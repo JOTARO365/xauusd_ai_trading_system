@@ -107,7 +107,7 @@ def analyze_sentiment(news_data: dict, chart_data: dict | None = None) -> dict:
 
     has_any = tweets or calendar or articles
     if not has_any:
-        logger.warning("ไม่มีข้อมูลข่าวเลย")
+        logger.warning("ไม่มีข้อมูลข่าว")
         return {"sentiment": "NEUTRAL", "confidence": 0, "summary": "ไม่มีข้อมูลข่าว"}
 
     # ── News Cache: Haiku summary + vector search ──────────────

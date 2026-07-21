@@ -87,7 +87,7 @@ async def fetch_from_accounts(limit_per_account: int = 15) -> list:
     if all_tweets:
         _tweet_cache = (now_ts, all_tweets)
     elif cached_items:
-        logger.info("Twitter: fetch ไม่ได้ข้อมูล — ใช้ cache เก่า")
+        logger.info("Twitter: ไม่สามารถ fetch ข้อมูลได้ — ใช้ cache เดิม")
         return cached_items
 
     return all_tweets

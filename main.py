@@ -299,7 +299,7 @@ def _should_skip_ai() -> tuple[bool, str]:
         try:
             _eq = get_account_info().get("equity")
             if _eq is not None and _eq < config.MIN_AI_EQUITY:
-                return True, f"capital floor: equity {_eq:.0f} < {config.MIN_AI_EQUITY:.0f} — ข้าม AI"
+                return True, f"capital floor: equity {_eq:.0f} < {config.MIN_AI_EQUITY:.0f} — งดใช้ AI"
         except Exception:
             pass
 
@@ -314,7 +314,7 @@ def _should_skip_ai() -> tuple[bool, str]:
         if cur > 0 and _last_ai_price > 0:
             spike = abs(cur - _last_ai_price) / 0.01   # XAUUSD point = 0.01
             if spike >= AI_SPIKE_PIPS:
-                return False, f"price spike {spike:.0f}p ≥ {AI_SPIKE_PIPS}p — ข่าวด่วน!"
+                return False, f"price spike {spike:.0f}p ≥ {AI_SPIKE_PIPS}p — ข่าวด่วน"
     except Exception:
         pass
 
@@ -411,8 +411,8 @@ async def run_cycle() -> tuple[dict, dict]:
         logger.warning("[NNLB] No-Risk-No-Lamborghini — ข้าม money management / gates ทั้งหมด")
         print_warning("NNLB MODE — ข้าม gates / MM ทั้งหมด | lot=MIN_LOT เสมอ")
     if not is_algo_trading_enabled():
-        logger.warning("MT5 Algo Trading ปิดอยู่")
-        print_warning("MT5 Algo Trading ปิดอยู่ — กดปุ่ม Algo Trading ใน toolbar ก่อน")
+        logger.warning("MT5 Algo Trading ปิดใช้งานอยู่")
+        print_warning("MT5 Algo Trading ปิดใช้งานอยู่ — โปรดกดปุ่ม Algo Trading ใน toolbar ก่อน")
 
     _skip_ai, _skip_why = _should_skip_ai()
     if _skip_ai:
@@ -464,7 +464,7 @@ async def main():
     print_header(0)
 
     if not connect_mt5():
-        print_error("เชื่อมต่อ MT5 ไม่ได้ — หยุดระบบ")
+        print_error("ไม่สามารถเชื่อมต่อ MT5 ได้ — หยุดระบบ")
         return
 
     console.print(f"  [green]✓[/green]  เชื่อมต่อ MT5 สำเร็จ\n")
@@ -499,7 +499,7 @@ async def main():
             console.print(f"  [green]✓[/green]  Metadata backfill: {bf['backfilled']}/{bf['db_missing']} "
                           f"trade(s) enriched from logs (no_log={bf['no_log']})\n")
     else:
-        console.print(f"  [yellow]⚠[/yellow]  Database ต่อไม่ได้ ({get_url()}) — บันทึกลง JSON อย่างเดียว\n")
+        console.print(f"  [yellow]⚠[/yellow]  ไม่สามารถเชื่อมต่อ Database ({get_url()}) ได้ — บันทึกลง JSON เท่านั้น\n")
 
     # ── Startup: verify D1/W1 HTF data availability ───────────────
     try:
@@ -536,7 +536,7 @@ async def main():
 
             # ── Auto-reconnect MT5 ถ้าหลุด ────────────────────────────────
             if not is_mt5_connected():
-                console.print("  [yellow]⚠[/yellow]  MT5 หลุด — reconnect...\n")
+                console.print("  [yellow]⚠[/yellow]  MT5 ขาดการเชื่อมต่อ — reconnect...\n")
                 if not connect_mt5():
                     await asyncio.sleep(10)
                     continue
@@ -560,21 +560,21 @@ async def main():
                 try:
                     p = auto_place_pending_orders(_last_chart_data or {}, _last_sentiment_data)
                     if p:
-                        print_warning(f"Auto-pending: วาง {p} order ที่ key S/R levels (H4+Daily)")
+                        print_warning(f"Auto-pending: ส่งคำสั่ง {p} order ที่ key S/R levels (H4+Daily)")
                 except Exception as pe:
                     logger.error(f"Auto-pending error: {pe}")
                 # Range pending: ตรวจ stale + วาง ถ้า sideways
                 try:
                     rp = manage_range_pending(_last_chart_data or {})
                     if rp:
-                        print_warning(f"Range pending: วาง {rp} order ที่กรอบ sideways")
+                        print_warning(f"Range pending: ส่งคำสั่ง {rp} order ที่กรอบ sideways")
                 except Exception as rpe:
                     logger.error(f"Range pending error: {rpe}")
                 # Post-SL re-entry: หาจุดเข้าใหม่ที่ safe zone หลัง SL hit
                 try:
                     sr = manage_sl_reentry(_last_chart_data or {})
                     if sr:
-                        print_warning(f"Post-SL: วาง {sr} re-entry order ที่ safe zone")
+                        print_warning(f"Post-SL: ส่งคำสั่ง {sr} re-entry order ที่ safe zone")
                 except Exception as sre:
                     logger.error(f"Post-SL re-entry error: {sre}")
             else:
@@ -658,9 +658,9 @@ async def main():
                 _last_weekly_pending_date = today
                 wkly = place_weekly_calendar_pending(_last_chart_data or {})
                 if wkly:
-                    print_warning(f"Weekly calendar pending: วาง {wkly} orders ตามปฏิทิน")
+                    print_warning(f"Weekly calendar pending: ส่งคำสั่ง {wkly} orders ตามปฏิทิน")
                 else:
-                    logger.info("Weekly calendar pending: ไม่วาง order (ดู system.log)")
+                    logger.info("Weekly calendar pending: ไม่ส่งคำสั่ง order (ดู system.log)")
 
             # ALGO v2 terminal panel — สถานะระบบใหม่ทุกรอบ (regime/algo/S-R/sentiment guide/journal). display-only.
             if getattr(config, "REGIME_LIVE", False):

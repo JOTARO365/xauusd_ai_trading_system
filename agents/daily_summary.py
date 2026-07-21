@@ -46,15 +46,15 @@ def _why_loss(t):
     conf = t.get("technical_confidence")
     reasons = []
     if trend and ((d == "BUY" and "BEAR" in trend) or (d == "SELL" and "BULL" in trend)):
-        reasons.append("สวนเทรนด์")
+        reasons.append("สวนทางเทรนด์")
     if sent and ((d == "BUY" and "BEAR" in sent) or (d == "SELL" and "BULL" in sent)):
-        reasons.append("สวน sentiment")
+        reasons.append("สวนทาง sentiment")
     if conf is not None and conf < 60:
         reasons.append(f"conf ต่ำ ({conf}%)")
     zone = t.get("sr_zone")
     if zone:
         reasons.append(f"เข้าที่ {zone} ทะลุ")
-    return " · ".join(reasons) or "ราคาไปสวนทาง (SL)"
+    return " · ".join(reasons) or "ราคาเคลื่อนสวนทาง (SL)"
 
 
 def _live_floating():
@@ -204,4 +204,4 @@ if __name__ == "__main__":
               f"{x['regime']:>7}  {techs}{'  · ' + why if why else ''}")
     t = s["totals"]
     print("-" * 90)
-    print(f"รวม {t.get('n')} ไม้ · net {t.get('net_pnl'):+.0f}฿ · WR {t.get('win_rate',0)*100:.0f}%")
+    print(f"รวม {t.get('n')} ออเดอร์ · net {t.get('net_pnl'):+.0f}฿ · WR {t.get('win_rate',0)*100:.0f}%")

@@ -62,7 +62,7 @@ def _place_leg(direction: str, lot: float, sl_price: float, tp_price: float, leg
     คืน ticket หรือ None. DRY_RUN → log เฉยๆ"""
     tick = mt5.symbol_info_tick(SYMBOL)
     if tick is None:
-        logger.error("[SWING] tick None — วาง leg ไม่ได้")
+        logger.error("[SWING] tick None — ไม่สามารถวาง leg ได้")
         return None
     is_buy = direction == "BUY"
     price  = tick.ask if is_buy else tick.bid
@@ -275,7 +275,7 @@ def manage_swing_campaign(chart_data: dict) -> int:
             # guard งบ: risk รวมหลังเติมต้องไม่ทะลุ budget (กันลอตปัดเศษทำเกิน)
             new_risk = _current_risk(camp) + lot * (abs(current - camp["structural_sl"]) / point) * pipval
             if new_risk > camp["budget"] * 1.05:
-                logger.warning(f"[SWING] scale-in leg#{idx} จะทำ risk เกินงบ — ข้าม")
+                logger.warning(f"[SWING] scale-in leg#{idx} จะทำให้ risk เกินงบ — ข้าม")
                 camp["placed"].add(idx)
                 continue
             ticket = _place_leg(camp["direction"], lot, camp["structural_sl"], camp["tp"], idx)
@@ -323,7 +323,7 @@ def manage_swing_campaign(chart_data: dict) -> int:
     # วาง leg แรก (idx 0 = ที่ zone, เข้าตอนราคาย่อมาถึงแล้ว → market)
     lot = _leg_lot(camp, current, 0)
     if lot < info.volume_min:
-        logger.info(f"[SWING] leg1 lot {lot} < min — equity ไม่พอกับ structural SL กว้าง, skip")
+        logger.info(f"[SWING] leg1 lot {lot} < min — equity ไม่เพียงพอต่อ structural SL ที่กว้าง, skip")
         return 0
     ticket = _place_leg(direction, lot, camp["structural_sl"], camp["tp"], 0)
     camp["placed"].add(0)

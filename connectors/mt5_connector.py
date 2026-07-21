@@ -179,7 +179,7 @@ def _nnlb_lot_and_check(equity: float, sl_pips: float) -> tuple[float, str]:
     # ── Gate: equity ต่ำกว่า base → ไม่คุ้มกับ SL ────────────────
     if equity < base_acct:
         msg = (f"[NNLB] equity {equity:.2f} {ccy} < base {base_acct:.2f} {ccy} "
-               f"(${_cfg.NNLB_BASE_EQUITY:.0f} × {rate:.2f}) — skip (ทุนไม่พอ)")
+               f"(${_cfg.NNLB_BASE_EQUITY:.0f} × {rate:.2f}) — skip (เงินทุนไม่เพียงพอ)")
         logger.warning(msg)
         return 0.0, msg
 
@@ -208,9 +208,9 @@ def _nnlb_lot_and_check(equity: float, sl_pips: float) -> tuple[float, str]:
             lot      = _cfg.MIN_LOT
             max_loss = round(lot * sl_pips * pv_1lot, 2)
             logger.warning(
-                f"[NNLB] ⚠ MIN_LOT={lot} ยังให้ max_loss {max_loss:.0f} {ccy} "
+                f"[NNLB] MIN_LOT={lot} ยังให้ max_loss {max_loss:.0f} {ccy} "
                 f">{_cfg.NNLB_MAX_LOSS_PCT:.0f}% equity ({max_loss_allowed:.0f} {ccy}) "
-                f"— ทุนน้อยเกิน SL แต่ NNLB ยังเข้า"
+                f"— เงินทุนน้อยเกินกว่า SL แต่ NNLB ยังคงเข้าออเดอร์"
             )
 
     loss_pct = round(max_loss / equity * 100, 1) if equity > 0 else 0
@@ -273,7 +273,7 @@ def manage_trailing_stop() -> int:
 
     swing_low, swing_high = _get_htf_swing(tf_name, lookback=lookback)
     if swing_low <= 0 or swing_high <= 0:
-        logger.warning("[TRAILING] ดึง swing levels ไม่ได้ — ข้าม")
+        logger.warning("[TRAILING] ไม่สามารถดึง swing levels ได้ — ข้าม")
         return 0
 
     tick = mt5.symbol_info_tick(SYMBOL)
@@ -474,7 +474,7 @@ def check_open_slot(direction: str, last_dir_lost: bool = False) -> tuple[bool, 
             if not unprotected:
                 # ทุก position ที่ไม่กำไร SL อยู่หน้าทุนแล้ว — ไม่มีความเสี่ยงเพิ่ม
                 logger.debug(
-                    f"{opp_name} not-in-profit แต่ SL protected ทั้งหมด → เปิด {direction} ได้"
+                    f"{opp_name} not-in-profit แต่ SL protected ทั้งหมด → สามารถเปิด {direction} ได้"
                 )
             else:
                 # ตรวจ pip distance ของ unprotected positions vs hedge_buffer_pips
@@ -497,10 +497,10 @@ def check_open_slot(direction: str, last_dir_lost: bool = False) -> tuple[bool, 
                         f"ไม่สามารถเปิด {direction} — "
                         f"{opp_name} สวนทางสูงสุด {max_adverse:.0f} จุด "
                         f"เกิน buffer ({buffer_pips} จุด) | "
-                        f"{len(unprotected)} position ยังเสี่ยงอยู่"
+                        f"{len(unprotected)} position ยังมีความเสี่ยง"
                     )
                 logger.debug(
-                    f"{opp_name} สวนทาง {max_adverse:.0f} จุด ≤ {buffer_pips} → เปิด {direction} ได้"
+                    f"{opp_name} สวนทาง {max_adverse:.0f} จุด ≤ {buffer_pips} → สามารถเปิด {direction} ได้"
                 )
 
     return True, ""
@@ -564,7 +564,7 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
 
     if lot is not None and lot > 0:                   # P-E: algo risk-based lot override (ยังผ่าน clamp+guards ด้านล่าง)
         lot = max(_cfg.MIN_LOT, min(float(lot), _cfg.MAX_LOT))
-        logger.info(f"Lot override (algo sizing เหมาะทุน): {lot}")
+        logger.info(f"Lot override (algo sizing เหมาะสมกับเงินทุน): {lot}")
     elif _cfg.NNLB_MODE:
         lot, err = _nnlb_lot_and_check(account.equity, sl_pips)
         if err:
@@ -590,7 +590,7 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         return {"success": False, "error": f"Invalid direction: {direction}"}
 
     if no_tp:
-        logger.info("No-TP mode: เปิด order โดยไม่ตั้ง TP — รอตั้งหลัง momentum สงบ")
+        logger.info("No-TP mode: เปิดออเดอร์โดยไม่ตั้ง TP — รอตั้งภายหลังเมื่อ momentum สงบ")
 
     if not _cfg.NNLB_MODE:
         # ตรวจ Risk/Reward ratio — ข้ามถ้า no_tp (ไม่มี TP ให้คำนวณ)
@@ -614,12 +614,12 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         # ตรวจ margin ก่อนส่ง — คำนวณ margin ที่ต้องการสำหรับ lot นี้
         margin_needed = mt5.order_calc_margin(order_type, SYMBOL, lot, price)
         if margin_needed is not None and account.equity < margin_needed:
-            logger.warning(f"Margin ไม่พอ: ต้องการ {margin_needed:.2f}, equity {account.equity:.2f}")
+            logger.warning(f"Margin ไม่เพียงพอ: ต้องการ {margin_needed:.2f}, equity {account.equity:.2f}")
             safe_lot = round((account.equity * 0.9) / (margin_needed / lot), 2) if lot > 0 else 0
             safe_lot = max(_cfg.MIN_LOT, min(safe_lot, lot))
             if safe_lot < _cfg.MIN_LOT:
-                return {"success": False, "error": f"Margin ไม่พอแม้จะใช้ lot ขั้นต่ำ (equity={account.equity:.2f})"}
-            logger.info(f"ลด lot จาก {lot} → {safe_lot} เพราะ margin จำกัด")
+                return {"success": False, "error": f"Margin ไม่เพียงพอแม้ใช้ lot ขั้นต่ำ (equity={account.equity:.2f})"}
+            logger.info(f"ลด lot จาก {lot} → {safe_lot} เนื่องจาก margin จำกัด")
             lot = safe_lot
 
     request = {
@@ -803,7 +803,7 @@ def daily_trade_cap_reached() -> tuple[bool, str]:
         return False, ""
     n = count_trades_opened_today()
     if n >= cap:
-        return True, f"Daily trade cap: เปิดแล้ว {n}/{cap} ไม้วันนี้ — หยุดเปิดเพิ่ม (กัน over-trade)"
+        return True, f"Daily trade cap: เปิดแล้ว {n}/{cap} ออเดอร์วันนี้ — หยุดเปิดเพิ่ม (ป้องกัน over-trade)"
     return False, ""
 
 
@@ -1050,7 +1050,7 @@ def manage_breakeven() -> int:
             if buf_pips < 0:
                 logger.debug(
                     f"BE wait ticket={pos.ticket}: profit {profit_pips:.0f}p − gap {_gap}p "
-                    f"ไม่พอ lock — รอกำไรเพิ่ม"
+                    f"ไม่เพียงพอต่อการ lock — รอกำไรเพิ่ม"
                 )
                 continue
 
@@ -1218,7 +1218,7 @@ def ensure_sl_protection() -> int:
         if _set_sl_tp(pos.ticket, round(new_sl, 2), pos.tp):
             protected += 1
             logger.warning(
-                f"AUTO-SL: ไม้ไม่มี SL ticket={pos.ticket} "
+                f"AUTO-SL: ออเดอร์ไม่มี SL ticket={pos.ticket} "
                 f"{'BUY' if is_buy else 'SELL'} magic={pos.magic} "
                 f"→ ตั้ง SL={new_sl:.2f} ({sl_pips:.0f}p จากราคา {ref:.2f})"
             )
@@ -1376,7 +1376,7 @@ def _force_breakeven_opposing(new_direction: str) -> int:
         safe_buffer = min(_buf, profit_pips - _gap)
         if safe_buffer < 0:
             logger.debug(
-                f"Force-BE skip {tag}: profit {profit_pips:.0f}p ไม่พอเว้น gap {_gap}p — ข้าม"
+                f"Force-BE skip {tag}: profit {profit_pips:.0f}p ไม่เพียงพอต่อการเว้น gap {_gap}p — ข้าม"
             )
             continue
 
@@ -1925,7 +1925,7 @@ def manage_post_event_tp(chart_data: dict | None = None) -> int:
         if _is_momentum_strong(direction):
             logger.info(
                 f"No-TP ticket={pos.ticket} — elapsed {elapsed_mins:.0f}min "
-                "แต่ momentum ยังแรง — รอต่อ"
+                "แต่ momentum ยังแรง — รอต่อไป"
             )
             continue
 

@@ -92,7 +92,7 @@ def _gate_cancel_fades(price, atr, market):
         direction = "BUY" if "BUY" in pt else "SELL"
         if not vol_momentum_gate(market, direction)["pass"] and cancel_pending_order(tk):
             n += 1
-            logger.warning(f"[REGIME-FADE] cancel {pt}@{lvl:.2f} — momentum break ใกล้ level, รอข้อมูลใหม่")
+            logger.warning(f"[REGIME-FADE] cancel {pt}@{lvl:.2f} — momentum break ใกล้แนว รอข้อมูลใหม่")
     return n
 
 
@@ -116,7 +116,7 @@ def _place_trend_straddle(positions, i, high, low, close, atr, hour, bar_ts=None
             placed += 1
             record_pending("BUY_STOP", lv["buy_level"], lv["sl_pips"], _btp or lv["tp_pips"], "STOP", "TREND", bar_ts)
     else:
-        logger.info("[REGIME-PENDING] ข้าม BUY_STOP — BUY เต็ม MAX_OPEN")
+        logger.info("[REGIME-PENDING] งดวาง BUY_STOP — BUY เต็ม MAX_OPEN")
     if _same_dir_count(positions, "SELL") < limit:
         _stp = sr_tp_pips("SELL", lv["sell_level"], lv["sl_pips"], lv["tp_pips"])
         if place_pending_order("SELL_STOP", lv["sell_level"], lv["sl_pips"], _stp,
@@ -124,13 +124,13 @@ def _place_trend_straddle(positions, i, high, low, close, atr, hour, bar_ts=None
             placed += 1
             record_pending("SELL_STOP", lv["sell_level"], lv["sl_pips"], _stp or lv["tp_pips"], "STOP", "TREND", bar_ts)
     else:
-        logger.info("[REGIME-PENDING] ข้าม SELL_STOP — SELL เต็ม MAX_OPEN")
+        logger.info("[REGIME-PENDING] งดวาง SELL_STOP — SELL เต็ม MAX_OPEN")
     if placed:
         from agents.regime_executor import _log
         _log({"via": "pending", "mode": "TREND-STOP", "ts_hour": hour,
               "buy_level": lv["buy_level"], "sell_level": lv["sell_level"],
               "sl_pips": lv["sl_pips"], "tp_pips": lv["tp_pips"], "placed": placed})
-        logger.warning(f"[REGIME-PENDING] วาง STOP straddle {placed} ขา @ {lv['buy_level']:.2f}/{lv['sell_level']:.2f}")
+        logger.warning(f"[REGIME-PENDING] ส่งคำสั่ง STOP straddle {placed} ขา @ {lv['buy_level']:.2f}/{lv['sell_level']:.2f}")
     return placed
 
 
@@ -217,7 +217,7 @@ def manage_algo_pending():
         if _fade_on or _stop_on:                            # เขียน state เฉพาะตอน pending เป็น path จริง
             try:                                            # (hybrid: TREND ให้ tick เขียน ARMED — ไม่ทับ)
                 from agents.algo_state import write_state
-                _pd = "วาง LIMIT fade แนวแข็ง" if _fade_on else "วาง STOP breakout Donchian"
+                _pd = "ส่งคำสั่ง LIMIT fade แนวแข็ง" if _fade_on else "ส่งคำสั่ง STOP breakout Donchian"
                 write_state("PENDING", regime=regime, via="pending", detail=f"regime={regime} — {_pd}")
             except Exception:
                 pass

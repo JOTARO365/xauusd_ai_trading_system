@@ -344,7 +344,7 @@ def _store_cache(content_hash: str, summary: str, news_data: dict) -> int | None
         ).execute()
         cache_id = res.data[0]["id"] if res.data else None
         if not cache_id:
-            logger.warning("news_cache upsert ไม่คืน id")
+            logger.warning("news_cache upsert ไม่คืนค่า id")
             return None
 
         # สร้าง item list สำหรับ embed
@@ -467,7 +467,7 @@ def get_news_context(news_data: dict, market_context: str = "",
             filter_stats = cached_filter_stats
     else:
         logger.info("News cache: MISS — เรียก Haiku สรุปข่าว"
-                    + (" [force_fresh: ราคาวิ่งแรง]" if force_fresh else ""))
+                    + (" [force_fresh: ราคาเคลื่อนไหวรุนแรง]" if force_fresh else ""))
         try:
             summary, scores = _summarize_with_haiku(news_data, scored_posts=kept_posts)
             cache_id   = _store_cache(content_hash, summary, news_data)
@@ -476,7 +476,7 @@ def get_news_context(news_data: dict, market_context: str = "",
             _write_scores_cache(content_hash, scores, filter_stats)
         except Exception as e:
             # Haiku fail → fallback cache เก่าที่ยังไม่หมดอายุ (ไม่จำกัดอายุ) ดีกว่าไม่มีข่าวเลย
-            logger.warning(f"News summarize failed: {e} — ลอง fallback cache เก่า")
+            logger.warning(f"News summarize failed: {e} — ใช้ fallback cache เดิม")
             stale = _get_latest_valid_cache()
             if stale is None:
                 raise

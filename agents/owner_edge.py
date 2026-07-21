@@ -59,7 +59,7 @@ def build_owner_edge():
         tr = json.load(open(os.path.join(_BASE, "logs", "trades.json"), encoding="utf-8"))
         tr = tr if isinstance(tr, list) else tr.get("trades", [])
     except (OSError, json.JSONDecodeError):
-        return {"ok": False, "error": "อ่าน trades.json ไม่ได้"}
+        return {"ok": False, "error": "ไม่สามารถอ่าน trades.json ได้"}
     man = [t for t in tr if isinstance(t, dict) and t.get("status") == "CLOSED"
            and t.get("pnl") is not None and t.get("timestamp")
            and (t.get("source") == "MANUAL" or t.get("entry_type") == "MANUAL")]
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     e = build_owner_edge()
     if not e.get("ok"):
         print(e); raise SystemExit
-    print(f"OWNER EDGE — ไม้ manual {e['n_manual']} (map vol ได้ {e['n_mapped']})")
+    print(f"OWNER EDGE — ออเดอร์ manual {e['n_manual']} (map vol ได้ {e['n_mapped']})")
     o = e["overall"]
     print(f"รวม: n={o['n']} WR={o['win_rate']*100:.0f}% net={o['net']:+.0f}฿ avg={o['avg']:+.1f}฿ PF={o['pf']}\n")
     for title, key in (("× VOL REGIME", "by_vol"), ("× MARKET REGIME", "by_regime"), ("× ทิศทาง", "by_dir")):

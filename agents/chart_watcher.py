@@ -1532,7 +1532,7 @@ def analyze_chart() -> dict:
     w1_rates  = get_ohlcv(timeframe=mt5.TIMEFRAME_W1,  count=30)
 
     if h4_rates is None or h1_rates is None or m15_rates is None:
-        logger.error("ดึง OHLCV ไม่ได้")
+        logger.error("ไม่สามารถดึง OHLCV ได้")
         return {"signal": "NO_TRADE", "confidence": 0,
                 "sl_pips": 1000, "tp_pips": 1500, "raw": "OHLCV unavailable"}
 

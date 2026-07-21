@@ -53,11 +53,11 @@ def fetch_forexfactory_calendar(hours_ahead: int = 24,
             with urllib.request.urlopen(req, timeout=10) as res:
                 events = json.loads(res.read().decode("utf-8"))
             _ff_cache = (now_ts, events)
-            logger.debug("ForexFactory: fetch สำเร็จ — อัพเดต cache")
+            logger.debug("ForexFactory: fetch สำเร็จ — อัปเดต cache")
         except Exception as e:
             logger.warning(f"ForexFactory calendar fetch failed: {e}")
             if cached_events:
-                logger.info(f"ForexFactory: ใช้ cache เก่า ({len(cached_events)} events) เพราะ fetch ล้มเหลว")
+                logger.info(f"ForexFactory: ใช้ cache เดิม ({len(cached_events)} events) เนื่องจาก fetch ล้มเหลว")
                 events = cached_events
             else:
                 return []
@@ -181,7 +181,7 @@ def fetch_investing_news(limit: int = 10) -> list[dict]:
     if results:
         _inv_cache = (now_ts, results)
     elif cached_items:
-        logger.info("Investing.com: fetch ไม่ได้ข้อมูล — ใช้ cache เก่า")
+        logger.info("Investing.com: ไม่สามารถ fetch ข้อมูลได้ — ใช้ cache เดิม")
         return cached_items[:limit]
 
     logger.info(f"Investing.com: {len(results)} articles")

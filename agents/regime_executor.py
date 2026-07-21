@@ -47,46 +47,46 @@ def run_regime_executor():
     if not getattr(_cfg, "REGIME_LIVE", False):
         return None
     if getattr(_cfg, "REGIME_LIVE_TICK", False) or getattr(_cfg, "REGIME_PENDING", False):
-        _hb("HAND-OFF", "per-tick/pending คุม entry แล้ว → per-cycle ปิด")
+        _hb("HAND-OFF", "per-tick/pending ควบคุม entry แล้ว → per-cycle หยุดทำงาน")
         return None                                     # per-tick / pending จัดการ entry แล้ว → per-cycle ไม่เข้าซ้ำ
     global _last_bar
     bars = _bars_from_feed()
     if bars is None:
-        _hb("NO-BARS", "ดึง H1 bars ไม่ได้ (feed ไม่พร้อม)")
+        _hb("NO-BARS", "ไม่สามารถดึง H1 bars ได้ (feed ไม่พร้อม)")
         return None
     high, low, close, times = bars
     rec = compute_shadow_signal(high, low, close, times)
     if not rec:
-        _hb("NO-SIGNAL", "คำนวณ regime/signal ไม่ได้")
+        _hb("NO-SIGNAL", "ไม่สามารถคำนวณ regime/signal ได้")
         return None
     regime = rec.get("regime")
     sig = rec.get("signal")
     if not sig or sig.get("algo") != "momentum_breakout":   # เข้าเฉพาะ momentum ใน TREND (mean_rev ตัดแล้ว)
-        _hb("STAND-DOWN", f"regime={regime} (ไม่ใช่ TREND → ยืนดู)", regime=regime)
+        _hb("STAND-DOWN", f"regime={regime} (ไม่ใช่ TREND → งดเข้าออเดอร์)", regime=regime)
         return None
     from agents.regime_adaptive import is_enabled                 # weekly auto-disable (decay kill switch)
     if not is_enabled("momentum_breakout"):
-        _hb("DISABLED", f"regime={regime} · momentum ถูกปิดโดย weekly-adaptive")
+        _hb("DISABLED", f"regime={regime} · momentum ถูกปิดใช้งานโดย weekly-adaptive")
         return None
     if rec["bar_ts"] and rec["bar_ts"] == _last_bar:        # บาร์นี้เข้าไปแล้ว → ไม่ซ้ำ
-        _hb("ARMED", f"regime=TREND {sig.get('dir')} · เข้าไม้บาร์นี้แล้ว (รอบาร์ถัดไป)")
+        _hb("ARMED", f"regime=TREND {sig.get('dir')} · เข้าออเดอร์บาร์นี้แล้ว (รอบาร์ถัดไป)")
         return None
     try:                                                    # stack guard: ถือครบ ALGO_MAX_STACK = ข้าม (dict-safe)
         from connectors.mt5_connector import get_open_positions
         _algo_open = sum(1 for p in (get_open_positions() or [])
                          if str((p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or "").startswith("ALGO"))
         if _algo_open >= getattr(_cfg, "ALGO_MAX_STACK", 1):
-            _hb("HOLD", f"regime=TREND {sig.get('dir')} · ถือครบ {_algo_open} ไม้ ALGO → ไม่ stack")
+            _hb("HOLD", f"regime=TREND {sig.get('dir')} · ถือครบ {_algo_open} ออเดอร์ ALGO → ไม่เปิดสถานะซ้อน")
             return None
     except Exception:
         pass
     from agents.algo_sizing import standdown_for_size          # small-acct guard: min-lot เสี่ยงเกินเพดาน = ข้าม
     _skip, _si = standdown_for_size(sig["sl_pips"])
     if _skip:
-        _hb("SIZE-STANDDOWN", f"regime=TREND {sig.get('dir')} · min-lot เสี่ยง {_si.get('risk_pct',0)*100:.1f}% "
-            f"> เพดาน {_si.get('ceiling',0)*100:.0f}% (ทุนเล็กเกิน SL {sig.get('sl_pips')}p) → ข้าม", regime="TREND")
+        _hb("SIZE-STANDDOWN", f"regime=TREND {sig.get('dir')} · min-lot มีความเสี่ยง {_si.get('risk_pct',0)*100:.1f}% "
+            f"> เพดาน {_si.get('ceiling',0)*100:.0f}% (เงินทุนไม่เพียงพอ SL {sig.get('sl_pips')}p) → ข้าม", regime="TREND")
         return None
-    _hb("ENTER", f"{sig.get('dir')} SL={sig.get('sl_pips')}p TP={sig.get('tp_pips')}p → วาง order", regime="TREND")
+    _hb("ENTER", f"{sig.get('dir')} SL={sig.get('sl_pips')}p TP={sig.get('tp_pips')}p → ส่งคำสั่ง", regime="TREND")
     _last_bar = rec["bar_ts"]
     from connectors.mt5_connector import open_order
     from agents.algo_exit import sr_tp_pips                  # P-D: TP ตามแนว S/R (flag OFF → RR2 เดิม)
