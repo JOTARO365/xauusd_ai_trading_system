@@ -44,11 +44,13 @@ def _stats(rows):
     if not pnls:
         return None
     w = [p for p in pnls if p > 0]; l = [p for p in pnls if p <= 0]
+    net = sum(pnls); srt = sorted(pnls, reverse=True)
     return {"n": len(pnls), "wins": len(w), "win_rate": round(len(w) / len(pnls), 3),
-            "net": round(sum(pnls), 2), "avg": round(sum(pnls) / len(pnls), 2),
+            "net": round(net, 2), "avg": round(net / len(pnls), 2),
             "avg_win": round(sum(w) / len(w), 2) if w else 0,
             "avg_loss": round(sum(l) / len(l), 2) if l else 0,
-            "pf": round(sum(w) / abs(sum(l)), 2) if l and sum(l) != 0 else None}
+            "pf": round(sum(w) / abs(sum(l)), 2) if l and sum(l) != 0 else None,
+            "top3_pct": round(sum(srt[:3]) / net * 100) if net > 0 else None}  # outlier check: % net จาก top-3
 
 
 def build_owner_edge():

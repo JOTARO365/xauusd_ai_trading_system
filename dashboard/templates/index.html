@@ -4083,9 +4083,10 @@ async function loadOwnerEdge() {
       if (!(rows || []).length) return '';
       const body = rows.map(r => {
         const nc = r.net >= 0 ? 'var(--green)' : 'var(--red)';
+        const out = (r.top3_pct != null && r.top3_pct > 60) ? ` <span style="color:var(--gold)" title="net ${r.top3_pct}% มาจาก 3 ไม้ใหญ่ = outlier">⚠${r.top3_pct}%</span>` : '';
         return `<tr style="text-align:right"><td style="text-align:left;padding:2px 8px">${r.key}</td>`
           + `<td>${r.n}</td><td>${Math.round(r.win_rate * 100)}%</td>`
-          + `<td style="color:${nc}">${r.net >= 0 ? '+' : ''}${r.net}</td><td>${r.avg}</td><td>${r.pf}</td></tr>`;
+          + `<td style="color:${nc}">${r.net >= 0 ? '+' : ''}${r.net}${out}</td><td>${r.avg}</td><td>${r.pf}</td></tr>`;
       }).join('');
       return `<div style="margin-bottom:8px"><div style="color:var(--gold);font-size:11px;margin:4px 0">${title}</div>`
         + `<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="color:var(--muted);text-align:right">`
