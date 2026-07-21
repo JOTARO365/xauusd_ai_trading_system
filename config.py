@@ -226,6 +226,9 @@ TSMOM_LIVE       = os.getenv("TSMOM_LIVE", "false").lower() == "true"
 TSMOM_SHADOW     = os.getenv("TSMOM_SHADOW", "false").lower() == "true"      # log target เฉยๆ ไม่วาง order
 TSMOM_LOOKBACKS  = os.getenv("TSMOM_LOOKBACKS", "63,126,252")                # ensemble lookback (วัน D1)
 TSMOM_SL_ATR     = float(os.getenv("TSMOM_SL_ATR") or 3.0)                   # chandelier disaster SL (× ATR D1)
+# TSMOM_SL_PIPS > 0 = override SL เป็นค่าคงที่ (points) แทน chandelier — สำหรับบัญชีเล็กให้เปิด order ได้.
+# ⚠️ SL แคบ = edge TSMOM หาย (backtest: SL<2000p → WR 2-18% โดน noise รูด). = execution-test ไม่ใช่ edge.
+TSMOM_SL_PIPS    = float(os.getenv("TSMOM_SL_PIPS") or 0)
 
 # ZRE = Zone Re-Entry RR≥2 (v2 fixed-SL). วาง LIMIT ดักเด้งที่โซนเกรดสูงเชิงรุก (RR≥2, SL คงที่).
 # เกราะสุด (replay 2026-07-16): trend-align-only (ตัด SIDEWAYS ที่ replay ขาดทุน −0.6R),
@@ -319,7 +322,7 @@ def reload_config():
     global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING, REGIME_SR_ENTRY, REGIME_PENDING_FADE, REGIME_SR_EXIT
     global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK
     global ALGO_SIZE_STANDDOWN, ALGO_MAX_TRADE_RISK_PCT
-    global TSMOM_LIVE, TSMOM_SHADOW, TSMOM_LOOKBACKS, TSMOM_SL_ATR
+    global TSMOM_LIVE, TSMOM_SHADOW, TSMOM_LOOKBACKS, TSMOM_SL_ATR, TSMOM_SL_PIPS
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
     SPECIALIST_ENABLED       = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"
     REGIME_SHADOW            = os.getenv("REGIME_SHADOW", "false").lower() == "true"
@@ -340,6 +343,7 @@ def reload_config():
     TSMOM_SHADOW             = os.getenv("TSMOM_SHADOW", "false").lower() == "true"
     TSMOM_LOOKBACKS          = os.getenv("TSMOM_LOOKBACKS", "63,126,252")
     TSMOM_SL_ATR             = float(os.getenv("TSMOM_SL_ATR") or 3.0)
+    TSMOM_SL_PIPS            = float(os.getenv("TSMOM_SL_PIPS") or 0)                        # fixed SL override (บัญชีเล็ก)
 
     global ZONE_REENTRY_ENABLED, ZONE_REENTRY_SHADOW, ZRE_MIN_SCORE, ZRE_MAX_BARS_SINCE
     global ZRE_PROXIMITY_PCT, ZRE_TREND_ALIGN_ONLY, ZRE_MAX_CONCURRENT

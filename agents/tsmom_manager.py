@@ -56,7 +56,8 @@ def _open(direction, atr, shadow):
     from connectors.mt5_connector import open_order
     from agents.algo_sizing import algo_lot
     import regime_lib as R
-    sl_pips = max(1, round(float(getattr(_cfg, "TSMOM_SL_ATR", 3.0)) * atr / R.POINT))
+    fixed = float(getattr(_cfg, "TSMOM_SL_PIPS", 0) or 0)   # >0 = SL คงที่ (บัญชีเล็ก); 0 = chandelier ATR
+    sl_pips = int(fixed) if fixed > 0 else max(1, round(float(getattr(_cfg, "TSMOM_SL_ATR", 3.0)) * atr / R.POINT))
     tp_pips = 0                                              # no-TP mode (open_order รองรับ): trend-following exit ที่ flip
     lot = algo_lot(sl_pips)
     res = open_order(direction, sl_pips, tp_pips, comment=COMMENT, lot=lot, shadow=shadow)
