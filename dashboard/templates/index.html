@@ -4084,16 +4084,20 @@ function renderDay(date) {
   if (!day) { tb.innerHTML = '<tr><td colspan="6" style="padding:8px;color:var(--muted)">—</td></tr>'; return; }
   const pc = day.net_pnl >= 0 ? 'var(--green)' : 'var(--red)';
   const techs = Object.entries(day.techniques || {}).map(([k, v]) => `${k}×${v}`).join(', ');
-  const openTxt = day.open ? ` · <span style="color:var(--gold)">${day.open} open</span> (float ${day.float_pnl >= 0 ? '+' : ''}${day.float_pnl}฿)` : '';
+  const openTxt = (day.open ? ` · <span style="color:var(--gold)">${day.open} open</span> (float ${day.float_pnl >= 0 ? '+' : ''}${day.float_pnl}฿)` : '')
+    + (day.pending ? ` · <span style="color:var(--cyan,#4fd1e0)">${day.pending} pending (algo รอ fill)</span>` : '');
   if (tot) tot.innerHTML = `<b>${day.date}</b> · regime <b>${day.regime}</b> · ${day.n}ไม้ ${day.wins}/${day.losses} `
     + `(WR ${Math.round(day.win_rate * 100)}%) · net <span style="color:${pc}">${day.net_pnl >= 0 ? '+' : ''}${day.net_pnl}฿</span>${openTxt} · ${techs}`;
   tb.innerHTML = (day.trades || []).map(t => {
-    const isOpen = t.status === 'OPEN';
-    const pnlTxt = t.pnl === null || t.pnl === undefined ? 'OPEN' : (t.pnl >= 0 ? '+' : '') + t.pnl;
-    const tp = t.pnl === null || t.pnl === undefined ? 'var(--gold)' : (t.pnl >= 0 ? 'var(--green)' : 'var(--red)');
+    const isOpen = t.status === 'OPEN', isPend = t.status === 'PENDING';
+    const pnlTxt = isPend ? 'PENDING' : (t.pnl === null || t.pnl === undefined ? 'OPEN' : (t.pnl >= 0 ? '+' : '') + t.pnl);
+    const tp = (isPend || t.pnl === null || t.pnl === undefined) ? 'var(--gold)' : (t.pnl >= 0 ? 'var(--green)' : 'var(--red)');
     const dc = t.dir === 'BUY' ? 'var(--green)' : (t.dir === 'SELL' ? 'var(--red)' : 'var(--muted)');
-    return `<tr style="text-align:right;border-bottom:1px solid var(--border)${isOpen ? ';background:rgba(244,196,48,0.05)' : ''}">`
-      + `<td style="text-align:left;padding:4px 8px">${t.time}${isOpen ? ' <span style="color:var(--gold);font-size:9px">●OPEN</span>' : ''}</td>`
+    const mark = isPend ? ' <span style="color:var(--cyan,#4fd1e0);font-size:9px">◇PEND</span>'
+               : isOpen ? ' <span style="color:var(--gold);font-size:9px">●OPEN</span>' : '';
+    const bg = isPend ? ';background:rgba(79,209,224,0.05)' : (isOpen ? ';background:rgba(244,196,48,0.05)' : '');
+    return `<tr style="text-align:right;border-bottom:1px solid var(--border)${bg}">`
+      + `<td style="text-align:left;padding:4px 8px">${t.time}${mark}</td>`
       + `<td style="text-align:left;color:var(--muted)">${t.tech}</td>`
       + `<td style="color:${dc}">${t.dir || '—'}</td>`
       + `<td style="color:${tp}">${pnlTxt}</td>`

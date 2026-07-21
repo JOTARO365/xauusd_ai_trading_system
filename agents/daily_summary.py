@@ -25,16 +25,21 @@ _TECH = {
 
 
 def _tech(t):
-    """technique + regime-hint จาก comment (ALGO) หรือ entry_type."""
+    """technique + regime-hint จาก comment (ALGO) หรือ entry_type. เช็ค prefix ยาวก่อน (ALGO-PF ก่อน ALGO-P)."""
     cmt = str(t.get("comment") or "")
-    for k, v in _TECH.items():
+    for k in sorted(_TECH, key=len, reverse=True):
         if cmt.startswith(k):
-            return v
+            return _TECH[k]
     return _TECH.get(t.get("entry_type"), (t.get("entry_type") or "unknown", "—"))
 
 
 def _why_loss(t):
     """heuristic ว่าทำไมขาดทุน (จาก field ที่มี). คืน str สั้น."""
+    if str(t.get("source")) == "ALGO":                     # ALGO: infer จาก technique
+        cmt = str(t.get("comment") or "")
+        if "PF" in cmt or "fade" in cmt.lower():
+            return "fade แนว S/R — ราคาทะลุ (SL) [−EV per gauntlet]"
+        return "momentum breakout ล้มเหลว/reverse (SL)"
     d = str(t.get("direction") or "").upper()
     trend = str(t.get("trend") or "").upper()
     sent = str(t.get("sentiment") or "").upper()
@@ -61,6 +66,51 @@ def _live_floating():
         return {}
 
 
+def _algo_trades_from_mt5(days=45):
+    """ดึงไม้ ALGO (comment 'ALGO*') จาก MT5 — closed (deal history) + open (positions ปัจจุบัน).
+    algo path ไม่เขียน trades.json → ต้องดึงจาก MT5. shape เหมือน trades.json. fail-soft → []."""
+    from datetime import datetime, timedelta
+    out = []
+    try:
+        import MetaTrader5 as mt5
+        from collections import defaultdict
+        if not mt5.initialize():
+            return []
+        deals = mt5.history_deals_get(datetime.now() - timedelta(days=days), datetime.now()) or []
+        pos = defaultdict(lambda: {"pnl": 0.0, "cmt": "", "dir": None, "open_t": None, "close_t": None})
+        for d in deals:
+            cmt = str(getattr(d, "comment", "") or "")
+            if not cmt.startswith("ALGO"):
+                continue
+            pp = pos[d.position_id]
+            pp["pnl"] += d.profit + d.swap + d.commission
+            if d.entry == 0:                              # open deal → ทิศ + เวลาเปิด + comment
+                pp["cmt"] = cmt; pp["dir"] = "BUY" if d.type == 0 else "SELL"; pp["open_t"] = d.time
+            elif d.entry in (1, 2):                       # close deal
+                pp["close_t"] = d.time
+        for pid, pp in pos.items():
+            if pp["close_t"] is None:
+                continue
+            out.append({"timestamp": datetime.fromtimestamp(pp["close_t"]).isoformat(),
+                        "direction": pp["dir"], "comment": pp["cmt"], "entry_type": pp["cmt"],
+                        "pnl": round(pp["pnl"], 2), "status": "CLOSED", "source": "ALGO", "ticket": pid})
+        for p in (mt5.positions_get() or []):             # open ALGO ปัจจุบัน
+            if str(getattr(p, "comment", "") or "").startswith("ALGO"):
+                out.append({"timestamp": datetime.fromtimestamp(p.time).isoformat(),
+                            "direction": "BUY" if p.type == 0 else "SELL", "comment": p.comment,
+                            "entry_type": p.comment, "pnl": None, "status": "OPEN",
+                            "source": "ALGO", "ticket": p.ticket})
+        for o in (mt5.orders_get() or []):                # pending ALGO ที่ยังรอ fill
+            if str(getattr(o, "comment", "") or "").startswith("ALGO"):
+                out.append({"timestamp": datetime.fromtimestamp(o.time_setup).isoformat(),
+                            "direction": "BUY" if o.type in (2, 4) else "SELL", "comment": o.comment,
+                            "entry_type": o.comment, "pnl": None, "status": "PENDING",
+                            "source": "ALGO", "ticket": o.ticket, "level": o.price_open})
+    except Exception:
+        return out
+    return out
+
+
 def build_daily_summary(days=30, tech="all"):
     """คืน {days, totals, techniques_all, filter} — สรุปต่อวัน (ล่าสุดก่อน). รวมไม้ OPEN (วันนี้). 0 token, fail-soft."""
     try:
@@ -69,6 +119,7 @@ def build_daily_summary(days=30, tech="all"):
     except (OSError, json.JSONDecodeError):
         return {"days": [], "totals": {}, "techniques_all": [], "filter": tech}
     rows_all = [t for t in trades if t.get("timestamp")]     # ทั้ง CLOSED + OPEN (วันนี้)
+    rows_all += _algo_trades_from_mt5(days)                   # + ไม้ ALGO จาก MT5 (ไม่อยู่ใน trades.json)
     techs_all = sorted({_tech(t)[0] for t in rows_all})
     if tech and tech != "all":
         rows_all = [t for t in rows_all if _tech(t)[0] == tech]
@@ -83,7 +134,9 @@ def build_daily_summary(days=30, tech="all"):
     out = []
     for date in sorted(byday, reverse=True)[:days]:
         rows = byday[date]
-        cl = [t for t in rows if _is_closed(t)]; op = [t for t in rows if not _is_closed(t)]
+        cl = [t for t in rows if _is_closed(t)]
+        op = [t for t in rows if t.get("status") == "OPEN"]
+        pend = [t for t in rows if t.get("status") == "PENDING"]
         pnls = [float(t.get("pnl") or 0) for t in cl]
         wins = [p for p in pnls if p > 0]; losses = [p for p in pnls if p <= 0]
         techs = Counter(_tech(t)[0] for t in rows)
@@ -96,18 +149,24 @@ def build_daily_summary(days=30, tech="all"):
         for t in sorted(rows, key=lambda t: str(t.get("timestamp"))):
             closed = _is_closed(t)
             flt = floating.get(t.get("ticket"))
+            is_algo = str(t.get("source")) == "ALGO"
+            st = t.get("status") or ("CLOSED" if closed else "OPEN")
+            why_in = (f"regime {_tech(t)[1]} · algo (deterministic)" if is_algo
+                      else (t.get("manual_reason") or t.get("entry_type") or "—"))
+            why_out = ("รอ fill @ " + str(round(t.get("level"), 2)) if st == "PENDING" and t.get("level")
+                       else "ยังรอ fill" if st == "PENDING"
+                       else "ยังเปิดอยู่" if st == "OPEN"
+                       else (_why_loss(t) if float(t.get("pnl") or 0) <= 0 else "กำไร (TP algo/manual)"))
             detail.append({
-                "time": str(t.get("timestamp"))[11:16], "status": "CLOSED" if closed else "OPEN",
+                "time": str(t.get("timestamp"))[11:16], "status": st,
                 "tech": _tech(t)[0], "dir": t.get("direction"),
                 "pnl": round(float(t.get("pnl") or 0), 2) if closed else (round(flt, 2) if flt is not None else None),
-                "why_in": (t.get("manual_reason") or t.get("entry_type") or "—"),
-                "why_out": ("ยังเปิดอยู่" if not closed else
-                            (_why_loss(t) if float(t.get("pnl") or 0) <= 0 else "กำไร (TP/manual)")),
+                "why_in": why_in, "why_out": why_out,
             })
         float_open = sum(v for k, v in floating.items() if any(t.get("ticket") == k for t in op))
         out.append({
             "date": date,
-            "n": len(rows), "wins": len(wins), "losses": len(losses), "open": len(op),
+            "n": len(rows), "wins": len(wins), "losses": len(losses), "open": len(op), "pending": len(pend),
             "win_rate": round(len(wins) / len(cl), 3) if cl else 0,
             "net_pnl": round(sum(pnls), 2),                  # realized (closed) เท่านั้น
             "float_pnl": round(float_open, 2) if op else 0,  # floating ของไม้ open วันนั้น
