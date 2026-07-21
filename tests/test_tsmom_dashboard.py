@@ -111,6 +111,22 @@ class TestAlgoExitExclusion(unittest.TestCase):
         self.assertFalse(_included("ALGO-TSMOM"))           # excluded ✓
 
 
+class TestCalcStatsToday(unittest.TestCase):
+    """calc_stats นิยาม 'วันนี้' สม่ำเสมอ (close-date) — ไม้คร่อมวันนับถูก."""
+    def test_cross_day_trade_counted_by_close(self):
+        sys.path.insert(0, os.path.join(_BASE, "dashboard"))
+        import app
+        from datetime import date, timedelta
+        today = date.today().isoformat(); yest = (date.today() - timedelta(days=1)).isoformat()
+        trades = [{"status": "CLOSED", "pnl": -50, "timestamp": yest + "T20:00:00",
+                   "close_time": today + "T02:00:00", "source": "SYSTEM"},
+                  {"status": "CLOSED", "pnl": 30, "timestamp": today + "T09:00:00",
+                   "close_time": today + "T10:00:00", "source": "SYSTEM"}]
+        s = app.calc_stats(trades)
+        self.assertEqual(s["today_trades"], 2)             # นับตาม close-date (ไม้เปิดเมื่อวานปิดวันนี้ = นับ)
+        self.assertEqual(s["today_pnl"], -20)              # สม่ำเสมอกับ today_trades
+
+
 class TestDashboardEndpoints(unittest.TestCase):
     """integration (user) — จำลอง browser fetch endpoints."""
     @classmethod

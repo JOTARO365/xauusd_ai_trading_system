@@ -471,7 +471,8 @@ def calc_stats(trades: list) -> dict:
         equity_curve.append({"time": ts[:16], "equity": round(running, 2)})
 
     # Current losing streak = most recent consecutive losses → walk newest first
-    today_closed  = [t for t in chrono if t.get("timestamp", "").startswith(today_str)]
+    # ใช้ close-date (_closed_date) สม่ำเสมอกับ today_pnl ด้านบน (ไม้คร่อมวันนับตามวันที่ปิด)
+    today_closed  = [t for t in chrono if _closed_date(t) == today_str]
     losing_streak = 0
     for t in reversed(today_closed):
         if (t.get("pnl") or 0) < 0:
