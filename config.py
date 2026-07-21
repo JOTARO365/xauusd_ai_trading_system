@@ -213,6 +213,12 @@ REGIME_SHADOW_FILL    = os.getenv("REGIME_SHADOW_FILL", "false").lower() == "tru
 # (ไม้ปิด/margin ว่าง → เข้าใหม่อัตโนมัติ). ยังผ่าน MAX_OPEN guard ต่อทิศ + margin check. default 1.
 ALGO_MAX_STACK        = int(os.getenv("ALGO_MAX_STACK") or 1)
 
+# ALGO_SIZE_STANDDOWN = safety guard บัญชีเล็ก: ก่อนเปิดไม้ ALGO เช็คว่าถ้าเปิดที่ MIN_LOT จะเสี่ยงเกิน
+# ALGO_MAX_TRADE_RISK_PCT ไหม (min-lot ใหญ่เกินทุน). เกิน → ข้ามไม้ (stand down) ไม่ over-risk. ramp อัตโนมัติ
+# ตามทุน (ทุนโต → ไม้ SL แคบเปิดก่อน, กว้างตามมา). แตะเฉพาะ momentum ALGO. default ON (ปลอดภัย). 0 token.
+ALGO_SIZE_STANDDOWN     = os.getenv("ALGO_SIZE_STANDDOWN", "true").lower() == "true"
+ALGO_MAX_TRADE_RISK_PCT = float(os.getenv("ALGO_MAX_TRADE_RISK_PCT") or 0.02)   # เพดาน risk/ไม้ ALGO (2%)
+
 # ZRE = Zone Re-Entry RR≥2 (v2 fixed-SL). วาง LIMIT ดักเด้งที่โซนเกรดสูงเชิงรุก (RR≥2, SL คงที่).
 # เกราะสุด (replay 2026-07-16): trend-align-only (ตัด SIDEWAYS ที่ replay ขาดทุน −0.6R),
 # grade A/B + score≥ZRE_MIN_SCORE, สด ≤ZRE_MAX_BARS_SINCE, ในระยะ ZRE_PROXIMITY_PCT%,
@@ -304,6 +310,7 @@ def reload_config():
     global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT, REGIME_SHADOW
     global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING, REGIME_SR_ENTRY, REGIME_PENDING_FADE, REGIME_SR_EXIT
     global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK
+    global ALGO_SIZE_STANDDOWN, ALGO_MAX_TRADE_RISK_PCT
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
     SPECIALIST_ENABLED       = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"
     REGIME_SHADOW            = os.getenv("REGIME_SHADOW", "false").lower() == "true"
@@ -318,6 +325,8 @@ def reload_config():
     REGIME_SR_RISK_PCT       = float(os.getenv("REGIME_SR_RISK_PCT") or 0.005)
     REGIME_SHADOW_FILL       = os.getenv("REGIME_SHADOW_FILL", "false").lower() == "true"   # algo paper-fill
     ALGO_MAX_STACK           = int(os.getenv("ALGO_MAX_STACK") or 1)                        # ไม้ ALGO พร้อมกัน
+    ALGO_SIZE_STANDDOWN      = os.getenv("ALGO_SIZE_STANDDOWN", "true").lower() == "true"    # small-acct guard
+    ALGO_MAX_TRADE_RISK_PCT  = float(os.getenv("ALGO_MAX_TRADE_RISK_PCT") or 0.02)           # เพดาน risk/ไม้
 
     global ZONE_REENTRY_ENABLED, ZONE_REENTRY_SHADOW, ZRE_MIN_SCORE, ZRE_MAX_BARS_SINCE
     global ZRE_PROXIMITY_PCT, ZRE_TREND_ALIGN_ONLY, ZRE_MAX_CONCURRENT

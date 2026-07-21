@@ -83,6 +83,16 @@ def _tick() -> None:
                          if str((p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or "").startswith("ALGO"))
         if _algo_open >= getattr(config, "ALGO_MAX_STACK", 1):
             return
+        from agents.algo_sizing import standdown_for_size         # small-acct guard: min-lot เสี่ยงเกินเพดาน = ข้าม
+        _skip, _si = standdown_for_size(_cache["sl_pips"])
+        if _skip:
+            _last_traded_hour = hour                              # ถือว่าจัดการชั่วโมงนี้แล้ว (กัน log ซ้ำทุก tick)
+            logger.info(f"[REGIME-TICK] SIZE-STANDDOWN {d}: min-lot เสี่ยง {_si.get('risk_pct',0)*100:.1f}% "
+                        f"> เพดาน {_si.get('ceiling',0)*100:.0f}% (SL {_cache['sl_pips']}p ทุนเล็กเกิน) → ข้าม")
+            from agents.algo_state import write_state
+            write_state("SIZE-STANDDOWN", regime="TREND", via="tick",
+                        detail=f"min-lot เสี่ยง {_si.get('risk_pct',0)*100:.1f}% > เพดาน (SL {_cache['sl_pips']}p ทุนเล็กเกิน)")
+            return
         _last_traded_hour = hour
         from agents.algo_exit import sr_tp_pips                    # P-D: TP ตามแนว S/R (flag OFF → RR2 เดิม)
         from agents.algo_sizing import algo_lot                    # P-E: lot risk-based (flag OFF → fixed เดิม)

@@ -80,6 +80,12 @@ def run_regime_executor():
             return None
     except Exception:
         pass
+    from agents.algo_sizing import standdown_for_size          # small-acct guard: min-lot เสี่ยงเกินเพดาน = ข้าม
+    _skip, _si = standdown_for_size(sig["sl_pips"])
+    if _skip:
+        _hb("SIZE-STANDDOWN", f"regime=TREND {sig.get('dir')} · min-lot เสี่ยง {_si.get('risk_pct',0)*100:.1f}% "
+            f"> เพดาน {_si.get('ceiling',0)*100:.0f}% (ทุนเล็กเกิน SL {sig.get('sl_pips')}p) → ข้าม", regime="TREND")
+        return None
     _hb("ENTER", f"{sig.get('dir')} SL={sig.get('sl_pips')}p TP={sig.get('tp_pips')}p → วาง order", regime="TREND")
     _last_bar = rec["bar_ts"]
     from connectors.mt5_connector import open_order
