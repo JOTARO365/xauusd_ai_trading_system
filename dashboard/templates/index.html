@@ -1673,6 +1673,10 @@
       <div style="font-size:10px;color:var(--muted);margin-top:4px">SELECTION = guide เลือก regime/กลยุทธ์ · EXECUTION (entry/ทิศ) = algo คำนวณจาก data เอง ไม่ให้ LLM ตัดสิน</div>
     </section>
 
+    <!-- OWNER-GATE ADVISORY — เตือนเมื่อ mid-vol / manual short (regime ที่ owner เสียต่อเนื่อง). ไม่ปิด/ไม่บล็อก -->
+    <div id="owner-gate-banner" style="display:none;margin-bottom:10px;padding:8px 12px;border-radius:6px;
+         background:rgba(233,69,96,0.12);border:1px solid var(--red,#E94560);font-family:var(--mono);font-size:12px"></div>
+
     <!-- PRICE CLUSTER decision-support — บอทคำนวณ dwell-zone S/R ให้ owner ตัดสินใจ (กฎ fade อัตโนมัติไม่มี edge; วิจารณญาณ owner มี) -->
     <section id="cluster-map-section" style="margin-bottom:10px">
       <div class="section-title">Price Cluster S/R — decision-support (owner ตัดสินใจ, บอทคำนวณ)</div>
@@ -3388,6 +3392,7 @@ async function loadLivePrice() {
       setT('ai-sent-summary', bs.sent_summary || '—');
     }
     loadClusterMap();   // Price-Cluster decision-support (throttled, server-cached)
+    loadOwnerGate();    // Owner-gate advisory — เตือน mid-vol / manual short
     loadMacroQuant();   // Macro/News quant — ข่าว+เศรษฐกิจ → gold bias (throttled, server-cached)
     loadLiquidityProxy();   // Liquidity/order-flow proxy (throttled, server-cached)
     loadAlgoJournal();      // Trade score — algo journal win-rate/exp_R (throttled, server-cached)
@@ -3971,6 +3976,19 @@ async function loadClusterMap() {
     const le = document.getElementById('cluster-list');
     if (le) le.innerHTML = 'dwell zones: ' + (d.clusters || []).map(c => `${c.level}(${c.touches})`).join('  ');
     drawClusterLines(d);   // overlay cluster S/R + Donchian บนกราฟ candle
+  } catch (_e) {}
+}
+
+async function loadOwnerGate() {
+  try {
+    const d = await (await fetch('/api/owner-gate')).json();
+    const b = document.getElementById('owner-gate-banner'); if (!b) return;
+    const ws = (d.warnings || []);
+    if (!d.ok || !ws.length) { b.style.display = 'none'; return; }
+    b.style.display = 'block';
+    b.innerHTML = `<span style="color:var(--red,#E94560);font-weight:700">⚠ OWNER-GATE</span> `
+      + ws.map(w => `<span style="color:var(--gold)">[${w.tag}]</span> ${w.msg}`).join('<br>')
+      + `<div style="color:var(--muted);font-size:10px;margin-top:3px">advisory เท่านั้น — พี่ตัดสินใจเอง (ไม่ปิด/ไม่บล็อก)</div>`;
   } catch (_e) {}
 }
 
@@ -6099,6 +6117,7 @@ function _bootstrap() {
   setInterval(loadRegimeState, 3600000); // regime_state.json updated daily — hourly poll sufficient
   setInterval(loadLivePrice, 5000);
   setInterval(loadMacroStrip, 3600000);  // macro data is daily — refresh hourly is sufficient
+  setInterval(loadOwnerGate, 20000);     // Owner-gate advisory
   setInterval(loadMacroQuant, 15000);    // Macro/News quant — realtime (news updates per cycle)
   setInterval(loadLiquidityProxy, 15000);   // Liquidity/order-flow proxy — realtime
   setInterval(loadAlgoJournal, 15000);      // Trade score — algo journal — realtime

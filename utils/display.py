@@ -209,6 +209,13 @@ def print_regime_panel(open_positions: list | None = None):
         exp = d.get("exp_R", 0); ec = GREEN if exp > 0 else RED
         return f"{tag} n={d['n_closed']} [{ec}]exp{exp:+.2f}R[/] wr{int(d.get('win_rate',0)*100)}%"
     lines.append(f"  [dim]journal[/dim] {_jline('mom', mom)} · {_jline('fade', fade)} [dim](shadow)[/dim]")
+    # ── owner-gate advisory (เตือน mid-vol / manual short — regime ที่ owner เสียต่อเนื่อง) ──
+    try:
+        from agents.owner_gate import owner_gate_now
+        for w in (owner_gate_now().get("warnings") or []):
+            lines.append(f"  [{RED}]⚠ OWNER-GATE[/] [{GOLD}]{w.get('tag','')}[/] [dim]{w.get('msg','')}[/dim]")
+    except Exception:
+        pass
 
     console.print(Panel("\n".join(lines), title=f"[bold {GOLD}]ALGO v2 · REGIME_LIVE[/]",
                         border_style=GOLD, padding=(0, 1), box=box.ROUNDED))

@@ -1153,6 +1153,15 @@ def api_algo_journal():
     return jsonify(_cached("algo-journal", _c, ttl=15))
 
 
+@app.route("/api/owner-gate")
+def api_owner_gate():
+    """Owner-gate advisory — เตือนเมื่อ mid-vol / manual short (regime ที่ owner เสียต่อเนื่อง). 0 token."""
+    def _c():
+        from agents.owner_gate import owner_gate_now
+        return owner_gate_now()
+    return jsonify(_cached("owner-gate", _c, ttl=20))
+
+
 @app.route("/api/owner-edge")
 def api_owner_edge():
     """Owner edge × vol/market regime — วิเคราะห์ไม้ manual ว่าชนะ/แพ้ regime ไหน (หา alpha จริงของ owner). 0 token."""
