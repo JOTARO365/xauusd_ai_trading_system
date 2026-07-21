@@ -800,12 +800,17 @@ def _tsmom_vs_bh():
         mt, mb = TD._metrics(ens), TD._metrics(bh)
         if not mt or not mb:
             return None
+        eq_ts = np.cumprod(1 + ens); eq_bh = np.cumprod(1 + bh)              # equity curve (start=1)
+        step = max(1, len(eq_ts) // 150)                                    # downsample ~150 จุด
+        curve = {"tsmom": [round(float(x), 3) for x in eq_ts[::step]],
+                 "bh": [round(float(x), 3) for x in eq_bh[::step]]}
         return {"tsmom": {"sharpe": round(mt["sharpe"], 2), "cagr": round(mt["cagr"] * 100, 1),
                           "maxdd": round(mt["maxdd"] * 100, 1)},
                 "bh": {"sharpe": round(mb["sharpe"], 2), "cagr": round(mb["cagr"] * 100, 1),
                        "maxdd": round(mb["maxdd"] * 100, 1)},
                 "alpha_sharpe": round(mt["sharpe"] - mb["sharpe"], 2),
-                "has_alpha": bool(mt["sharpe"] > mb["sharpe"]), "years": round(mn / 252, 1)}
+                "has_alpha": bool(mt["sharpe"] > mb["sharpe"]), "years": round(mn / 252, 1),
+                "curve": curve}
     except Exception:
         return None
 

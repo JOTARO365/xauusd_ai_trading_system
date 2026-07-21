@@ -1684,6 +1684,11 @@
           <div><span style="color:var(--gold)">Buy&amp;Hold</span> · Sharpe <b id="tvb-bh-sh">—</b> · CAGR <span id="tvb-bh-cagr">—</span> · DD <span id="tvb-bh-dd">—</span></div>
           <div style="flex:1;min-width:200px;text-align:right"><span style="color:var(--muted);font-size:10px">ALPHA (Sharpe)</span> <b id="tvb-verdict" style="font-size:13px">—</b></div>
         </div>
+        <svg id="tvb-chart" viewBox="0 0 600 130" preserveAspectRatio="none" style="width:100%;height:130px;margin-top:8px;overflow:visible">
+          <polyline id="tvb-line-bh" fill="none" stroke="var(--gold)" stroke-width="1.5" points=""/>
+          <polyline id="tvb-line-ts" fill="none" stroke="#a78bfa" stroke-width="1.5" points=""/>
+        </svg>
+        <div style="font-size:10px;color:var(--muted);text-align:center">equity curve (start=1, log-scale, vol-target เท่ากัน) · <span style="color:var(--gold)">■</span> Buy&amp;Hold · <span style="color:#a78bfa">■</span> TSMOM</div>
       </div>
     </section>
 
@@ -4031,6 +4036,18 @@ async function loadTsmom() {
         v.innerHTML = `${vb.alpha_sharpe >= 0 ? '+' : ''}${vb.alpha_sharpe} · ` +
           (pos ? '<span style="color:var(--green)">มี alpha เหนือทอง</span>'
                : '<span style="color:var(--red)">ไม่มี alpha (แค่ beta ที่ DD ต่ำกว่า)</span>');
+      }
+      // equity curve 2 เส้น (SVG polyline, log-scale, shared y-normalize)
+      if (vb.curve && vb.curve.tsmom.length > 1) {
+        const W = 600, H = 130, pad = 5;
+        const all = vb.curve.tsmom.concat(vb.curve.bh).filter(x => x > 0).map(Math.log);
+        const lo = Math.min(...all), hi = Math.max(...all), rng = (hi - lo) || 1;
+        const mk = arr => arr.map((val, i) =>
+          ((i / (arr.length - 1)) * W).toFixed(1) + ',' +
+          (H - pad - ((Math.log(val) - lo) / rng) * (H - 2 * pad)).toFixed(1)).join(' ');
+        const lts = document.getElementById('tvb-line-ts'), lbh = document.getElementById('tvb-line-bh');
+        if (lts) lts.setAttribute('points', mk(vb.curve.tsmom));
+        if (lbh) lbh.setAttribute('points', mk(vb.curve.bh));
       }
     }
   } catch (_e) {}
