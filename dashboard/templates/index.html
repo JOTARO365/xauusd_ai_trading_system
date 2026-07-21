@@ -4069,7 +4069,7 @@ async function loadDailySummary() {
     _dsData = d;
     const sel = document.getElementById('ds-day');
     if (sel) sel.innerHTML = (d.days || []).map(x =>
-      `<option value="${x.date}">${x.date} (${x.n}ไม้ ${x.net_pnl >= 0 ? '+' : ''}${x.net_pnl}฿)</option>`
+      `<option value="${x.date}">${x.date} (${x.n}ไม้${x.open ? ' · ' + x.open + ' open' : ''} · net ${x.net_pnl >= 0 ? '+' : ''}${x.net_pnl}฿)</option>`
     ).join('') || '<option value="">ไม่มีข้อมูล</option>';
     if ((d.days || []).length) renderDay(d.days[0].date);   // default: วันล่าสุด
   } catch (_e) {}
@@ -4084,16 +4084,19 @@ function renderDay(date) {
   if (!day) { tb.innerHTML = '<tr><td colspan="6" style="padding:8px;color:var(--muted)">—</td></tr>'; return; }
   const pc = day.net_pnl >= 0 ? 'var(--green)' : 'var(--red)';
   const techs = Object.entries(day.techniques || {}).map(([k, v]) => `${k}×${v}`).join(', ');
+  const openTxt = day.open ? ` · <span style="color:var(--gold)">${day.open} open</span> (float ${day.float_pnl >= 0 ? '+' : ''}${day.float_pnl}฿)` : '';
   if (tot) tot.innerHTML = `<b>${day.date}</b> · regime <b>${day.regime}</b> · ${day.n}ไม้ ${day.wins}/${day.losses} `
-    + `(WR ${Math.round(day.win_rate * 100)}%) · net <span style="color:${pc}">${day.net_pnl >= 0 ? '+' : ''}${day.net_pnl}฿</span> · ${techs}`;
+    + `(WR ${Math.round(day.win_rate * 100)}%) · net <span style="color:${pc}">${day.net_pnl >= 0 ? '+' : ''}${day.net_pnl}฿</span>${openTxt} · ${techs}`;
   tb.innerHTML = (day.trades || []).map(t => {
-    const tp = t.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    const isOpen = t.status === 'OPEN';
+    const pnlTxt = t.pnl === null || t.pnl === undefined ? 'OPEN' : (t.pnl >= 0 ? '+' : '') + t.pnl;
+    const tp = t.pnl === null || t.pnl === undefined ? 'var(--gold)' : (t.pnl >= 0 ? 'var(--green)' : 'var(--red)');
     const dc = t.dir === 'BUY' ? 'var(--green)' : (t.dir === 'SELL' ? 'var(--red)' : 'var(--muted)');
-    return `<tr style="text-align:right;border-bottom:1px solid var(--border)">`
-      + `<td style="text-align:left;padding:4px 8px">${t.time}</td>`
+    return `<tr style="text-align:right;border-bottom:1px solid var(--border)${isOpen ? ';background:rgba(244,196,48,0.05)' : ''}">`
+      + `<td style="text-align:left;padding:4px 8px">${t.time}${isOpen ? ' <span style="color:var(--gold);font-size:9px">●OPEN</span>' : ''}</td>`
       + `<td style="text-align:left;color:var(--muted)">${t.tech}</td>`
       + `<td style="color:${dc}">${t.dir || '—'}</td>`
-      + `<td style="color:${tp}">${t.pnl >= 0 ? '+' : ''}${t.pnl}</td>`
+      + `<td style="color:${tp}">${pnlTxt}</td>`
       + `<td style="text-align:left;color:var(--muted);max-width:220px">${t.why_in}</td>`
       + `<td style="text-align:left;color:var(--muted);max-width:260px">${t.why_out}</td></tr>`;
   }).join('') || '<tr><td colspan="6" style="padding:8px;color:var(--muted)">ไม่มีไม้</td></tr>';

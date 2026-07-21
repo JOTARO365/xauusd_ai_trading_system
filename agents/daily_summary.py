@@ -52,47 +52,65 @@ def _why_loss(t):
     return " · ".join(reasons) or "ราคาไปสวนทาง (SL)"
 
 
+def _live_floating():
+    """{ticket: floating P/L} จาก MT5 (สำหรับไม้ OPEN). fail-soft → {}."""
+    try:
+        from connectors.mt5_connector import get_open_positions
+        return {p.get("ticket"): float(p.get("profit") or 0) for p in (get_open_positions() or [])}
+    except Exception:
+        return {}
+
+
 def build_daily_summary(days=30, tech="all"):
-    """คืน {days, totals, techniques_all, filter} — สรุปต่อวัน (ล่าสุดก่อน). tech=filter เทคนิค. 0 token, fail-soft."""
+    """คืน {days, totals, techniques_all, filter} — สรุปต่อวัน (ล่าสุดก่อน). รวมไม้ OPEN (วันนี้). 0 token, fail-soft."""
     try:
         d = json.load(open(os.path.join(_BASE, "logs", "trades.json"), encoding="utf-8"))
         trades = d if isinstance(d, list) else d.get("trades", [])
     except (OSError, json.JSONDecodeError):
         return {"days": [], "totals": {}, "techniques_all": [], "filter": tech}
-    closed = [t for t in trades if t.get("status") == "CLOSED" and t.get("pnl") is not None
-              and t.get("timestamp")]
-    techs_all = sorted({_tech(t)[0] for t in closed})
-    if tech and tech != "all":                              # filter เฉพาะเทคนิคที่เลือก
-        closed = [t for t in closed if _tech(t)[0] == tech]
+    rows_all = [t for t in trades if t.get("timestamp")]     # ทั้ง CLOSED + OPEN (วันนี้)
+    techs_all = sorted({_tech(t)[0] for t in rows_all})
+    if tech and tech != "all":
+        rows_all = [t for t in rows_all if _tech(t)[0] == tech]
+    floating = _live_floating()
     byday = defaultdict(list)
-    for t in closed:
+    for t in rows_all:
         byday[str(t["timestamp"])[:10]].append(t)
+
+    def _is_closed(t):
+        return t.get("status") == "CLOSED" and t.get("pnl") is not None
 
     out = []
     for date in sorted(byday, reverse=True)[:days]:
         rows = byday[date]
-        pnls = [float(t.get("pnl") or 0) for t in rows]
+        cl = [t for t in rows if _is_closed(t)]; op = [t for t in rows if not _is_closed(t)]
+        pnls = [float(t.get("pnl") or 0) for t in cl]
         wins = [p for p in pnls if p > 0]; losses = [p for p in pnls if p <= 0]
         techs = Counter(_tech(t)[0] for t in rows)
         regimes = Counter(_tech(t)[1] for t in rows if _tech(t)[1] != "—")
         trends = Counter(str(t.get("trend") or "").upper() for t in rows if t.get("trend"))
-        # ไม้ขาดทุนหนักสุด + เหตุผล
-        losers = sorted((t for t in rows if float(t.get("pnl") or 0) <= 0),
-                        key=lambda t: float(t.get("pnl") or 0))
+        losers = sorted((t for t in cl if float(t.get("pnl") or 0) <= 0), key=lambda t: float(t.get("pnl") or 0))
         worst = losers[0] if losers else None
         why_agg = Counter(_why_loss(t) for t in losers)
-        detail = [{
-            "time": str(t.get("timestamp"))[11:16],
-            "tech": _tech(t)[0], "dir": t.get("direction"),
-            "pnl": round(float(t.get("pnl") or 0), 2),
-            "why_in": (t.get("manual_reason") or t.get("entry_type") or "—"),   # ทำไมเข้า
-            "why_out": (_why_loss(t) if float(t.get("pnl") or 0) <= 0 else "กำไร (TP/manual)"),  # ทำไมออก/ขาดทุน
-        } for t in sorted(rows, key=lambda t: str(t.get("timestamp")))]
+        detail = []
+        for t in sorted(rows, key=lambda t: str(t.get("timestamp"))):
+            closed = _is_closed(t)
+            flt = floating.get(t.get("ticket"))
+            detail.append({
+                "time": str(t.get("timestamp"))[11:16], "status": "CLOSED" if closed else "OPEN",
+                "tech": _tech(t)[0], "dir": t.get("direction"),
+                "pnl": round(float(t.get("pnl") or 0), 2) if closed else (round(flt, 2) if flt is not None else None),
+                "why_in": (t.get("manual_reason") or t.get("entry_type") or "—"),
+                "why_out": ("ยังเปิดอยู่" if not closed else
+                            (_why_loss(t) if float(t.get("pnl") or 0) <= 0 else "กำไร (TP/manual)")),
+            })
+        float_open = sum(v for k, v in floating.items() if any(t.get("ticket") == k for t in op))
         out.append({
             "date": date,
-            "n": len(rows), "wins": len(wins), "losses": len(losses),
-            "win_rate": round(len(wins) / len(rows), 3) if rows else 0,
-            "net_pnl": round(sum(pnls), 2),
+            "n": len(rows), "wins": len(wins), "losses": len(losses), "open": len(op),
+            "win_rate": round(len(wins) / len(cl), 3) if cl else 0,
+            "net_pnl": round(sum(pnls), 2),                  # realized (closed) เท่านั้น
+            "float_pnl": round(float_open, 2) if op else 0,  # floating ของไม้ open วันนั้น
             "gross_win": round(sum(wins), 2), "gross_loss": round(sum(losses), 2),
             "techniques": dict(techs.most_common()),
             "regime": (regimes.most_common(1)[0][0] if regimes else
