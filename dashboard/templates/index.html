@@ -1676,6 +1676,15 @@
         <div style="flex:1;min-width:180px"><span style="color:var(--muted);font-size:10px">STATE</span><br><span id="ts-state" style="color:var(--muted)">—</span></div>
       </div>
       <div style="font-size:10px;color:var(--muted);margin-top:4px">exit = signal flip (ปล่อยเทรนด์วิ่ง) · SL = chandelier 3×ATR(D1) disaster · vol-target 0.5% · edge modest+partly-beta = forward-validation</div>
+      <!-- TSMOM vs Buy&Hold — มี alpha เหนือทองไหม (apples-to-apples: vol-target+cost เท่ากัน) -->
+      <div style="margin-top:8px;padding:9px 14px;border:1px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:12px">
+        <div style="color:var(--muted);font-size:10px;margin-bottom:5px">TSMOM vs BUY&amp;HOLD ทอง — มี alpha ไหม (backtest <span id="tvb-years">—</span> ปี, risk เท่ากัน)</div>
+        <div style="display:flex;gap:26px;flex-wrap:wrap;align-items:center">
+          <div><span style="color:#a78bfa">TSMOM</span> · Sharpe <b id="tvb-ts-sh">—</b> · CAGR <span id="tvb-ts-cagr">—</span> · DD <span id="tvb-ts-dd">—</span></div>
+          <div><span style="color:var(--gold)">Buy&amp;Hold</span> · Sharpe <b id="tvb-bh-sh">—</b> · CAGR <span id="tvb-bh-cagr">—</span> · DD <span id="tvb-bh-dd">—</span></div>
+          <div style="flex:1;min-width:200px;text-align:right"><span style="color:var(--muted);font-size:10px">ALPHA (Sharpe)</span> <b id="tvb-verdict" style="font-size:13px">—</b></div>
+        </div>
+      </div>
     </section>
 
     <!-- AI SENTIMENT (SELECTION layer) — LLM อ่านข่าว X + ตัวเลขเศรษฐกิจ → guide เลือก regime (display-only, 0 token) -->
@@ -4009,6 +4018,20 @@ async function loadTsmom() {
           `ทุน ${w.equity.toLocaleString()}฿ · ควรมี ~<b>${w.needed.toLocaleString()}฿</b> ถึงจะเหมาะ ` +
           `(เข้า order ต่อ — ระวังพอร์ตหมดเร็ว)`;
       } else { cw.style.display = 'none'; }
+    }
+    // TSMOM vs Buy&Hold (มี alpha ไหม)
+    const vb = d.vs_bh;
+    if (vb) {
+      set('tvb-years', vb.years);
+      set('tvb-ts-sh', vb.tsmom.sharpe); set('tvb-ts-cagr', vb.tsmom.cagr + '%'); set('tvb-ts-dd', vb.tsmom.maxdd + '%');
+      set('tvb-bh-sh', vb.bh.sharpe); set('tvb-bh-cagr', vb.bh.cagr + '%'); set('tvb-bh-dd', vb.bh.maxdd + '%');
+      const v = document.getElementById('tvb-verdict');
+      if (v) {
+        const pos = vb.has_alpha;
+        v.innerHTML = `${vb.alpha_sharpe >= 0 ? '+' : ''}${vb.alpha_sharpe} · ` +
+          (pos ? '<span style="color:var(--green)">มี alpha เหนือทอง</span>'
+               : '<span style="color:var(--red)">ไม่มี alpha (แค่ beta ที่ DD ต่ำกว่า)</span>');
+      }
     }
   } catch (_e) {}
 }

@@ -149,6 +149,15 @@ class TestDashboardEndpoints(unittest.TestCase):
             self.assertIsNotNone(d["capital_warn"])
             self.assertGreater(d["capital_warn"]["risk_pct"], 2.0)
 
+    def test_api_tsmom_vs_bh(self):
+        d = self.client.get("/api/tsmom").get_json()
+        vb = d.get("vs_bh")
+        if vb:                                              # backtest จาก xau_d1 (มีไฟล์)
+            self.assertIn("sharpe", vb["tsmom"])
+            self.assertIn("sharpe", vb["bh"])
+            self.assertIsInstance(vb["has_alpha"], bool)
+            self.assertAlmostEqual(vb["alpha_sharpe"], vb["tsmom"]["sharpe"] - vb["bh"]["sharpe"], places=2)
+
     def test_api_algo_status_tsmom_aware(self):
         d = self.client.get("/api/algo-status").get_json()
         self.assertEqual(d["mode"], "TSMOM-D1 (daily)")

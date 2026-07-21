@@ -43,7 +43,8 @@ def _metrics(sret):
 
 
 def backtest(close, L, mode="ls"):
-    """position-based TSMOM. mode: 'ls'=long-short, 'lo'=long-only. คืน (daily net returns, positions)."""
+    """position-based TSMOM. mode: 'ls'=long-short, 'lo'=long-only, 'bh'=buy&hold (always-long, vol-targeted).
+    คืน (daily net returns, positions). 'bh' = benchmark เทียบ apples-to-apples (vol-target+cost เท่ากัน)."""
     ret = np.zeros(len(close)); ret[1:] = np.diff(close) / close[:-1]
     # realized vol สำหรับ vol-target (EWMA)
     vol = np.zeros(len(close)); vol[0] = abs(ret[0]) + 1e-6
@@ -54,6 +55,8 @@ def backtest(close, L, mode="ls"):
         mom = np.sign(close[t] - close[t - L])
         if mode == "lo":
             mom = max(mom, 0.0)
+        elif mode == "bh":
+            mom = 1.0                                          # always-long (buy&hold, vol-targeted)
         w = mom * min(TARGET_VOL / (vol[t] + 1e-9), 3.0)      # vol-target, cap leverage 3
         pos[t] = w
     sret = np.zeros(len(close))

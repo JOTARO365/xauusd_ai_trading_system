@@ -784,6 +784,32 @@ def api_monitor():
     })
 
 
+def _tsmom_vs_bh():
+    """เทียบ TSMOM (deployed long-short ensemble) vs Buy&Hold ทอง — apples-to-apples (vol-target+cost เท่ากัน).
+    ตอบคำถาม audit: TSMOM มี alpha เหนือทองไหม หรือแค่ beta. คำนวณจาก xau_d1 (compute-in-code, cache 1ชม.)."""
+    try:
+        import numpy as np
+        sys.path.insert(0, os.path.join(_BASE, "..", "scripts"))
+        import tsmom_develop as TD
+        with open(os.path.join(_BASE, "..", "data", "xau_d1.json")) as _f:
+            close = np.array(json.load(_f), dtype=float)[:, 4]
+        srets = [TD.backtest(close, L, "ls")[0] for L in (63, 126, 252)]     # ensemble ที่ deploy
+        mn = min(len(s) for s in srets)
+        ens = np.mean([s[-mn:] for s in srets], axis=0)
+        bh = TD.backtest(close, 126, "bh")[0][-mn:]                          # buy&hold vol-targeted (benchmark)
+        mt, mb = TD._metrics(ens), TD._metrics(bh)
+        if not mt or not mb:
+            return None
+        return {"tsmom": {"sharpe": round(mt["sharpe"], 2), "cagr": round(mt["cagr"] * 100, 1),
+                          "maxdd": round(mt["maxdd"] * 100, 1)},
+                "bh": {"sharpe": round(mb["sharpe"], 2), "cagr": round(mb["cagr"] * 100, 1),
+                       "maxdd": round(mb["maxdd"] * 100, 1)},
+                "alpha_sharpe": round(mt["sharpe"] - mb["sharpe"], 2),
+                "has_alpha": bool(mt["sharpe"] > mb["sharpe"]), "years": round(mn / 252, 1)}
+    except Exception:
+        return None
+
+
 @app.route("/api/tsmom")
 def api_tsmom():
     """สถานะ TSMOM-D1 directional engine: signal ensemble + position + state (compute-in-code, 0 token)."""
@@ -791,7 +817,8 @@ def api_tsmom():
     out = {"ok": True, "live": bool(getattr(_cfg, "TSMOM_LIVE", False)),
            "shadow": bool(getattr(_cfg, "TSMOM_SHADOW", False)),
            "signal": None, "votes": [], "d1_close": None, "atr_d1": None, "sl_pips": None,
-           "position": None, "state": None, "capital_warn": None}
+           "position": None, "state": None, "capital_warn": None,
+           "vs_bh": _cached("tsmom-vs-bh", _tsmom_vs_bh, ttl=3600)}
     # ── signal ensemble จาก xau_d1.json (บอทอัปเดตไฟล์) ──
     try:
         import numpy as np
