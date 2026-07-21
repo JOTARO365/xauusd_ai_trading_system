@@ -12,3 +12,4 @@ accounts.txt
 accounts.db
 .claude/
 .playwright-mcp/
+reports/
