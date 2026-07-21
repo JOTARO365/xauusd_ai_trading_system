@@ -59,6 +59,12 @@ def _open(direction, atr, shadow):
     fixed = float(getattr(_cfg, "TSMOM_SL_PIPS", 0) or 0)   # >0 = SL คงที่ (บัญชีเล็ก); 0 = chandelier ATR
     sl_pips = int(fixed) if fixed > 0 else max(1, round(float(getattr(_cfg, "TSMOM_SL_ATR", 3.0)) * atr / R.POINT))
     tp_pips = 0                                              # no-TP mode (open_order รองรับ): trend-following exit ที่ flip
+    from agents.algo_sizing import capital_warning           # เตือนทุนไม่พอ (ไม่บล็อก — เข้า order ต่อ)
+    _warn, _wi = capital_warning(sl_pips)
+    if _warn:
+        logger.warning(f"[TSMOM] ⚠️ CAPITAL WARNING: risk {_wi['risk_pct']*100:.0f}%/ไม้ > เพดาน "
+                       f"{_wi['threshold']*100:.0f}% · ทุน {_wi['equity']:,.0f} · ควรมี ~{_wi['needed_equity']:,.0f} "
+                       f"— เปิด order ต่อ (เตือนเฉยๆ เหมือน margin call)")
     lot = algo_lot(sl_pips)
     res = open_order(direction, sl_pips, tp_pips, comment=COMMENT, lot=lot, shadow=shadow)
     ok = True if shadow else bool(isinstance(res, dict) and res.get("success"))

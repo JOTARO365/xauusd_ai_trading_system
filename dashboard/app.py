@@ -790,7 +790,7 @@ def api_tsmom():
     out = {"ok": True, "live": bool(getattr(_cfg, "TSMOM_LIVE", False)),
            "shadow": bool(getattr(_cfg, "TSMOM_SHADOW", False)),
            "signal": None, "votes": [], "d1_close": None, "atr_d1": None, "sl_pips": None,
-           "position": None, "state": None}
+           "position": None, "state": None, "capital_warn": None}
     # ── signal ensemble จาก xau_d1.json (บอทอัปเดตไฟล์) ──
     try:
         import numpy as np
@@ -809,7 +809,19 @@ def api_tsmom():
         tr = np.maximum(high[1:] - low[1:], np.maximum(abs(high[1:] - close[:-1]), abs(low[1:] - close[:-1])))
         atr = float(np.mean(tr[-23:-1]))
         out["atr_d1"] = round(atr, 2)
-        out["sl_pips"] = int(round(float(getattr(_cfg, "TSMOM_SL_ATR", 3.0)) * atr / 0.01))
+        fixed = float(getattr(_cfg, "TSMOM_SL_PIPS", 0) or 0)   # respect fixed-SL override
+        out["sl_pips"] = int(fixed) if fixed > 0 else int(round(float(getattr(_cfg, "TSMOM_SL_ATR", 3.0)) * atr / 0.01))
+    except Exception:
+        pass
+    # ── capital warning (คล้าย margin call — เตือนถ้าทุนไม่พอ, ไม่บล็อก) ──
+    try:
+        if out["sl_pips"]:
+            from agents.algo_sizing import capital_warning
+            warn, wi = capital_warning(out["sl_pips"])
+            if warn:
+                out["capital_warn"] = {"risk_pct": round(wi["risk_pct"] * 100, 1),
+                                       "threshold": round(wi["threshold"] * 100, 1),
+                                       "equity": round(wi["equity"]), "needed": round(wi["needed_equity"])}
     except Exception:
         pass
     # ── position ALGO-TSMOM จาก MT5 ──

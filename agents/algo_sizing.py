@@ -55,6 +55,25 @@ def standdown_for_size(sl_pips, equity=None):
         return False, {"reason": "error"}
 
 
+def capital_warning(sl_pips, equity=None):
+    """แจ้งเตือนทุนไม่พอ (risk/ไม้ ที่ MIN_LOT เกินเพดาน) — ไม่บล็อก แค่เตือน (คล้าย margin call).
+    คืน (warn: bool, info). warn=True เมื่อ risk_at_min_lot > ALGO_MAX_TRADE_RISK_PCT. needed = ทุนที่ทำให้ถึงเพดาน."""
+    try:
+        sl_pips = float(sl_pips)
+        eq, pip_value = _equity_pipval(equity)
+        if eq is None or sl_pips <= 0:
+            return False, {}
+        thr = float(getattr(_cfg, "ALGO_MAX_TRADE_RISK_PCT", 0.02))
+        min_lot = float(getattr(_cfg, "MIN_LOT", 0.01))
+        risk = (min_lot * sl_pips * pip_value) / eq
+        needed = (min_lot * sl_pips * pip_value) / thr if thr > 0 else 0.0
+        return (risk > thr), {"risk_pct": risk, "threshold": thr, "equity": eq,
+                              "needed_equity": needed, "sl_pips": sl_pips}
+    except Exception as e:
+        logger.debug(f"[CAPITAL-WARN] {e}")
+        return False, {}
+
+
 def algo_lot(sl_pips, equity=None, confidence_scale=1.0):
     """คืน lot risk-based (clamped) หรือ None ถ้า flag OFF / คำนวณไม่ได้ (→ fallback fixed).
     equity: override (เทสต์); ปกติดึงจาก account.equity."""

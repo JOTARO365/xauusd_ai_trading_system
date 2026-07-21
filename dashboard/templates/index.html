@@ -1663,6 +1663,9 @@
     <!-- TSMOM-D1 ENGINE — directional engine รายวัน (edge เดียวที่ validated). display-only, compute-in-code -->
     <section id="tsmom-section" style="margin-bottom:10px">
       <div class="section-title">TSMOM-D1 Engine — time-series momentum รายวัน (edge เดียวที่ validated)</div>
+      <div id="ts-capital-warn" style="display:none;margin-bottom:8px;padding:8px 12px;border-radius:6px;
+           background:rgba(233,69,96,0.15);border:1px solid var(--red,#E94560);color:var(--red,#E94560);
+           font-family:var(--mono);font-size:12px;font-weight:600"></div>
       <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;padding:10px 14px;border:1px solid var(--border);border-left:3px solid #a78bfa;border-radius:8px;font-family:var(--mono);font-size:12px">
         <div><span style="color:var(--muted);font-size:10px">ENGINE</span><br><span id="ts-engine" style="font-weight:700;font-size:14px">—</span></div>
         <div><span style="color:var(--muted);font-size:10px">SIGNAL (ensemble)</span><br><span id="ts-signal" style="font-weight:700;font-size:15px">—</span></div>
@@ -3997,6 +4000,16 @@ async function loadTsmom() {
     }
     set('ts-sl', (d.sl_pips ? d.sl_pips + 'p' : '—') + (d.atr_d1 ? ` <span style="color:var(--muted)">/ ATR ${d.atr_d1}</span>` : ''));
     set('ts-state', d.state ? (d.state.detail || d.state.state) : '<span style="color:var(--muted)">รอแท่ง D1 ใหม่</span>');
+    // capital warning (คล้าย margin call — เตือนถ้าทุนไม่พอ)
+    const cw = document.getElementById('ts-capital-warn'), w = d.capital_warn;
+    if (cw) {
+      if (w) {
+        cw.style.display = '';
+        cw.innerHTML = `⚠️ CAPITAL WARNING — เสี่ยง <b>${w.risk_pct}%</b>/ไม้ &gt; เพดาน ${w.threshold}% · ` +
+          `ทุน ${w.equity.toLocaleString()}฿ · ควรมี ~<b>${w.needed.toLocaleString()}฿</b> ถึงจะเหมาะ ` +
+          `(เข้า order ต่อ — ระวังพอร์ตหมดเร็ว)`;
+      } else { cw.style.display = 'none'; }
+    }
   } catch (_e) {}
 }
 
