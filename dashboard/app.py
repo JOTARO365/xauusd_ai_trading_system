@@ -784,15 +784,17 @@ def api_monitor():
     })
 
 
-def _tsmom_vs_bh():
+def _tsmom_vs_bh(years=None):
     """เทียบ TSMOM (deployed long-short ensemble) vs Buy&Hold ทอง — apples-to-apples (vol-target+cost เท่ากัน).
-    ตอบคำถาม audit: TSMOM มี alpha เหนือทองไหม หรือแค่ beta. คำนวณจาก xau_d1 (compute-in-code, cache 1ชม.)."""
+    ตอบคำถาม audit: TSMOM มี alpha เหนือทองไหม หรือแค่ beta. years=None=ทั้งหมด, 5/10=ช่วงล่าสุด. cache 1ชม."""
     try:
         import numpy as np
         sys.path.insert(0, os.path.join(_BASE, "..", "scripts"))
         import tsmom_develop as TD
         with open(os.path.join(_BASE, "..", "data", "xau_d1.json")) as _f:
             close = np.array(json.load(_f), dtype=float)[:, 4]
+        if years:                                                           # ช่วงล่าสุด + buffer สำหรับ lookback L=252
+            close = close[-(int(years * 252) + 300):]
         srets = [TD.backtest(close, L, "ls")[0] for L in (63, 126, 252)]     # ensemble ที่ deploy
         mn = min(len(s) for s in srets)
         ens = np.mean([s[-mn:] for s in srets], axis=0)
@@ -819,11 +821,13 @@ def _tsmom_vs_bh():
 def api_tsmom():
     """สถานะ TSMOM-D1 directional engine: signal ensemble + position + state (compute-in-code, 0 token)."""
     import config as _cfg
+    vb_years = request.args.get("vb_years", "all")          # toggle: 5 / 10 / all
+    _vy = None if vb_years == "all" else float(vb_years)
     out = {"ok": True, "live": bool(getattr(_cfg, "TSMOM_LIVE", False)),
            "shadow": bool(getattr(_cfg, "TSMOM_SHADOW", False)),
            "signal": None, "votes": [], "d1_close": None, "atr_d1": None, "sl_pips": None,
-           "position": None, "state": None, "capital_warn": None,
-           "vs_bh": _cached("tsmom-vs-bh", _tsmom_vs_bh, ttl=3600)}
+           "position": None, "state": None, "capital_warn": None, "vb_years": vb_years,
+           "vs_bh": _cached(f"tsmom-vs-bh:{vb_years}", lambda: _tsmom_vs_bh(_vy), ttl=3600)}
     # ── signal ensemble จาก xau_d1.json (บอทอัปเดตไฟล์) ──
     try:
         import numpy as np

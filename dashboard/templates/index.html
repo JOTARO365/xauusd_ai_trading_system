@@ -1678,7 +1678,14 @@
       <div style="font-size:10px;color:var(--muted);margin-top:4px">exit = signal flip (ปล่อยเทรนด์วิ่ง) · SL = chandelier 3×ATR(D1) disaster · vol-target 0.5% · edge modest+partly-beta = forward-validation</div>
       <!-- TSMOM vs Buy&Hold — มี alpha เหนือทองไหม (apples-to-apples: vol-target+cost เท่ากัน) -->
       <div style="margin-top:8px;padding:9px 14px;border:1px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:12px">
-        <div style="color:var(--muted);font-size:10px;margin-bottom:5px">TSMOM vs BUY&amp;HOLD ทอง — มี alpha ไหม (backtest <span id="tvb-years">—</span> ปี, risk เท่ากัน)</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;gap:8px;flex-wrap:wrap">
+          <span style="color:var(--muted);font-size:10px">TSMOM vs BUY&amp;HOLD ทอง — มี alpha ไหม (backtest <span id="tvb-years">—</span> ปี, risk เท่ากัน)</span>
+          <span style="font-family:var(--mono);font-size:10px;white-space:nowrap">
+            <button class="tvb-btn" data-y="5" onclick="setTvbYears('5')" style="padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--muted);cursor:pointer">5 ปี</button>
+            <button class="tvb-btn" data-y="10" onclick="setTvbYears('10')" style="padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--muted);cursor:pointer">10 ปี</button>
+            <button class="tvb-btn" data-y="all" onclick="setTvbYears('all')" style="padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:#a78bfa;color:#0e1117;cursor:pointer">ทั้งหมด</button>
+          </span>
+        </div>
         <div style="display:flex;gap:26px;flex-wrap:wrap;align-items:center">
           <div><span style="color:#a78bfa">TSMOM</span> · Sharpe <b id="tvb-ts-sh">—</b> · CAGR <span id="tvb-ts-cagr">—</span> · DD <span id="tvb-ts-dd">—</span></div>
           <div><span style="color:var(--gold)">Buy&amp;Hold</span> · Sharpe <b id="tvb-bh-sh">—</b> · CAGR <span id="tvb-bh-cagr">—</span> · DD <span id="tvb-bh-dd">—</span></div>
@@ -3991,9 +3998,20 @@ async function loadAlgoStatus() {
   } catch (_e) {}
 }
 
+let _tvbYears = 'all';
+function setTvbYears(y) {
+  _tvbYears = y;
+  document.querySelectorAll('.tvb-btn').forEach(b => {
+    const on = b.dataset.y === y;
+    b.style.background = on ? '#a78bfa' : 'transparent';
+    b.style.color = on ? '#0e1117' : 'var(--muted)';
+  });
+  loadTsmom();
+}
+
 async function loadTsmom() {
   try {
-    const d = await (await fetch('/api/tsmom')).json();
+    const d = await (await fetch('/api/tsmom?vb_years=' + _tvbYears)).json();
     if (!d.ok) return;
     const sec = document.getElementById('tsmom-section');
     if (sec) sec.style.display = (d.live || d.shadow) ? '' : 'none';   // ซ่อนถ้า TSMOM ปิด
