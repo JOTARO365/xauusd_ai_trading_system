@@ -134,8 +134,9 @@ def _place_trend_straddle(positions, i, high, low, close, atr, hour, bar_ts=None
     return placed
 
 
-def _place_range_fade(positions, sr_view, atr, hour, bar_ts=None):
-    """RANGE: LIMIT fade ที่ S/R แข็ง (veto อ่อน). BUY_LIMIT@support / SELL_LIMIT@resistance. MAX_OPEN guard."""
+def _place_range_fade(positions, sr_view, atr, hour, bar_ts=None, htf_trend=None):
+    """RANGE: LIMIT fade ที่ S/R แข็ง (veto อ่อน). BUY_LIMIT@support / SELL_LIMIT@resistance. MAX_OPEN guard.
+    **HTF-trend gate:** ไม่ fade สวนเทรนด์ (finding: counter-trend/short ขาดทุน; deterministic ไม่ใช่ sentiment)."""
     if not sr_view.get("ok"):
         return 0
     from connectors.mt5_connector import place_pending_order
@@ -144,10 +145,15 @@ def _place_range_fade(positions, sr_view, atr, hour, bar_ts=None):
     from agents.algo_journal import record_pending            # เก็บ lifecycle pending (placed→fill→TP/SL)
     limit = _max_open_limit()
     sl_pips = max(1, round(0.6 * atr / R.POINT))             # SL 0.6·ATR เลย level (กัน stop-hunt เบื้องต้น; P-E refine)
+    _tr = str(htf_trend or "").upper()
     placed = 0
 
     def _one(lvl_obj, direction, otype):
         nonlocal placed
+        if "BULL" in _tr and direction == "SELL":            # เทรนด์ขึ้น → ไม่ SELL แนวต้าน (สวนเทรนด์)
+            return
+        if "BEAR" in _tr and direction == "BUY":             # เทรนด์ลง → ไม่ BUY แนวรับ
+            return
         if not lvl_obj or _weak(lvl_obj) or _same_dir_count(positions, direction) >= limit:
             return
         lvl = lvl_obj["level"]
@@ -234,9 +240,10 @@ def manage_algo_pending():
             if not is_enabled("momentum_breakout"):
                 return 0
             return _place_trend_straddle(positions, i, high, low, close, atr_a, hour, _bar_ts)
-        # RANGE → LIMIT fade
+        # RANGE → LIMIT fade (gate ด้วย HTF trend — ไม่ fade สวนเทรนด์)
         if regime == "RANGE" and getattr(_cfg, "REGIME_PENDING_FADE", False):
-            return _place_range_fade(positions, _sr_view(high, low, close, atr, st), atr, hour, _bar_ts)
+            _htf = market.get("d1_trend") or market.get("trend")
+            return _place_range_fade(positions, _sr_view(high, low, close, atr, st), atr, hour, _bar_ts, _htf)
         return 0
     except Exception as e:
         logger.error(f"[REGIME-PENDING] {e}")
