@@ -139,12 +139,12 @@ def report(results):
 # ============================================================
 # STRATEGIES — เสียบจาก persona brainstorm (แต่ละตัว: gen(D) -> list {i,dir,sl_pips,tp_pips})
 # ============================================================
-try:
-    import strat_candidates
-    STRATEGIES = strat_candidates.ALL
-except Exception as _e:
-    print(f"[strat_candidates import err] {_e}")
-    STRATEGIES = []
+STRATEGIES = []
+for _mod in ("strat_candidates", "strat_candidates2"):
+    try:
+        STRATEGIES += __import__(_mod).ALL
+    except Exception as _e:
+        print(f"[{_mod} import err] {_e}")
 
 
 def main():
