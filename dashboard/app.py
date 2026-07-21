@@ -783,6 +783,62 @@ def api_monitor():
     })
 
 
+@app.route("/api/tsmom")
+def api_tsmom():
+    """สถานะ TSMOM-D1 directional engine: signal ensemble + position + state (compute-in-code, 0 token)."""
+    import config as _cfg
+    out = {"ok": True, "live": bool(getattr(_cfg, "TSMOM_LIVE", False)),
+           "shadow": bool(getattr(_cfg, "TSMOM_SHADOW", False)),
+           "signal": None, "votes": [], "d1_close": None, "atr_d1": None, "sl_pips": None,
+           "position": None, "state": None}
+    # ── signal ensemble จาก xau_d1.json (บอทอัปเดตไฟล์) ──
+    try:
+        import numpy as np
+        d = np.array(json.load(open(os.path.join(_BASE, "..", "data", "xau_d1.json"))), dtype=float)
+        close, high, low = d[:, 4], d[:, 2], d[:, 3]
+        Ls = [int(x) for x in str(getattr(_cfg, "TSMOM_LOOKBACKS", "63,126,252")).split(",")]
+        ci = -2; votes_sum = 0
+        for L in Ls:
+            if len(close) > L - ci + 1:
+                s = int(np.sign(close[ci] - close[ci - L]))
+                votes_sum += s
+                out["votes"].append({"L": L, "sign": s})
+        out["signal"] = "BUY" if votes_sum > 0 else ("SELL" if votes_sum < 0 else "FLAT")
+        out["d1_close"] = round(float(close[ci]), 2)
+        # ATR(D1,22) แท่งปิด
+        tr = np.maximum(high[1:] - low[1:], np.maximum(abs(high[1:] - close[:-1]), abs(low[1:] - close[:-1])))
+        atr = float(np.mean(tr[-23:-1]))
+        out["atr_d1"] = round(atr, 2)
+        out["sl_pips"] = int(round(float(getattr(_cfg, "TSMOM_SL_ATR", 3.0)) * atr / 0.01))
+    except Exception:
+        pass
+    # ── position ALGO-TSMOM จาก MT5 ──
+    if _MT5_AVAILABLE:
+        try:
+            already = mt5.terminal_info() is not None
+            if not already:
+                mt5.initialize(); mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER)
+            for p in (mt5.positions_get(symbol=SYMBOL) or []):
+                if str(p.comment or "").startswith("ALGO-TSMOM"):
+                    out["position"] = {"ticket": p.ticket, "direction": "BUY" if p.type == 0 else "SELL",
+                                       "lot": p.volume, "entry": p.price_open, "sl": p.sl or None,
+                                       "profit": round(p.profit, 2),
+                                       "days": round((datetime.now().timestamp() - p.time) / 86400, 1)}
+                    break
+            if not already:
+                mt5.shutdown()
+        except Exception:
+            pass
+    # ── state ล่าสุด (algo_state.json ถ้าเป็น TSMOM-*) ──
+    try:
+        st = json.load(open(os.path.join(_BASE, "..", "data", "algo_state.json"), encoding="utf-8"))
+        if str(st.get("state") or "").startswith("TSMOM"):
+            out["state"] = {"state": st.get("state"), "detail": st.get("detail"), "ts": st.get("ts")}
+    except Exception:
+        pass
+    return jsonify(out)
+
+
 @app.route("/api/backtest")
 def api_backtest():
     """Deep historical breakdown for Backtest tab."""

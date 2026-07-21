@@ -1660,6 +1660,21 @@
       </div>
     </section>
 
+    <!-- TSMOM-D1 ENGINE — directional engine รายวัน (edge เดียวที่ validated). display-only, compute-in-code -->
+    <section id="tsmom-section" style="margin-bottom:10px">
+      <div class="section-title">TSMOM-D1 Engine — time-series momentum รายวัน (edge เดียวที่ validated)</div>
+      <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;padding:10px 14px;border:1px solid var(--border);border-left:3px solid #a78bfa;border-radius:8px;font-family:var(--mono);font-size:12px">
+        <div><span style="color:var(--muted);font-size:10px">ENGINE</span><br><span id="ts-engine" style="font-weight:700;font-size:14px">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">SIGNAL (ensemble)</span><br><span id="ts-signal" style="font-weight:700;font-size:15px">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">VOTES (L=63/126/252)</span><br><span id="ts-votes">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">POSITION</span><br><span id="ts-position">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">P&amp;L</span><br><span id="ts-pnl">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">SL / ATR(D1)</span><br><span id="ts-sl">—</span></div>
+        <div style="flex:1;min-width:180px"><span style="color:var(--muted);font-size:10px">STATE</span><br><span id="ts-state" style="color:var(--muted)">—</span></div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">exit = signal flip (ปล่อยเทรนด์วิ่ง) · SL = chandelier 3×ATR(D1) disaster · vol-target 0.5% · edge modest+partly-beta = forward-validation</div>
+    </section>
+
     <!-- AI SENTIMENT (SELECTION layer) — LLM อ่านข่าว X + ตัวเลขเศรษฐกิจ → guide เลือก regime (display-only, 0 token) -->
     <section id="ai-sentiment-section" style="margin-bottom:10px">
       <div class="section-title">AI Sentiment (SELECTION) — LLM อ่านข่าว/ตัวเลข · algo ตัดสิน entry ด้วยตนเอง</div>
@@ -3397,6 +3412,7 @@ async function loadLivePrice() {
     loadLiquidityProxy();   // Liquidity/order-flow proxy (throttled, server-cached)
     loadAlgoJournal();      // Trade score — algo journal win-rate/exp_R (throttled, server-cached)
     loadAlgoStatus();   // System status — algo mode / regime / signal
+    loadTsmom();        // TSMOM-D1 engine — signal ensemble / position / state
 
     // Live ticker
     const bidEl  = document.getElementById('px-bid');
@@ -3955,6 +3971,32 @@ async function loadAlgoStatus() {
     set('as-note', dis);
     // REGIME_LIVE: ซ่อน panel LLM-entry เก่าที่ stale (chart/advisor/decision ถูก gate off)
     document.querySelectorAll('.legacy-llm').forEach(el => { el.style.display = live ? 'none' : ''; });
+  } catch (_e) {}
+}
+
+async function loadTsmom() {
+  try {
+    const d = await (await fetch('/api/tsmom')).json();
+    if (!d.ok) return;
+    const sec = document.getElementById('tsmom-section');
+    if (sec) sec.style.display = (d.live || d.shadow) ? '' : 'none';   // ซ่อนถ้า TSMOM ปิด
+    if (!(d.live || d.shadow)) return;
+    const set = (id, v, c) => { const e = document.getElementById(id); if (e) { e.innerHTML = v; if (c) e.style.color = c; } };
+    set('ts-engine', d.shadow ? 'SHADOW' : 'LIVE', d.shadow ? 'var(--gold)' : 'var(--green)');
+    const sc = d.signal === 'BUY' ? 'var(--green)' : (d.signal === 'SELL' ? 'var(--red)' : 'var(--muted)');
+    set('ts-signal', d.signal || '—', sc);
+    set('ts-votes', (d.votes || []).map(v => (v.sign > 0 ? '↑' : (v.sign < 0 ? '↓' : '·'))).join(' ') +
+        (d.d1_close ? `  <span style="color:var(--muted)">D1 ${d.d1_close}</span>` : ''));
+    const p = d.position;
+    if (p) {
+      const pc = p.direction === 'BUY' ? 'var(--green)' : 'var(--red)';
+      set('ts-position', `<b style="color:${pc}">${p.direction}</b> ${p.lot} lot @ ${p.entry} <span style="color:var(--muted)">(${p.days}d)</span>`);
+      set('ts-pnl', (p.profit >= 0 ? '+' : '') + p.profit, p.profit >= 0 ? 'var(--green)' : 'var(--red)');
+    } else {
+      set('ts-position', '<span style="color:var(--muted)">ไม่มี position</span>'); set('ts-pnl', '—', 'var(--muted)');
+    }
+    set('ts-sl', (d.sl_pips ? d.sl_pips + 'p' : '—') + (d.atr_d1 ? ` <span style="color:var(--muted)">/ ATR ${d.atr_d1}</span>` : ''));
+    set('ts-state', d.state ? (d.state.detail || d.state.state) : '<span style="color:var(--muted)">รอแท่ง D1 ใหม่</span>');
   } catch (_e) {}
 }
 
