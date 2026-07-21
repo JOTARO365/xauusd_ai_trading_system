@@ -57,11 +57,14 @@ def _open(direction, atr, shadow):
     from agents.algo_sizing import algo_lot
     import regime_lib as R
     sl_pips = max(1, round(float(getattr(_cfg, "TSMOM_SL_ATR", 3.0)) * atr / R.POINT))
-    tp_pips = sl_pips * 20                                   # trend-following: ปล่อยวิ่ง (exit ที่ flip/SL จริง)
+    tp_pips = 0                                              # no-TP mode (open_order รองรับ): trend-following exit ที่ flip
     lot = algo_lot(sl_pips)
     res = open_order(direction, sl_pips, tp_pips, comment=COMMENT, lot=lot, shadow=shadow)
+    ok = True if shadow else bool(isinstance(res, dict) and res.get("success"))
     logger.warning(f"[TSMOM] {'SHADOW ' if shadow else ''}OPEN {direction} SL={sl_pips}p (3×ATR D1) lot={lot} → {res}")
-    _state("OPEN", f"{direction} · SL={sl_pips}p (chandelier 3×ATR D1) · lot={lot}")
+    _state("OPEN" if ok else "OPEN-FAIL",
+           f"{direction} · SL={sl_pips}p (chandelier 3×ATR D1) · lot={lot}" + ("" if ok else " · เปิดไม่สำเร็จ (retry)"))
+    return ok
 
 
 def _close(pos, reason, shadow):
@@ -89,13 +92,13 @@ def _reconcile(target, atr, shadow):
             _close(cur, "signal FLAT", shadow); _state("FLAT", "signal เป็นกลาง → ปิด position")
         else:
             _state("STAND-DOWN", "signal FLAT · ไม่มี position")
-        return
+        return True
     if cur is None:
-        _open(target, atr, shadow); return
+        return _open(target, atr, shadow)                   # fail → ไม่ mark bar (retry รอบหน้า)
     if cur["direction"] == target:
-        _state("HOLD", f"ถือ {target} ตามเทรนด์ D1 · #{cur['ticket']}"); return
+        _state("HOLD", f"ถือ {target} ตามเทรนด์ D1 · #{cur['ticket']}"); return True
     _close(cur, f"flip → {target}", shadow)                  # ทิศกลับ → ปิด+เปิดตรงข้าม
-    _open(target, atr, shadow)
+    return _open(target, atr, shadow)
 
 
 def manage_tsmom():
@@ -116,8 +119,8 @@ def manage_tsmom():
         if atr <= 0:
             return None
         shadow = getattr(_cfg, "TSMOM_SHADOW", False) and not getattr(_cfg, "TSMOM_LIVE", False)
-        _reconcile(target, atr, shadow)
-        _last_d1_ts = closed_ts
+        if _reconcile(target, atr, shadow):                 # set bar เฉพาะเมื่อสำเร็จ (open fail → retry รอบหน้า)
+            _last_d1_ts = closed_ts
         return {"target": target, "atr": atr, "shadow": shadow}
     except Exception as e:
         logger.debug(f"[TSMOM] manage error: {e}")
