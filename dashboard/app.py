@@ -1153,6 +1153,15 @@ def api_algo_journal():
     return jsonify(_cached("algo-journal", _c, ttl=15))
 
 
+@app.route("/api/owner-edge")
+def api_owner_edge():
+    """Owner edge × vol/market regime — วิเคราะห์ไม้ manual ว่าชนะ/แพ้ regime ไหน (หา alpha จริงของ owner). 0 token."""
+    def _c():
+        from agents.owner_edge import build_owner_edge
+        return build_owner_edge()
+    return jsonify(_cached("owner-edge", _c, ttl=120))
+
+
 @app.route("/api/daily-summary")
 def api_daily_summary():
     """สรุปเทรดรายวัน (Analytics): เทคนิค · regime · กำไร/ขาดทุน · ทำไมเข้า/ขาดทุน. จาก trades.json. 0 token."""

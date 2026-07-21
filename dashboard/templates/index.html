@@ -2082,6 +2082,13 @@
   <div class="tab-content" id="tab-backtest">
 
     <!-- REGIME ROUTER ANALYTICS — regime ไหนของทองเหมาะ algo ไหน + score + weekly (scripts/regime_analytics.py) -->
+    <!-- OWNER EDGE — วิจารณญาณ owner × vol/market regime (alpha จริง) -->
+    <section id="owner-edge-section" style="margin-bottom:18px">
+      <div class="section-title">Owner Edge — วิจารณญาณพี่ × สภาพตลาด (alpha จริงอยู่ที่ไหน)</div>
+      <div id="oe-overall" style="font-size:12px;font-family:var(--mono);color:var(--muted);margin:6px 0 8px">—</div>
+      <div id="oe-body" style="font-size:12px;font-family:var(--mono)">Loading…</div>
+    </section>
+
     <!-- DAILY TRADE SUMMARY — เทคนิค · regime · กำไร/ขาดทุน · ทำไมเข้า/ขาดทุน -->
     <section id="daily-summary-section" style="margin-bottom:18px">
       <div class="section-title" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -3309,7 +3316,7 @@ function switchTab(name) {
   if (name === 'settings')   loadConfig();
   if (name === 'accounting') loadAccounting();
   if (name === 'monitor')    loadMonitor();
-  if (name === 'backtest') { loadBacktest(); loadRegimeAnalytics(); loadDailySummary(); }
+  if (name === 'backtest') { loadBacktest(); loadRegimeAnalytics(); loadDailySummary(); loadOwnerEdge(); }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -4062,6 +4069,34 @@ async function loadAlgoJournal() {
 }
 
 let _dsData = null;
+async function loadOwnerEdge() {
+  try {
+    const d = await (await fetch('/api/owner-edge')).json();
+    const bd = document.getElementById('oe-body'); if (!bd) return;
+    if (!d.ok) { bd.textContent = d.error || 'ไม่มีข้อมูล'; return; }
+    const o = d.overall || {};
+    const ov = document.getElementById('oe-overall');
+    if (ov) ov.innerHTML = `รวม ${o.n} ไม้ · WR ${Math.round((o.win_rate || 0) * 100)}% · net `
+      + `<span style="color:${o.net >= 0 ? 'var(--green)' : 'var(--red)'}">${o.net >= 0 ? '+' : ''}${o.net}฿</span> · PF ${o.pf} `
+      + `<span style="color:var(--muted)">(map vol ${d.n_mapped}/${d.n_manual})</span>`;
+    const tbl = (title, rows) => {
+      if (!(rows || []).length) return '';
+      const body = rows.map(r => {
+        const nc = r.net >= 0 ? 'var(--green)' : 'var(--red)';
+        return `<tr style="text-align:right"><td style="text-align:left;padding:2px 8px">${r.key}</td>`
+          + `<td>${r.n}</td><td>${Math.round(r.win_rate * 100)}%</td>`
+          + `<td style="color:${nc}">${r.net >= 0 ? '+' : ''}${r.net}</td><td>${r.avg}</td><td>${r.pf}</td></tr>`;
+      }).join('');
+      return `<div style="margin-bottom:8px"><div style="color:var(--gold);font-size:11px;margin:4px 0">${title}</div>`
+        + `<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="color:var(--muted);text-align:right">`
+        + `<th style="text-align:left;padding:2px 8px">—</th><th>n</th><th>WR</th><th>net฿</th><th>avg฿</th><th>PF</th></tr></thead>`
+        + `<tbody>${body}</tbody></table></div>`;
+    };
+    bd.innerHTML = tbl('× VOL REGIME (ปริมาณผันผวน)', d.by_vol)
+      + tbl('× MARKET REGIME', d.by_regime) + tbl('× ทิศทาง', d.by_dir);
+  } catch (_e) {}
+}
+
 async function loadDailySummary() {
   try {
     const d = await (await fetch('/api/daily-summary')).json();
