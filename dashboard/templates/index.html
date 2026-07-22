@@ -14,39 +14,41 @@
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg:        #07080a;
-      --bg2:       #0c0e12;
-      --surface:   #11141a;
-      --surface2:  #161a22;
-      --surface3:  #1c2230;
-      --border:    #1f2533;
-      --border2:   #2a3142;
-      --border3:   #353d52;
+      /* ── WorldMonitor palette (dark terminal-intelligence, green signal) ── */
+      --bg:        #050505;
+      --bg2:       #0a0a0a;
+      --surface:   #111111;
+      --surface2:  #151515;
+      --surface3:  #1b1b1b;
+      --border:    #222222;
+      --border2:   #2a2a2a;
+      --border3:   #333333;
 
-      --gold:      #D4AC0D;
-      --gold-2:    #E6BC18;
-      --gold-dim:  rgba(212,172,13,0.10);
-      --gold-glow: rgba(212,172,13,0.35);
+      /* accent = WM green (แทน gold เดิม — ชื่อ var คงไว้ให้ทุก usage อัปเดตเอง) */
+      --gold:      #4ade80;
+      --gold-2:    #22c55e;
+      --gold-dim:  rgba(74,222,128,0.10);
+      --gold-glow: rgba(74,222,128,0.30);
 
-      --cyan:      #00B4D8;
-      --cyan-dim:  rgba(0,180,216,0.12);
+      --cyan:      #60a5fa;
+      --cyan-dim:  rgba(96,165,250,0.12);
 
-      --green:     #26C281;
-      --green-2:   #1FAE73;
-      --green-dim: rgba(38,194,129,0.10);
+      --green:     #4ade80;
+      --green-2:   #22c55e;
+      --green-dim: rgba(74,222,128,0.12);
 
-      --red:       #E94560;
-      --red-2:     #D63851;
-      --red-dim:   rgba(233,69,96,0.10);
+      --red:       #ef4444;
+      --red-2:     #dc2626;
+      --red-dim:   rgba(239,68,68,0.12);
 
-      --amber:     #F5A623;
-      --violet:    #A78BFA;
+      --amber:     #f59e0b;
+      --violet:    #a78bfa;
 
-      --text:      #DDE2EC;
-      --text-dim:  #A0A8B8;
-      --muted:     #6B7488;
-      --muted2:    #3D4456;
-      --muted3:    #2A2F3C;
+      --text:      #f3f4f6;
+      --text-dim:  #b4bcc8;
+      --muted:     #9ca3af;
+      --muted2:    #4b5563;
+      --muted3:    #262626;
 
       --mono:      'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
       --display:   'Space Grotesk', 'Inter', -apple-system, system-ui, sans-serif;
@@ -109,7 +111,7 @@
       font-size: 13px;
       color: #1a1308;
       letter-spacing: -1px;
-      box-shadow: 0 0 0 1px rgba(212,172,13,0.3), 0 0 18px rgba(212,172,13,0.18);
+      box-shadow: 0 0 0 1px rgba(74,222,128,0.3), 0 0 18px rgba(74,222,128,0.18);
     }
 
     header h1, #dashboard-title {
@@ -125,7 +127,7 @@
       width: 7px; height: 7px;
       background: var(--green);
       border-radius: 50%;
-      box-shadow: 0 0 6px var(--green), 0 0 0 2px rgba(38,194,129,0.15);
+      box-shadow: 0 0 6px var(--green), 0 0 0 2px rgba(74,222,128,0.15);
       animation: pulse 2.4s infinite;
     }
     @keyframes pulse {
@@ -133,11 +135,11 @@
       50% { opacity: 0.5; transform: scale(0.85); }
     }
     @keyframes flash-green {
-      0% { background: rgba(38,194,129,0.25); }
+      0% { background: rgba(74,222,128,0.25); }
       100% { background: transparent; }
     }
     @keyframes flash-red {
-      0% { background: rgba(233,69,96,0.25); }
+      0% { background: rgba(239,68,68,0.25); }
       100% { background: transparent; }
     }
     .flash-up { animation: flash-green 0.6s ease-out; }
@@ -189,8 +191,8 @@
     /* Wall-Street ticker: session badge + bias pill */
     #px-session { color: var(--gold); font-weight: 700; letter-spacing: 0.5px; }
     .ticker-bias .ticker-val { font-weight: 800; letter-spacing: 0.5px; }
-    #px-bias-wrap.long  .ticker-val { color: #26C281; }
-    #px-bias-wrap.short .ticker-val { color: #E94560; }
+    #px-bias-wrap.long  .ticker-val { color: #4ade80; }
+    #px-bias-wrap.short .ticker-val { color: #ef4444; }
     #px-bias-wrap.flat  .ticker-val { color: var(--muted); }
 
     /* ─── LAYOUT ─────────────────────────────────────── */
@@ -232,8 +234,8 @@
     /* ─── READY MODE BANNER ─────────────────────────── */
     .ready-banner {
       display: none;
-      background: linear-gradient(90deg, rgba(212,172,13,0.18) 0%, rgba(212,172,13,0.05) 60%, transparent 100%);
-      border: 1px solid rgba(212,172,13,0.4);
+      background: linear-gradient(90deg, rgba(74,222,128,0.18) 0%, rgba(74,222,128,0.05) 60%, transparent 100%);
+      border: 1px solid rgba(74,222,128,0.4);
       border-left: 3px solid var(--gold);
       border-radius: 6px;
       padding: 12px 18px;
@@ -249,7 +251,7 @@
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: radial-gradient(ellipse at left, rgba(212,172,13,0.12) 0%, transparent 60%);
+      background: radial-gradient(ellipse at left, rgba(74,222,128,0.12) 0%, transparent 60%);
       pointer-events: none;
     }
     .ready-pulse {
@@ -276,8 +278,8 @@
 
     /* ─── ALERT BAR ───────────────────────────────────── */
     .alert-bar {
-      background: rgba(212,172,13,0.06);
-      border: 1px solid rgba(212,172,13,0.25);
+      background: rgba(74,222,128,0.06);
+      border: 1px solid rgba(74,222,128,0.25);
       border-left: 3px solid var(--gold);
       border-radius: 6px;
       padding: 9px 16px;
@@ -381,7 +383,7 @@
     }
     .pipeline-step:last-child { border-right: none; }
     .pipeline-step.active {
-      background: linear-gradient(180deg, rgba(212,172,13,0.10) 0%, rgba(212,172,13,0.02) 100%);
+      background: linear-gradient(180deg, rgba(74,222,128,0.10) 0%, rgba(74,222,128,0.02) 100%);
     }
     .pipeline-step.active::before {
       content: '';
@@ -612,10 +614,10 @@
     }
     tbody tr:last-child { border-bottom: none; }
     tbody tr:hover { background: rgba(255,255,255,0.02); }
-    tbody tr.row-win  { background: rgba(38,194,129,0.04); }
-    tbody tr.row-loss { background: rgba(233,69,96,0.04); }
-    tbody tr.row-win:hover  { background: rgba(38,194,129,0.07); }
-    tbody tr.row-loss:hover { background: rgba(233,69,96,0.07); }
+    tbody tr.row-win  { background: rgba(74,222,128,0.04); }
+    tbody tr.row-loss { background: rgba(239,68,68,0.04); }
+    tbody tr.row-win:hover  { background: rgba(74,222,128,0.07); }
+    tbody tr.row-loss:hover { background: rgba(239,68,68,0.07); }
 
     tbody td {
       padding: 9px 14px;
@@ -641,13 +643,13 @@
       font-family: var(--mono);
     }
 
-    .badge-buy    { background: rgba(38,194,129,0.14); color: var(--green); border: 1px solid rgba(38,194,129,0.3); }
-    .badge-sell   { background: rgba(233,69,96,0.14);  color: var(--red);   border: 1px solid rgba(233,69,96,0.3); }
-    .badge-open   { background: rgba(212,172,13,0.12); color: var(--gold);  border: 1px solid rgba(212,172,13,0.3); }
+    .badge-buy    { background: rgba(74,222,128,0.14); color: var(--green); border: 1px solid rgba(74,222,128,0.3); }
+    .badge-sell   { background: rgba(239,68,68,0.14);  color: var(--red);   border: 1px solid rgba(239,68,68,0.3); }
+    .badge-open   { background: rgba(74,222,128,0.12); color: var(--gold);  border: 1px solid rgba(74,222,128,0.3); }
     .badge-closed { background: var(--surface2);        color: var(--muted); border: 1px solid var(--border2); }
-    .badge-win    { background: rgba(38,194,129,0.14); color: var(--green); }
-    .badge-loss   { background: rgba(233,69,96,0.14);  color: var(--red); }
-    .badge-system { background: rgba(0,180,216,0.12); color: var(--cyan); border: 1px solid rgba(0,180,216,0.3); }
+    .badge-win    { background: rgba(74,222,128,0.14); color: var(--green); }
+    .badge-loss   { background: rgba(239,68,68,0.14);  color: var(--red); }
+    .badge-system { background: rgba(96,165,250,0.12); color: var(--cyan); border: 1px solid rgba(96,165,250,0.3); }
     .badge-manual { background: rgba(245,166,35,0.12); color: var(--amber); border: 1px solid rgba(245,166,35,0.3); }
 
     .analysis-cell { font-size: 11px; color: var(--text-dim); line-height: 1.45; max-width: 280px; }
@@ -743,7 +745,7 @@
     /* Combined Calendar + News feed (list + slide-down accordion) */
     .feed-group-title { font-size: 11px; color: var(--muted); letter-spacing: 1px;
       text-transform: uppercase; margin: 0 0 4px; font-family: var(--mono); }
-    .feed-item { border-bottom: 1px solid var(--border2, #2a3142); }
+    .feed-item { border-bottom: 1px solid var(--border2, #2a2a2a); }
     .feed-row  { display: flex; align-items: center; gap: 8px; padding: 8px 6px; }
     .feed-row.clickable { cursor: pointer; }
     .feed-row.clickable:hover { background: rgba(255,255,255,0.03); }
@@ -761,8 +763,8 @@
 
     /* ─── SETTINGS (Accordion) ─────────────────────────── */
     .settings-notice {
-      background: rgba(212,172,13,0.05);
-      border: 1px solid rgba(212,172,13,0.2);
+      background: rgba(74,222,128,0.05);
+      border: 1px solid rgba(74,222,128,0.2);
       border-left: 3px solid var(--gold);
       border-radius: 6px;
       padding: 10px 16px;
@@ -928,9 +930,9 @@
       text-transform: uppercase;
       font-family: var(--mono);
       transition: all 0.15s;
-      box-shadow: 0 0 0 1px rgba(212,172,13,0.3), 0 4px 12px rgba(212,172,13,0.2);
+      box-shadow: 0 0 0 1px rgba(74,222,128,0.3), 0 4px 12px rgba(74,222,128,0.2);
     }
-    .save-btn:hover    { transform: translateY(-1px); box-shadow: 0 0 0 1px rgba(212,172,13,0.4), 0 6px 16px rgba(212,172,13,0.3); }
+    .save-btn:hover    { transform: translateY(-1px); box-shadow: 0 0 0 1px rgba(74,222,128,0.4), 0 6px 16px rgba(74,222,128,0.3); }
     .save-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
 
     .secondary-btn {
@@ -1035,7 +1037,7 @@
       border-radius: 3px;
       font-family: var(--mono);
     }
-    .impact-high   .cal-badge { background: rgba(233,69,96,0.18); color: var(--red); }
+    .impact-high   .cal-badge { background: rgba(239,68,68,0.18); color: var(--red); }
     .impact-medium .cal-badge { background: rgba(245,166,35,0.18); color: var(--amber); }
 
     /* ─── ACCOUNTING TAB ──────────────────────────────── */
@@ -1073,8 +1075,8 @@
       letter-spacing: 1px;
       font-family: var(--mono);
     }
-    .model-haiku  { background: rgba(38,194,129,0.15); color: var(--green); }
-    .model-sonnet { background: rgba(212,172,13,0.15); color: var(--gold); }
+    .model-haiku  { background: rgba(74,222,128,0.15); color: var(--green); }
+    .model-sonnet { background: rgba(74,222,128,0.15); color: var(--gold); }
     .hit-bar {
       display: flex; align-items: center; gap: 8px;
     }
@@ -1242,15 +1244,15 @@
       from { transform: translateX(0); }
       to   { transform: translateX(-50%); }
     }
-    .regime-k { color: var(--gold, #D4AC0D); font-weight: 700; letter-spacing: 1px; }
+    .regime-k { color: var(--gold, #4ade80); font-weight: 700; letter-spacing: 1px; }
     .tf-btn {
-      background: transparent; border: 1px solid var(--border2, #2a3142); border-radius: 5px;
+      background: transparent; border: 1px solid var(--border2, #2a2a2a); border-radius: 5px;
       color: var(--muted); font-size: 10px; font-weight: 700; padding: 3px 10px;
       cursor: pointer; font-family: var(--mono); letter-spacing: 1px;
     }
-    .tf-btn.active { color: var(--gold, #D4AC0D); border-color: var(--gold, #D4AC0D); }
+    .tf-btn.active { color: var(--gold, #4ade80); border-color: var(--gold, #4ade80); }
   </style>
-  <div id="regime-strip" title="" style="display:none;margin:0 0 10px;padding:7px 14px;border:1px solid var(--border2,#2a3142);border-left:3px solid var(--gold,#D4AC0D);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--text-dim,#9aa3b8);align-items:center;gap:12px;overflow:hidden">
+  <div id="regime-strip" title="" style="display:none;margin:0 0 10px;padding:7px 14px;border:1px solid var(--border2,#2a2a2a);border-left:3px solid var(--gold,#4ade80);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--text-dim,#9aa3b8);align-items:center;gap:12px;overflow:hidden">
     <span class="regime-k" style="flex-shrink:0">REGIME</span>
     <div style="flex:1;overflow:hidden">
       <div class="regime-marquee" id="regime-marquee">
@@ -1361,7 +1363,7 @@
     .deck-pills { display:flex; flex-wrap:wrap; gap:6px; }
     .deck-pill { font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:0.5px;
                  padding:4px 9px; border-radius:5px; border:1px solid var(--border2); }
-    .deck-pill.on  { color:var(--green); border-color:rgba(38,194,129,0.4); background:var(--green-dim); }
+    .deck-pill.on  { color:var(--green); border-color:rgba(74,222,128,0.4); background:var(--green-dim); }
     .deck-pill.off { color:var(--muted); border-color:var(--border2); }
     .corridor { display:flex; flex-direction:column; gap:0; }
     .corr-row { display:flex; align-items:center; justify-content:space-between; padding:7px 10px;
@@ -1385,7 +1387,7 @@
     .scn-txt { font-family:var(--mono); font-size:11px; color:var(--text-dim); line-height:1.5; }
     .consensus-bar { display:flex; height:24px; border-radius:6px; overflow:hidden; border:1px solid var(--border2); }
     .cons-seg { display:flex; align-items:center; justify-content:center; font-family:var(--mono);
-                font-size:10px; font-weight:700; color:#07080a; transition:flex 0.4s; min-width:0; }
+                font-size:10px; font-weight:700; color:#050505; transition:flex 0.4s; min-width:0; }
     .cons-bull { background:var(--green); } .cons-bear { background:var(--red); } .cons-neut { background:var(--muted2); color:var(--muted); }
     @media(max-width:900px){ .cmd-deck{ grid-template-columns:1fr; } }
   </style>
@@ -1455,7 +1457,7 @@
         <div class="sparkline-label">Equity Trend</div>
         <svg id="equity-sparkline" viewBox="0 0 160 40" preserveAspectRatio="none">
           <polyline id="spark-line" fill="none" stroke="var(--gold)" stroke-width="1.5" points="" />
-          <polyline id="spark-area" fill="rgba(212,172,13,0.10)" stroke="none" points="" />
+          <polyline id="spark-area" fill="rgba(74,222,128,0.10)" stroke="none" points="" />
         </svg>
       </div>
     </div>
@@ -1664,7 +1666,7 @@
     <section id="tsmom-section" style="margin-bottom:10px">
       <div class="section-title">TSMOM-D1 Engine — time-series momentum รายวัน (edge เดียวที่ validated)</div>
       <div id="ts-capital-warn" style="display:none;margin-bottom:8px;padding:8px 12px;border-radius:6px;
-           background:rgba(233,69,96,0.15);border:1px solid var(--red,#E94560);color:var(--red,#E94560);
+           background:rgba(239,68,68,0.15);border:1px solid var(--red,#ef4444);color:var(--red,#ef4444);
            font-family:var(--mono);font-size:12px;font-weight:600"></div>
       <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;padding:10px 14px;border:1px solid var(--border);border-left:3px solid #a78bfa;border-radius:8px;font-family:var(--mono);font-size:12px">
         <div><span style="color:var(--muted);font-size:10px">ENGINE</span><br><span id="ts-engine" style="font-weight:700;font-size:14px">—</span></div>
@@ -1702,7 +1704,7 @@
     <!-- AI SENTIMENT (SELECTION layer) — LLM อ่านข่าว X + ตัวเลขเศรษฐกิจ → guide เลือก regime (display-only, 0 token) -->
     <section id="ai-sentiment-section" style="margin-bottom:10px">
       <div class="section-title">AI Sentiment (SELECTION) — LLM อ่านข่าว/ตัวเลข · algo ตัดสิน entry ด้วยตนเอง</div>
-      <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:9px 14px;border:1px solid var(--border);border-left:3px solid var(--cyan,#00B4D8);border-radius:8px;font-family:var(--mono);font-size:12px">
+      <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:9px 14px;border:1px solid var(--border);border-left:3px solid var(--cyan,#60a5fa);border-radius:8px;font-family:var(--mono);font-size:12px">
         <div><span style="color:var(--muted);font-size:10px">SENTIMENT</span><br><span id="ai-sent-val" style="font-weight:700;font-size:15px">—</span></div>
         <div><span style="color:var(--muted);font-size:10px">CONF</span><br><span id="ai-sent-conf">—</span></div>
         <div><span style="color:var(--muted);font-size:10px">BIAS</span><br><span id="ai-sent-bias">—</span></div>
@@ -1714,7 +1716,7 @@
 
     <!-- OWNER-GATE ADVISORY — เตือนเมื่อ mid-vol / manual short (regime ที่ owner เสียต่อเนื่อง). ไม่ปิด/ไม่บล็อก -->
     <div id="owner-gate-banner" style="display:none;margin-bottom:10px;padding:8px 12px;border-radius:6px;
-         background:rgba(233,69,96,0.12);border:1px solid var(--red,#E94560);font-family:var(--mono);font-size:12px"></div>
+         background:rgba(239,68,68,0.12);border:1px solid var(--red,#ef4444);font-family:var(--mono);font-size:12px"></div>
 
     <!-- PRICE CLUSTER decision-support — บอทคำนวณ dwell-zone S/R ให้ owner ตัดสินใจ (กฎ fade อัตโนมัติไม่มี edge; วิจารณญาณ owner มี) -->
     <section id="cluster-map-section" style="margin-bottom:10px">
@@ -1758,71 +1760,71 @@
 
     <!-- MACRO STRIP — §3.5 macro_strip.json (display-only, daily via scripts/fetch_macro_strip.py) -->
     <section id="macro-strip-section" style="margin-bottom:10px">
-      <div id="macro-strip" style="display:flex;align-items:center;gap:16px;padding:7px 14px;border:1px solid var(--border2,#2a3142);border-left:3px solid var(--cyan,#00B4D8);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--text-dim,#9aa3b8);flex-wrap:wrap">
-        <span style="color:var(--cyan,#00B4D8);font-weight:700;letter-spacing:1px;flex-shrink:0">MACRO</span>
+      <div id="macro-strip" style="display:flex;align-items:center;gap:16px;padding:7px 14px;border:1px solid var(--border2,#2a2a2a);border-left:3px solid var(--cyan,#60a5fa);border-radius:8px;font-family:var(--mono);font-size:11px;color:var(--text-dim,#9aa3b8);flex-wrap:wrap">
+        <span style="color:var(--cyan,#60a5fa);font-weight:700;letter-spacing:1px;flex-shrink:0">MACRO</span>
         <span style="display:flex;align-items:center;gap:5px">
-          <span style="color:var(--muted,#6B7488);text-transform:uppercase;font-size:10px;letter-spacing:0.5px">DXY</span>
-          <span id="macro-dxy-val" style="font-weight:600;color:var(--text,#DDE2EC)">—</span>
+          <span style="color:var(--muted,#9ca3af);text-transform:uppercase;font-size:10px;letter-spacing:0.5px">DXY</span>
+          <span id="macro-dxy-val" style="font-weight:600;color:var(--text,#f3f4f6)">—</span>
           <span id="macro-dxy-chg" style="font-size:10px">—</span>
         </span>
         <span style="color:var(--muted2,#3D4456)">|</span>
         <span style="display:flex;align-items:center;gap:5px">
-          <span style="color:var(--muted,#6B7488);text-transform:uppercase;font-size:10px;letter-spacing:0.5px">10Y</span>
-          <span id="macro-y10-val" style="font-weight:600;color:var(--text,#DDE2EC)">—</span>
+          <span style="color:var(--muted,#9ca3af);text-transform:uppercase;font-size:10px;letter-spacing:0.5px">10Y</span>
+          <span id="macro-y10-val" style="font-weight:600;color:var(--text,#f3f4f6)">—</span>
           <span id="macro-y10-chg" style="font-size:10px">—</span>
         </span>
         <span style="color:var(--muted2,#3D4456)">|</span>
         <span style="display:flex;align-items:center;gap:5px">
-          <span style="color:var(--muted,#6B7488);text-transform:uppercase;font-size:10px;letter-spacing:0.5px">REAL</span>
-          <span id="macro-real-val" style="font-weight:600;color:var(--text,#DDE2EC)">—</span>
+          <span style="color:var(--muted,#9ca3af);text-transform:uppercase;font-size:10px;letter-spacing:0.5px">REAL</span>
+          <span id="macro-real-val" style="font-weight:600;color:var(--text,#f3f4f6)">—</span>
           <span id="macro-real-chg" style="font-size:10px">—</span>
         </span>
-        <span id="macro-updated" style="margin-left:auto;color:var(--muted,#6B7488);font-size:10px">No data — run scripts/fetch_macro_strip.py</span>
+        <span id="macro-updated" style="margin-left:auto;color:var(--muted,#9ca3af);font-size:10px">No data — run scripts/fetch_macro_strip.py</span>
       </div>
     </section>
 
     <!-- GOLD REGIME CONTEXT — deep-research interpretation of macro_strip (display-only, computed-in-code, 0 API)
          drivers ผกผันกับทอง (DXY/10Y/real-yield ลง = หนุนทอง). regime/context filter ไม่ใช่ intraday signal. -->
     <section id="gold-regime-section" style="margin-bottom:10px">
-      <div style="border:1px solid var(--border2,#2a3142);border-left:3px solid var(--gold,#F4C430);border-radius:8px;padding:8px 14px;font-family:var(--mono);font-size:11px">
+      <div style="border:1px solid var(--border2,#2a2a2a);border-left:3px solid var(--gold,#F4C430);border-radius:8px;padding:8px 14px;font-family:var(--mono);font-size:11px">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:7px">
           <span style="color:var(--gold,#F4C430);font-weight:700;letter-spacing:1px;flex-shrink:0">GOLD REGIME</span>
-          <span id="gold-tilt-badge" style="padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:0.5px;background:var(--muted2,#3D4456);color:var(--muted,#6B7488)">—</span>
-          <span style="margin-left:auto;color:var(--muted,#6B7488);font-size:9px;letter-spacing:0.3px">context filter · not an entry signal</span>
+          <span id="gold-tilt-badge" style="padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:0.5px;background:var(--muted2,#3D4456);color:var(--muted,#9ca3af)">—</span>
+          <span style="margin-left:auto;color:var(--muted,#9ca3af);font-size:9px;letter-spacing:0.3px">context filter · not an entry signal</span>
         </div>
         <div style="display:flex;gap:9px;flex-wrap:wrap">
           <span class="regime-tile" id="rt-dxy" style="display:flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--muted2,#3D4456);border-radius:6px">
-            <span style="color:var(--muted,#6B7488);text-transform:uppercase;font-size:9px;letter-spacing:0.5px">DXY (USD)</span>
-            <span class="rt-effect" style="font-weight:600;font-size:10px;color:var(--muted,#6B7488)">—</span>
+            <span style="color:var(--muted,#9ca3af);text-transform:uppercase;font-size:9px;letter-spacing:0.5px">DXY (USD)</span>
+            <span class="rt-effect" style="font-weight:600;font-size:10px;color:var(--muted,#9ca3af)">—</span>
           </span>
           <span class="regime-tile" id="rt-y10" style="display:flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--muted2,#3D4456);border-radius:6px">
-            <span style="color:var(--muted,#6B7488);text-transform:uppercase;font-size:9px;letter-spacing:0.5px">10Y YIELD</span>
-            <span class="rt-effect" style="font-weight:600;font-size:10px;color:var(--muted,#6B7488)">—</span>
+            <span style="color:var(--muted,#9ca3af);text-transform:uppercase;font-size:9px;letter-spacing:0.5px">10Y YIELD</span>
+            <span class="rt-effect" style="font-weight:600;font-size:10px;color:var(--muted,#9ca3af)">—</span>
           </span>
           <span class="regime-tile" id="rt-real" style="display:flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--muted2,#3D4456);border-radius:6px">
-            <span style="color:var(--muted,#6B7488);text-transform:uppercase;font-size:9px;letter-spacing:0.5px">REAL YIELD <span style="color:#C9843E" title="ความสัมพันธ์อ่อนลงหลัง 2022 (central-bank buying กลบ) — deep research">⚠</span></span>
-            <span class="rt-effect" style="font-weight:600;font-size:10px;color:var(--muted,#6B7488)">—</span>
+            <span style="color:var(--muted,#9ca3af);text-transform:uppercase;font-size:9px;letter-spacing:0.5px">REAL YIELD <span style="color:#C9843E" title="ความสัมพันธ์อ่อนลงหลัง 2022 (central-bank buying กลบ) — deep research">⚠</span></span>
+            <span class="rt-effect" style="font-weight:600;font-size:10px;color:var(--muted,#9ca3af)">—</span>
           </span>
         </div>
         <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:7px">
-          <span style="color:var(--muted,#6B7488);text-transform:uppercase;font-size:9px;letter-spacing:0.5px;flex-shrink:0">RISK REGIME</span>
+          <span style="color:var(--muted,#9ca3af);text-transform:uppercase;font-size:9px;letter-spacing:0.5px;flex-shrink:0">RISK REGIME</span>
           <span class="regime-tile" id="rt-vix" style="display:flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--muted2,#3D4456);border-radius:6px" title="VIX = ความผันผวนตลาดหุ้น; สูง=risk-off→ทองได้ haven bid">
-            <span style="color:var(--muted,#6B7488);font-size:9px;letter-spacing:0.5px">VIX</span>
-            <span id="rt-vix-val" style="font-weight:600;color:var(--text,#DDE2EC);font-size:10px">—</span>
-            <span class="rt-lbl" style="font-weight:600;font-size:9px;color:var(--muted,#6B7488)">—</span>
+            <span style="color:var(--muted,#9ca3af);font-size:9px;letter-spacing:0.5px">VIX</span>
+            <span id="rt-vix-val" style="font-weight:600;color:var(--text,#f3f4f6);font-size:10px">—</span>
+            <span class="rt-lbl" style="font-weight:600;font-size:9px;color:var(--muted,#9ca3af)">—</span>
           </span>
           <span class="regime-tile" id="rt-gsr" style="display:flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--muted2,#3D4456);border-radius:6px" title="Gold/Silver ratio; สูง=fear/risk-off (silver underperform)">
-            <span style="color:var(--muted,#6B7488);font-size:9px;letter-spacing:0.5px">G/S RATIO</span>
-            <span id="rt-gsr-val" style="font-weight:600;color:var(--text,#DDE2EC);font-size:10px">—</span>
-            <span class="rt-lbl" style="font-weight:600;font-size:9px;color:var(--muted,#6B7488)">—</span>
+            <span style="color:var(--muted,#9ca3af);font-size:9px;letter-spacing:0.5px">G/S RATIO</span>
+            <span id="rt-gsr-val" style="font-weight:600;color:var(--text,#f3f4f6);font-size:10px">—</span>
+            <span class="rt-lbl" style="font-weight:600;font-size:9px;color:var(--muted,#9ca3af)">—</span>
           </span>
           <span class="regime-tile" id="rt-hmm" style="display:flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--gold,#F4C430);border-radius:6px" title="HMM cross-asset regime (gold+VIX+DXY, validated multi-feature); ทำนาย forward vol — risk context ไม่ใช่ entry signal">
             <span style="color:var(--gold,#F4C430);font-size:9px;letter-spacing:0.5px">HMM</span>
-            <span id="rt-hmm-val" style="font-weight:700;font-size:10px;color:var(--muted,#6B7488)">—</span>
-            <span id="rt-hmm-ctx" style="font-size:9px;color:var(--muted,#6B7488)">—</span>
+            <span id="rt-hmm-val" style="font-weight:700;font-size:10px;color:var(--muted,#9ca3af)">—</span>
+            <span id="rt-hmm-ctx" style="font-size:9px;color:var(--muted,#9ca3af)">—</span>
           </span>
         </div>
-        <div style="color:var(--muted,#6B7488);font-size:9px;margin-top:7px;line-height:1.45">
+        <div style="color:var(--muted,#9ca3af);font-size:9px;margin-top:7px;line-height:1.45">
           drivers ผกผันกับทอง (ลง = หนุนทอง). <b style="color:var(--text-dim,#9aa3b8)">coincident/regime context — ไม่ใช่ intraday lead</b>
           (deep research: DXY-นำ-ทอง ถูก refute). regime-unstable: real-yield link อ่อนหลัง 2022. sens ~+1.75% ต่อ −25bp 10Y (WGC).
         </div>
@@ -1952,14 +1954,14 @@
       .cal-afp b { font-weight:700; }
       .cal-hd { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
       .cal-badge-inline { font-family:var(--mono); font-size:8px; font-weight:700; letter-spacing:1px; padding:2px 5px; border-radius:3px; }
-      .cal-badge-inline.impact-high   { background:rgba(233,69,96,0.18); color:var(--red); }
+      .cal-badge-inline.impact-high   { background:rgba(239,68,68,0.18); color:var(--red); }
       .cal-badge-inline.impact-medium { background:rgba(245,166,35,0.18); color:var(--amber); }
       .cal-badge-inline.impact-low    { background:var(--surface3); color:var(--muted); }
       .cal-exp { font-family:var(--mono); font-size:10px; font-weight:700; color:var(--gold); }
       .cal-summary { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px; }
       .cal-chip { font-family:var(--mono); font-size:10px; color:var(--text-dim); background:var(--surface);
                   border:1px solid var(--border); border-radius:5px; padding:4px 9px; }
-      .cal-chip.gold { color:var(--gold); border-color:rgba(212,172,13,0.35); }
+      .cal-chip.gold { color:var(--gold); border-color:rgba(74,222,128,0.35); }
       .cal-chip b { color:var(--text); }
       .cal-legend { display:flex; gap:9px; align-items:center; font-size:9px; color:var(--muted); font-family:var(--mono); margin-left:auto; }
       .cal-legend i { display:inline-block; width:10px; height:3px; border-radius:2px; margin-right:3px; vertical-align:middle; }
@@ -2339,7 +2341,7 @@
       <div class="section-title">Daily AI Cost (Last 30 Days)</div>
       <div class="chart-card">
         <div style="display:flex;gap:18px;margin-bottom:12px;font-size:10px;color:var(--muted);font-family:var(--mono);letter-spacing:0.5px">
-          <span><span style="display:inline-block;width:10px;height:10px;background:rgba(212,172,13,0.6);border-radius:2px;margin-right:5px"></span>Cost (USD)</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:rgba(74,222,128,0.6);border-radius:2px;margin-right:5px"></span>Cost (USD)</span>
           <span><span style="display:inline-block;width:10px;height:3px;background:var(--cyan);border-radius:2px;margin-right:5px;vertical-align:middle"></span>Cycles</span>
         </div>
         <canvas id="dailyCostChart" height="100"></canvas>
@@ -2992,14 +2994,14 @@ function initCharts() {
                  tickMarkFormatter: (t) => (_eqLabels[t - _EQ_BASE] || '').slice(5, 10) },
     crosshair: {
       mode: LightweightCharts.CrosshairMode.Magnet,
-      vertLine: { color: 'rgba(212,172,13,0.45)', width: 1, labelBackgroundColor: '#D4AC0D' },
-      horzLine: { color: 'rgba(212,172,13,0.45)', labelBackgroundColor: '#D4AC0D' },
+      vertLine: { color: 'rgba(74,222,128,0.45)', width: 1, labelBackgroundColor: '#4ade80' },
+      horzLine: { color: 'rgba(74,222,128,0.45)', labelBackgroundColor: '#4ade80' },
     },
     handleScroll: false, handleScale: false,
   });
   equitySeries = equityChart.addAreaSeries({
-    lineColor: '#D4AC0D', lineWidth: 2,
-    topColor: 'rgba(212,172,13,0.20)', bottomColor: 'rgba(212,172,13,0.0)',
+    lineColor: '#4ade80', lineWidth: 2,
+    topColor: 'rgba(74,222,128,0.20)', bottomColor: 'rgba(74,222,128,0.0)',
     priceLineVisible: false, lastValueVisible: true,
     priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
   });
@@ -3012,7 +3014,7 @@ function initCharts() {
       labels: ['WIN', 'LOSS'],
       datasets: [{
         data: [0, 0],
-        backgroundColor: ['rgba(38,194,129,0.85)', 'rgba(233,69,96,0.85)'],
+        backgroundColor: ['rgba(74,222,128,0.85)', 'rgba(239,68,68,0.85)'],
         borderWidth: 0,
         hoverOffset: 5,
       }]
@@ -3052,7 +3054,7 @@ function renderSparkline(values) {
   // color by trend
   const trendUp = values[values.length - 1] >= values[0];
   line.setAttribute('stroke', trendUp ? 'var(--green)' : 'var(--red)');
-  area.setAttribute('fill', trendUp ? 'rgba(38,194,129,0.10)' : 'rgba(233,69,96,0.10)');
+  area.setAttribute('fill', trendUp ? 'rgba(74,222,128,0.10)' : 'rgba(239,68,68,0.10)');
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -3836,10 +3838,10 @@ async function loadAccounting() {
     const costs      = sortedDays.map(d => +(daily[d].total_cost_usd || 0).toFixed(6));
     const cycles     = sortedDays.map(d => daily[d].cycles || 0);
     const barColors  = sortedDays.map(d =>
-      d === todayKey ? 'rgba(212,172,13,0.85)' : 'rgba(212,172,13,0.28)'
+      d === todayKey ? 'rgba(74,222,128,0.85)' : 'rgba(74,222,128,0.28)'
     );
     const barBorders = sortedDays.map(d =>
-      d === todayKey ? 'rgba(212,172,13,1)' : 'rgba(212,172,13,0.55)'
+      d === todayKey ? 'rgba(74,222,128,1)' : 'rgba(74,222,128,0.55)'
     );
 
     if (dailyCostChart) dailyCostChart.destroy();
@@ -3863,11 +3865,11 @@ async function loadAccounting() {
             label: 'Cycles',
             data: cycles,
             type: 'line',
-            borderColor: 'rgba(0,180,216,0.85)',
-            backgroundColor: 'rgba(0,180,216,0.06)',
+            borderColor: 'rgba(96,165,250,0.85)',
+            backgroundColor: 'rgba(96,165,250,0.06)',
             borderWidth: 1.5,
             pointRadius: 2,
-            pointBackgroundColor: 'rgba(0,180,216,0.9)',
+            pointBackgroundColor: 'rgba(96,165,250,0.9)',
             fill: false,
             tension: 0.3,
             yAxisID: 'yCycles',
@@ -4099,7 +4101,7 @@ async function loadOwnerGate() {
     const ws = (d.warnings || []);
     if (!d.ok || !ws.length) { b.style.display = 'none'; return; }
     b.style.display = 'block';
-    b.innerHTML = `<span style="color:var(--red,#E94560);font-weight:700">⚠ OWNER-GATE</span> `
+    b.innerHTML = `<span style="color:var(--red,#ef4444);font-weight:700">⚠ OWNER-GATE</span> `
       + ws.map(w => `<span style="color:var(--gold)">[${w.tag}]</span> ${w.msg}`).join('<br>')
       + `<div style="color:var(--muted);font-size:10px;margin-top:3px">advisory เท่านั้น — owner เป็นผู้ตัดสินใจ (ไม่ปิด/ไม่บล็อก)</div>`;
   } catch (_e) {}
@@ -4392,7 +4394,7 @@ async function loadCalibration() {
       } else {
         const style = {
           ok_keep:               { c: 'var(--green)', bg: 'rgba(38,166,91,0.10)',  icon: '✓' },
-          suggest_raise:         { c: 'var(--gold)',  bg: 'rgba(212,172,13,0.12)', icon: '⬆' },
+          suggest_raise:         { c: 'var(--gold)',  bg: 'rgba(74,222,128,0.12)', icon: '⬆' },
           suggest_lower_cautious:{ c: 'var(--red)',   bg: 'rgba(232,59,59,0.10)',  icon: '⚠' },
           no_profitable_floor:   { c: 'var(--red)',   bg: 'rgba(232,59,59,0.10)',  icon: '⚠' },
         }[sg.status] || { c: 'var(--muted)', bg: 'rgba(255,255,255,0.04)', icon: '💡' };
@@ -4786,18 +4788,18 @@ async function loadRegimeState() {
       const since = shift.since ? shift.since.slice(0, 10) : '';
       bar.style.cssText = [
         'display:flex', 'margin:0 0 10px', 'padding:7px 14px',
-        'border:1px solid var(--red,#E94560)',
-        'border-left:3px solid var(--red,#E94560)',
+        'border:1px solid var(--red,#ef4444)',
+        'border-left:3px solid var(--red,#ef4444)',
         'border-radius:8px', 'font-family:var(--mono,monospace)', 'font-size:11px',
-        'color:var(--text,#DDE2EC)', 'align-items:center', 'gap:8px',
-        'background:rgba(233,69,96,0.06)',
+        'color:var(--text,#f3f4f6)', 'align-items:center', 'gap:8px',
+        'background:rgba(239,68,68,0.06)',
       ].join(';');
       bar.innerHTML =
-        '<span style="font-weight:700;color:var(--red,#E94560);flex-shrink:0">' +
+        '<span style="font-weight:700;color:var(--red,#ef4444);flex-shrink:0">' +
           '&#9888; REGIME SHIFT — ' + kinds +
         '</span>' +
-        '<span style="color:var(--muted,#6B7488)">since ' + since + '</span>' +
-        '<span style="color:var(--muted,#6B7488);font-size:10px;margin-left:auto">' +
+        '<span style="color:var(--muted,#9ca3af)">since ' + since + '</span>' +
+        '<span style="color:var(--muted,#9ca3af);font-size:10px;margin-left:auto">' +
           'macro regime moved — run youtube-to-knowhow to refresh the narrative' +
         '</span>';
     } else {
@@ -4807,7 +4809,7 @@ async function loadRegimeState() {
       const tilt   = data.sentiment_tilt || '—';
       bar.style.cssText = [
         'display:flex', 'margin:0 0 10px', 'padding:5px 14px',
-        'border:1px solid var(--border2,#2a3142)',
+        'border:1px solid var(--border2,#2a2a2a)',
         'border-radius:8px', 'font-family:var(--mono,monospace)', 'font-size:11px',
         'color:var(--text-dim,#9aa3b8)', 'align-items:center', 'gap:8px',
       ].join(';');
@@ -5453,7 +5455,7 @@ function _tfBadge(name, dir, strength) {
   const dn = dir === 'DOWN' || dir === 'BEARISH';
   const color = up ? 'var(--green)' : dn ? 'var(--red)' : 'var(--gold)';
   const sub = strength ? `<div style="font-size:9px;color:var(--muted)">${strength}</div>` : '';
-  return `<div style="flex:1;min-width:90px;text-align:center;padding:8px 6px;border:1px solid var(--border2,#2a3142);border-radius:8px">
+  return `<div style="flex:1;min-width:90px;text-align:center;padding:8px 6px;border:1px solid var(--border2,#2a2a2a);border-radius:8px">
     <div style="font-size:9px;color:var(--muted);letter-spacing:1.5px">${name}</div>
     <div style="font-weight:700;color:${color}">${dir || '—'}</div>${sub}</div>`;
 }
@@ -5513,7 +5515,7 @@ function renderFib(bs) {
       .filter(x => x.key).sort((a, b) => b.price - a.price)
       .map(x => `<span style="margin-right:10px;${Math.abs(x.price - n.price) < 0.001 ? 'color:var(--gold);font-weight:700' : 'color:var(--muted)'}">${x.name} ${x.price.toFixed(2)}</span>`)
       .join('');
-    return `<div style="padding:4px 0;border-top:1px solid var(--border2,#2a3142)">
+    return `<div style="padding:4px 0;border-top:1px solid var(--border2,#2a2a2a)">
       <div style="font-size:10px"><b>${tf}</b> <span style="color:${dcol}">${dir}</span>
         <span style="color:var(--muted)">${fib.swing_low}─${fib.swing_high}</span>
         · ใกล้ <span style="color:${inZone ? 'var(--gold)' : 'var(--text)'};font-weight:700">${n.name} ${(+n.price).toFixed(2)}</span>
@@ -5648,7 +5650,7 @@ function renderZones(bs) {
   };
   const res = (z.resistance || []).slice().sort((a, b) => b - a);
   const sup = (z.support || []).slice().sort((a, b) => b - a);
-  const priceRow = px ? `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;margin:4px 0;border-top:1px dashed var(--border2,#2a3142);border-bottom:1px dashed var(--border2,#2a3142)">
+  const priceRow = px ? `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;margin:4px 0;border-top:1px dashed var(--border2,#2a2a2a);border-bottom:1px dashed var(--border2,#2a2a2a)">
       <span style="width:72px;color:var(--gold);font-weight:800">${px.toFixed(2)}</span>
       <span style="color:var(--gold);font-size:10px;letter-spacing:1.5px">◄ PRICE</span></div>` : '';
   el.innerHTML =
@@ -5668,8 +5670,8 @@ function initChart() {
     height: 380,
     layout: { background: { color: 'transparent' }, textColor: '#9aa3b8', fontFamily: 'JetBrains Mono, monospace' },
     grid: { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
-    timeScale: { timeVisible: true, secondsVisible: false, borderColor: '#2a3142' },
-    rightPriceScale: { borderColor: '#2a3142' },
+    timeScale: { timeVisible: true, secondsVisible: false, borderColor: '#2a2a2a' },
+    rightPriceScale: { borderColor: '#2a2a2a' },
   });
   _candleSeries = _chart.addCandlestickSeries({
     upColor: '#22c55e', downColor: '#ef4444',
@@ -5704,11 +5706,11 @@ function drawClusterLines(d) {
   _clusterLines = [];
   const add = (price, color, title, style) => { if (price != null) _clusterLines.push(_candleSeries.createPriceLine({
     price, color, lineWidth: 2, lineStyle: style, axisLabelVisible: true, title })); };
-  if (d.resistance) add(d.resistance.level, 'rgba(233,69,96,0.9)', `C·R ${d.resistance.touches}t`, LightweightCharts.LineStyle.Solid);
-  if (d.support) add(d.support.level, 'rgba(38,194,129,0.9)', `C·S ${d.support.touches}t`, LightweightCharts.LineStyle.Solid);
+  if (d.resistance) add(d.resistance.level, 'rgba(239,68,68,0.9)', `C·R ${d.resistance.touches}t`, LightweightCharts.LineStyle.Solid);
+  if (d.support) add(d.support.level, 'rgba(74,222,128,0.9)', `C·S ${d.support.touches}t`, LightweightCharts.LineStyle.Solid);
   if (d.donchian) {
-    add(d.donchian.buy, 'rgba(212,172,13,0.85)', 'Donchian BUY', LightweightCharts.LineStyle.Dashed);
-    add(d.donchian.sell, 'rgba(212,172,13,0.85)', 'Donchian SELL', LightweightCharts.LineStyle.Dashed);
+    add(d.donchian.buy, 'rgba(74,222,128,0.85)', 'Donchian BUY', LightweightCharts.LineStyle.Dashed);
+    add(d.donchian.sell, 'rgba(74,222,128,0.85)', 'Donchian SELL', LightweightCharts.LineStyle.Dashed);
   }
 }
 
@@ -5752,7 +5754,7 @@ function drawZoneLines(bs) {
   if (kl.pdh) add(kl.pdh, 'rgba(245,158,11,0.85)', 'PDH', 1, LightweightCharts.LineStyle.Dotted, true);
   if (kl.pdl) add(kl.pdl, 'rgba(245,158,11,0.85)', 'PDL', 1, LightweightCharts.LineStyle.Dotted, true);
   const htf = z.htf_zone;
-  if (htf && htf.level) add(htf.level, '#D4AC0D', '★' + htf.tf, 3, LightweightCharts.LineStyle.Solid, true);
+  if (htf && htf.level) add(htf.level, '#4ade80', '★' + htf.tf, 3, LightweightCharts.LineStyle.Solid, true);
 }
 
 /* ── Why No Entry — gate blocks สด (07-03) ── */
@@ -5874,7 +5876,7 @@ function renderEventCard(bs) {
         break;
       }
     }
-    return `<div style="padding:7px 0;border-bottom:1px solid var(--border2,#2a3142)">
+    return `<div style="padding:7px 0;border-bottom:1px solid var(--border2,#2a2a2a)">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="width:64px;color:${cdColor};font-weight:800">${cd}</span>
         <span style="width:36px;color:var(--gold);font-size:10px;font-weight:700">${ev.currency || ''}</span>
@@ -6003,7 +6005,7 @@ async function loadMacroStrip() {
       if (chg === null || chg === undefined) return '<span style="color:var(--muted)">—</span>';
       const sign  = chg >= 0 ? '+' : '';
       const arrow = chg > 0.0001 ? '▲' : chg < -0.0001 ? '▼' : '→';
-      const color = chg > 0.0001 ? 'var(--green,#26C281)' : chg < -0.0001 ? 'var(--red,#E94560)' : 'var(--muted,#6B7488)';
+      const color = chg > 0.0001 ? 'var(--green,#4ade80)' : chg < -0.0001 ? 'var(--red,#ef4444)' : 'var(--muted,#9ca3af)';
       return `<span style="color:${color}">${arrow} ${sign}${chg.toFixed(decimals)}</span>`;
     }
 
@@ -6041,10 +6043,10 @@ async function loadMacroStrip() {
     // ── GOLD REGIME CONTEXT (deep-research interpretation, computed-in-code, 0 API) ──
     // drivers ผกผันกับทอง: chg < 0 (ตัวขับลง) => tailwind (หนุนทอง) ; chg > 0 => headwind
     function _goldEffect(chg) {
-      if (chg === null || chg === undefined) return { txt: '—', tilt: 0, color: 'var(--muted,#6B7488)' };
-      if (chg < -0.0001) return { txt: '▼ tailwind', tilt: 1,  color: 'var(--green,#26C281)' };
-      if (chg >  0.0001) return { txt: '▲ headwind', tilt: -1, color: 'var(--red,#E94560)' };
-      return { txt: '→ neutral', tilt: 0, color: 'var(--muted,#6B7488)' };
+      if (chg === null || chg === undefined) return { txt: '—', tilt: 0, color: 'var(--muted,#9ca3af)' };
+      if (chg < -0.0001) return { txt: '▼ tailwind', tilt: 1,  color: 'var(--green,#4ade80)' };
+      if (chg >  0.0001) return { txt: '▲ headwind', tilt: -1, color: 'var(--red,#ef4444)' };
+      return { txt: '→ neutral', tilt: 0, color: 'var(--muted,#9ca3af)' };
     }
     function _setTile(id, chg) {
       const eff = _goldEffect(chg);
@@ -6059,8 +6061,8 @@ async function loadMacroStrip() {
     const badge = document.getElementById('gold-tilt-badge');
     if (badge) {
       let label, bg, fg;
-      if (_tilt >= 2)       { label = 'BULLISH context'; bg = 'rgba(38,194,129,0.18)'; fg = 'var(--green,#26C281)'; }
-      else if (_tilt <= -2) { label = 'BEARISH context'; bg = 'rgba(233,69,96,0.18)';  fg = 'var(--red,#E94560)'; }
+      if (_tilt >= 2)       { label = 'BULLISH context'; bg = 'rgba(74,222,128,0.18)'; fg = 'var(--green,#4ade80)'; }
+      else if (_tilt <= -2) { label = 'BEARISH context'; bg = 'rgba(239,68,68,0.18)';  fg = 'var(--red,#ef4444)'; }
       else                  { label = 'MIXED context';   bg = 'var(--muted2,#3D4456)'; fg = 'var(--text-dim,#9aa3b8)'; }
       badge.textContent = label;
       badge.style.background = bg;
@@ -6089,7 +6091,7 @@ async function loadRegimeExtra() {
     if (vix && vix.val != null) {
       const v = document.getElementById('rt-vix-val'); if (v) v.textContent = vix.val.toFixed(1);
       if (vix.val > 25)      _setLbl('rt-vix', 'RISK-OFF ↑haven', 'var(--gold,#F4C430)');
-      else if (vix.val < 16) _setLbl('rt-vix', 'RISK-ON',         'var(--muted,#6B7488)');
+      else if (vix.val < 16) _setLbl('rt-vix', 'RISK-ON',         'var(--muted,#9ca3af)');
       else                   _setLbl('rt-vix', 'NEUTRAL',         'var(--text-dim,#9aa3b8)');
     }
     // Gold/Silver ratio: <75 risk-on(silver แข็ง) · 75-85 neutral · >85 fear/risk-off
@@ -6097,7 +6099,7 @@ async function loadRegimeExtra() {
     if (gsr && gsr.val != null) {
       const g = document.getElementById('rt-gsr-val'); if (g) g.textContent = gsr.val.toFixed(1);
       if (gsr.val > 85)      _setLbl('rt-gsr', 'FEAR/risk-off', 'var(--gold,#F4C430)');
-      else if (gsr.val < 75) _setLbl('rt-gsr', 'RISK-ON',       'var(--muted,#6B7488)');
+      else if (gsr.val < 75) _setLbl('rt-gsr', 'RISK-ON',       'var(--muted,#9ca3af)');
       else                   _setLbl('rt-gsr', 'NEUTRAL',       'var(--text-dim,#9aa3b8)');
     }
   } catch (e) {
@@ -6113,8 +6115,8 @@ async function loadRiskRegime() {
     const res = await fetch('/api/risk-regime');
     const d = await res.json();
     if (!d.ok || !d.regime) return;
-    const color = d.regime === 'RISK-OFF' ? 'var(--red,#E94560)'
-                : d.regime === 'RISK-ON'  ? 'var(--green,#26C281)'
+    const color = d.regime === 'RISK-OFF' ? 'var(--red,#ef4444)'
+                : d.regime === 'RISK-ON'  ? 'var(--green,#4ade80)'
                 : 'var(--text-dim,#9aa3b8)';
     const v = document.getElementById('rt-hmm-val');
     if (v) { v.textContent = d.regime; v.style.color = color; }
@@ -6151,7 +6153,7 @@ async function loadCotCard() {
     if (netEl) {
       const sign = data.net >= 0 ? '+' : '';
       netEl.textContent = sign + data.net.toLocaleString();
-      netEl.style.color = data.net >= 0 ? 'var(--gold,#D4AC0D)' : 'var(--red,#E94560)';
+      netEl.style.color = data.net >= 0 ? 'var(--gold,#4ade80)' : 'var(--red,#ef4444)';
     }
 
     // Weekly change
@@ -6159,7 +6161,7 @@ async function loadCotCard() {
       if (data.net_chg !== null && data.net_chg !== undefined) {
         const sign  = data.net_chg >= 0 ? '+' : '';
         const arrow = data.net_chg > 0 ? '▲' : data.net_chg < 0 ? '▼' : '→';
-        const color = data.net_chg > 0 ? 'var(--green,#26C281)' : data.net_chg < 0 ? 'var(--red,#E94560)' : 'var(--muted,#6B7488)';
+        const color = data.net_chg > 0 ? 'var(--green,#4ade80)' : data.net_chg < 0 ? 'var(--red,#ef4444)' : 'var(--muted,#9ca3af)';
         chgEl.innerHTML = `<span style="color:${color}">${arrow} ${sign}${data.net_chg.toLocaleString()}</span>`;
       } else {
         chgEl.textContent = '—';
@@ -6178,12 +6180,12 @@ async function loadCotCard() {
       const shortPct = total > 0 ? (data.noncomm_short / total * 100).toFixed(1) : '50.0';
       barEl.innerHTML =
         `<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--bg2,#1A2035)">` +
-          `<div style="width:${longPct}%;background:var(--green,#26C281);transition:width 0.5s"></div>` +
-          `<div style="width:${shortPct}%;background:var(--red,#E94560);transition:width 0.5s"></div>` +
+          `<div style="width:${longPct}%;background:var(--green,#4ade80);transition:width 0.5s"></div>` +
+          `<div style="width:${shortPct}%;background:var(--red,#ef4444);transition:width 0.5s"></div>` +
         `</div>` +
         `<div style="display:flex;justify-content:space-between;margin-top:3px;font-size:9px">` +
-          `<span style="color:var(--green,#26C281)">L ${longPct}%</span>` +
-          `<span style="color:var(--red,#E94560)">S ${shortPct}%</span>` +
+          `<span style="color:var(--green,#4ade80)">L ${longPct}%</span>` +
+          `<span style="color:var(--red,#ef4444)">S ${shortPct}%</span>` +
         `</div>`;
       if (barNumsEl) {
         barNumsEl.textContent =
@@ -6261,7 +6263,7 @@ if (document.readyState === 'loading') {
   <div style="
     background:var(--surface); border:1px solid var(--red);
     border-radius:10px; padding:26px 30px; max-width:460px; width:90%;
-    box-shadow:0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(233,69,96,0.2);">
+    box-shadow:0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(239,68,68,0.2);">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
       <span style="font-size:22px">⚠️</span>
       <h3 style="margin:0;color:var(--red);font-size:13px;letter-spacing:1.5px;text-transform:uppercase;font-family:var(--mono)">Enable NNLB Mode — Risk Acknowledgement</h3>
@@ -6272,7 +6274,7 @@ if (document.readyState === 'loading') {
       <li>If MIN_LOT exceeds Max Loss budget, orders <strong>still execute at MIN_LOT</strong></li>
       <li>Intended for <strong>small accounts willing to accept high risk only</strong></li>
     </ul>
-    <p style="margin:0 0 18px 0;font-size:11px;color:var(--red);background:rgba(233,69,96,0.08);
+    <p style="margin:0 0 18px 0;font-size:11px;color:var(--red);background:rgba(239,68,68,0.08);
       padding:10px 14px;border-radius:5px;border-left:3px solid var(--red);font-family:var(--mono);line-height:1.6">
       This mode is designed for users who fully understand the risks.<br>
       <strong>The system accepts no responsibility for losses incurred.</strong>
