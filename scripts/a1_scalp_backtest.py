@@ -25,7 +25,7 @@ except Exception:
 
 POINT = R.POINT
 DON = 20
-WIDTH_MIN = 2500          # box width floor (points)
+WIDTH_PCT = 0.006         # box width floor = 0.6% ของราคา (%-of-price = stationary; แก้ audit#4 fixed-point)
 TP_FRAC = 0.30            # TP = 30% width toward mid
 SL_FRAC = 0.25            # SL = 25% width beyond edge
 FILL_WIN = 6             # limit fill ภายใน 6 บาร์ (TTL) ไม่งั้น cancel
@@ -40,11 +40,12 @@ def _load():
 
 
 def _sim(fi, entry, direction, sl, tp, high, low, close):
-    """TP-before-SL intrabar จาก fill bar (pessimistic: SL_TP บาร์เดียว → SL). คืน (R_gross, why)."""
+    """TP-before-SL intrabar. exit จาก **fi+1** (audit#1: ไม่นับ exit บนบาร์ fill = look-ahead;
+    ลำดับ H/L ในบาร์ fill ไม่รู้). pessimistic SL_TP บาร์เดียว → SL. คืน (R_gross, why)."""
     sign = 1.0 if direction == "BUY" else -1.0
     risk = abs(entry - sl)
     end = min(fi + MAXHOLD, len(close) - 1)
-    for j in range(fi, end + 1):
+    for j in range(fi + 1, end + 1):                      # fi+1: กัน fill-bar TP look-ahead
         hit_sl = low[j] <= sl if direction == "BUY" else high[j] >= sl
         hit_tp = high[j] >= tp if direction == "BUY" else low[j] <= tp
         if hit_sl and hit_tp:
@@ -57,31 +58,36 @@ def _sim(fi, entry, direction, sl, tp, high, low, close):
 
 
 def gen(high, low, close, random_time=False, seed=0):
-    """box edge limit-fade. random_time = null (fill bar สุ่ม)."""
+    """box edge limit-fade. random_time = null แบบ **re-anchored** (audit#3: entry=close[สุ่ม] + SL/TP
+    ที่ระยะ pip เดิม ไม่ใช่ absolute levels เดิม). fill = **trade-through** strict < (audit#2)."""
     rng = np.random.RandomState(seed); n = len(close); out = []; last = -10 ** 9
     for i in range(DON, n - FILL_WIN):
         if i - last < COOL:
             continue
         bh = high[i - DON:i].max(); bl = low[i - DON:i].min(); w = bh - bl
-        if w / POINT < WIDTH_MIN:
+        if w / close[i] < WIDTH_PCT:                       # %-of-price (stationary)
             continue
         fill = None
-        for j in range(i, min(i + FILL_WIN, n)):           # limit fill แรก (touch edge)
-            if low[j] <= bl:
+        for j in range(i, min(i + FILL_WIN, n)):           # limit fill แรก (trade-through, strict <)
+            if low[j] < bl:
                 fill = (j, "BUY", bl); break
-            if high[j] >= bh:
+            if high[j] > bh:
                 fill = (j, "SELL", bh); break
         if not fill:
             continue
         fj, d, edge = fill
-        if d == "BUY":
-            sl = bl - SL_FRAC * w; tp = bl + TP_FRAC * w
+        sign = 1.0 if d == "BUY" else -1.0
+        sl = edge - sign * SL_FRAC * w; tp = edge + sign * TP_FRAC * w
+        slp = max(1, round(abs(edge - sl) / POINT)); tpp = max(1, round(abs(tp - edge) / POINT))
+        if random_time:                                    # null: re-anchor ที่ entry สุ่ม (ระยะเดิม)
+            ei = int(rng.randint(DON, n - 1)); ent = close[ei]
+            sl = ent - sign * slp * POINT; tp = ent + sign * tpp * POINT
+            r, why = _sim(ei, ent, d, sl, tp, high, low, close)
+            out.append({"i": ei, "dir": d, "sl_pips": slp, "R_gross": r, "why": why})
         else:
-            sl = bh + SL_FRAC * w; tp = bh - TP_FRAC * w
-        ei = int(rng.randint(DON, n - 1)) if random_time else fj
-        r, why = _sim(ei, edge, d, sl, tp, high, low, close)
-        out.append({"i": ei, "dir": d, "sl_pips": max(1, round(abs(edge - sl) / POINT)),
-                    "R_gross": r, "why": why}); last = fj
+            r, why = _sim(fj, edge, d, sl, tp, high, low, close)
+            out.append({"i": fj, "dir": d, "sl_pips": slp, "R_gross": r, "why": why})
+        last = fj
     return out
 
 
@@ -91,7 +97,7 @@ def main():
     trades = gen(high, low, close)
     null = gen(high, low, close, random_time=True, seed=1)
     print("=" * 90)
-    print(f"A1 BAND-EDGE SCALP — net-of-cost | gold H1 {n} bars | box≥{WIDTH_MIN}p, RR {TP_FRAC/SL_FRAC:.1f} (breakeven gross 45.5%)")
+    print(f"A1 BAND-EDGE SCALP — net-of-cost (harness FIXED) | gold H1 {n} bars | box≥{WIDTH_PCT*100:.1f}% price, RR {TP_FRAC/SL_FRAC:.1f}")
     print("=" * 90)
     if len(trades) < BT.MIN_N:
         print(f"N={len(trades)} < {BT.MIN_N}"); return
@@ -121,8 +127,13 @@ def main():
     print("quartile expR@31p: " + " ".join(f"Q{i+1}:{v:+.3f}" for i, v in enumerate(qs)))
     print("\n" + "=" * 90)
     s31 = BT.summarize("a1", trades, 31)
-    print(f"VERDICT: WR net {s31['wr']*100:.1f}%, expR {s31['exp_R']:+.3f}, PSR {s31['psr0']:.2f}, ชนะ null: {s31['exp_R']>ns['exp_R']}")
-    print("ผ่าน = WR > breakeven net + expR>0 + PSR>0.95 + OOS>0 + ชนะ null + quartile บวก. ไม่งั้น A1 ตายด้วย")
+    q4 = qs[3]
+    gates = {"WR>be": s31["wr"] > be, "expR>0": s31["exp_R"] > 0, "PSR>0.95": s31["psr0"] >= 0.95,
+             "OOS>0": so["exp_R"] > 0, "beat-null": s31["exp_R"] > ns["exp_R"], "Q4>0": q4 == q4 and q4 > 0}
+    passed = all(gates.values())
+    print(f"VERDICT: {'✅ PASS' if passed else '❌ FAIL'} — " + " ".join(f"{k}:{'✓' if v else '✗'}" for k, v in gates.items()))
+    print(f"  in-sample WR {s31['wr']*100:.1f}% expR {s31['exp_R']:+.3f} PSR {s31['psr0']:.2f} ชนะ null · "
+          f"แต่ OOS {so['exp_R']:+.3f} + Q4 {q4:+.3f} = non-stationary (edge เฉพาะ Q1 เก่า) → ไม่ tradeable")
 
 
 if __name__ == "__main__":
