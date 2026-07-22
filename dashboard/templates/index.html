@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/globe.gl"></script><!-- WM-style globe (fallback ถ้า offline) -->
   <script src="/static/lightweight-charts.standalone.production.js"></script><!-- vendored 07-03: VM/offline ใช้ได้ -->
 
   <style>
@@ -471,13 +472,28 @@
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 7px;
+      border-radius: 4px;
       padding: 13px 16px;
       display: flex;
       flex-direction: column;
       gap: 3px;
-      transition: border-color 0.18s;
+      box-shadow: inset 0 0 0 1px rgba(74,222,128,0.02), 0 1px 4px rgba(0,0,0,0.35);
+      transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
     }
+    .card:hover {
+      border-color: rgba(74,222,128,0.28);
+      box-shadow: 0 0 12px rgba(74,222,128,0.10), 0 1px 4px rgba(0,0,0,0.4);
+    }
+    /* ── WM signal dots (pulsing) ── */
+    .wm-dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:7px; vertical-align:middle; }
+    .wm-dot.ok    { background:var(--green); box-shadow:0 0 7px var(--green); animation:wm-pulse 2.2s ease-in-out infinite; }
+    .wm-dot.warn  { background:var(--amber); box-shadow:0 0 7px var(--amber); animation:wm-pulse 1.5s ease-in-out infinite; }
+    .wm-dot.alert { background:var(--red);   box-shadow:0 0 7px var(--red);   animation:wm-pulse 0.9s ease-in-out infinite; }
+    .wm-dot.idle  { background:var(--muted2); }
+    @keyframes wm-pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.4;transform:scale(.8);} }
+    /* ── WM panel treatment — subtle green glow on hover (inline-styled panels) ── */
+    section[id$="-section"] > div { transition: border-color 140ms ease, box-shadow 140ms ease; }
+    section[id$="-section"] > div:hover { border-color: rgba(74,222,128,0.20) !important; box-shadow: 0 0 12px rgba(74,222,128,0.06); }
     .card:hover { border-color: var(--border2); }
 
     .card .label {
@@ -1702,6 +1718,18 @@
     </section>
 
     <!-- AI SENTIMENT (SELECTION layer) — LLM อ่านข่าว X + ตัวเลขเศรษฐกิจ → guide เลือก regime (display-only, 0 token) -->
+    <!-- GLOBAL CONTEXT — WorldMonitor-style globe: gold trading hubs + geopolitical risk (safe-haven drivers) -->
+    <section id="wm-globe-section" style="margin-bottom:10px">
+      <div class="section-title"><span class="wm-dot ok"></span>Global Context — ศูนย์เทรดทอง + จุดเสี่ยง geopolitical (ตัวขับ safe-haven)</div>
+      <div style="position:relative;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:radial-gradient(ellipse at center,#0a120a 0%,#050505 72%)">
+        <div id="wm-globe" style="width:100%;height:440px"></div>
+        <div id="wm-globe-fallback" style="display:none;padding:48px;text-align:center;color:var(--muted);font-size:12px;font-family:var(--mono)">🌐 globe ต้องต่อเน็ต (globe.gl CDN) + WebGL — offline/ไม่รองรับ = ไม่แสดง</div>
+        <div style="position:absolute;bottom:9px;left:13px;font-size:10px;color:var(--muted);font-family:var(--mono);pointer-events:none">
+          <span style="color:var(--green)">●</span> trading hub&nbsp;&nbsp;<span style="color:var(--cyan)">●</span> central bank&nbsp;&nbsp;<span style="color:var(--amber)">●</span> risk zone&nbsp;&nbsp;·&nbsp;หมุนอัตโนมัติ · ลากหมุน/ซูมได้
+        </div>
+      </div>
+    </section>
+
     <section id="ai-sentiment-section" style="margin-bottom:10px">
       <div class="section-title">AI Sentiment (SELECTION) — LLM อ่านข่าว/ตัวเลข · algo ตัดสิน entry ด้วยตนเอง</div>
       <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:9px 14px;border:1px solid var(--border);border-left:3px solid var(--cyan,#60a5fa);border-radius:8px;font-family:var(--mono);font-size:12px">
@@ -4011,6 +4039,61 @@ function setTvbYears(y) {
   loadTsmom();
 }
 
+// ── WM-style globe: gold trading hubs + central banks + geopolitical risk zones (safe-haven drivers) ──
+const WM_POINTS = [
+  {name:'London · LBMA', lat:51.51, lng:-0.13, kind:'hub'},
+  {name:'New York · COMEX', lat:40.71, lng:-74.01, kind:'hub'},
+  {name:'Shanghai · SGE', lat:31.23, lng:121.47, kind:'hub'},
+  {name:'Zurich', lat:47.37, lng:8.54, kind:'hub'},
+  {name:'Hong Kong', lat:22.32, lng:114.17, kind:'hub'},
+  {name:'Dubai · DGCX', lat:25.20, lng:55.27, kind:'hub'},
+  {name:'Mumbai', lat:19.08, lng:72.88, kind:'hub'},
+  {name:'Fed · Washington', lat:38.90, lng:-77.04, kind:'cb'},
+  {name:'ECB · Frankfurt', lat:50.11, lng:8.68, kind:'cb'},
+  {name:'PBOC · Beijing', lat:39.90, lng:116.40, kind:'cb'},
+  {name:'⚠ Strait of Hormuz', lat:26.57, lng:56.25, kind:'risk'},
+  {name:'⚠ Ukraine', lat:49.0, lng:32.0, kind:'risk'},
+  {name:'⚠ Taiwan Strait', lat:24.5, lng:119.5, kind:'risk'},
+  {name:'⚠ Red Sea', lat:20.0, lng:38.0, kind:'risk'},
+];
+const WM_ARCS = [
+  {startLat:51.51,startLng:-0.13,endLat:40.71,endLng:-74.01},   // London↔NY
+  {startLat:51.51,startLng:-0.13,endLat:31.23,endLng:121.47},   // London↔Shanghai
+  {startLat:40.71,startLng:-74.01,endLat:31.23,endLng:121.47},  // NY↔Shanghai
+  {startLat:51.51,startLng:-0.13,endLat:25.20,endLng:55.27},    // London↔Dubai
+];
+let _wmGlobeInit = false;
+function initWmGlobe() {
+  if (_wmGlobeInit) return;
+  const el = document.getElementById('wm-globe');
+  if (!el || typeof Globe === 'undefined') {
+    const fb = document.getElementById('wm-globe-fallback');
+    if (fb) { fb.style.display = 'block'; if (el) el.style.display = 'none'; }
+    return;
+  }
+  _wmGlobeInit = true;
+  const col = k => k === 'risk' ? '#f59e0b' : (k === 'cb' ? '#60a5fa' : '#4ade80');
+  try {
+    const g = Globe()(el)
+      .backgroundColor('rgba(0,0,0,0)')
+      .globeImageUrl('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-dark.jpg')
+      .showAtmosphere(true).atmosphereColor('#4ade80').atmosphereAltitude(0.16)
+      .pointsData(WM_POINTS).pointLat('lat').pointLng('lng')
+      .pointColor(d => col(d.kind)).pointAltitude(d => d.kind === 'risk' ? 0.09 : 0.03).pointRadius(0.55)
+      .pointLabel(d => `<div style="font-family:var(--mono),monospace;font-size:11px;color:#f3f4f6;background:#111;border:1px solid #222;padding:3px 8px;border-radius:3px">${d.name}</div>`)
+      .arcsData(WM_ARCS)
+      .arcColor(() => ['rgba(74,222,128,0.15)', 'rgba(74,222,128,0.55)'])
+      .arcDashLength(0.4).arcDashGap(0.2).arcDashAnimateTime(2600).arcStroke(0.35);
+    g.controls().autoRotate = true; g.controls().autoRotateSpeed = 0.42;
+    const resize = () => g.width(el.clientWidth).height(440);
+    resize(); window.addEventListener('resize', resize);
+  } catch (_e) {
+    _wmGlobeInit = false;
+    const fb = document.getElementById('wm-globe-fallback');
+    if (fb) { fb.style.display = 'block'; el.style.display = 'none'; }
+  }
+}
+
 async function loadTsmom() {
   try {
     const d = await (await fetch('/api/tsmom?vb_years=' + _tvbYears)).json();
@@ -6223,6 +6306,8 @@ function _bootstrap() {
   loadNewsImpact();
   loadImpactCalibration();
   loadNewsGate();
+  window.addEventListener('load', initWmGlobe);   // WM globe — init หลัง globe.gl CDN โหลด (fallback ถ้า offline)
+  setTimeout(initWmGlobe, 1500);                   // เผื่อ load ยิงไปแล้ว (idempotent guard)
   setInterval(_tickCountdowns, 1000);   // live countdowns in the combined feed
   setInterval(fetchData, 10000);
   setInterval(fetchCalendar, 1800000);
