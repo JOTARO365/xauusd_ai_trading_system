@@ -1446,7 +1446,7 @@ def _force_breakeven_opposing(new_direction: str) -> int:
 
 TP_EXT_NEAR_PIPS       = 150   # ขยับ TP เมื่อราคาห่างจาก TP น้อยกว่านี้ (เดิม 300)
 TP_EXT_PIPS            = 400   # ขยับ TP ออกไปอีกเท่านี้ต่อรอบ
-TP_EXT_MAX             = 2     # จำนวนครั้งสูงสุดต่อ position (เดิม 3)
+TP_EXT_MAX             = 4     # fallback — ใช้ config.TP_EXT_MAX (env TP_EXT_MAX) เป็นหลัก (live-reload)
 TP_EXT_MIN_PROFIT_PIPS = 500   # กำไรขั้นต่ำก่อนพิจารณาขยาย (เดิม 300)
 TP_EXT_COOLDOWN_SECS   = 900   # cooldown 15 นาทีระหว่าง extension แต่ละครั้ง
 TP_EXT_SL_LOCK_PIPS    = 200   # trail SL ห่างจากราคาปัจจุบัน X pips เมื่อ extend TP
@@ -1790,6 +1790,7 @@ def manage_dynamic_tp() -> int:
     """
     if not _cfg.DYNAMIC_TP:
         return 0
+    _max = int(getattr(_cfg, "TP_EXT_MAX", 0) or TP_EXT_MAX)   # live-reload override (default TP_EXT_MAX=4)
 
     info = mt5.symbol_info(SYMBOL)
     if info is None:
@@ -1833,7 +1834,7 @@ def manage_dynamic_tp() -> int:
             continue  # ยังไกล TP อยู่ หรือ TP โดนแล้ว
 
         ext_done = _tp_ext_count.get(ticket, 0)
-        if ext_done >= TP_EXT_MAX:
+        if ext_done >= _max:
             continue
 
         # cooldown — ไม่ extend อีกถ้าเพิ่ง extend ไปภายใน TP_EXT_COOLDOWN_SECS
@@ -1849,8 +1850,27 @@ def manage_dynamic_tp() -> int:
             logger.debug(f"Dynamic TP: ticket={ticket} momentum ไม่แรงพอ — ไม่ขยาย")
             continue
 
-        new_tp = round(pos.tp + TP_EXT_PIPS * point, 2) if is_buy \
-            else round(pos.tp - TP_EXT_PIPS * point, 2)
+        # เลื่อน TP → แนว S/R ถัดไปเลย TP ปัจจุบัน (สอดคล้องกับ pick_tp_target ตอนตั้ง TP แรก).
+        # fallback = +TP_EXT_PIPS คงที่ ถ้าไม่มี sr_view / ไม่มีแนวถัดไปพอ.
+        sr_tp = None
+        try:
+            from agents.sr_engine import from_live as _sr_from_live
+            _sv = _sr_from_live()
+            if _sv.get("ok"):
+                _atr = _sv.get("atr", 0)
+                _tgts = _sv["targets_up"] if is_buy else _sv["targets_down"]   # เรียงใกล้→ไกล
+                for _t in _tgts:
+                    _lvl = _t.get("level")
+                    if _lvl is None:
+                        continue
+                    _cand = round(_lvl - (1 if is_buy else -1) * 0.1 * _atr, 2)   # buffer ก่อนถึงแนว
+                    if (_cand > pos.tp) if is_buy else (_cand < pos.tp):          # ต้องเลื่อนออกจริง
+                        sr_tp = _cand
+                        break
+        except Exception:
+            pass
+        new_tp = sr_tp if sr_tp is not None else (round(pos.tp + TP_EXT_PIPS * point, 2) if is_buy
+                                                  else round(pos.tp - TP_EXT_PIPS * point, 2))
 
         # trail SL มาล็อคกำไรเมื่อ extend TP — SL ไม่ถอยหลัง
         # ระยะ lock ต้อง ≥ SL_MIN_GAP (เดิม 200p = $2 ชิดเกิน โดน noise กวาดก่อนถึง TP ใหม่)
@@ -1882,8 +1902,9 @@ def manage_dynamic_tp() -> int:
             logger.info(
                 f"Dynamic TP extended: ticket={ticket} {direction} "
                 f"profit={profit_pips:.0f}pips dist_to_tp={dist_to_tp:.0f}pips "
-                f"TP {pos.tp:.2f}→{new_tp:.2f} | SL {pos.sl:.2f}→{new_sl:.2f} "
-                f"(locked {locked_pips:.0f}pips profit) ext #{ext_done + 1}/{TP_EXT_MAX}"
+                f"TP {pos.tp:.2f}→{new_tp:.2f} [{'S/R-next' if sr_tp is not None else '+' + str(TP_EXT_PIPS) + 'p'}] "
+                f"| SL {pos.sl:.2f}→{new_sl:.2f} "
+                f"(locked {locked_pips:.0f}pips profit) ext #{ext_done + 1}/{_max}"
             )
             extended += 1
 

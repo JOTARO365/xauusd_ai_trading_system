@@ -42,6 +42,7 @@ NO_TP_WAIT_MINUTES = int(os.getenv("NO_TP_WAIT_MINUTES", "30"))   # รอ X น
 # True  = ขยับ TP ออกอัตโนมัติเมื่อ momentum แรงและราคาใกล้ TP
 # False = ปิด TP อยู่ที่กำหนดตอนเปิด order
 DYNAMIC_TP = os.getenv("DYNAMIC_TP", "true").lower() != "false"
+TP_EXT_MAX = int(os.getenv("TP_EXT_MAX") or 4)   # จำนวนครั้งสูงสุดที่ dynamic-TP ขยาย TP ต่อไม้ (เดิม 2 → 4; env-tunable)
 
 # ── Losing Streak Protection ──────────────────────────────────
 # True  = เมื่อแพ้ติดกันเกิน max_losing_streak → เพิ่ม confidence threshold
@@ -253,7 +254,7 @@ def reload_config():
     """อ่าน .env ใหม่และอัปเดตตัวแปรทั้งหมด — เรียกทุกต้น cycle เพื่อ pick up dashboard changes"""
     global SYMBOL, START_BALANCE, LOT_MODE, FIXED_LOT, MIN_LOT, MAX_LOT
     global PORTFOLIO_PROTECTION, NO_TP_ON_EVENT, NO_TP_EVENT_MINS, NO_TP_WAIT_MINUTES
-    global DYNAMIC_TP, STREAK_PROTECTION
+    global DYNAMIC_TP, TP_EXT_MAX, STREAK_PROTECTION
     load_dotenv(override=True)
     SYMBOL        = os.getenv("SYMBOL", "XAUUSD")
     START_BALANCE = float(os.getenv("START_BALANCE", 5000))
@@ -266,6 +267,7 @@ def reload_config():
     NO_TP_EVENT_MINS   = int(os.getenv("NO_TP_EVENT_MINS",   "20"))
     NO_TP_WAIT_MINUTES = int(os.getenv("NO_TP_WAIT_MINUTES", "30"))
     DYNAMIC_TP        = os.getenv("DYNAMIC_TP", "true").lower() != "false"
+    TP_EXT_MAX        = int(os.getenv("TP_EXT_MAX") or 4)
     STREAK_PROTECTION = os.getenv("STREAK_PROTECTION", "true").lower() != "false"
     global TRAILING_STOP, TRAILING_ATR_TF, TRAILING_ATR_MULT
     global TRAILING_MIN_PROFIT_R, TRAILING_LOOKBACK
