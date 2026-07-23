@@ -190,6 +190,11 @@ SHADOW_ENGINE         = os.getenv("SHADOW_ENGINE", "false").lower() == "true"
 SHADOW_UNIVERSE       = [s.strip() for s in os.getenv("SHADOW_UNIVERSE", "").split(",") if s.strip()] or None
 SHADOW_MAX_HOLD_BARS  = int(os.getenv("SHADOW_MAX_HOLD_BARS") or 48)
 
+# SHADOW_TSMOM = forward TSMOM-D1 equity tracker (trend-follower) per symbol → logs/shadow/tsmom__<sym>.jsonl.
+# 0 order. default OFF. universe (comma-sep) default = trend-family BTCUSD,XAUUSD,XAGUSD (gold = validated ref).
+SHADOW_TSMOM          = os.getenv("SHADOW_TSMOM", "false").lower() == "true"
+SHADOW_TSMOM_UNIVERSE = [s.strip() for s in os.getenv("SHADOW_TSMOM_UNIVERSE", "").split(",") if s.strip()] or None
+
 # REGIME_LIVE_TICK = per-tick executor (daemon thread) — เช็ค breakout ทุก ~Ns (realtime) แทนรอ bar-close cycle.
 # level คำนวณต่อ bar-close (cache), ต่อ tick แค่เทียบราคา vs level (0 LLM, 0 recompute). ต้องมี REGIME_LIVE=true ด้วย.
 # ⚠️ LIVE MONEY — default OFF. kill = REGIME_LIVE_TICK=false. เปิด = per-cycle executor ปิดอัตโนมัติ (กันเข้าซ้ำ).
@@ -275,6 +280,7 @@ def reload_config():
     global DYNAMIC_TP, TP_EXT_MAX, TP_EXT_PIPS, TP_EXT_NEAR_PIPS, STREAK_PROTECTION
     global TP_EXT_MOMENTUM_MIN, TP_EXT_COOLDOWN_SECS, TP_EXT_SL_LOCK_PIPS, SPEECH_SUMMARY
     global DB_RECONCILE_SECS, SHADOW_ENGINE, SHADOW_UNIVERSE, SHADOW_MAX_HOLD_BARS
+    global SHADOW_TSMOM, SHADOW_TSMOM_UNIVERSE
     load_dotenv(override=True)
     SYMBOL        = os.getenv("SYMBOL", "XAUUSD")
     START_BALANCE = float(os.getenv("START_BALANCE", 5000))
@@ -298,6 +304,8 @@ def reload_config():
     SHADOW_ENGINE        = os.getenv("SHADOW_ENGINE", "false").lower() == "true"
     SHADOW_UNIVERSE      = [s.strip() for s in os.getenv("SHADOW_UNIVERSE", "").split(",") if s.strip()] or None
     SHADOW_MAX_HOLD_BARS = int(os.getenv("SHADOW_MAX_HOLD_BARS") or 48)
+    SHADOW_TSMOM          = os.getenv("SHADOW_TSMOM", "false").lower() == "true"
+    SHADOW_TSMOM_UNIVERSE = [s.strip() for s in os.getenv("SHADOW_TSMOM_UNIVERSE", "").split(",") if s.strip()] or None
     STREAK_PROTECTION = os.getenv("STREAK_PROTECTION", "true").lower() != "false"
     global TRAILING_STOP, TRAILING_ATR_TF, TRAILING_ATR_MULT
     global TRAILING_MIN_PROFIT_R, TRAILING_LOOKBACK

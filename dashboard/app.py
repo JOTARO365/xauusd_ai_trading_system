@@ -1371,6 +1371,16 @@ def api_shadow_matrix():
     return jsonify(_cached("shadow-matrix", _c, ttl=30))
 
 
+@app.route("/api/shadow-tsmom")
+def api_shadow_tsmom():
+    """Batch B / Phase 2: forward TSMOM-D1 equity per symbol (BTC/gold/silver) — annualized Sharpe + OOS.
+    clean forward mark-to-market (no backfill). judge OOS>0 + Sharpe. 0 token."""
+    def _c():
+        from agents.shadow_tsmom import summary
+        return summary()
+    return jsonify(_cached("shadow-tsmom", _c, ttl=30))
+
+
 @app.route("/api/algo-status")
 def api_algo_status():
     """สถานะระบบใหม่ (header): REGIME_LIVE mode + regime ปัจจุบัน + algo signal + disabled. 0 token."""

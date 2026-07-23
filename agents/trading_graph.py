@@ -362,6 +362,14 @@ def node_position_mgmt(state: TradingState) -> dict:
             logger.info(f"[SHADOW] {_st['new']} new · {_st['resolved']} resolved · {_st['combos']} combos")
     except Exception as _se:
         logger.error(f"[GRAPH:shadow_engine] {_se}")
+    # forward TSMOM-D1 equity tracker (trend-follower, per symbol). gated SHADOW_TSMOM. fail-soft. 0 order.
+    try:
+        from agents.shadow_tsmom import tick as _tsmom_tick
+        _tt = _tsmom_tick()
+        if _tt and _tt.get("new_bars"):
+            logger.info(f"[SHADOW-TSMOM] +{_tt['new_bars']} D1 bar(s)")
+    except Exception as _tse:
+        logger.error(f"[GRAPH:shadow_tsmom] {_tse}")
     # in-loop MT5→DB sync+reconcile (throttled) — ให้ DB cohort fresh ระหว่าง session (แก้ system-trade stale). fail-soft.
     _periodic_db_sync()
     return {}
