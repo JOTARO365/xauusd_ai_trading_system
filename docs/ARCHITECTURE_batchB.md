@@ -196,10 +196,12 @@ Batch B — sequential (shared interfaces §4 frozen before T-01):
          |   → per-pair cost is load-bearing (flat-30 badly under-costs XAU-crosses). switches file is runtime
          |   (dashboard-edited, gitignored); shadow works without it (missing combo ⇒ SHADOW).
 
-[ ] T-04 | agent: worker | scope: agents/shadow_engine.py
+[DONE] T-04 | agent: worker | scope: agents/shadow_engine.py
          | input: T-01..T-03 + get_ohlcv(symbol) + node hook contract
          | output: tick(): per-SHADOW-combo eval→log→resolve into logs/shadow/<algo>__<sym>.jsonl;
          |         per-(combo,bar_ts) dedup; fail-soft; 0 orders; LIVE-state downgraded to SHADOW+warn
+         | RESULT 2026-07-23: tick(force) 8 combos 0-order no-crash; _apply log→resolve TP realized_R=1.7 net;
+         |   dedup verified (_apply core is bars-injectable for deterministic test). Not yet wired (T-05).
 
 [ ] T-05 | agent: worker | scope: config.py, agents/trading_graph.py
          | output: SHADOW_ENGINE flag (default OFF) + reload_config; wire shadow_tick after journal_tick
