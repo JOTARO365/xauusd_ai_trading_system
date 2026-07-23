@@ -234,6 +234,36 @@ def node_decision(state: TradingState) -> dict:
         return {"decision": {"action": "SKIP", "reason": str(e)}}
 
 
+_last_db_sync = 0.0   # module-level throttle สำหรับ _periodic_db_sync (in-loop MT5→DB reconcile)
+
+
+def _periodic_db_sync():
+    """แก้ root cause: ไม้ระบบ (magic) ไม่ persist ลง DB ตอนเปิด → DB cohort นิ่งตั้งแต่ startup.
+    รัน sync (เขียนไม้ใหม่ OPEN/CLOSED) + reconcile (flip DB-OPEN ที่ปิดจริง) ทุก DB_RECONCILE_SECS วินาที.
+    reuse ฟังก์ชัน startup เดิม (tested) — อยู่นอกสาย order, 0 token, fail-soft. window สั้น (sync 3d / reconcile 30d)."""
+    import config as _cfg
+    secs = getattr(_cfg, "DB_RECONCILE_SECS", 600)
+    if secs <= 0:
+        return
+    global _last_db_sync
+    now = time.time()
+    if now - _last_db_sync < secs:
+        return
+    _last_db_sync = now
+    try:
+        from db.connection import is_available
+        if not is_available():
+            return
+        from db.sync import sync_mt5_history_to_db, reconcile_open_trades
+        n = sync_mt5_history_to_db(days=3)          # ไม้ใหม่ (ระบบ+manual) → DB
+        rc = reconcile_open_trades(days=30, dry_run=False)   # flip DB-OPEN ที่ปิดจริง → CLOSED
+        if n or rc.get("reconciled") or rc.get("stale"):
+            logger.info(f"[DB-SYNC] in-loop: +{n} new · reconciled={rc.get('reconciled', 0)} "
+                        f"stale={rc.get('stale', 0)}")
+    except Exception as e:
+        logger.debug(f"[DB-SYNC] in-loop fail-soft: {e}")
+
+
 def node_position_mgmt(state: TradingState) -> dict:
     """รัน position management ทุก cycle — ทั้ง skip_ai และ full path"""
     from connectors.mt5_connector import (
@@ -324,6 +354,8 @@ def node_position_mgmt(state: TradingState) -> dict:
                         f"SL={_j['sl']} TP={_j['tp']} ({_ctx}) — รอ resolve")
     except Exception as _je:
         logger.error(f"[GRAPH:algo_journal] {_je}")
+    # in-loop MT5→DB sync+reconcile (throttled) — ให้ DB cohort fresh ระหว่าง session (แก้ system-trade stale). fail-soft.
+    _periodic_db_sync()
     return {}
 
 

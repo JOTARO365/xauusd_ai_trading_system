@@ -178,6 +178,11 @@ REGIME_SHADOW         = os.getenv("REGIME_SHADOW", "false").lower() == "true"
 # kill switch = REGIME_LIVE=false (live-reload). หมายเหตุ: pending/ZRE/swing เป็น path แยก (ปิดเองถ้าจะ algo-only ล้วน).
 REGIME_LIVE           = os.getenv("REGIME_LIVE", "false").lower() == "true"
 
+# DB_RECONCILE_SECS = ช่วงเวลา (วินาที) ที่รัน sync+reconcile MT5→DB ระหว่าง session (in-loop).
+# แก้ root cause: ไม้ระบบ (magic) ไม่ persist ลง DB ตอนเปิด → DB cohort นิ่งตั้งแต่ startup.
+# sync เขียนไม้ใหม่ (OPEN/CLOSED) + reconcile flip DB-OPEN ที่ปิดจริง → /api/data fresh. 0 token. 0=ปิด.
+DB_RECONCILE_SECS     = int(os.getenv("DB_RECONCILE_SECS") or 600)
+
 # REGIME_LIVE_TICK = per-tick executor (daemon thread) — เช็ค breakout ทุก ~Ns (realtime) แทนรอ bar-close cycle.
 # level คำนวณต่อ bar-close (cache), ต่อ tick แค่เทียบราคา vs level (0 LLM, 0 recompute). ต้องมี REGIME_LIVE=true ด้วย.
 # ⚠️ LIVE MONEY — default OFF. kill = REGIME_LIVE_TICK=false. เปิด = per-cycle executor ปิดอัตโนมัติ (กันเข้าซ้ำ).
@@ -262,6 +267,7 @@ def reload_config():
     global PORTFOLIO_PROTECTION, NO_TP_ON_EVENT, NO_TP_EVENT_MINS, NO_TP_WAIT_MINUTES
     global DYNAMIC_TP, TP_EXT_MAX, TP_EXT_PIPS, TP_EXT_NEAR_PIPS, STREAK_PROTECTION
     global TP_EXT_MOMENTUM_MIN, TP_EXT_COOLDOWN_SECS, TP_EXT_SL_LOCK_PIPS, SPEECH_SUMMARY
+    global DB_RECONCILE_SECS
     load_dotenv(override=True)
     SYMBOL        = os.getenv("SYMBOL", "XAUUSD")
     START_BALANCE = float(os.getenv("START_BALANCE", 5000))
@@ -281,6 +287,7 @@ def reload_config():
     TP_EXT_COOLDOWN_SECS = int(os.getenv("TP_EXT_COOLDOWN_SECS") or 900)
     TP_EXT_SL_LOCK_PIPS  = int(os.getenv("TP_EXT_SL_LOCK_PIPS") or 200)
     SPEECH_SUMMARY       = os.getenv("SPEECH_SUMMARY", "false").lower() == "true"
+    DB_RECONCILE_SECS    = int(os.getenv("DB_RECONCILE_SECS") or 600)
     STREAK_PROTECTION = os.getenv("STREAK_PROTECTION", "true").lower() != "false"
     global TRAILING_STOP, TRAILING_ATR_TF, TRAILING_ATR_MULT
     global TRAILING_MIN_PROFIT_R, TRAILING_LOOKBACK
