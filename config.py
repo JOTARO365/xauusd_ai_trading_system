@@ -48,6 +48,7 @@ TP_EXT_NEAR_PIPS = int(os.getenv("TP_EXT_NEAR_PIPS") or 150)   # ราคาห
 TP_EXT_MOMENTUM_MIN = int(os.getenv("TP_EXT_MOMENTUM_MIN") or 4)   # momentum score ≥ นี้ (max 5) จึง extend
 TP_EXT_COOLDOWN_SECS = int(os.getenv("TP_EXT_COOLDOWN_SECS") or 900)   # cooldown ระหว่าง extend แต่ละครั้ง (วินาที)
 TP_EXT_SL_LOCK_PIPS = int(os.getenv("TP_EXT_SL_LOCK_PIPS") or 200)   # trail SL ห่างราคา X pips เมื่อ extend (floor ด้วย SL_MIN_GAP)
+SPEECH_SUMMARY = os.getenv("SPEECH_SUMMARY", "false").lower() == "true"   # Phase 3: dashboard สรุป speech (Haiku, on-demand, cached) — default OFF (มี cost)
 
 # ── Losing Streak Protection ──────────────────────────────────
 # True  = เมื่อแพ้ติดกันเกิน max_losing_streak → เพิ่ม confidence threshold
@@ -260,7 +261,7 @@ def reload_config():
     global SYMBOL, START_BALANCE, LOT_MODE, FIXED_LOT, MIN_LOT, MAX_LOT
     global PORTFOLIO_PROTECTION, NO_TP_ON_EVENT, NO_TP_EVENT_MINS, NO_TP_WAIT_MINUTES
     global DYNAMIC_TP, TP_EXT_MAX, TP_EXT_PIPS, TP_EXT_NEAR_PIPS, STREAK_PROTECTION
-    global TP_EXT_MOMENTUM_MIN, TP_EXT_COOLDOWN_SECS, TP_EXT_SL_LOCK_PIPS
+    global TP_EXT_MOMENTUM_MIN, TP_EXT_COOLDOWN_SECS, TP_EXT_SL_LOCK_PIPS, SPEECH_SUMMARY
     load_dotenv(override=True)
     SYMBOL        = os.getenv("SYMBOL", "XAUUSD")
     START_BALANCE = float(os.getenv("START_BALANCE", 5000))
@@ -279,6 +280,7 @@ def reload_config():
     TP_EXT_MOMENTUM_MIN  = int(os.getenv("TP_EXT_MOMENTUM_MIN") or 4)
     TP_EXT_COOLDOWN_SECS = int(os.getenv("TP_EXT_COOLDOWN_SECS") or 900)
     TP_EXT_SL_LOCK_PIPS  = int(os.getenv("TP_EXT_SL_LOCK_PIPS") or 200)
+    SPEECH_SUMMARY       = os.getenv("SPEECH_SUMMARY", "false").lower() == "true"
     STREAK_PROTECTION = os.getenv("STREAK_PROTECTION", "true").lower() != "false"
     global TRAILING_STOP, TRAILING_ATR_TF, TRAILING_ATR_MULT
     global TRAILING_MIN_PROFIT_R, TRAILING_LOOKBACK

@@ -1584,6 +1584,23 @@ def api_speech_history():
     return jsonify(out)
 
 
+@app.route("/api/speech-summary")
+def api_speech_summary():
+    """Phase 3: สรุป speech ครั้งก่อน (Haiku, cached, on-demand). flag SPEECH_SUMMARY (default OFF, มี LLM cost)."""
+    import config as _cfg
+    if not getattr(_cfg, "SPEECH_SUMMARY", False):
+        return jsonify({"ok": False, "note": "ปิดอยู่ — ตั้ง SPEECH_SUMMARY=true เพื่อเปิด (มี LLM cost ~เศษสตางค์)"})
+    title = request.args.get("title", "")
+    if not title:
+        return jsonify({"ok": False, "note": "ไม่มี title"})
+    try:
+        from connectors.speech_log import norm_key
+        from connectors.speech_summary import summarize_speech
+        return jsonify(summarize_speech(title, norm_key(title)))
+    except Exception as e:
+        return jsonify({"ok": False, "note": str(e)[:80]})
+
+
 @app.route("/api/regime")
 def api_regime():
     """สรุป macro regime จาก agents/prompts/macro_regime.md (ไฟล์เดียวกับที่ analyst อ่าน)

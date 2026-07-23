@@ -18,3 +18,4 @@ reports/
 data/pairs/
 data/pair_context.json
 data/speech_log.json
+data/speech_summary_cache.json
