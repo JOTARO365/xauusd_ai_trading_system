@@ -67,6 +67,34 @@ def _live_floating():
         return {}
 
 
+def _mt5_state(days):
+    """(open_tickets:set, realized:{position_id: pnl}, ok:bool) — reconcile trades.json ที่ status ค้าง
+    กับ MT5 จริง: ไม้ที่ trades.json บอก OPEN แต่ไม่มีใน positions = ปิดไปแล้ว (reporter ไม่อัปเดต).
+    ok=False ถ้า MT5 ต่อไม่ได้ (อย่า reconcile กัน false-close). realized จาก deal history."""
+    open_t, realized, ok = set(), {}, False
+    try:
+        import MetaTrader5 as mt5
+        from datetime import datetime, timedelta
+        from collections import defaultdict
+        if not mt5.initialize():
+            return open_t, realized, False
+        pos = mt5.positions_get()
+        if pos is not None:
+            open_t = {p.ticket for p in pos}
+            ok = True
+        deals = mt5.history_deals_get(datetime.now() - timedelta(days=days), datetime.now()) or []
+        agg = defaultdict(lambda: {"pnl": 0.0, "closed": False})
+        for d in deals:
+            a = agg[d.position_id]
+            a["pnl"] += d.profit + d.swap + d.commission
+            if d.entry in (1, 2):
+                a["closed"] = True
+        realized = {pid: round(a["pnl"], 2) for pid, a in agg.items() if a["closed"]}
+    except Exception:
+        pass
+    return open_t, realized, ok
+
+
 def _algo_trades_from_mt5(days=45):
     """ดึงไม้ ALGO (comment 'ALGO*') จาก MT5 — closed (deal history) + open (positions ปัจจุบัน).
     algo path ไม่เขียน trades.json → ต้องดึงจาก MT5. shape เหมือน trades.json. fail-soft → []."""
@@ -121,6 +149,16 @@ def build_daily_summary(days=30, tech="all"):
         return {"days": [], "totals": {}, "techniques_all": [], "filter": tech}
     rows_all = [t for t in trades if t.get("timestamp")]     # ทั้ง CLOSED + OPEN (วันนี้)
     rows_all += _algo_trades_from_mt5(days)                   # + ไม้ ALGO จาก MT5 (ไม่อยู่ใน trades.json)
+    # ── reconcile: ไม้ที่ trades.json ค้างสถานะ OPEN แต่ปิดไปแล้วจริงบน MT5 → mark CLOSED + realized pnl ──
+    _open_tk, _realized, _mt5_ok = _mt5_state(days)
+    if _mt5_ok:
+        for t in rows_all:
+            if t.get("status") == "OPEN" and t.get("ticket") not in _open_tk:
+                t["status"] = "CLOSED"
+                if t.get("ticket") in _realized:
+                    t["pnl"] = _realized[t["ticket"]]
+                elif t.get("pnl") is None:
+                    t["pnl"] = 0.0                            # ปิดแล้วแต่ไม่พบ deal (เก่ากว่า window) → 0
     techs_all = sorted({_tech(t)[0] for t in rows_all})
     if tech and tech != "all":
         rows_all = [t for t in rows_all if _tech(t)[0] == tech]
