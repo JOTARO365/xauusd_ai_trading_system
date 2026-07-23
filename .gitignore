@@ -13,3 +13,7 @@ accounts.db
 .claude/
 .playwright-mcp/
 reports/
+
+# multi-pair collector runtime data (regenerated)
+data/pairs/
+data/pair_context.json

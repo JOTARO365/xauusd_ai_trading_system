@@ -1737,6 +1737,13 @@
       </div>
     </section>
 
+    <section id="pair-context-section" style="margin-bottom:10px">
+      <div class="section-title"><span class="wm-dot ok"></span>Gold-Complex Context — breadth · USD-leg · gold/silver ratio (data-only, 0 token)</div>
+      <div id="pair-context" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:9px 14px;border:1px solid var(--border);border-left:3px solid var(--amber,#f59e0b);border-radius:8px;font-family:var(--mono);font-size:12px">
+        <span style="color:var(--muted)">— รอ collector (connectors/pair_collector.py) —</span>
+      </div>
+    </section>
+
     <section id="ai-sentiment-section" style="margin-bottom:10px">
       <div class="section-title">AI Sentiment (SELECTION) — LLM อ่านข่าว/ตัวเลข · algo ตัดสิน entry ด้วยตนเอง</div>
       <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:9px 14px;border:1px solid var(--border);border-left:3px solid var(--cyan,#60a5fa);border-radius:8px;font-family:var(--mono);font-size:12px">
@@ -3475,6 +3482,7 @@ async function loadLivePrice() {
     loadAlgoStatus();   // System status — algo mode / regime / signal
     loadTsmom();        // TSMOM-D1 engine — signal ensemble / position / state
     loadWorldMonitor(); // GDELT geopolitical signals — globe live dots + attention/headline
+    loadPairContext();  // gold-complex cross-pair context (breadth / USD-leg / gold-silver ratio)
 
     // Live ticker
     const bidEl  = document.getElementById('px-bid');
@@ -4158,6 +4166,33 @@ async function loadWorldMonitor() {
       } else { at.innerHTML = '<span class="wm-dot idle"></span>GDELT — รอ data (offline/rate-limit)'; }
     }
     renderWmNews(d);
+  } catch (_e) {}
+}
+
+// gold-complex cross-pair context strip (Batch A: data-only, 0 token) — breadth / USD-leg / gold-silver ratio
+async function loadPairContext() {
+  const box = document.getElementById('pair-context');
+  if (!box) return;
+  try {
+    const d = await (await fetch('/api/pair-context')).json();
+    if (!d.ok) {
+      box.innerHTML = '<span style="color:var(--muted)">— รอ collector (connectors/pair_collector.py) —</span>';
+      return;
+    }
+    const br = d.breadth;
+    const brC = br == null ? 'var(--muted)' : (br > 0.5 ? 'var(--green)' : (br < -0.5 ? 'var(--red)' : 'var(--amber)'));
+    const brTxt = br == null ? '—' : (br > 0 ? `+${br}` : `${br}`);
+    const story = d.usd_story || '—';
+    const storyC = story === 'gold-specific' ? 'var(--green)' : (story === 'USD-driven' ? 'var(--cyan)' : 'var(--muted)');
+    const z = d.ratio_z;
+    const zC = z == null ? 'var(--muted)' : (Math.abs(z) > 1.5 ? 'var(--amber)' : 'var(--text)');
+    const stale = d.stale_s != null && d.stale_s > 300 ? ` <span style="color:var(--muted)">(stale ${Math.round(d.stale_s/60)}m)</span>` : '';
+    box.innerHTML =
+      `<span>breadth <b style="color:${brC}">${brTxt}</b> <span style="color:var(--muted)">(${d.breadth_n||0}/4 gold คู่ยืนยัน)</span></span>`
+      + `<span>move: <b style="color:${storyC}">${story}</b></span>`
+      + `<span style="color:var(--muted)">XAU ${d.xau_ret!=null?(d.xau_ret*100).toFixed(1)+'%':'—'} · EUR ${d.eur_ret!=null?(d.eur_ret*100).toFixed(1)+'%':'—'}</span>`
+      + `<span>gold/silver <b>${d.gold_silver_ratio!=null?d.gold_silver_ratio:'—'}</b> <span style="color:${zC}">z ${z!=null?(z>0?'+'+z:z):'—'}</span></span>`
+      + stale;
   } catch (_e) {}
 }
 

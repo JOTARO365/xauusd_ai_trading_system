@@ -874,6 +874,21 @@ def api_worldmap():
     return resp
 
 
+@app.route("/api/pair-context")
+def api_pair_context():
+    """gold-complex cross-pair context (breadth / USD-leg decomposition / gold-silver ratio) — 0-token,
+    pure-Python จาก connectors/pair_collector. display-only + context (ไม่ใช่ entry signal)."""
+    p = os.path.join(_BASE, "..", "data", "pair_context.json")
+    out = {"ok": False}
+    try:
+        with open(p, encoding="utf-8") as f:
+            out = json.load(f)
+        out["stale_s"] = int(_time_mod.time() - os.path.getmtime(p))
+    except Exception:
+        pass
+    return jsonify(out)
+
+
 @app.route("/api/tsmom")
 def api_tsmom():
     """สถานะ TSMOM-D1 directional engine: signal ensemble + position + state (compute-in-code, 0 token)."""
