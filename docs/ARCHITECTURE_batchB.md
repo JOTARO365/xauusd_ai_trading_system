@@ -182,9 +182,11 @@ Batch B — sequential (shared interfaces §4 frozen before T-01):
          | RESULT 2026-07-23: 10/10 parity PASS (bit-for-bit vs algo_journal._resolve, resolved_at excluded);
          |   symbol-general EURUSD (point 1e-5) verified. `python tests/test_shadow_resolve.py`.
 
-[ ] T-02 | agent: worker | scope: agents/algo_registry.py
+[DONE] T-02 | agent: worker | scope: agents/algo_registry.py
          | input: §4.1/§4.2 interfaces + regime_shadow.compute_shadow_signal
          | output: ALGO_REGISTRY with RegimeMomentumAlgo.evaluate(symbol,bars,ctx)->VirtualOrder|None
+         | RESULT 2026-07-23: VirtualOrder shape == §4.1 (9 keys); all 8 pairs fetch+evaluate OK via
+         |   broker map (symbol-param end-to-end); non-momentum/stand-down → None. `python agents/algo_registry.py`.
 
 [ ] T-03 | agent: worker | scope: agents/shadow_switches.py, agents/shadow_cost.py, data/algo_switches.json
          | output: TTL-cached switch store (regime_adaptive idiom) + measured per-symbol cost_pips;
