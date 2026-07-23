@@ -29,7 +29,7 @@ class Algo:
     klass: str = "scalp"                 # "scalp"→ promotion needs n≥100 ; "swing"→ n≥20
     eligible_pairs: list = UNIVERSE
 
-    def evaluate(self, symbol, bars, ctx=None):
+    def evaluate(self, symbol, bars, ctx=None, point=None):
         raise NotImplementedError
 
 
@@ -43,9 +43,9 @@ class RegimeMomentumAlgo(Algo):
     klass = "scalp"
     eligible_pairs = UNIVERSE
 
-    def evaluate(self, symbol, bars, ctx=None):
+    def evaluate(self, symbol, bars, ctx=None, point=None):
         high, low, close, times = bars
-        rec = compute_shadow_signal(high, low, close, times)
+        rec = compute_shadow_signal(high, low, close, times, point=point)
         if not rec:
             return None                                  # not enough bars / no regime
         sig = rec.get("signal")

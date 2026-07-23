@@ -145,27 +145,30 @@ REGIME_ALGO = {"TREND": "momentum_breakout"}   # display/analytics map (sync ก
 
 
 # ─────────────────────────── algorithm library (EXECUTION — deterministic, ONE/regime) ───────────────────────────
-def algo_momentum_breakout(i, high, low, close, atr_v):
-    """TREND: Donchian breakout + ATR SL/TP. entry = ราคาทะลุ N-bar high/low (คำนวณจาก data ไม่ prediction)."""
+def algo_momentum_breakout(i, high, low, close, atr_v, point=None):
+    """TREND: Donchian breakout + ATR SL/TP. entry = ราคาทะลุ N-bar high/low (คำนวณจาก data ไม่ prediction).
+    point: pip size ของ symbol (None = POINT ทอง 0.01). ต้องส่งค่าจริงต่อคู่ ไม่งั้น sl_pips เพี้ยนสำหรับคู่ point≠0.01."""
+    pt = POINT if point is None else point
     if i < BRK_WIN or np.isnan(atr_v[i]) or atr_v[i] == 0:
         return None
     hh = high[i - BRK_WIN:i].max(); ll = low[i - BRK_WIN:i].min()
     d = "BUY" if close[i] > hh else ("SELL" if close[i] < ll else None)
     if d is None:
         return None
-    sl_pips = round(ATR_SL * atr_v[i] / POINT)
+    sl_pips = round(ATR_SL * atr_v[i] / pt)
     return {"algo": "momentum_breakout", "dir": d, "sl_pips": sl_pips, "tp_pips": round(sl_pips * RR)}
 
 
-def momentum_levels(i, high, low, close, atr_v):
+def momentum_levels(i, high, low, close, atr_v, point=None):
     """ระดับ Donchian breakout สำหรับ **แท่งที่กำลังก่อตัว** (per-tick): ราคาต้องทะลุเพื่อเข้า.
     i = แท่งปิดล่าสุด → level = max/min ของ BRK_WIN แท่งปิดล่าสุด (จบที่ i). คืน None ถ้า data ไม่พอ.
     ใช้คู่ detect_regime (เข้าเฉพาะ TREND). SL/TP = ATR เดียวกับ algo_momentum_breakout."""
+    pt = POINT if point is None else point
     if i < BRK_WIN or np.isnan(atr_v[i]) or atr_v[i] == 0:
         return None
     hh = high[i - BRK_WIN + 1:i + 1].max()
     ll = low[i - BRK_WIN + 1:i + 1].min()
-    sl_pips = round(ATR_SL * atr_v[i] / POINT)
+    sl_pips = round(ATR_SL * atr_v[i] / pt)
     return {"buy_level": float(hh), "sell_level": float(ll),
             "sl_pips": sl_pips, "tp_pips": round(sl_pips * RR)}
 
@@ -200,8 +203,8 @@ def algo_mean_reversion(i, close, atr_v):
 # แต่ละ strategy รับ context ครบ (high/low/close/atr/er/adx/volpct) → ใช้ "เครื่องมือ" ไหนก็ได้ที่เหมาะ regime นั้น.
 # เพิ่มกลยุทธ์ต่อ regime ได้ที่นี่ — แต่ **ต้องผ่าน gauntlet (backtest OOS+null) ก่อน** ค่อยเสียบเข้า routing จริง.
 # validated ปัจจุบัน: TREND→momentum เท่านั้น. RANGE/RISK-OFF/NEUTRAL = STAND-DOWN จนเจอกลยุทธ์ที่ผ่าน (mean_rev ตัดแล้ว).
-def _strat_momentum(i, high, low, close, atr_v, er, adx_v, volpct):
-    return algo_momentum_breakout(i, high, low, close, atr_v)
+def _strat_momentum(i, high, low, close, atr_v, er, adx_v, volpct, point=None):
+    return algo_momentum_breakout(i, high, low, close, atr_v, point=point)
 
 
 STRATEGIES = {
@@ -212,12 +215,13 @@ STRATEGIES = {
 }
 
 
-def route(i, high, low, close, atr_v, er, adx_v, volpct):
+def route(i, high, low, close, atr_v, er, adx_v, volpct, point=None):
     """SELECTION: regime → กลยุทธ์ที่เหมาะ (STRATEGIES) → signal | STAND-DOWN.
+    point: pip size ของ symbol (None = ทอง) — thread ให้ algo คำนวณ sl_pips ถูกต่อคู่.
     (P3: AI/sentiment จากข่าวจะช่วยเลือก regime แทน detect_regime แบบ rule)."""
     regime = detect_regime(er[i], adx_v[i], volpct[i])
     strat = STRATEGIES.get(regime)
-    return regime, (strat(i, high, low, close, atr_v, er, adx_v, volpct) if strat else None)
+    return regime, (strat(i, high, low, close, atr_v, er, adx_v, volpct, point=point) if strat else None)
 
 
 # ─────────────────────────── demo / sanity-check (ยังไม่ใช่ validation) ───────────────────────────

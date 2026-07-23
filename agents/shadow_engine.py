@@ -93,7 +93,7 @@ def _apply(algo_id, symbol, bars, point, digits, cost_pips, max_hold=_DEFAULT_MA
 
     # 1) capture new signal at the last closed bar (dedup per bar_ts)
     algo = _reg.get(algo_id)
-    vo = algo.evaluate(symbol, bars) if algo else None
+    vo = algo.evaluate(symbol, bars, point=point) if algo else None
     if vo and vo.get("bar_ts") and vo["bar_ts"] not in seen:
         rows.append(_new_record(vo, cost_pips, point, digits))
         changed = True

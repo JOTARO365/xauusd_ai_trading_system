@@ -45,9 +45,10 @@ def _bars_from_feed(count=600):
         return None
 
 
-def compute_shadow_signal(high, low, close, times=None):
+def compute_shadow_signal(high, low, close, times=None, point=None):
     """Deterministic regime + ONE-algo signal ที่ **bar ปิดล่าสุด** (index n-2; n-1 อาจเป็น bar กำลังก่อตัว).
-    0 LLM. คืน record dict (signal=None ถ้า STAND-DOWN) หรือ None ถ้า data ไม่พอ."""
+    0 LLM. คืน record dict (signal=None ถ้า STAND-DOWN) หรือ None ถ้า data ไม่พอ.
+    point: pip size ต่อ symbol (None = ทอง 0.01) — จำเป็นสำหรับ multi-pair ให้ sl_pips ถูกต่อคู่."""
     n = len(close)
     if n < _MIN_BARS:
         return None
@@ -56,7 +57,7 @@ def compute_shadow_signal(high, low, close, times=None):
     volpct = R.vol_percentile(close)
     atr_v = R.atr(high, low, close)
     i = n - 2                                             # last CLOSED bar
-    regime, sig = R.route(i, high, low, close, atr_v, er, adx_v, volpct)
+    regime, sig = R.route(i, high, low, close, atr_v, er, adx_v, volpct, point=point)
     bar_ts = None
     if times is not None:
         try:

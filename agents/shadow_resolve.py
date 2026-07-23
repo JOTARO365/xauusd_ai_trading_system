@@ -44,12 +44,15 @@ def _close_outcome(result, r_gross, bars, exit_px, exit_ts, mfe, mae, sl_pips, c
 
 
 def resolve_signal(rec, high, low, close, times, *,
-                   point, cost_pips, max_hold_bars, price_digits=2):
+                   point, cost_pips, max_hold_bars, price_digits=2, i0=None):
     """Resolve one shadow/journal record against forward bars. Pure. See module docstring.
 
     rec must carry: entry, dir ("BUY"/"SELL"), sl_pips, tp_pips, bar_ts (ISO of the signal bar).
     rec["outcome"] (if present) seeds the running MFE/MAE. Returns the NEW outcome dict, or None
     when the signal bar is not in `times` (out of window) or sl_pips is non-positive.
+
+    i0: optional index of the signal bar in `times`. When known (e.g. a backtest walk), pass it to
+    skip the O(N) bar_ts search — behaviour is identical, this is only an optimization.
     """
     dir_ = rec["dir"]
     sl_pips = rec["sl_pips"]
@@ -61,12 +64,12 @@ def resolve_signal(rec, high, low, close, times, *,
     sl = entry - sign * sl_pips * point
     tp = entry + sign * rec["tp_pips"] * point
 
-    # locate the signal bar in the current window by matching bar_ts
-    i0 = None
-    for k in range(len(times)):
-        if _iso(times[k]) == rec["bar_ts"]:
-            i0 = k
-            break
+    # locate the signal bar in the current window by matching bar_ts (unless caller supplied i0)
+    if i0 is None:
+        for k in range(len(times)):
+            if _iso(times[k]) == rec["bar_ts"]:
+                i0 = k
+                break
     if i0 is None:
         return None                                      # signal bar fell out of window → caller keeps state
 
