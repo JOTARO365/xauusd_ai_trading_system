@@ -1972,6 +1972,7 @@
       </div>
       <div class="chart-card" style="padding:8px 8px 4px">
         <div id="price-chart" style="width:100%;min-height:380px"></div>
+        <div id="price-chart-msg" style="display:none;color:#ef4444;font-family:var(--mono);font-size:12px;padding:8px 4px"></div>
       </div>
     </section>
 
@@ -6147,17 +6148,31 @@ function initChart() {
   new ResizeObserver(() => { if (el.clientWidth) _chart.applyOptions({ width: el.clientWidth }); }).observe(el);
 }
 
+function _setChartMsg(msg) {
+  const m = document.getElementById('price-chart-msg');
+  if (!m) return;
+  if (msg) { m.textContent = msg; m.style.display = 'block'; }
+  else { m.style.display = 'none'; }
+}
+
 async function loadCandles(force) {
   initChart();
-  if (!_candleSeries) return;
+  if (!_candleSeries) {
+    _setChartMsg(window.LightweightCharts ? '' : 'chart library ไม่โหลด (/static/lightweight-charts.standalone.production.js)');
+    return;
+  }
   const now = Date.now();
   if (!force && now - _lastCandleLoad < 25000) return;   // throttle 25s (backend cache 10s)
   _lastCandleLoad = now;
   try {
     const r = await fetch('/api/candles?tf=' + _chartTf + '&count=250');
     const d = await r.json();
-    if (d.ok && d.candles.length) _candleSeries.setData(d.candles);
-  } catch (e) {}
+    if (d.ok && d.candles && d.candles.length) {
+      _candleSeries.setData(d.candles); _setChartMsg('');
+    } else {
+      _setChartMsg('แท่งเทียนไม่มา: ' + (d.error || 'ไม่มีข้อมูล') + ' · SYMBOL=' + (d.symbol || '?'));
+    }
+  } catch (e) { _setChartMsg('โหลดแท่งเทียนล้มเหลว: ' + e.message); }
 }
 
 function setChartTf(tf) {

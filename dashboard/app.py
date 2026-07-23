@@ -1554,11 +1554,13 @@ def api_candles():
 
     def _fetch():
         if not _MT5_AVAILABLE or not _ensure_mt5():
-            return {"ok": False, "error": "MT5 not connected", "candles": []}
+            return {"ok": False, "error": "MT5 not connected (dashboard process)", "symbol": SYMBOL, "candles": []}
         rates = mt5.copy_rates_from_pos(SYMBOL, _TF_MAP[tf], 0, count)
-        if rates is None:
-            return {"ok": False, "error": str(mt5.last_error()), "candles": []}
-        return {"ok": True, "tf": tf, "candles": [
+        if rates is None or len(rates) == 0:
+            return {"ok": False, "symbol": SYMBOL,
+                    "error": f"no bars for '{SYMBOL}' — {mt5.last_error()} (ตรวจ SYMBOL ใน .env ตรงกับ broker symbol ไหม)",
+                    "candles": []}
+        return {"ok": True, "tf": tf, "symbol": SYMBOL, "candles": [
             {"time": int(r["time"]), "open": float(r["open"]), "high": float(r["high"]),
              "low": float(r["low"]), "close": float(r["close"])} for r in rates]}
     return jsonify(_cached(f"candles:{tf}:{count}", _fetch, ttl=10))
