@@ -1793,6 +1793,9 @@ def manage_dynamic_tp() -> int:
     _max = int(getattr(_cfg, "TP_EXT_MAX", 0) or TP_EXT_MAX)         # live-reload override (default 4)
     _near = int(getattr(_cfg, "TP_EXT_NEAR_PIPS", 0) or TP_EXT_NEAR_PIPS)  # "ใกล้ TP" threshold (default 150)
     _ext = int(getattr(_cfg, "TP_EXT_PIPS", 0) or TP_EXT_PIPS)       # fallback extend ระยะ (default 400)
+    _momo = int(getattr(_cfg, "TP_EXT_MOMENTUM_MIN", 0) or 4)        # momentum score ≥ นี้ (default 4/5)
+    _cool = int(getattr(_cfg, "TP_EXT_COOLDOWN_SECS", 0) or TP_EXT_COOLDOWN_SECS)   # cooldown (default 900s)
+    _lock = int(getattr(_cfg, "TP_EXT_SL_LOCK_PIPS", 0) or TP_EXT_SL_LOCK_PIPS)     # SL-lock ระยะ (default 200)
 
     info = mt5.symbol_info(SYMBOL)
     if info is None:
@@ -1842,13 +1845,13 @@ def manage_dynamic_tp() -> int:
         # cooldown — ไม่ extend อีกถ้าเพิ่ง extend ไปภายใน TP_EXT_COOLDOWN_SECS
         last_ext = _tp_ext_last_time.get(ticket, 0.0)
         secs_since = _time.time() - last_ext
-        if secs_since < TP_EXT_COOLDOWN_SECS:
-            wait_min = int((TP_EXT_COOLDOWN_SECS - secs_since) / 60)
+        if secs_since < _cool:
+            wait_min = int((_cool - secs_since) / 60)
             logger.debug(f"Dynamic TP: ticket={ticket} cooldown — อีก {wait_min}min")
             continue
 
         direction = "BUY" if is_buy else "SELL"
-        if not _is_momentum_strong(direction):
+        if not _is_momentum_strong(direction, _momo):
             logger.debug(f"Dynamic TP: ticket={ticket} momentum ไม่แรงพอ — ไม่ขยาย")
             continue
 
@@ -1876,7 +1879,7 @@ def manage_dynamic_tp() -> int:
 
         # trail SL มาล็อคกำไรเมื่อ extend TP — SL ไม่ถอยหลัง
         # ระยะ lock ต้อง ≥ SL_MIN_GAP (เดิม 200p = $2 ชิดเกิน โดน noise กวาดก่อนถึง TP ใหม่)
-        _lock_dist = max(TP_EXT_SL_LOCK_PIPS, int(getattr(_cfg, "SL_MIN_GAP_PIPS", 800) or 0))
+        _lock_dist = max(_lock, int(getattr(_cfg, "SL_MIN_GAP_PIPS", 800) or 0))
         lock_sl = round(current - _lock_dist * point, 2) if is_buy \
             else round(current + _lock_dist * point, 2)
         if is_buy:
