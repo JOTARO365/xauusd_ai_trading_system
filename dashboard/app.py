@@ -1332,20 +1332,21 @@ def api_ride_stats():
             return {"ok": False, "error": "MT5 not connected"}
         from collections import defaultdict
         deals = mt5.history_deals_get(datetime.now() - timedelta(days=90), datetime.now()) or []
-        pos = defaultdict(lambda: {"in": None, "pnl": 0.0, "closed": False})
+        # จัดกลุ่มทุก deal ตาม position_id แล้วค่อยตัดสินว่าเป็นไม้ระบบจาก magic ของ "ขาเข้า"
+        # (ขาปิดที่ broker ยิง SL/TP เองมัก magic=0 → กรอง magic ทีละ deal จะทิ้งขาปิด → ไม้ค้าง n_open)
+        pos = defaultdict(lambda: {"in": None, "pnl": 0.0, "closed": False, "sys": False})
         for d in deals:
-            if getattr(d, "magic", 0) != 20260429:      # SYSTEM_MAGIC — ไม้ระบบจริง
-                continue
             p = pos[d.position_id]
             p["pnl"] += d.profit + d.swap + d.commission
             if d.entry == 0 and p["in"] is None:
                 p["in"] = d
+                p["sys"] = getattr(d, "magic", 0) == 20260429   # ไม้ระบบ = ขาเข้า magic SYSTEM
             elif d.entry in (1, 2):
                 p["closed"] = True
         rides = []
         for pid, p in pos.items():
             e = p["in"]
-            if e is None:
+            if e is None or not p["sys"]:      # เอาเฉพาะไม้ระบบ (ตัดสินจากขาเข้า)
                 continue
             rides.append({"time": datetime.fromtimestamp(e.time).isoformat()[:16],
                           "dir": "BUY" if e.type == 0 else "SELL",

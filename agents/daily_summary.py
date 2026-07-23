@@ -106,31 +106,33 @@ def _algo_trades_from_mt5(days=45):
         if not mt5.initialize():
             return []
         deals = mt5.history_deals_get(datetime.now() - timedelta(days=days), datetime.now()) or []
-        pos = defaultdict(lambda: {"pnl": 0.0, "cmt": "", "dir": None, "open_t": None, "close_t": None})
+        # จัดกลุ่มทุก deal ตาม position_id แล้วตัดสินว่าเป็นไม้ระบบจาก "ขาเข้า" (magic SYSTEM)
+        # ไม่กรอง deal ทีละอันด้วย comment เพราะขาปิดถูก broker rename ([sl]/[tp]/MOMENTUM_EXIT) → ขาปิดหาย
+        pos = defaultdict(lambda: {"pnl": 0.0, "cmt": "", "dir": None, "open_t": None,
+                                   "close_t": None, "sys": False})
         for d in deals:
-            cmt = str(getattr(d, "comment", "") or "")
-            if not cmt.startswith("ALGO"):
-                continue
             pp = pos[d.position_id]
             pp["pnl"] += d.profit + d.swap + d.commission
-            if d.entry == 0:                              # open deal → ทิศ + เวลาเปิด + comment
+            if d.entry == 0:                              # open deal → ทิศ + เวลาเปิด + comment + เช็ค magic
+                cmt = str(getattr(d, "comment", "") or "")
                 pp["cmt"] = cmt; pp["dir"] = "BUY" if d.type == 0 else "SELL"; pp["open_t"] = d.time
+                pp["sys"] = getattr(d, "magic", 0) == 20260429 or cmt.startswith("ALGO")
             elif d.entry in (1, 2):                       # close deal
                 pp["close_t"] = d.time
         for pid, pp in pos.items():
-            if pp["close_t"] is None:
+            if pp["close_t"] is None or not pp["sys"]:
                 continue
             out.append({"timestamp": datetime.fromtimestamp(pp["close_t"]).isoformat(),
                         "direction": pp["dir"], "comment": pp["cmt"], "entry_type": pp["cmt"],
                         "pnl": round(pp["pnl"], 2), "status": "CLOSED", "source": "ALGO", "ticket": pid})
         for p in (mt5.positions_get() or []):             # open ALGO ปัจจุบัน
-            if str(getattr(p, "comment", "") or "").startswith("ALGO"):
+            if getattr(p, "magic", 0) == 20260429 or str(getattr(p, "comment", "") or "").startswith("ALGO"):
                 out.append({"timestamp": datetime.fromtimestamp(p.time).isoformat(),
                             "direction": "BUY" if p.type == 0 else "SELL", "comment": p.comment,
                             "entry_type": p.comment, "pnl": None, "status": "OPEN",
                             "source": "ALGO", "ticket": p.ticket})
         for o in (mt5.orders_get() or []):                # pending ALGO ที่ยังรอ fill
-            if str(getattr(o, "comment", "") or "").startswith("ALGO"):
+            if getattr(o, "magic", 0) == 20260429 or str(getattr(o, "comment", "") or "").startswith("ALGO"):
                 out.append({"timestamp": datetime.fromtimestamp(o.time_setup).isoformat(),
                             "direction": "BUY" if o.type in (2, 4) else "SELL", "comment": o.comment,
                             "entry_type": o.comment, "pnl": None, "status": "PENDING",
@@ -147,8 +149,10 @@ def build_daily_summary(days=30, tech="all"):
         trades = d if isinstance(d, list) else d.get("trades", [])
     except (OSError, json.JSONDecodeError):
         return {"days": [], "totals": {}, "techniques_all": [], "filter": tech}
-    rows_all = [t for t in trades if t.get("timestamp")]     # ทั้ง CLOSED + OPEN (วันนี้)
-    rows_all += _algo_trades_from_mt5(days)                   # + ไม้ ALGO จาก MT5 (ไม่อยู่ใน trades.json)
+    algo = _algo_trades_from_mt5(days)                        # ไม้ ALGO จาก MT5 (ไม่อยู่ใน trades.json)
+    _algo_tk = {t.get("ticket") for t in algo}                # MT5 = source of truth (pnl/สถานะถูกต้อง)
+    rows_all = [t for t in trades if t.get("timestamp") and t.get("ticket") not in _algo_tk]
+    rows_all += algo                                          # dedup: ถ้า ticket ชนกัน เอาของ MT5
     # ── reconcile: ไม้ที่ trades.json ค้างสถานะ OPEN แต่ปิดไปแล้วจริงบน MT5 → mark CLOSED + realized pnl ──
     _open_tk, _realized, _mt5_ok = _mt5_state(days)
     if _mt5_ok:
