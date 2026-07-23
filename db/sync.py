@@ -132,8 +132,8 @@ def reconcile_open_trades(account_login: int | None = None, days: int = 365,
     from db.connection import is_available, get_client
     from config import SYMBOL
 
-    result = {"login": None, "db_open": 0, "still_open": 0,
-              "reconciled": 0, "stale": 0, "failed": 0, "dry_run": dry_run, "actions": []}
+    result = {"login": None, "db_open": 0, "still_open": 0, "reconciled": 0, "stale": 0,
+              "backfilled": 0, "failed": 0, "dry_run": dry_run, "actions": []}
 
     if not is_available():
         logger.debug("reconcile_open_trades: DB ไม่พร้อม — ข้าม")
@@ -198,10 +198,35 @@ def reconcile_open_trades(account_login: int | None = None, days: int = 365,
         result[kind] += 1
         result["actions"].append({"ticket": tk, "reason": reason, "pnl": patch.get("pnl")})
 
+    # ── backfill pnl/closed_at ให้ row ที่ CLOSED แต่ pnl=None (เช่น RECONCILED_STALE เก่า / close ที่ pnl ไม่ถูกบันทึก) ──
+    # reuse hist (position_id → pnl,closed_at). ticket = order = position_id บนโบรกนี้. update เฉพาะ 2 ฟิลด์ ไม่ทับ context.
+    try:
+        crows = (get_client().table("trades").select("ticket")
+                 .eq("status", "CLOSED").is_("pnl", "null")
+                 .eq("account_login", login).eq("symbol", SYMBOL).execute().data) or []
+    except Exception as e:
+        crows = []
+        logger.debug(f"reconcile_open_trades: closed-pnl-null query error: {e}")
+    for r in crows:
+        tk = r.get("ticket")
+        if tk is None or int(tk) not in hist:
+            continue
+        pnl, closed_at = hist[int(tk)]
+        if not dry_run:
+            try:
+                (get_client().table("trades").update({"pnl": pnl, "closed_at": closed_at})
+                 .eq("ticket", int(tk)).eq("account_login", login).execute())
+            except Exception as e:
+                result["failed"] += 1
+                logger.debug(f"reconcile_open_trades: pnl-backfill ticket {tk} failed: {e}")
+                continue
+        result["backfilled"] += 1
+        result["actions"].append({"ticket": int(tk), "reason": "PNL_BACKFILL", "pnl": pnl})
+
     tag = "DRY-RUN" if dry_run else "applied"
     logger.info(f"reconcile_open_trades[{login}] ({tag}): db_open={result['db_open']} "
                 f"still_open={result['still_open']} reconciled={result['reconciled']} "
-                f"stale={result['stale']} failed={result['failed']}")
+                f"stale={result['stale']} backfilled={result['backfilled']} failed={result['failed']}")
     return result
 
 
