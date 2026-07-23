@@ -4071,7 +4071,8 @@ const wmX = lng => (lng + 180) * WM_S;
 const wmY = lat => (WM_LAT_TOP - lat) * WM_S;
 let _wmMapInit = false, _wmLand = null;
 
-const _wmEsc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const _wmEsc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const _wmUrl = u => /^https?:\/\//i.test(u || '') ? _wmEsc(u) : '#';   // allowlist http(s) เท่านั้น (กัน javascript:/attr break-out)
 const _wmShort = name => name.replace(/^⚠\s*/, '').split(' · ')[0];
 
 function _wmGraticule() {
@@ -4099,6 +4100,7 @@ function _wmLandPath(rings) {
 
 function _wmDotSvg(p) {
   const x = wmX(p.lng), y = wmY(p.lat);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return '';  // กัน NaN จาก data เพี้ยน
   if (y < -12 || y > WM_H + 12) return '';                    // นอกกรอบ (เช่น Antarctica) ข้าม
   const c = p.kind === 'live' ? ((p.sev || 0) > 0.6 ? '#ef4444' : '#f59e0b')
     : (p.kind === 'risk' ? '#f59e0b' : (p.kind === 'cb' ? '#60a5fa' : '#4ade80'));
@@ -4171,7 +4173,7 @@ function renderWmNews(d) {
   const rows = d.headlines.slice(0, 10).map(h => {
     const s = h.seen || '';
     const tm = s.length >= 13 ? `${s.slice(6, 8)}/${s.slice(4, 6)} ${s.slice(9, 11)}:${s.slice(11, 13)}` : '';
-    const url = _wmEsc(h.url || '#');
+    const url = _wmUrl(h.url);
     return `<tr style="border-top:1px solid var(--border)">`
       + `<td style="padding:5px 9px;color:var(--amber);white-space:nowrap;vertical-align:top">${_wmEsc(h.country || '—')}</td>`
       + `<td style="padding:5px 9px;vertical-align:top"><a href="${url}" target="_blank" rel="noopener" `

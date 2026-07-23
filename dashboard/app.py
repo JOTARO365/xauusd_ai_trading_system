@@ -817,10 +817,28 @@ def _tsmom_vs_bh(years=None):
         return None
 
 
+import threading as _threading
+_wm_refresh_lock = _threading.Lock()
+_wm_refreshing = False
+
+
+def _wm_bg_refresh():
+    """background pull เดียว (in-flight guard reset ท้าย). กันหลาย poll/tab spawn ซ้ำ + เขียนไฟล์ชนกัน."""
+    global _wm_refreshing
+    try:
+        from connectors.worldmonitor import refresh
+        refresh()
+    except Exception:
+        pass
+    finally:
+        _wm_refreshing = False
+
+
 @app.route("/api/worldmonitor")
 def api_worldmonitor():
-    """live geopolitical/gold signals จาก GDELT (WorldMonitor upstream, ฟรี 0-token). serve file +
-    background refresh ถ้า stale (non-blocking). feed globe live risk dots + SELECTION/risk layer."""
+    """live geopolitical/gold signals (GDELT→Google News, ฟรี 0-token). serve file +
+    background refresh ถ้า stale (non-blocking, single-flight). feed flat-map live dots + ตารางข่าว + SELECTION layer."""
+    global _wm_refreshing
     p = os.path.join(_BASE, "..", "data", "worldmonitor.json")
     out = {"ok": False, "events": [], "headlines": [], "attention": None}
     try:
@@ -828,13 +846,14 @@ def api_worldmonitor():
             out = json.load(f)
     except Exception:
         pass
-    # background refresh ถ้า stale (ไม่ block request)
+    # background refresh ถ้า stale (ไม่ block request; single-flight — refresh ได้ทีละ 1)
     try:
         stale = (not os.path.exists(p)) or (_time_mod.time() - os.path.getmtime(p) > 1800)
         if stale:
-            import threading
-            from connectors.worldmonitor import refresh
-            threading.Thread(target=refresh, daemon=True).start()
+            with _wm_refresh_lock:
+                if not _wm_refreshing:
+                    _wm_refreshing = True
+                    _threading.Thread(target=_wm_bg_refresh, daemon=True).start()
     except Exception:
         pass
     return jsonify(out)
