@@ -2034,6 +2034,7 @@
       #cal-detailed .cal-card { max-width:none; width:100%; flex:1 1 auto; }
       #cal-detailed .cal-card.has-scenario { cursor:pointer; }
       #cal-detailed .cal-card.has-scenario:hover { border-color:var(--gold); }
+      #cal-detailed .cal-card.is-speech:hover { border-color:var(--red); }
       .cal-afp { font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:7px;
                  display:flex; gap:14px; border-top:1px solid var(--border); padding-top:6px; }
       .cal-afp b { font-weight:700; }
@@ -5232,6 +5233,7 @@ function renderCalendarDetailed(events) {
     html += `<div class="cal-day-group"><div class="cal-day-label ${isToday ? 'is-today' : ''}"><span class="cal-day-dot"></span>${label}${isToday ? ' · TODAY' : ''} <span style="color:var(--muted);font-weight:400;font-size:10px">· เหลือ ${remain}</span></div><div class="cal-cards">`;
     arr.forEach(([e, ts]) => {
       const key = _scenarioKey(e.title), gold = !!key, rel = isRel(e), th = _thaiEventName(e.title);
+      const isSpeech = !gold && /speaks?|speech|testif|remarks|press conf/i.test(e.title || '');
       const timeStr = isNaN(ts) ? '--:--' : new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       const exp = gold ? expOf(key) : 0;
       const expStr = exp ? `<span class="cal-exp">±${exp.toFixed(2)}%</span>` : '';
@@ -5243,19 +5245,20 @@ function renderCalendarDetailed(events) {
       const an = parseFloat(act.replace(/[^0-9.\-]/g, '')), fn = parseFloat(String(fc).replace(/[^0-9.\-]/g, ''));
       if (rel && !isNaN(an) && !isNaN(fn)) actCol = an > fn ? 'var(--green)' : an < fn ? 'var(--red)' : 'var(--text)';
       const detail = gold ? `<div class="cal-detail" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px" onclick="event.stopPropagation()">${buildScenarioDetail(key, e)}</div>` : '';
-      html += `<div class="cal-card ${impCls(e.impact)} ${isToday ? 'is-today-card' : ''} ${gold ? 'has-scenario' : ''}"${gold ? ' onclick="_toggleCalCard(this)"' : ''}>
+      const spClick = isSpeech ? ` onclick="openSpeechModal(this)" data-sp-title="${_wmEsc(e.title || '')}" data-sp-time="${timeStr}" data-sp-ccy="${_wmEsc(e.currency || '')}" data-sp-imp="${impLbl(e.impact)}" style="cursor:pointer"` : '';
+      html += `<div class="cal-card ${impCls(e.impact)} ${isToday ? 'is-today-card' : ''} ${gold ? 'has-scenario' : ''} ${isSpeech ? 'is-speech' : ''}"${gold ? ' onclick="_toggleCalCard(this)"' : spClick}>
         <div class="cal-hd">
           <span class="cal-time" style="min-width:40px">${timeStr}</span>
           <span class="cal-badge-inline ${impCls(e.impact)}">${impLbl(e.impact)}</span>
           <span class="cal-curr" style="margin:0">${gold ? '★ ' : ''}${e.currency || ''}</span>
-          <span class="cal-name" style="margin:0;padding:0;flex:1;min-width:120px">${e.title || ''}${th ? `<span style="display:block;font-size:9px;color:var(--muted);font-weight:400;margin-top:1px">${th}</span>` : ''}</span>
+          <span class="cal-name" style="margin:0;padding:0;flex:1;min-width:120px">${isSpeech ? '<span style="color:var(--red);font-weight:700" title="live speech">🔴▶ </span>' : ''}${e.title || ''}${th ? `<span style="display:block;font-size:9px;color:var(--muted);font-weight:400;margin-top:1px">${th}</span>` : ''}</span>
           ${expStr}${cd}
         </div>
         <div class="cal-afp">
           <span>A <b style="color:${rel ? actCol : 'var(--muted)'}">${rel ? act : '·'}</b></span>
           <span>F <b style="color:var(--text-dim)">${fc}</b></span>
           <span>P <b style="color:var(--text-dim)">${pv}</b></span>
-          ${gold ? '<span style="color:var(--gold);font-size:9px;margin-left:auto">คลิกดูสถิติ ▾</span>' : ''}
+          ${gold ? '<span style="color:var(--gold);font-size:9px;margin-left:auto">คลิกดูสถิติ ▾</span>' : (isSpeech ? '<span style="color:var(--red);font-size:9px;margin-left:auto">▶ คลิกดู live + ราคา</span>' : '')}
         </div>${detail}</div>`;
     });
     html += `</div></div>`;
@@ -6604,7 +6607,82 @@ if (document.readyState === 'loading') {
 } else {
   _bootstrap();
 }
+
+// ── Speech / live-event modal (Phase 1): live financial stream + XAU price reaction ──
+const _SP_SRC = {
+  yahoo: 'UCEAZeUIeJs0IjQiqTCdVSIg',      // Yahoo Finance
+  dw: 'UCknLrEdhRCp1aegoMqRaCZg',         // DW News (24/7)
+  cnbc: 'UCrp_UI8XtuYfpiqluWLD7Lw',       // CNBC Television
+  bloomberg: 'UCUMZ7gohGI9HcU9VNsr2FJQ'   // Bloomberg Originals
+};
+let _spChart = null, _spSeries = null;
+function _spSetSrc(k, btn) {
+  const ch = _SP_SRC[k];
+  const f = document.getElementById('sp-video');
+  if (f && ch) f.src = `https://www.youtube.com/embed/live_stream?channel=${ch}&autoplay=1&mute=1&cc_load_policy=1&cc_lang_pref=th`;
+  document.querySelectorAll('#speech-modal .sp-src').forEach(b => b.classList.toggle('active', b === btn));
+}
+async function openSpeechModal(el) {
+  const m = document.getElementById('speech-modal');
+  if (!m) return;
+  const d = el.dataset || {};
+  document.getElementById('sp-title').textContent = d.spTitle || 'Speech';
+  document.getElementById('sp-meta').textContent = `${d.spCcy || ''} · ${d.spImp || ''} · ${d.spTime || ''}`.trim();
+  const sr = document.getElementById('sp-search');
+  if (sr) sr.href = 'https://www.youtube.com/results?search_query=' + encodeURIComponent((d.spTitle || '') + ' live');
+  m.style.display = 'flex';
+  _spSetSrc('dw', document.querySelector('#speech-modal .sp-src'));   // default DW News (24/7 live)
+  try {
+    const cEl = document.getElementById('sp-chart');
+    if (!_spChart && window.LightweightCharts && cEl) {
+      _spChart = LightweightCharts.createChart(cEl, {
+        width: cEl.clientWidth, height: 220,
+        layout: { background: { color: 'transparent' }, textColor: '#888', fontSize: 10 },
+        grid: { vertLines: { color: '#1a1a1a' }, horzLines: { color: '#1a1a1a' } },
+        timeScale: { timeVisible: true, borderColor: '#2a2a2a' }, rightPriceScale: { borderColor: '#2a2a2a' }
+      });
+      _spSeries = _spChart.addCandlestickSeries({ upColor: '#44ff88', downColor: '#ff4444', wickUpColor: '#44ff88', wickDownColor: '#ff4444', borderVisible: false });
+    }
+    if (_spChart && cEl) _spChart.applyOptions({ width: cEl.clientWidth });
+    const r = await (await fetch('/api/candles?tf=H1&count=72')).json();
+    if (r.ok && _spSeries) { _spSeries.setData(r.candles); _spChart.timeScale().fitContent(); }
+  } catch (_e) {}
+}
+function closeSpeechModal() {
+  const m = document.getElementById('speech-modal');
+  if (m) m.style.display = 'none';
+  const f = document.getElementById('sp-video');
+  if (f) f.src = '';   // หยุด video เมื่อปิด
+}
 </script>
+
+<!-- Speech / Live-event Modal (Phase 1: live video + XAU price reaction) -->
+<div id="speech-modal" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.8);align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeSpeechModal()">
+  <div style="background:var(--surface,#141414);border:1px solid var(--border);border-radius:8px;max-width:940px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 12px 44px rgba(0,0,0,0.6)">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)">
+      <div><span id="sp-title" style="font-weight:700;font-size:14px">—</span><span id="sp-meta" style="display:block;font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px"></span></div>
+      <button onclick="closeSpeechModal()" style="background:none;border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 9px;cursor:pointer;font-size:15px;flex:0 0 auto">✕</button>
+    </div>
+    <div style="padding:14px 16px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+        <span style="font-size:11px;color:var(--muted)">🔴 Live:</span>
+        <button class="jbtn sp-src" onclick="_spSetSrc('dw',this)">DW News</button>
+        <button class="jbtn sp-src" onclick="_spSetSrc('bloomberg',this)">Bloomberg</button>
+        <button class="jbtn sp-src" onclick="_spSetSrc('cnbc',this)">CNBC</button>
+        <button class="jbtn sp-src" onclick="_spSetSrc('yahoo',this)">Yahoo Finance</button>
+        <a id="sp-search" href="#" target="_blank" rel="noopener" class="jbtn" style="text-decoration:none">🔎 ค้นหา speaker live</a>
+      </div>
+      <div style="position:relative;padding-top:52%;background:#000;border:1px solid var(--border);border-radius:4px;overflow:hidden">
+        <iframe id="sp-video" src="" allow="autoplay; encrypted-media; fullscreen" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:5px">💬 แปลไทย: ในเครื่องเล่นกด ⚙ → Subtitles/CC → Auto-translate → Thai (YouTube live auto-caption — มีดีเลย์/ผิดพลาดบ้างตามธรรมชาติ ASR)</div>
+      <div style="margin-top:14px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:5px">📈 ราคาทอง XAUUSD (H1, ~3 วันล่าสุด) — ดูปฏิกิริยารอบ speech</div>
+        <div id="sp-chart" style="width:100%;height:220px"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- NNLB Risk Warning Modal -->
 <div id="nnlb-modal" style="
