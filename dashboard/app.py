@@ -889,6 +889,45 @@ def api_pair_context():
     return jsonify(out)
 
 
+@app.route("/api/map-layers")
+def api_map_layers():
+    """static geodata layers (gold mines / central banks / waterways) — lift จาก WorldMonitor commodity config.
+    display-only, cache ยาว. เติมความหนาแน่นให้ flat map แบบ WM."""
+    p = os.path.join(_BASE, "..", "data", "map_layers.json")
+    try:
+        with open(p, encoding="utf-8") as f:
+            data = f.read()
+    except Exception:
+        data = "{}"
+    resp = app.response_class(data, mimetype="application/json")
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    return resp
+
+
+@app.route("/api/pair-moves")
+def api_pair_moves():
+    """today % move ต่อคู่ (จาก data/pairs/<sym>_d1.json ที่ pair_collector เก็บ) — เติม hub บนแผนที่.
+    display-only, 0 token. stale ถ้า collector ไม่รัน (คืน last-collected)."""
+    pairs = ["XAUUSD", "XAGUSD", "XAUEUR", "XAUJPY", "AUDUSD", "EURUSD", "USDCHF", "USDJPY"]
+    out = {"ok": False, "moves": {}}
+    pdir = os.path.join(_BASE, "..", "data", "pairs")
+    newest = 0
+    for sym in pairs:
+        fp = os.path.join(pdir, f"{sym.lower()}_d1.json")
+        try:
+            with open(fp, encoding="utf-8") as f:
+                arr = json.load(f)
+            if len(arr) >= 2 and arr[-2][4]:
+                last, prev = float(arr[-1][4]), float(arr[-2][4])
+                out["moves"][sym] = {"pct": round((last / prev - 1) * 100, 2), "last": round(last, 3)}
+                newest = max(newest, int(arr[-1][0]))
+        except Exception:
+            continue
+    out["ok"] = bool(out["moves"])
+    out["stale_s"] = int(_time_mod.time() - newest) if newest else None
+    return jsonify(out)
+
+
 @app.route("/api/tsmom")
 def api_tsmom():
     """สถานะ TSMOM-D1 directional engine: signal ensemble + position + state (compute-in-code, 0 token)."""
