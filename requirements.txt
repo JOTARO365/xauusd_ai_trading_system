@@ -18,3 +18,10 @@ supabase>=2.0.0
 google-genai>=0.8.0
 fastapi>=0.100.0
 uvicorn>=0.23.0
+pydantic>=2.0.0
+
+# offline research / ML scripts only (ml/, scripts/) — NOT needed by main.py or dashboard/app.py
+scipy>=1.10.0
+scikit-learn>=1.3.0
+joblib>=1.3.0
+Pillow>=10.0.0
