@@ -238,6 +238,7 @@
       padding: 4px 9px; cursor: pointer; white-space: nowrap; transition: all .12s;
     }
     .jbtn:hover { color: var(--gold, #f59e0b); border-color: var(--gold, #f59e0b); }
+    .wm-newsrow:hover { background: var(--surface-hover, #1a1a1a); }
 
     /* ─── READY MODE BANNER ─────────────────────────── */
     .ready-banner {
@@ -1745,21 +1746,23 @@
         <span><span class="wm-dot ok"></span>Global Context — ศูนย์เทรดทอง + geopolitical risk (safe-haven driver)</span>
         <span id="wm-attention" style="text-transform:none;letter-spacing:0;font-family:var(--mono);font-size:11px;color:var(--muted)"><span class="wm-dot idle"></span>GDELT — โหลด...</span>
       </div>
-      <div style="position:relative;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:#020a08">
-        <div id="wm-map" style="width:100%;line-height:0"></div>
-        <div style="position:absolute;bottom:7px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:11px;font-size:9px;color:var(--text-dim,#888);font-family:var(--mono);letter-spacing:.3px;padding:5px 14px;background:rgba(2,10,8,0.72);border:1px solid var(--border);border-radius:4px;pointer-events:none">
-          <span><span style="color:#ffd700">●</span> gold mine</span>
-          <span><span style="color:#f59e0b">◆</span> chokepoint</span>
-          <span><span style="color:#8ab4f8">●</span> central bank</span>
-          <span><span style="color:#44ff88">▲</span>/<span style="color:#ff4444">▼</span> hub move</span>
-          <span><span style="color:#ff4444">◉</span> live event</span>
-          <span>📅 econ event</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:stretch">
+        <div style="flex:2 1 540px;min-width:0;position:relative;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:#020a08">
+          <div id="wm-map" style="width:100%;line-height:0"></div>
+          <div style="position:absolute;bottom:7px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:11px;font-size:9px;color:var(--text-dim,#888);font-family:var(--mono);letter-spacing:.3px;padding:5px 14px;background:rgba(2,10,8,0.72);border:1px solid var(--border);border-radius:4px;pointer-events:none">
+            <span><span style="color:#ffd700">●</span> gold mine</span>
+            <span><span style="color:#f59e0b">◆</span> chokepoint</span>
+            <span><span style="color:#8ab4f8">●</span> central bank</span>
+            <span><span style="color:#44ff88">▲</span>/<span style="color:#ff4444">▼</span> hub move</span>
+            <span><span style="color:#ff4444">◉</span> live event</span>
+            <span>📅 econ</span>
+          </div>
         </div>
-      </div>
-      <div style="margin-top:8px;border:1px solid var(--border);border-radius:6px;overflow:hidden">
-        <div class="section-title" style="font-size:11px;padding:7px 10px;margin:0;border-bottom:1px solid var(--border);background:var(--card,#111)">📰 ข่าว safe-haven + ทอง (GDELT + feed รวมกัน) · <span style="color:#e8b923">●</span><span style="color:#e87b23">●</span><span style="color:#e83b3b">●</span> = ความรุนแรง</div>
-        <div id="wm-news" style="max-height:220px;overflow-y:auto">
-          <div style="padding:10px;color:var(--muted);font-size:11px;font-family:var(--mono)">— รอ GDELT pull —</div>
+        <div style="flex:1 1 300px;min-width:255px;border:1px solid var(--border);border-radius:4px;overflow:hidden;display:flex;flex-direction:column">
+          <div class="section-title" style="font-size:10px;padding:7px 10px;margin:0;border-bottom:1px solid var(--border);background:var(--card,#111)">📰 ข่าว + ความรุนแรง · <span style="color:var(--muted);text-transform:none;letter-spacing:0">คลิกเพื่อ focus บนแผนที่</span></div>
+          <div id="wm-news" style="flex:1;overflow-y:auto;max-height:460px">
+            <div style="padding:10px;color:var(--muted);font-size:11px;font-family:var(--mono)">— รอ GDELT pull —</div>
+          </div>
         </div>
       </div>
     </section>
@@ -4172,10 +4175,12 @@ function renderAllLayers() {
       label: `📅${e.ccy}${cd ? ' ' + cd : ''}`,
       title: `${e.ccy} ${e.impact} · ${e.name}${e.forecast ? ` (f:${e.forecast})` : ''}` });
   });
+  const _hubLabeled = {};                          // label ตัวแรกต่อ instrument (กัน XAUUSD ซ้ำ 6 ที่ = clutter)
   WM_HUBS.forEach(h => {
-    const mv = _hubMove(h.sym), col = _moveCol(mv);
+    const mv = _hubMove(h.sym), col = _moveCol(mv), show = !_hubLabeled[h.sym];
+    _hubLabeled[h.sym] = 1;
     s += _mk(h.lat, h.lng, 3.4, col, { glow: mv != null, labelCol: col,
-      label: `${_wmShort(h.name)}${mv != null ? ` ${mv > 0 ? '+' : ''}${mv}%` : ''}`,
+      label: show ? `${_wmShort(h.name)}${mv != null ? ` ${mv > 0 ? '+' : ''}${mv}%` : ''}` : '',
       title: `${h.name}${mv != null ? ` · ${h.sym} ${mv > 0 ? '+' : ''}${mv}%` : ''}` });
   });
   (_wmGdelt || []).forEach(e => {
@@ -4198,7 +4203,7 @@ async function initWmMap() {
     + `<rect x="0" y="0" width="${WM_W}" height="${WM_H}" fill="#020a08"/>`   // WM ocean: near-black green
     + _wmGraticule()
     + `<path d="${_wmLandPath(_wmLand || [])}" fill="#0a2018" stroke="#0f5040" stroke-width="0.5" stroke-linejoin="round"/>`
-    + `<g id="wm-dots"></g></svg>`;
+    + `<g id="wm-dots"></g><g id="wm-focus"></g></svg>`;
   renderAllLayers();          // static layers ทันที (mines/waterways/cb/hubs)
   loadWorldMonitor();         // แล้ว merge GDELT live + pair-moves
 }
@@ -4258,6 +4263,21 @@ async function loadPairContext() {
 // รวมข่าว GDELT (geopolitical) + gold feed (news_impact) เป็นลิสต์เดียว + จุดสี severity (เหลือง/ส้ม/แดง)
 const _sevColor = t => t >= 3 ? '#e83b3b' : (t >= 2 ? '#e87b23' : '#e8b923');   // red / orange / yellow
 const _sevTier = sev => sev > 0.66 ? 3 : (sev > 0.33 ? 2 : 1);
+// focus จุดบนแผนที่ (คลิกจากตารางข่าว) — วง highlight ที่พิกัด + เลื่อน map เข้า view
+function focusMapPoint(lat, lng) {
+  const fg = document.getElementById('wm-focus');
+  if (!fg || !Number.isFinite(+lat) || !Number.isFinite(+lng)) return;
+  const x = wmX(+lng).toFixed(1), y = wmY(+lat).toFixed(1);
+  fg.innerHTML =
+    `<circle cx="${x}" cy="${y}" r="3" fill="none" stroke="#fff" stroke-width="1.3">`
+    + `<animate attributeName="r" values="3;18;3" dur="1.3s" repeatCount="5"/>`
+    + `<animate attributeName="opacity" values="1;0.1;1" dur="1.3s" repeatCount="5"/></circle>`
+    + `<circle cx="${x}" cy="${y}" r="2.2" fill="#fff"/>`;
+  const m = document.getElementById('wm-map');
+  if (m) m.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => { if (fg) fg.innerHTML = ''; }, 6500);
+}
+
 function renderUnifiedNews(wm, ni) {
   const box = document.getElementById('wm-news');
   if (!box) return;
@@ -4268,13 +4288,15 @@ function renderUnifiedNews(wm, ni) {
       const s = h.seen || '';
       const ts = s.length >= 13
         ? Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8), +s.slice(9, 11), +s.slice(11, 13)) / 1000 : 0;
-      items.push({ tier: _sevTier(ev ? ev.sev : 0.4), title: h.title, source: h.domain || h.country, url: h.url, ts, tag: 'geo' });
+      items.push({ tier: _sevTier(ev ? ev.sev : 0.4), title: h.title, source: h.domain || h.country, url: h.url,
+        ts, tag: 'geo', lat: ev ? ev.lat : null, lng: ev ? ev.lng : null });
     });
   }
   if (ni && ni.ok && ni.posts) {
     ni.posts.forEach(p => {
       const ts = p.ts_utc ? Date.parse(p.ts_utc) / 1000 : (p.age_min != null ? Date.now() / 1000 - p.age_min * 60 : 0);
-      items.push({ tier: p.magnitude_tier || 1, title: p.text || p.reason || '', source: p.source || '', url: p.url, ts, tag: p.direction || 'gold' });
+      items.push({ tier: p.magnitude_tier || 1, title: p.text || p.reason || '', source: p.source || '', url: p.url,
+        ts, tag: p.direction || 'gold', lat: 51.51, lng: -0.13 });   // gold news → gold hub (London LBMA)
     });
   }
   if (!items.length) {
@@ -4282,25 +4304,20 @@ function renderUnifiedNews(wm, ni) {
     return;
   }
   items.sort((a, b) => b.ts - a.ts);
-  const rows = items.slice(0, 14).map(it => {
+  box.innerHTML = items.slice(0, 30).map(it => {
     const c = _sevColor(it.tier);
     const tm = it.ts ? new Date(it.ts * 1000).toISOString().slice(5, 16).replace('T', ' ') : '';
-    const title = _wmEsc(it.title || '');
-    const inner = it.url && /^https?:/i.test(it.url)
-      ? `<a href="${_wmUrl(it.url)}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none">${title}</a>` : title;
-    const tagC = it.tag === 'geo' ? 'var(--muted)' : (it.tag === 'bull' ? 'var(--green)' : (it.tag === 'bear' ? 'var(--red)' : 'var(--cyan)'));
-    return `<tr style="border-top:1px solid var(--border)">`
-      + `<td style="padding:5px 9px;vertical-align:top;text-align:center"><span title="tier ${it.tier}" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c};box-shadow:0 0 5px ${c}"></span></td>`
-      + `<td style="padding:5px 9px;vertical-align:top">${inner}</td>`
-      + `<td style="padding:5px 9px;color:${tagC};white-space:nowrap;vertical-align:top;font-size:10px">${_wmEsc(it.tag)}</td>`
-      + `<td style="padding:5px 9px;color:var(--cyan);white-space:nowrap;vertical-align:top">${_wmEsc(it.source || '')}</td>`
-      + `<td style="padding:5px 9px;color:var(--muted);white-space:nowrap;vertical-align:top;font-family:var(--mono)">${tm}</td></tr>`;
+    const trend = it.tag === 'bull' ? '<span style="color:#44ff88" title="bullish gold">▲</span>'
+      : (it.tag === 'bear' ? '<span style="color:#ff4444" title="bearish gold">▼</span>'
+        : '<span style="color:var(--muted)" title="geopolitical">◆</span>');
+    const canFocus = it.lat != null && it.lng != null;
+    const click = canFocus ? `onclick="focusMapPoint(${it.lat},${it.lng})"` : '';
+    return `<div class="wm-newsrow" ${click} style="display:flex;gap:7px;padding:6px 9px;border-bottom:1px solid var(--border);${canFocus ? 'cursor:pointer' : ''};align-items:flex-start">`
+      + `<span style="flex:0 0 auto;margin-top:3px;width:8px;height:8px;border-radius:50%;background:${c};box-shadow:0 0 5px ${c}"></span>`
+      + `<span style="flex:1;min-width:0;font-size:11px"><span style="color:var(--text)">${_wmEsc(it.title || '')}</span>`
+      + `<span style="display:block;color:var(--muted);font-size:9px;margin-top:2px;font-family:var(--mono)">${_wmEsc(it.source || '')} · ${tm}</span></span>`
+      + `<span style="flex:0 0 auto;margin-top:1px;font-size:11px">${trend}</span></div>`;
   }).join('');
-  box.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:11px">`
-    + `<thead><tr style="color:var(--muted);text-align:left;position:sticky;top:0;background:var(--card,#111)">`
-    + `<th style="padding:6px 9px">⚠</th><th style="padding:6px 9px">พาดหัวข่าว</th><th style="padding:6px 9px">ทิศ</th>`
-    + `<th style="padding:6px 9px">แหล่ง</th><th style="padding:6px 9px">เวลา</th>`
-    + `</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 async function loadTsmom() {

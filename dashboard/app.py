@@ -1827,8 +1827,33 @@ def _warm_cache() -> None:
         print(f"[warm_cache] error: {e}", flush=True)
 
 
+def _pair_collector_loop():
+    """daemon: เก็บ pair data (gold-complex) เองพร้อม dashboard — ไม่ต้องรัน process แยก.
+    ปิดได้ด้วย PAIR_COLLECT=false. read-only MT5, 0 token."""
+    if os.getenv("PAIR_COLLECT", "true").lower() == "false":
+        return
+    import time as _t
+    try:
+        from connectors import pair_collector as pc
+    except Exception as e:
+        print(f"[pair-collector] import fail: {e}", flush=True)
+        return
+    try:
+        pc._init_mt5()
+    except Exception:
+        pass
+    print("[pair-collector] started (in-dashboard daemon)", flush=True)
+    while True:
+        try:
+            pc.collect_once()
+        except Exception as e:
+            print(f"[pair-collector] cycle error: {e}", flush=True)
+        _t.sleep(getattr(pc, "INTERVAL", 60))
+
+
 if __name__ == "__main__":
     import threading
     threading.Thread(target=_warm_cache, daemon=True).start()
+    threading.Thread(target=_pair_collector_loop, daemon=True, name="pair-collector").start()
     from waitress import serve
     serve(app, host="0.0.0.0", port=5050, threads=4)
