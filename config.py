@@ -280,7 +280,7 @@ def reload_config():
     BE_MAX_TRIGGER_PIPS = int(os.getenv("BE_MAX_TRIGGER_PIPS", "1500"))
     TRAILING_STOP        = os.getenv("TRAILING_STOP",           "false").lower() == "true"
     TRAILING_ATR_TF      = os.getenv("TRAILING_ATR_TF",         "D1")
-    TRAILING_ATR_MULT    = float(os.getenv("TRAILING_ATR_MULT",  "1.5"))
+    TRAILING_ATR_MULT    = float(os.getenv("TRAILING_ATR_MULT",  "0.8"))   # × ATR(tf) — vol-adaptive buffer
     TRAILING_MIN_PROFIT_R= float(os.getenv("TRAILING_MIN_PROFIT_R", "1.5"))
     TRAILING_LOOKBACK    = int(os.getenv("TRAILING_LOOKBACK",    "6"))
     global MIN_TECHNICAL_CONFIDENCE, ASIAN_MIN_CONF, COUNTER_SPIKE_PIPS
@@ -416,7 +416,7 @@ BE_MAX_TRIGGER_PIPS = int(os.getenv("BE_MAX_TRIGGER_PIPS", "1500"))
 # ── Trailing Stop (Swing Low/High Higher TF) ──────────────────
 TRAILING_STOP         = os.getenv("TRAILING_STOP",      "false").lower() == "true"
 TRAILING_ATR_TF       = os.getenv("TRAILING_ATR_TF",    "D1")   # H4 | D1 | W1
-TRAILING_ATR_MULT     = float(os.getenv("TRAILING_ATR_MULT",     "1.5"))
+TRAILING_ATR_MULT     = float(os.getenv("TRAILING_ATR_MULT",     "0.8"))   # × ATR(tf) buffer ใต้/เหนือ swing (vol-adaptive; เดิม flat-$ แคบไปช่วง vol สูง → whipsaw)
 TRAILING_MIN_PROFIT_R = float(os.getenv("TRAILING_MIN_PROFIT_R", "1.5"))  # start only after 1.5R profit
 TRAILING_LOOKBACK     = int(os.getenv("TRAILING_LOOKBACK",       "6"))    # candles for swing calc
 

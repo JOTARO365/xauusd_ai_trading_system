@@ -249,6 +249,21 @@ def _get_htf_swing(tf_name: str = "D1", lookback: int = 3) -> tuple:
     return swing_low, swing_high
 
 
+def _htf_atr(tf_name: str = "H4", n: int = 14) -> float:
+    """ATR(n) ของ Higher TF (Wilder-ish SMA of TR) สำหรับ vol-adaptive trailing buffer. คืน 0.0 ถ้า error."""
+    from connectors.price_feed import get_ohlcv
+    tf_map = {"H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1, "W1": mt5.TIMEFRAME_W1}
+    tf = tf_map.get(tf_name.upper(), mt5.TIMEFRAME_H4)
+    rates = get_ohlcv(SYMBOL, tf, n + 2)
+    if rates is None or len(rates) < n + 1:
+        return 0.0
+    trs = []
+    for i in range(1, len(rates)):
+        h, l, pc = float(rates[i]["high"]), float(rates[i]["low"]), float(rates[i - 1]["close"])
+        trs.append(max(h - l, abs(h - pc), abs(l - pc)))
+    return float(sum(trs[-n:]) / n) if len(trs) >= n else 0.0
+
+
 def manage_trailing_stop() -> int:
     """
     Swing Low/High trailing stop ใช้ Higher TF (H4 / D1 / W1)
@@ -267,7 +282,7 @@ def manage_trailing_stop() -> int:
         return 0
 
     tf_name        = getattr(_cfg, "TRAILING_ATR_TF",       "D1")
-    buffer         = getattr(_cfg, "TRAILING_ATR_MULT",      1.5)   # $ buffer above/below swing
+    mult           = getattr(_cfg, "TRAILING_ATR_MULT",      0.8)   # × ATR(tf) buffer ใต้/เหนือ swing (vol-adaptive)
     min_profit_r   = getattr(_cfg, "TRAILING_MIN_PROFIT_R",  1.5)   # start trailing only after 1.5R profit
     lookback       = int(getattr(_cfg, "TRAILING_LOOKBACK",  6))    # H4 candles to find swing
 
@@ -275,6 +290,14 @@ def manage_trailing_stop() -> int:
     if swing_low <= 0 or swing_high <= 0:
         logger.warning("[TRAILING] ไม่สามารถดึง swing levels ได้ — ข้าม")
         return 0
+
+    # buffer = mult × ATR(tf) — vol-adaptive (แก้ whipsaw: เดิม flat-$ แคบไปช่วงทอง vol สูง).
+    # ถ้าดึง ATR ไม่ได้ → ข้าม (ไม่ขยับ SL ด้วย buffer มั่ว = fail-safe ไม่รูดชิด)
+    atr_htf = _htf_atr(tf_name)
+    if atr_htf <= 0:
+        logger.warning("[TRAILING] ดึง ATR ไม่ได้ — ข้าม (กันวาง buffer แคบ)")
+        return 0
+    buffer = round(mult * atr_htf, 2)
 
     tick = mt5.symbol_info_tick(SYMBOL)
     if tick is None:
@@ -329,7 +352,7 @@ def manage_trailing_stop() -> int:
             ref = f"swing_low={swing_low:.2f}" if is_buy else f"swing_high={swing_high:.2f}"
             logger.warning(
                 f"[TRAILING] ticket={pos.ticket} {direction} "
-                f"SL {cur_sl:.2f} → {trail_sl:.2f}  ({ref} buf=${buffer})"
+                f"SL {cur_sl:.2f} → {trail_sl:.2f}  ({ref} buf=${buffer}={mult}×ATR_{tf_name} ${atr_htf:.2f})"
             )
             moved += 1
         else:
