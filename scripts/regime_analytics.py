@@ -80,36 +80,34 @@ def compute_historical(tf="h1"):
 
 
 def compute_weekly_live():
-    """อ่าน shadow log → per ISO-week × regime: bars + signals. ว่าง = ยังไม่เปิด REGIME_SHADOW."""
-    if not os.path.exists(SHADOW_LOG):
-        return {"weeks": [], "note": "ยังไม่มี shadow data — เปิด REGIME_SHADOW=true บน VM เพื่อเริ่มเก็บ"}
-    weeks = defaultdict(lambda: defaultdict(lambda: {"bars": 0, "signals": 0}))
-    n = 0
-    with open(SHADOW_LOG, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rec = json.loads(line)
-            except Exception:
-                continue
-            ts = rec.get("bar_ts") or rec.get("ts")
-            if not ts:
-                continue
-            try:
-                dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-            except Exception:
-                continue
-            wk = f"{dt.isocalendar()[0]}-W{dt.isocalendar()[1]:02d}"
-            reg = rec.get("regime", "?")
-            weeks[wk][reg]["bars"] += 1
-            if rec.get("signal"):
-                weeks[wk][reg]["signals"] += 1
-            n += 1
-    out = [{"week": wk, **{r: dict(v) for r, v in regs.items()}} for wk, regs in sorted(weeks.items())]
-    return {"weeks": out[-8:], "total_bars_logged": n,
-            "note": "shadow track record (ยังไม่ forward-label outcome — P-next)"}
+    """per ISO-week ของไม้ ALGO ปิดจริง (MT5 deals magic-filtered): N / wins / WR / PnL. real ไม่ใช่ shadow."""
+    try:
+        import sys as _sys
+        _sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import regime_monitor as _rm
+        trades = _rm.fetch_algo_trades()
+    except Exception as e:
+        return {"weeks": [], "note": f"ดึงไม้ ALGO ไม่ได้: {str(e)[:60]}"}
+    if not trades:
+        return {"weeks": [], "note": "ยังไม่มีไม้ ALGO ปิดจริง (หรือ MT5 ไม่พร้อม)"}
+    weeks = defaultdict(lambda: {"n": 0, "wins": 0, "pnl": 0.0})
+    for t in trades:
+        ts = t.get("close_ts")
+        if not ts:
+            continue
+        try:
+            dt = datetime.utcfromtimestamp(int(ts))
+        except Exception:
+            continue
+        wk = f"{dt.isocalendar()[0]}-W{dt.isocalendar()[1]:02d}"
+        w = weeks[wk]
+        w["n"] += 1
+        w["wins"] += 1 if t.get("win") else 0
+        w["pnl"] = round(w["pnl"] + (t.get("pnl") or 0), 2)
+    out = [{"week": wk, "n": v["n"], "wins": v["wins"],
+            "wr": round(v["wins"] / v["n"], 2) if v["n"] else 0, "pnl": v["pnl"]}
+           for wk, v in sorted(weeks.items())]
+    return {"weeks": out[-8:], "total": len(trades), "note": "real closed ALGO trades (MT5 deals)"}
 
 
 def build_report():

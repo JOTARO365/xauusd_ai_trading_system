@@ -231,6 +231,14 @@
       background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
     }
 
+    /* ─── SECTION QUICK-JUMP NAV ─────────────────────── */
+    .jbtn {
+      font-family: var(--mono, monospace); font-size: 10px; color: var(--muted);
+      background: var(--card, #111); border: 1px solid var(--border); border-radius: 5px;
+      padding: 4px 9px; cursor: pointer; white-space: nowrap; transition: all .12s;
+    }
+    .jbtn:hover { color: var(--gold, #f59e0b); border-color: var(--gold, #f59e0b); }
+
     /* ─── READY MODE BANNER ─────────────────────────── */
     .ready-banner {
       display: none;
@@ -1596,7 +1604,7 @@
         <div class="value" id="man-count" style="color:var(--amber)">—</div>
         <div class="sub" id="man-winrate">Win rate —</div>
       </div>
-      <div class="card" style="grid-column:span 2">
+      <div class="card legacy-llm" style="grid-column:span 2">
         <div class="label">Strategy Breakdown (System)</div>
         <div id="entry-type-stats" style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.8;font-family:var(--mono)">—</div>
       </div>
@@ -1667,6 +1675,20 @@
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-monitor">
 
+    <div class="section-jump" style="position:sticky;top:0;z-index:30;display:flex;gap:5px;flex-wrap:wrap;padding:8px 2px;margin-bottom:8px;background:var(--bg,#0a0e14);border-bottom:1px solid var(--border)">
+      <button class="jbtn" onclick="jumpTo('algo-status-section')">สถานะ</button>
+      <button class="jbtn" onclick="jumpTo('tsmom-section')">TSMOM</button>
+      <button class="jbtn" onclick="jumpTo('wm-map-section')">แผนที่/ข่าว</button>
+      <button class="jbtn" onclick="jumpTo('pair-context-section')">Gold-Complex</button>
+      <button class="jbtn" onclick="jumpTo('ai-sentiment-section')">Sentiment</button>
+      <button class="jbtn" onclick="jumpTo('cluster-map-section')">S/R</button>
+      <button class="jbtn" onclick="jumpTo('macro-quant-section')">Macro</button>
+      <button class="jbtn" onclick="jumpTo('liq-proxy-section')">Liquidity</button>
+      <button class="jbtn" onclick="jumpTo('algo-journal-section')">Trade Score</button>
+      <button class="jbtn" onclick="jumpTo('gold-regime-section')">Regime</button>
+      <button class="jbtn" onclick="jumpTo('news-impact-section')">Calendar</button>
+    </div>
+
     <!-- SYSTEM STATUS — สถานะระบบ algo ใหม่ (REGIME_LIVE mode / regime / signal) -->
     <section id="algo-status-section" style="margin-bottom:10px">
       <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;padding:10px 14px;border:1px solid var(--border);border-left:3px solid var(--gold);border-radius:8px;font-family:var(--mono);font-size:12px">
@@ -1730,7 +1752,7 @@
         </div>
       </div>
       <div style="margin-top:8px;border:1px solid var(--border);border-radius:6px;overflow:hidden">
-        <div class="section-title" style="font-size:11px;padding:7px 10px;margin:0;border-bottom:1px solid var(--border);background:var(--card,#111)">📰 ข่าวขับเคลื่อน safe-haven (จุดบนแผนที่) — GDELT · 48h</div>
+        <div class="section-title" style="font-size:11px;padding:7px 10px;margin:0;border-bottom:1px solid var(--border);background:var(--card,#111)">📰 ข่าว safe-haven + ทอง (GDELT + feed รวมกัน) · <span style="color:#e8b923">●</span><span style="color:#e87b23">●</span><span style="color:#e83b3b">●</span> = ความรุนแรง</div>
         <div id="wm-news" style="max-height:220px;overflow-y:auto">
           <div style="padding:10px;color:var(--muted);font-size:11px;font-family:var(--mono)">— รอ GDELT pull —</div>
         </div>
@@ -2209,7 +2231,7 @@
           <tbody id="ra-tbody"><tr><td colspan="8" style="padding:8px;color:var(--muted)">Loading…</td></tr></tbody>
         </table>
       </div>
-      <div class="section-title" style="margin-top:14px">สรุปรายสัปดาห์ (shadow)</div>
+      <div class="section-title" style="margin-top:14px">สรุปรายสัปดาห์ — ไม้ ALGO ปิดจริง (N/WR/PnL)</div>
       <div id="ra-weekly" style="font-size:12px;font-family:var(--mono);color:var(--muted)">—</div>
       <div class="section-title" style="margin-top:14px">Live Monitor — ALGO trades จริง (N-gauge + decay)</div>
       <div id="ra-monitor" style="font-size:12px;font-family:var(--mono);color:var(--muted)">—</div>
@@ -3406,6 +3428,11 @@ function switchTab(name) {
   if (name === 'backtest') { loadBacktest(); loadRegimeAnalytics(); loadDailySummary(); loadOwnerEdge(); }
 }
 
+function jumpTo(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 /* ════════════════════════════════════════════════════════════
    FETCH DATA
    ════════════════════════════════════════════════════════════ */
@@ -3610,7 +3637,7 @@ function updateCommandDeck(bs) {
     const items = [];
     if (bs.skip_ai) {
       // ระบบใหม่: entry=algo deterministic (ไม่ใช่ LLM gate) → ไม่โชว์ "Signal 0% no gate pass" vestigial
-      items.push('ALGO mode — entry deterministic (LLM entry off)');
+      items.push('ALGO mode — entry deterministic');
       if (sig.reason) items.push(sig.reason);
     } else if (dec === 'SKIP') {
       if (sig.reason) items.push(sig.reason);
@@ -3762,7 +3789,7 @@ function updatePipelineFromStatus(bs) {
   if (signal === 'BUY') sigColor = 'var(--green)';
   else if (signal === 'SELL') sigColor = 'var(--red)';
   if (bs.skip_ai) {
-    setMeta(4, `<span style="color:var(--gold)">ALGO deterministic</span> · <span style="color:var(--text-dim)">LLM entry off</span>`);
+    setMeta(4, `<span style="color:var(--gold)">ALGO deterministic</span>`);
     setStatus(4, 'status-active', 'ALGO');
   } else {
     setMeta(4, `<span style="color:${sigColor};font-weight:600">${signal || '—'}</span> · <span style="color:var(--text-dim)">${conf}%</span>`);
@@ -4165,7 +4192,9 @@ async function loadWorldMonitor() {
           `GDELT attention <b style="color:${c}">${lvl}</b> · ${d.n_articles} ข่าว/48h`;
       } else { at.innerHTML = '<span class="wm-dot idle"></span>GDELT — รอ data (offline/rate-limit)'; }
     }
-    renderWmNews(d);
+    let ni = null;
+    try { ni = await (await fetch('/api/news-impact')).json(); } catch (_e2) {}
+    renderUnifiedNews(d, ni);
   } catch (_e) {}
 }
 
@@ -4196,30 +4225,51 @@ async function loadPairContext() {
   } catch (_e) {}
 }
 
-// ตารางข่าว GDELT ใต้แผนที่ — พาดหัวที่ขับเคลื่อน safe-haven (คู่กับจุดบน map)
-function renderWmNews(d) {
+// รวมข่าว GDELT (geopolitical) + gold feed (news_impact) เป็นลิสต์เดียว + จุดสี severity (เหลือง/ส้ม/แดง)
+const _sevColor = t => t >= 3 ? '#e83b3b' : (t >= 2 ? '#e87b23' : '#e8b923');   // red / orange / yellow
+const _sevTier = sev => sev > 0.66 ? 3 : (sev > 0.33 ? 2 : 1);
+function renderUnifiedNews(wm, ni) {
   const box = document.getElementById('wm-news');
   if (!box) return;
-  if (!(d.ok && d.headlines && d.headlines.length)) {
-    box.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:11px;font-family:var(--mono)">'
-      + '— ยังไม่มีข่าว (รอ GDELT pull / rate-limit) —</div>';
+  const items = [];
+  if (wm && wm.ok && wm.headlines) {
+    wm.headlines.forEach(h => {
+      const ev = (wm.events || []).find(e => e.name === h.country);
+      const s = h.seen || '';
+      const ts = s.length >= 13
+        ? Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8), +s.slice(9, 11), +s.slice(11, 13)) / 1000 : 0;
+      items.push({ tier: _sevTier(ev ? ev.sev : 0.4), title: h.title, source: h.domain || h.country, url: h.url, ts, tag: 'geo' });
+    });
+  }
+  if (ni && ni.ok && ni.posts) {
+    ni.posts.forEach(p => {
+      const ts = p.ts_utc ? Date.parse(p.ts_utc) / 1000 : (p.age_min != null ? Date.now() / 1000 - p.age_min * 60 : 0);
+      items.push({ tier: p.magnitude_tier || 1, title: p.text || p.reason || '', source: p.source || '', url: p.url, ts, tag: p.direction || 'gold' });
+    });
+  }
+  if (!items.length) {
+    box.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:11px;font-family:var(--mono)">— รอข่าว (GDELT / feed) —</div>';
     return;
   }
-  const rows = d.headlines.slice(0, 10).map(h => {
-    const s = h.seen || '';
-    const tm = s.length >= 13 ? `${s.slice(6, 8)}/${s.slice(4, 6)} ${s.slice(9, 11)}:${s.slice(11, 13)}` : '';
-    const url = _wmUrl(h.url);
+  items.sort((a, b) => b.ts - a.ts);
+  const rows = items.slice(0, 14).map(it => {
+    const c = _sevColor(it.tier);
+    const tm = it.ts ? new Date(it.ts * 1000).toISOString().slice(5, 16).replace('T', ' ') : '';
+    const title = _wmEsc(it.title || '');
+    const inner = it.url && /^https?:/i.test(it.url)
+      ? `<a href="${_wmUrl(it.url)}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none">${title}</a>` : title;
+    const tagC = it.tag === 'geo' ? 'var(--muted)' : (it.tag === 'bull' ? 'var(--green)' : (it.tag === 'bear' ? 'var(--red)' : 'var(--cyan)'));
     return `<tr style="border-top:1px solid var(--border)">`
-      + `<td style="padding:5px 9px;color:var(--amber);white-space:nowrap;vertical-align:top">${_wmEsc(h.country || '—')}</td>`
-      + `<td style="padding:5px 9px;vertical-align:top"><a href="${url}" target="_blank" rel="noopener" `
-      + `style="color:var(--text);text-decoration:none">${_wmEsc(h.title || '')}</a></td>`
-      + `<td style="padding:5px 9px;color:var(--cyan);white-space:nowrap;vertical-align:top">${_wmEsc(h.domain || '')}</td>`
+      + `<td style="padding:5px 9px;vertical-align:top;text-align:center"><span title="tier ${it.tier}" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c};box-shadow:0 0 5px ${c}"></span></td>`
+      + `<td style="padding:5px 9px;vertical-align:top">${inner}</td>`
+      + `<td style="padding:5px 9px;color:${tagC};white-space:nowrap;vertical-align:top;font-size:10px">${_wmEsc(it.tag)}</td>`
+      + `<td style="padding:5px 9px;color:var(--cyan);white-space:nowrap;vertical-align:top">${_wmEsc(it.source || '')}</td>`
       + `<td style="padding:5px 9px;color:var(--muted);white-space:nowrap;vertical-align:top;font-family:var(--mono)">${tm}</td></tr>`;
   }).join('');
   box.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:11px">`
     + `<thead><tr style="color:var(--muted);text-align:left;position:sticky;top:0;background:var(--card,#111)">`
-    + `<th style="padding:6px 9px;font-weight:600">ภูมิภาค</th><th style="padding:6px 9px;font-weight:600">พาดหัวข่าว</th>`
-    + `<th style="padding:6px 9px;font-weight:600">แหล่ง</th><th style="padding:6px 9px;font-weight:600">เวลา</th>`
+    + `<th style="padding:6px 9px">⚠</th><th style="padding:6px 9px">พาดหัวข่าว</th><th style="padding:6px 9px">ทิศ</th>`
+    + `<th style="padding:6px 9px">แหล่ง</th><th style="padding:6px 9px">เวลา</th>`
     + `</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -4517,8 +4567,8 @@ async function loadRegimeAnalytics() {
         wl.textContent = wk.note || 'ยังไม่มี shadow data';
       } else {
         wl.innerHTML = wk.weeks.map(w => {
-          const parts = Object.keys(w).filter(k => k !== 'week').map(k => `${k}:${w[k].bars}b/${w[k].signals}s`).join('  ');
-          return `<div>${w.week} — ${parts}</div>`;
+          const pc = (w.pnl || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+          return `<div>${w.week} — N=${w.n} · WR ${Math.round((w.wr || 0) * 100)}% · <span style="color:${pc}">PnL ${w.pnl}฿</span></div>`;
         }).join('');
       }
     }

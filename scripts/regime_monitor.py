@@ -88,14 +88,15 @@ def fetch_algo_trades(days=180):
                     pass
         pos = defaultdict(lambda: {"pnl": 0.0, "entry": None, "closed": False})
         for d in deals:
-            if not str(getattr(d, "comment", "") or "").startswith("ALGO"):
-                continue
+            if getattr(d, "magic", 0) != 20260429:       # SYSTEM_MAGIC — algo/system trades
+                continue                                  # (กรอง magic ไม่ใช่ comment: exit deal ถูก broker เปลี่ยนเป็น sl/tp)
             pp = pos[d.position_id]
             pp["pnl"] += d.profit + d.swap + d.commission
             if d.entry == 0 and pp["entry"] is None:
                 pp["entry"] = d
             elif d.entry in (1, 2):
                 pp["closed"] = True
+                pp["close_time"] = getattr(d, "time", None)
         out = []
         for pid, pp in pos.items():
             if not pp["closed"]:
@@ -107,7 +108,8 @@ def fetch_algo_trades(days=180):
                 pip_val = 0.01 * getattr(pp["entry"], "volume", 0.01) * 100   # XAU: $0.01/pip/0.01lot ≈ ปรับตามบัญชี
                 risk = sl * pip_val if pip_val else 0
                 R = pp["pnl"] / risk if risk else None
-            out.append({"pnl": pp["pnl"], "win": pp["pnl"] > 0, "R": round(R, 3) if R is not None else None})
+            out.append({"pnl": pp["pnl"], "win": pp["pnl"] > 0, "R": round(R, 3) if R is not None else None,
+                        "close_ts": pp.get("close_time")})
         return out
     except Exception:
         return []
