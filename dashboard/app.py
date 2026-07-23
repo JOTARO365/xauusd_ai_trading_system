@@ -1543,6 +1543,47 @@ def api_candles():
     return jsonify(_cached(f"candles:{tf}:{count}", _fetch, ttl=10))
 
 
+@app.route("/api/speech-history")
+def api_speech_history():
+    """ปฏิกิริยาราคา XAU รอบ speech ครั้งก่อน (data/speech_log.json + MT5 H1 รอบ prev ts). Phase 2, 0 token."""
+    from connectors.speech_log import norm_key
+    k = norm_key(request.args.get("title", ""))
+    out = {"ok": False}
+    try:
+        try:
+            rec = json.load(open(os.path.join(_BASE, "..", "data", "speech_log.json"), encoding="utf-8"))
+        except Exception:
+            rec = {}                                    # ยังไม่มีไฟล์ = กำลังสะสม
+        ent = rec.get(k)
+        if not ent or not ent.get("ts"):
+            out["note"] = "ยังไม่มีบันทึก speech นี้ (กำลังสะสม)"
+            return jsonify(out)
+        past = [t for t in ent["ts"] if t < _time_mod.time() - 3600]   # ผ่านมาแล้ว >1 ชม.
+        if not past:
+            out["note"] = "ยังไม่มี speech ครั้งก่อนที่ผ่านไปแล้ว (กำลังสะสม)"
+            return jsonify(out)
+        prev = max(past)
+        out["speech_ts"] = prev
+        if _MT5_AVAILABLE and _ensure_mt5():
+            frm = datetime.utcfromtimestamp(prev - 12 * 3600)
+            rates = mt5.copy_rates_from(SYMBOL, _TF_MAP["H1"], frm, 36)
+            if rates is not None and len(rates):
+                out["candles"] = [{"time": int(r["time"]), "open": float(r["open"]), "high": float(r["high"]),
+                                   "low": float(r["low"]), "close": float(r["close"])} for r in rates]
+                sp = min(rates, key=lambda r: abs(int(r["time"]) - prev))     # บาร์ ณ speech
+                after = [r for r in rates if int(r["time"]) >= prev + 5 * 3600]
+                if after and float(sp["close"]):
+                    out["move_pct"] = round((float(after[0]["close"]) / float(sp["close"]) - 1) * 100, 2)
+                out["ok"] = True
+            else:
+                out["note"] = "ดึงราคา MT5 ไม่ได้"
+        else:
+            out["note"] = "MT5 ไม่พร้อม"
+    except Exception as e:
+        out["error"] = str(e)[:60]
+    return jsonify(out)
+
+
 @app.route("/api/regime")
 def api_regime():
     """สรุป macro regime จาก agents/prompts/macro_regime.md (ไฟล์เดียวกับที่ analyst อ่าน)
@@ -1843,11 +1884,19 @@ def _pair_collector_loop():
     except Exception:
         pass
     print("[pair-collector] started (in-dashboard daemon)", flush=True)
+    _last_speech = 0.0
     while True:
         try:
             pc.collect_once()
         except Exception as e:
             print(f"[pair-collector] cycle error: {e}", flush=True)
+        if _t.time() - _last_speech > 1800:             # log speech timestamps ทุก ~30 นาที (Phase 2)
+            _last_speech = _t.time()
+            try:
+                from connectors.speech_log import log_speeches
+                log_speeches()
+            except Exception:
+                pass
         _t.sleep(getattr(pc, "INTERVAL", 60))
 
 
