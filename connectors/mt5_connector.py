@@ -1790,7 +1790,9 @@ def manage_dynamic_tp() -> int:
     """
     if not _cfg.DYNAMIC_TP:
         return 0
-    _max = int(getattr(_cfg, "TP_EXT_MAX", 0) or TP_EXT_MAX)   # live-reload override (default TP_EXT_MAX=4)
+    _max = int(getattr(_cfg, "TP_EXT_MAX", 0) or TP_EXT_MAX)         # live-reload override (default 4)
+    _near = int(getattr(_cfg, "TP_EXT_NEAR_PIPS", 0) or TP_EXT_NEAR_PIPS)  # "ใกล้ TP" threshold (default 150)
+    _ext = int(getattr(_cfg, "TP_EXT_PIPS", 0) or TP_EXT_PIPS)       # fallback extend ระยะ (default 400)
 
     info = mt5.symbol_info(SYMBOL)
     if info is None:
@@ -1830,7 +1832,7 @@ def manage_dynamic_tp() -> int:
             continue
 
         dist_to_tp = ((pos.tp - current) if is_buy else (current - pos.tp)) / point
-        if dist_to_tp > TP_EXT_NEAR_PIPS or dist_to_tp < 0:
+        if dist_to_tp > _near or dist_to_tp < 0:
             continue  # ยังไกล TP อยู่ หรือ TP โดนแล้ว
 
         ext_done = _tp_ext_count.get(ticket, 0)
@@ -1869,8 +1871,8 @@ def manage_dynamic_tp() -> int:
                         break
         except Exception:
             pass
-        new_tp = sr_tp if sr_tp is not None else (round(pos.tp + TP_EXT_PIPS * point, 2) if is_buy
-                                                  else round(pos.tp - TP_EXT_PIPS * point, 2))
+        new_tp = sr_tp if sr_tp is not None else (round(pos.tp + _ext * point, 2) if is_buy
+                                                  else round(pos.tp - _ext * point, 2))
 
         # trail SL มาล็อคกำไรเมื่อ extend TP — SL ไม่ถอยหลัง
         # ระยะ lock ต้อง ≥ SL_MIN_GAP (เดิม 200p = $2 ชิดเกิน โดน noise กวาดก่อนถึง TP ใหม่)
@@ -1902,7 +1904,7 @@ def manage_dynamic_tp() -> int:
             logger.info(
                 f"Dynamic TP extended: ticket={ticket} {direction} "
                 f"profit={profit_pips:.0f}pips dist_to_tp={dist_to_tp:.0f}pips "
-                f"TP {pos.tp:.2f}→{new_tp:.2f} [{'S/R-next' if sr_tp is not None else '+' + str(TP_EXT_PIPS) + 'p'}] "
+                f"TP {pos.tp:.2f}→{new_tp:.2f} [{'S/R-next' if sr_tp is not None else '+' + str(_ext) + 'p'}] "
                 f"| SL {pos.sl:.2f}→{new_sl:.2f} "
                 f"(locked {locked_pips:.0f}pips profit) ext #{ext_done + 1}/{_max}"
             )
