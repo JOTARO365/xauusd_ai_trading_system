@@ -4308,7 +4308,7 @@ function renderUnifiedNews(wm, ni) {
       const ts = s.length >= 13
         ? Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8), +s.slice(9, 11), +s.slice(11, 13)) / 1000 : 0;
       items.push({ tier: _sevTier(ev ? ev.sev : 0.4), title: h.title, source: h.domain || h.country, ts, tag: 'geo',
-        sched: false, us: h.country === 'United States', cats: _catsOf(h.title, false, 'geo'),
+        sched: false, us: h.country === 'United States', cats: _catsOf(h.title, false, 'geo'), url: h.url,
         lat: ev ? ev.lat : null, lng: ev ? ev.lng : null });
     });
   }
@@ -4318,7 +4318,7 @@ function renderUnifiedNews(wm, ni) {
       const _t = p.text || p.reason || '';
       items.push({ tier: p.magnitude_tier || 1, title: _t, source: p.source || '', ts,
         tag: p.direction || 'gold', sched: false, us: false, cats: _catsOf(_t, false, p.direction || 'gold'),
-        lat: 51.51, lng: -0.13 });   // gold news → gold hub
+        url: p.url, lat: 51.51, lng: -0.13 });   // gold news → gold hub
     });
   }
   (_wmCtx.events || []).forEach(e => {                // ข่าวการประกาศ (economic calendar)
@@ -4349,9 +4349,13 @@ function _renderNewsList() {
       : (it.tag === 'bear' ? '<span style="color:#ff4444" title="bearish gold">▼</span>'
         : (it.sched ? '<span style="color:var(--amber)" title="scheduled">📅</span>'
           : '<span style="color:var(--muted)" title="geopolitical">◆</span>'));
+    const url = it.url ? _wmUrl(it.url) : '';       // กดพาดหัว = เปิดข่าว (allowlist http(s))
+    const titleHtml = url && url !== '#'
+      ? `<a href="${url}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none">${_wmEsc(it.title || '')}</a>`
+      : `<span style="color:var(--text)">${_wmEsc(it.title || '')}</span>`;
     return `<div class="wm-newsrow" style="display:flex;gap:7px;padding:6px 9px;border-bottom:1px solid var(--border);align-items:flex-start">`
       + `<span style="flex:0 0 auto;margin-top:3px;width:8px;height:8px;border-radius:50%;background:${c};box-shadow:0 0 5px ${c}"></span>`
-      + `<span style="flex:1;min-width:0;font-size:11px"><span style="color:var(--text)">${_wmEsc(it.title || '')}</span>`
+      + `<span style="flex:1;min-width:0;font-size:11px">${titleHtml}`
       + `<span style="display:block;color:var(--muted);font-size:9px;margin-top:2px;font-family:var(--mono)">${_wmEsc(it.source || '')} · ${tm}</span></span>`
       + `<span style="flex:0 0 auto;margin-top:1px;font-size:11px">${trend}</span></div>`;
   }).join('');
