@@ -1361,6 +1361,16 @@ def api_ride_stats():
     return jsonify(_cached("ride-stats", _compute, ttl=60))
 
 
+@app.route("/api/shadow-matrix")
+def api_shadow_matrix():
+    """Batch B: attribution matrix per (algo,pair) จาก logs/shadow — forward SHADOW record + backtest ref.
+    LIVE/SHADOW ไม่ pool. badge = ready/collecting/dying (promotion Phase-5). 0 token."""
+    def _c():
+        from agents.shadow_matrix import build
+        return build()
+    return jsonify(_cached("shadow-matrix", _c, ttl=30))
+
+
 @app.route("/api/algo-status")
 def api_algo_status():
     """สถานะระบบใหม่ (header): REGIME_LIVE mode + regime ปัจจุบัน + algo signal + disabled. 0 token."""

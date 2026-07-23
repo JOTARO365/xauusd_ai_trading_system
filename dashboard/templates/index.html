@@ -1350,6 +1350,7 @@
       <button class="tab-sub-item" onclick="goSection('tsmom-section')">TSMOM</button>
       <button class="tab-sub-item" onclick="goSection('wm-map-section')">แผนที่/ข่าว</button>
       <button class="tab-sub-item" onclick="goSection('pair-context-section')">Gold-Complex</button>
+      <button class="tab-sub-item" onclick="goSection('shadow-matrix-section')">Shadow</button>
       <button class="tab-sub-item" onclick="goSection('ai-sentiment-section')">Sentiment</button>
       <button class="tab-sub-item" onclick="goSection('cluster-map-section')">S/R</button>
       <button class="tab-sub-item" onclick="goSection('macro-quant-section')">Macro</button>
@@ -1849,6 +1850,24 @@
     <section id="algo-journal-section" style="margin-bottom:10px">
       <div class="section-title">Trade Score — algo journal (win-rate · exp_R · realtime · counterfactual+pending)</div>
       <div id="aj-body" style="font-family:var(--mono);font-size:12px">—</div>
+    </section>
+
+    <!-- BATCH B — Multi-pair SHADOW matrix: regime_momentum ทุกคู่ (forward record + backtest ref, promotion badge) -->
+    <section id="shadow-matrix-section" style="margin-bottom:10px">
+      <div class="section-title">Shadow Matrix — regime momentum ทุกคู่ (SHADOW · net spread · badge พร้อมโปรโมท)</div>
+      <div id="sm-meta" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px">—</div>
+      <div style="overflow-x:auto">
+        <table id="sm-table" style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px">
+          <thead><tr style="color:var(--muted);text-align:right">
+            <th style="text-align:left;padding:4px 8px">คู่</th><th style="padding:4px 8px">state</th>
+            <th style="padding:4px 8px">n</th><th style="padding:4px 8px">open</th><th style="padding:4px 8px">WR%</th>
+            <th style="padding:4px 8px">exp_R (fwd)</th><th style="padding:4px 8px">ΣR</th>
+            <th style="padding:4px 8px">backtest R</th><th style="padding:4px 8px">span</th><th style="padding:4px 8px">badge</th>
+          </tr></thead>
+          <tbody id="sm-body"><tr><td colspan="10" style="color:var(--muted);padding:6px 8px">—</td></tr></tbody>
+        </table>
+      </div>
+      <div style="color:var(--muted);font-size:10px;margin-top:5px">forward shadow = OOS จริง (net measured spread, ยังไม่รวม swap) · backtest R = in-sample อ้างอิงเท่านั้น ไม่ pool กัน · promote เมื่อ badge=ready (manual)</div>
     </section>
 
     <!-- MACRO STRIP — §3.5 macro_strip.json (display-only, daily via scripts/fetch_macro_strip.py) -->
@@ -3516,6 +3535,7 @@ async function loadLivePrice() {
     loadMacroQuant();   // Macro/News quant — ข่าว+เศรษฐกิจ → gold bias (throttled, server-cached)
     loadLiquidityProxy();   // Liquidity/order-flow proxy (throttled, server-cached)
     loadAlgoJournal();      // Trade score — algo journal win-rate/exp_R (throttled, server-cached)
+    loadShadowMatrix();     // Batch B — multi-pair shadow matrix (throttled, server-cached)
     loadAlgoStatus();   // System status — algo mode / regime / signal
     loadTsmom();        // TSMOM-D1 engine — signal ensemble / position / state
     loadWorldMonitor(); // GDELT geopolitical signals — globe live dots + attention/headline
@@ -4565,6 +4585,38 @@ async function loadAlgoJournal() {
     if (d.needed_n)
       html += `<div style="color:var(--muted);font-size:10px;margin-top:3px">needed-N พิสูจน์ edge: δ0.2R→${d.needed_n['δ=0.2']} · δ0.3R→${d.needed_n['δ=0.3']} ออเดอร์</div>`;
     el.innerHTML = html;
+  } catch (_e) {}
+}
+
+let _smLast = 0;
+async function loadShadowMatrix() {
+  if (Date.now() - _smLast < 25000) return;     // throttle (server cache 30s)
+  _smLast = Date.now();
+  try {
+    const d = await (await fetch('/api/shadow-matrix')).json();
+    const body = document.getElementById('sm-body'), meta = document.getElementById('sm-meta');
+    if (!body || !d.ok) return;
+    const c = d.counts || {};
+    if (meta) meta.textContent = `engine ${d.engine_on ? 'ON' : 'OFF'} · ready ${c.ready || 0} · `
+      + `collecting ${c.collecting || 0} · dying ${c.dying || 0} · ready ต้อง n≥${(d.n_ready || {}).scalp} + exp_R>+${d.ready_exp_R}R + span≥${d.min_span_days}d · ${d.generated}`;
+    const badgeColor = { ready: 'var(--green)', collecting: 'var(--muted)', dying: 'var(--red)' };
+    const rC = v => v == null ? 'var(--muted)' : (v > 0 ? 'var(--green)' : (v < 0 ? 'var(--red)' : 'var(--text)'));
+    const fx = (v, d2 = 3) => v == null ? '—' : (v > 0 ? '+' : '') + Number(v).toFixed(d2);
+    body.innerHTML = (d.rows || []).map(r => {
+      const sym = r.symbol + (r.klass === 'swing' ? ' <span style="color:var(--muted);font-size:10px">sw</span>' : '');
+      return `<tr style="text-align:right;border-top:1px solid #262a31">
+        <td style="text-align:left;padding:4px 8px;font-weight:700">${sym}</td>
+        <td style="padding:4px 8px;color:var(--muted)">${r.state}</td>
+        <td style="padding:4px 8px">${r.n}</td>
+        <td style="padding:4px 8px;color:var(--muted)">${r.n_open || 0}</td>
+        <td style="padding:4px 8px">${r.wr == null ? '—' : r.wr}</td>
+        <td style="padding:4px 8px;color:${rC(r.exp_R)}">${fx(r.exp_R)}</td>
+        <td style="padding:4px 8px;color:${rC(r.sum_R)}">${r.n ? fx(r.sum_R, 1) : '—'}</td>
+        <td style="padding:4px 8px;color:${rC(r.backtest_exp_R)};opacity:.75">${fx(r.backtest_exp_R)}</td>
+        <td style="padding:4px 8px;color:var(--muted)">${r.span_days ? r.span_days + 'd' : '—'}</td>
+        <td style="padding:4px 8px;color:${badgeColor[r.badge]};font-weight:600">${r.badge}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="10" style="color:var(--muted);padding:6px 8px">ไม่มีข้อมูล</td></tr>';
   } catch (_e) {}
 }
 
@@ -6586,6 +6638,7 @@ function _bootstrap() {
   loadMacroQuant();
   loadLiquidityProxy();
   loadAlgoJournal();
+  loadShadowMatrix();
   loadRegimeExtra();
   loadRiskRegime();
   loadCotCard();
@@ -6606,6 +6659,7 @@ function _bootstrap() {
   setInterval(loadMacroQuant, 15000);    // Macro/News quant — realtime (news updates per cycle)
   setInterval(loadLiquidityProxy, 15000);   // Liquidity/order-flow proxy — realtime
   setInterval(loadAlgoJournal, 15000);      // Trade score — algo journal — realtime
+  setInterval(loadShadowMatrix, 30000);     // Batch B — multi-pair shadow matrix
   setInterval(loadRegimeAnalytics, 60000);  // regime analytics + ALGO monitor (N-gauge) — compute live, refresh 60s
   loadDeskTicker();
   setInterval(loadDeskTicker, 3600000);  // desk top-ticker macro/COT — hourly poll (daily/weekly data)

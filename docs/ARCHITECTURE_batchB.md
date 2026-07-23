@@ -209,11 +209,20 @@ Batch B — sequential (shared interfaces §4 frozen before T-01):
          | RESULT 2026-07-23: flag OFF→tick None (no-op); ON→8 combos processed, 0 orders (engine never calls
          |   open_order); wiring imports clean; compile OK. gate passed.
 
-[ ] T-06 | agent: worker | scope: scripts/shadow_matrix.py, dashboard/app.py (+ 1 tab in templates)
-         | output: matrix {n, WR, exp_R net, sumR, maxDD, mfe/mae, badge} per (algo,pair),
-         |         LIVE vs SHADOW separated; /api/shadow-matrix (_cached); promotion-readiness badge
+[DONE] T-06 | agent: worker | scope: agents/shadow_matrix.py (moved from scripts/ for clean import),
+         |        dashboard/app.py (/api/shadow-matrix), dashboard/templates/index.html (Shadow tab)
+         | output: matrix {n, WR, exp_R net, sumR, maxDD, mfe/mae, badge} per (algo,pair) + backtest ref
+         |         (never pooled); /api/shadow-matrix (_cached ttl30); promotion badge ready/collecting/dying;
+         |         sidebar "Shadow" tab + table (loadShadowMatrix, 30s).
+         | RESULT 2026-07-23: build() 8 rows JSON-serializable, backtest_exp_R reference attached, all
+         |   "collecting" (engine off, 0 forward data yet); compile OK.
 
-Gate: auditor — flag-OFF no-op verified; flag-ON writes only shadow logs; 0 MT5 orders; 0 token; parity test green.
+Gate: auditor — flag-OFF no-op verified (T-05); flag-ON writes only shadow logs; 0 MT5 orders (engine
+never calls open_order); 0 token; shadow_resolve parity 10/10; matrix import-safe + JSON-serializable.
+
+STATUS: **Batch B COMPLETE** (T-01..T-06 all DONE). To activate: set SHADOW_ENGINE=true in .env +
+restart bot. Shadow logs accrue in logs/shadow/; matrix visible in dashboard "Shadow" tab. Promotion to
+LIVE remains manual + needs Batch D (non-XAU live executor) — never auto, never on in-sample numbers.
 ```
 
 **Promotion readiness (matrix badge, Phase-5 rule):** `◐ready` when shadow `n ≥ 100` (scalp) / `≥ 20`
