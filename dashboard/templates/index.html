@@ -6651,9 +6651,9 @@ async function openSpeechModal(el) {
   if (sr) sr.href = 'https://www.youtube.com/results?search_query=' + encodeURIComponent((d.spTitle || '') + ' live');
   m.style.display = 'flex';
   _spSetSrc('dw', document.querySelector('#speech-modal .sp-src'));   // default DW News (24/7 live)
-  _spLoadBias(d.spTitle);                                             // Gold Bias gauge + poll ทุก 90 วิ
+  _spLoadBias(d.spTitle);                                             // Gold Bias gauge + poll ทุก 30 วิ
   if (_spBiasTimer) clearInterval(_spBiasTimer);
-  _spBiasTimer = setInterval(() => _spLoadBias(d.spTitle), 90000);
+  _spBiasTimer = setInterval(() => _spLoadBias(d.spTitle), 30000);
   try {
     const cEl = document.getElementById('sp-chart');
     if (!_spChart && window.LightweightCharts && cEl) {
@@ -6733,7 +6733,7 @@ function closeSpeechModal() {
         <div id="sp-prev-note" style="font-size:10px;color:var(--muted);margin-top:4px;font-family:var(--mono)"></div>
       </div>
       <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:7px">🎯 Gold Bias — จาก keyword ในข่าว (อัปเดตทุก ~90 วิ ระหว่างเปิด)
+        <div style="font-size:11px;color:var(--muted);margin-bottom:7px">🎯 Gold Bias — จาก keyword ในข่าว (อัปเดตทุก ~30 วิ · ตามข่าว ช้ากว่าราคาจริง)
           <span id="sp-bias-num" style="float:right;font-family:var(--mono);font-weight:800;font-size:14px">—</span></div>
         <div style="display:flex;align-items:center;gap:7px;font-size:9px;color:var(--muted)">
           <span style="white-space:nowrap">🐻 ทองลง</span>

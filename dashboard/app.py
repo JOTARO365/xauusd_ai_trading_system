@@ -1616,7 +1616,7 @@ def api_speech_bias():
             return b
         except Exception as e:
             return {"ok": False, "note": str(e)[:60]}
-    return jsonify(_cached(f"speech-bias:{title}", _compute, ttl=60))
+    return jsonify(_cached(f"speech-bias:{title}", _compute, ttl=25))
 
 
 @app.route("/api/regime")
