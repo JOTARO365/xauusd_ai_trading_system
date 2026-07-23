@@ -354,6 +354,14 @@ def node_position_mgmt(state: TradingState) -> dict:
                         f"SL={_j['sl']} TP={_j['tp']} ({_ctx}) — รอ resolve")
     except Exception as _je:
         logger.error(f"[GRAPH:algo_journal] {_je}")
+    # Batch B multi-pair shadow: รัน algo ทุกคู่ SHADOW → log/resolve (0 order). gated SHADOW_ENGINE. fail-soft.
+    try:
+        from agents.shadow_engine import tick as _shadow_tick
+        _st = _shadow_tick()
+        if _st and (_st.get("new") or _st.get("resolved")):
+            logger.info(f"[SHADOW] {_st['new']} new · {_st['resolved']} resolved · {_st['combos']} combos")
+    except Exception as _se:
+        logger.error(f"[GRAPH:shadow_engine] {_se}")
     # in-loop MT5→DB sync+reconcile (throttled) — ให้ DB cohort fresh ระหว่าง session (แก้ system-trade stale). fail-soft.
     _periodic_db_sync()
     return {}

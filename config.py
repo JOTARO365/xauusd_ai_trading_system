@@ -183,6 +183,13 @@ REGIME_LIVE           = os.getenv("REGIME_LIVE", "false").lower() == "true"
 # sync เขียนไม้ใหม่ (OPEN/CLOSED) + reconcile flip DB-OPEN ที่ปิดจริง → /api/data fresh. 0 token. 0=ปิด.
 DB_RECONCILE_SECS     = int(os.getenv("DB_RECONCILE_SECS") or 600)
 
+# SHADOW_ENGINE = Batch B multi-pair shadow — รัน algo (regime_momentum) ทุกคู่ใน SHADOW → log/resolve
+# เข้า logs/shadow/<algo>__<sym>.jsonl. 0 order, 0 token. default OFF. kill = SHADOW_ENGINE=false.
+# SHADOW_UNIVERSE = คู่ที่ shadow (comma-sep; ว่าง = 8 คู่ default ใน algo_registry). MAX_HOLD = timeout บาร์.
+SHADOW_ENGINE         = os.getenv("SHADOW_ENGINE", "false").lower() == "true"
+SHADOW_UNIVERSE       = [s.strip() for s in os.getenv("SHADOW_UNIVERSE", "").split(",") if s.strip()] or None
+SHADOW_MAX_HOLD_BARS  = int(os.getenv("SHADOW_MAX_HOLD_BARS") or 48)
+
 # REGIME_LIVE_TICK = per-tick executor (daemon thread) — เช็ค breakout ทุก ~Ns (realtime) แทนรอ bar-close cycle.
 # level คำนวณต่อ bar-close (cache), ต่อ tick แค่เทียบราคา vs level (0 LLM, 0 recompute). ต้องมี REGIME_LIVE=true ด้วย.
 # ⚠️ LIVE MONEY — default OFF. kill = REGIME_LIVE_TICK=false. เปิด = per-cycle executor ปิดอัตโนมัติ (กันเข้าซ้ำ).
@@ -267,7 +274,7 @@ def reload_config():
     global PORTFOLIO_PROTECTION, NO_TP_ON_EVENT, NO_TP_EVENT_MINS, NO_TP_WAIT_MINUTES
     global DYNAMIC_TP, TP_EXT_MAX, TP_EXT_PIPS, TP_EXT_NEAR_PIPS, STREAK_PROTECTION
     global TP_EXT_MOMENTUM_MIN, TP_EXT_COOLDOWN_SECS, TP_EXT_SL_LOCK_PIPS, SPEECH_SUMMARY
-    global DB_RECONCILE_SECS
+    global DB_RECONCILE_SECS, SHADOW_ENGINE, SHADOW_UNIVERSE, SHADOW_MAX_HOLD_BARS
     load_dotenv(override=True)
     SYMBOL        = os.getenv("SYMBOL", "XAUUSD")
     START_BALANCE = float(os.getenv("START_BALANCE", 5000))
@@ -288,6 +295,9 @@ def reload_config():
     TP_EXT_SL_LOCK_PIPS  = int(os.getenv("TP_EXT_SL_LOCK_PIPS") or 200)
     SPEECH_SUMMARY       = os.getenv("SPEECH_SUMMARY", "false").lower() == "true"
     DB_RECONCILE_SECS    = int(os.getenv("DB_RECONCILE_SECS") or 600)
+    SHADOW_ENGINE        = os.getenv("SHADOW_ENGINE", "false").lower() == "true"
+    SHADOW_UNIVERSE      = [s.strip() for s in os.getenv("SHADOW_UNIVERSE", "").split(",") if s.strip()] or None
+    SHADOW_MAX_HOLD_BARS = int(os.getenv("SHADOW_MAX_HOLD_BARS") or 48)
     STREAK_PROTECTION = os.getenv("STREAK_PROTECTION", "true").lower() != "false"
     global TRAILING_STOP, TRAILING_ATR_TF, TRAILING_ATR_MULT
     global TRAILING_MIN_PROFIT_R, TRAILING_LOOKBACK

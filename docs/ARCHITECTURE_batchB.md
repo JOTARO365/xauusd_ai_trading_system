@@ -203,9 +203,11 @@ Batch B — sequential (shared interfaces §4 frozen before T-01):
          | RESULT 2026-07-23: tick(force) 8 combos 0-order no-crash; _apply log→resolve TP realized_R=1.7 net;
          |   dedup verified (_apply core is bars-injectable for deterministic test). Not yet wired (T-05).
 
-[ ] T-05 | agent: worker | scope: config.py, agents/trading_graph.py
-         | output: SHADOW_ENGINE flag (default OFF) + reload_config; wire shadow_tick after journal_tick
-         | gate: auditor integration check — bot runs with flag OFF (no-op) AND ON (writes shadow logs, 0 orders)
+[DONE] T-05 | agent: worker | scope: config.py, agents/trading_graph.py
+         | output: SHADOW_ENGINE flag (default OFF) + SHADOW_UNIVERSE/SHADOW_MAX_HOLD_BARS + reload_config;
+         |         wire shadow_tick after journal_tick in node_position_mgmt (fail-soft)
+         | RESULT 2026-07-23: flag OFF→tick None (no-op); ON→8 combos processed, 0 orders (engine never calls
+         |   open_order); wiring imports clean; compile OK. gate passed.
 
 [ ] T-06 | agent: worker | scope: scripts/shadow_matrix.py, dashboard/app.py (+ 1 tab in templates)
          | output: matrix {n, WR, exp_R net, sumR, maxDD, mfe/mae, badge} per (algo,pair),
