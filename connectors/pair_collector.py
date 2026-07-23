@@ -17,8 +17,9 @@ _PROBE = os.path.join(_BASE, "data", "universe_probe.json")
 _CTX = os.path.join(_BASE, "data", "pair_context.json")
 _SPREAD_LOG = os.path.join(_PAIRDIR, "spread_log.jsonl")
 
-# คู่ที่เก็บ (Phase-1: trade XAUUSD only, collect all). XAU* + XAG + USD cluster.
-COLLECT = ["XAUUSD", "XAGUSD", "XAUEUR", "XAUJPY", "AUDUSD", "EURUSD", "USDCHF", "USDJPY"]
+# คู่ที่เก็บ (Phase-1: trade XAUUSD only, collect all). XAU* + XAG + USD cluster + trend-family (BTC/WTI).
+COLLECT = ["XAUUSD", "XAGUSD", "XAUEUR", "XAUJPY", "AUDUSD", "EURUSD", "USDCHF", "USDJPY",
+           "BTCUSD", "WTIUSD"]
 _TF_BARS = {"m15": 700, "h1": 500, "h4": 400, "d1": 300}    # เก็บล่าสุดเท่านี้ต่อ TF (bounded)
 INTERVAL = 60                                                # standalone loop วินาที/รอบ
 
