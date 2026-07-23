@@ -17,7 +17,7 @@ _OK, _WARN, _ERR = "  [OK] ", "  [!]  ", "  [X]  "
 
 
 def step(n, title):
-    print(f"\n── {n}. {title} " + "─" * max(0, 46 - len(title)))
+    print(f"\n-- {n}. {title} " + "-" * max(0, 46 - len(title)))
 
 
 def main():
@@ -103,4 +103,9 @@ def main():
 
 
 if __name__ == "__main__":
+    try:                                     # Thai-locale consoles are cp874 — force UTF-8 so output never crashes
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
     main()
