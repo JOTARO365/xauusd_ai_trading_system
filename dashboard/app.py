@@ -904,6 +904,47 @@ def api_map_layers():
     return resp
 
 
+@app.route("/api/map-context")
+def api_map_context():
+    """calendar events (geo-located ที่ CB ของสกุลเงิน) + CB stance — real: ForexFactory + regime_state (Fed).
+    cache 15 นาที (calendar = network). display-only."""
+    def _compute():
+        base = os.path.join(_BASE, "..", "data")
+        out = {"ok": True, "events": [], "cb_stance": {}}
+        cbs = {}
+        try:
+            ml = json.load(open(os.path.join(base, "map_layers.json"), encoding="utf-8"))
+            for b in ml.get("central_banks", []):
+                if b.get("ccy"):
+                    cbs[b["ccy"]] = b
+        except Exception:
+            pass
+        # ── upcoming high/medium-impact events → next per currency, join CB coords ──
+        try:
+            from connectors.web_news import fetch_forexfactory_calendar
+            evs = fetch_forexfactory_calendar(hours_ahead=72, include_all_us=True) or []
+            seen = {}
+            for e in evs:
+                ccy = e.get("currency") or e.get("country")
+                b = cbs.get(ccy)
+                imp = (e.get("impact") or "").lower()
+                if not b or imp not in ("high", "medium") or ccy in seen:
+                    continue
+                seen[ccy] = 1                            # อันแรก (ใกล้สุด) ต่อสกุลเงิน
+                out["events"].append({"name": e.get("title"), "ccy": ccy, "lat": b["lat"], "lng": b["lng"],
+                                      "impact": imp, "ts": e.get("timestamp_iso"), "forecast": e.get("forecast")})
+        except Exception as ex:
+            out["cal_err"] = str(ex)[:60]
+        # ── CB stance (real ที่มี: Fed จาก regime_state) ──
+        try:
+            rs = json.load(open(os.path.join(base, "regime_state.json"), encoding="utf-8"))
+            out["cb_stance"]["USD"] = {"rate": rs.get("fed_funds"), "dir": rs.get("fed_dir")}
+        except Exception:
+            pass
+        return out
+    return jsonify(_cached("map-context", _compute, ttl=900))
+
+
 @app.route("/api/pair-moves")
 def api_pair_moves():
     """today % move ต่อคู่ (จาก data/pairs/<sym>_d1.json ที่ pair_collector เก็บ) — เติม hub บนแผนที่.
@@ -939,11 +980,18 @@ def api_tsmom():
            "signal": None, "votes": [], "d1_close": None, "atr_d1": None, "sl_pips": None,
            "position": None, "state": None, "capital_warn": None, "vb_years": vb_years,
            "vs_bh": _cached(f"tsmom-vs-bh:{vb_years}", lambda: _tsmom_vs_bh(_vy), ttl=3600)}
-    # ── signal ensemble จาก xau_d1.json (บอทอัปเดตไฟล์) ──
+    # ── signal ensemble จาก D1 bars — pull MT5 สด (fallback xau_d1.json ถ้า MT5 ไม่พร้อม) ──
     try:
         import numpy as np
-        with open(os.path.join(_BASE, "..", "data", "xau_d1.json")) as _f:
-            d = np.array(json.load(_f), dtype=float)
+        d = None
+        if _MT5_AVAILABLE and _ensure_mt5():
+            r = mt5.copy_rates_from_pos(SYMBOL, mt5.TIMEFRAME_D1, 0, 300)
+            if r is not None and len(r) > 60:
+                d = np.array([[int(x['time']), float(x['open']), float(x['high']),
+                               float(x['low']), float(x['close'])] for x in r], dtype=float)
+        if d is None:                                   # MT5 ไม่พร้อม → ไฟล์ (อาจ stale)
+            with open(os.path.join(_BASE, "..", "data", "xau_d1.json")) as _f:
+                d = np.array(json.load(_f), dtype=float)
         close, high, low = d[:, 4], d[:, 2], d[:, 3]
         Ls = [int(x) for x in str(getattr(_cfg, "TSMOM_LOOKBACKS", "63,126,252")).split(",")]
         ci = -2; votes_sum = 0
@@ -1276,8 +1324,9 @@ def api_gate_blocks():
 
 @app.route("/api/ride-stats")
 def api_ride_stats():
-    """ผล cohort ไม้ MOMENTUM_RIDE (entry comment ขึ้นต้น 'RIDE') จาก MT5 —
-    หน้าปัดการทดลอง: cohort นี้แพ้เมื่อไหร่ = ปิด MOMENTUM_RIDE knob"""
+    """ผล cohort ไม้ระบบจริง (magic SYSTEM_MAGIC=20260429) จาก MT5 — closed WR/PnL + ไม้ล่าสุด.
+    หมายเหตุ: MOMENTUM_RIDE tag เดิมอยู่ใน decision_maker (LLM path) ซึ่ง dormant ใต้ REGIME_LIVE →
+    ไม่มีไม้ 'RIDE' จริง จึงใช้ magic (ไม้ระบบทั้งหมด) ให้เห็นผลจริง (exit deal ถูก broker เปลี่ยนชื่อ → กรอง magic ไม่ใช่ comment)."""
     def _compute():
         if not _MT5_AVAILABLE or not _ensure_mt5():
             return {"ok": False, "error": "MT5 not connected"}
@@ -1285,7 +1334,7 @@ def api_ride_stats():
         deals = mt5.history_deals_get(datetime.now() - timedelta(days=90), datetime.now()) or []
         pos = defaultdict(lambda: {"in": None, "pnl": 0.0, "closed": False})
         for d in deals:
-            if d.symbol != SYMBOL:
+            if getattr(d, "magic", 0) != 20260429:      # SYSTEM_MAGIC — ไม้ระบบจริง
                 continue
             p = pos[d.position_id]
             p["pnl"] += d.profit + d.swap + d.commission
@@ -1296,7 +1345,7 @@ def api_ride_stats():
         rides = []
         for pid, p in pos.items():
             e = p["in"]
-            if e is None or not str(e.comment or "").startswith("RIDE"):
+            if e is None:
                 continue
             rides.append({"time": datetime.fromtimestamp(e.time).isoformat()[:16],
                           "dir": "BUY" if e.type == 0 else "SELL",

@@ -1753,6 +1753,7 @@
           <span><span style="color:#8ab4f8">●</span> central bank</span>
           <span><span style="color:#44ff88">▲</span>/<span style="color:#ff4444">▼</span> hub move</span>
           <span><span style="color:#ff4444">◉</span> live event</span>
+          <span>📅 econ event</span>
         </div>
       </div>
       <div style="margin-top:8px;border:1px solid var(--border);border-radius:6px;overflow:hidden">
@@ -1917,7 +1918,7 @@
 
     <!-- RIDE COHORT — หน้าปัดการทดลอง MOMENTUM_RIDE (07-03) -->
     <section>
-      <div class="section-title">Ride Cohort &mdash; ผลการทดลอง MOMENTUM_RIDE</div>
+      <div class="section-title">System Trades Cohort &mdash; ไม้ระบบจริง (magic) closed WR/PnL + ล่าสุด</div>
       <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
         <div class="card"><div class="label">Closed / Open</div><div class="value gold" id="ride-n">—</div></div>
         <div class="card"><div class="label">Win Rate</div><div class="value" id="ride-wr">—</div></div>
@@ -4075,7 +4076,7 @@ const WM_W = 1000, WM_LAT_TOP = 84, WM_LAT_BOT = -58, WM_S = 1000 / 360;
 const WM_H = Math.round((WM_LAT_TOP - WM_LAT_BOT) * WM_S);   // ~394 (สัดส่วนไม่บิดเบี้ยว)
 const wmX = lng => (lng + 180) * WM_S;
 const wmY = lat => (WM_LAT_TOP - lat) * WM_S;
-let _wmMapInit = false, _wmLand = null, _wmLayers = null, _wmMoves = {}, _wmGdelt = [];
+let _wmMapInit = false, _wmLand = null, _wmLayers = null, _wmMoves = {}, _wmGdelt = [], _wmCtx = {};
 
 const _wmEsc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const _wmUrl = u => /^https?:\/\//i.test(u || '') ? _wmEsc(u) : '#';   // allowlist http(s) เท่านั้น (กัน javascript:/attr break-out)
@@ -4091,6 +4092,14 @@ function _cbMove(ccy) {   // ความแข็งของสกุลเง
   if (ccy === 'JPY') return m.USDJPY ? -m.USDJPY.pct : null;   // JPY แข็ง = USDJPY ลง
   if (ccy === 'CHF') return m.USDCHF ? -m.USDCHF.pct : null;
   return null;
+}
+function _wmCountdown(ts) {
+  if (!ts) return '';
+  const ms = Date.parse(ts) - Date.now();
+  if (isNaN(ms)) return '';
+  if (ms < 0) return 'now';
+  const h = ms / 3600000;
+  return h < 1 ? Math.round(ms / 60000) + 'm' : (h < 24 ? Math.round(h) + 'h' : Math.round(h / 24) + 'd');
 }
 
 function _wmGraticule() {
@@ -4148,10 +4157,20 @@ function renderAllLayers() {
   (L.waterways || []).forEach(w => s += _mk(w.lat, w.lng, 2.1, '#f59e0b',
     { title: w.name, label: _wmShort(w.name).replace(/\b\w+/g, t => t[0] + t.slice(1).toLowerCase()) }));
   const _cbMajor = { Fed: 1, ECB: 1, BoJ: 1, PBoC: 1, BoE: 1, SNB: 1 };   // label เฉพาะตัวใหญ่ (ลด clutter)
+  const _stance = _wmCtx.cb_stance || {};
   (L.central_banks || []).forEach(b => {
-    const mv = _cbMove(b.ccy);
+    const mv = _cbMove(b.ccy), st = _stance[b.ccy];
+    const stTxt = st && st.rate != null ? ` ${st.rate}%${st.dir === 'on hold' ? '⏸' : (st.dir ? ' ' + st.dir : '')}` : '';
     s += _mk(b.lat, b.lng, 3, _moveCol(mv), { glow: mv != null && Math.abs(mv) > 0.2, labelCol: '#8ab4f8',
-      label: _cbMajor[b.short] ? b.short : '', title: `${b.name}${mv != null ? ` · ${b.ccy} ${mv > 0 ? '+' : ''}${mv}%` : ''}` });
+      label: _cbMajor[b.short] ? b.short + stTxt : '',
+      title: `${b.name}${mv != null ? ` · ${b.ccy} ${mv > 0 ? '+' : ''}${mv}%` : ''}${st ? ` · rate ${st.rate}% ${st.dir}` : ''}` });
+  });
+  // calendar events (geo-located ที่ CB · ใกล้สุดต่อสกุลเงิน · high=red medium=amber + countdown)
+  (_wmCtx.events || []).forEach(e => {
+    const col = e.impact === 'high' ? '#ff4444' : '#ffaa00', cd = _wmCountdown(e.ts);
+    s += _mk(e.lat + 3, e.lng, 2.3, col, { glow: true, labelCol: col,   // label สั้น (ชื่อเต็มใน hover)
+      label: `📅${e.ccy}${cd ? ' ' + cd : ''}`,
+      title: `${e.ccy} ${e.impact} · ${e.name}${e.forecast ? ` (f:${e.forecast})` : ''}` });
   });
   WM_HUBS.forEach(h => {
     const mv = _hubMove(h.sym), col = _moveCol(mv);
@@ -4191,6 +4210,7 @@ async function loadWorldMonitor() {
     // GDELT live events + pair-moves → วาดทุก layer ใหม่ (live เฉพาะเมื่อ d.ok กันโชว์ stale)
     _wmGdelt = d.ok ? (d.events || []) : [];
     try { _wmMoves = ((await (await fetch('/api/pair-moves')).json()).moves) || {}; } catch (_e3) {}
+    try { _wmCtx = await (await fetch('/api/map-context')).json(); } catch (_e4) {}
     renderAllLayers();
     // attention gauge + top headline
     const at = document.getElementById('wm-attention');
