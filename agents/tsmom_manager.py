@@ -54,23 +54,37 @@ def _state(action, detail, regime="TREND"):
 
 def _open(direction, atr, shadow):
     from connectors.mt5_connector import open_order
-    from agents.algo_sizing import algo_lot
+    from agents.algo_sizing import algo_lot, capital_warning
     import regime_lib as R
     fixed = float(getattr(_cfg, "TSMOM_SL_PIPS", 0) or 0)   # >0 = SL คงที่ (บัญชีเล็ก); 0 = chandelier ATR
-    sl_pips = int(fixed) if fixed > 0 else max(1, round(float(getattr(_cfg, "TSMOM_SL_ATR", 3.0)) * atr / R.POINT))
+    tsmom_sl = int(fixed) if fixed > 0 else max(1, round(float(getattr(_cfg, "TSMOM_SL_ATR", 3.0)) * atr / R.POINT))
     tp_pips = 0                                              # no-TP mode (open_order รองรับ): trend-following exit ที่ flip
-    from agents.algo_sizing import capital_warning           # เตือนทุนไม่พอ (ไม่บล็อก — เข้า order ต่อ)
-    _warn, _wi = capital_warning(sl_pips)
-    if _warn:
+    # capital-aware SL: ทุนไม่พอสำหรับ SL TSMOM (chandelier กว้าง) → ใช้ manual auto-SL (แคบกว่า พอดีทุน) + เตือน
+    sl_pips, sl_src = tsmom_sl, "chandelier 3×ATR D1"
+    _warn, _wi = capital_warning(tsmom_sl)
+    if _warn and getattr(_cfg, "TSMOM_SL_CAP_FALLBACK", True):
+        # manual auto-SL = เดียวกับ ensure_sl_protection: AUTO_SL_PIPS หรือ default_sl_pips
+        fb = int(getattr(_cfg, "AUTO_SL_PIPS", 0) or 0) \
+            or int((getattr(_cfg, "MONEY_MANAGEMENT", {}) or {}).get("default_sl_pips", 2000))
+        if 0 < fb < tsmom_sl:                              # ใช้เฉพาะถ้าแคบกว่าจริง (พอดีทุน)
+            sl_pips, sl_src = fb, "manual auto-SL (capital fallback)"
+            logger.warning(f"[TSMOM] ⚠️ ทุนไม่พอ SL TSMOM {tsmom_sl}p (risk {_wi['risk_pct']*100:.0f}% > เพดาน "
+                           f"{_wi['threshold']*100:.0f}% · ทุน {_wi['equity']:,.0f}) → ใช้ manual auto-SL {fb}p แทน · "
+                           f"เติมทุน ~{_wi['needed_equity']:,.0f} เพื่อใช้ SL TSMOM เต็ม (SL แคบ = edge หาย WR ต่ำ โดน noise รูด)")
+        else:
+            logger.warning(f"[TSMOM] ⚠️ ทุนไม่พอ SL TSMOM {tsmom_sl}p แต่ manual auto-SL ({fb}p) ไม่แคบกว่า "
+                           f"→ เปิดด้วย SL TSMOM · ควรมีทุน ~{_wi['needed_equity']:,.0f}")
+    elif _warn:                                             # fallback ปิด → พฤติกรรมเดิม (warn-only, เปิดด้วย SL กว้าง)
         logger.warning(f"[TSMOM] ⚠️ CAPITAL WARNING: risk {_wi['risk_pct']*100:.0f}%/ไม้ > เพดาน "
                        f"{_wi['threshold']*100:.0f}% · ทุน {_wi['equity']:,.0f} · ควรมี ~{_wi['needed_equity']:,.0f} "
-                       f"— เปิด order ต่อ (เตือนเฉยๆ เหมือน margin call)")
+                       f"— เปิด order ต่อ (fallback ปิด)")
     lot = algo_lot(sl_pips)
     res = open_order(direction, sl_pips, tp_pips, comment=COMMENT, lot=lot, shadow=shadow)
     ok = True if shadow else bool(isinstance(res, dict) and res.get("success"))
-    logger.warning(f"[TSMOM] {'SHADOW ' if shadow else ''}OPEN {direction} SL={sl_pips}p (3×ATR D1) lot={lot} → {res}")
+    logger.warning(f"[TSMOM] {'SHADOW ' if shadow else ''}OPEN {direction} SL={sl_pips}p ({sl_src}) lot={lot} → {res}")
+    _fb_note = " · CAPITAL-FALLBACK เติมทุนเพื่อ SL TSMOM เต็ม" if sl_src.startswith("manual") else ""
     _state("OPEN" if ok else "OPEN-FAIL",
-           f"{direction} · SL={sl_pips}p (chandelier 3×ATR D1) · lot={lot}" + ("" if ok else " · เปิดไม่สำเร็จ (retry)"))
+           f"{direction} · SL={sl_pips}p ({sl_src}) · lot={lot}{_fb_note}" + ("" if ok else " · เปิดไม่สำเร็จ (retry)"))
     return ok
 
 
