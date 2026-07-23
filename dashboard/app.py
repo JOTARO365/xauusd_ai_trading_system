@@ -840,6 +840,21 @@ def api_worldmonitor():
     return jsonify(out)
 
 
+@app.route("/api/worldmap")
+def api_worldmap():
+    """world land outline (equirectangular rings, Natural Earth 110m ย่อ) สำหรับวาดแผนที่แบน 2D.
+    static ~63KB, cache ยาว 1 วัน (ข้อมูลไม่เปลี่ยน)."""
+    p = os.path.join(_BASE, "..", "data", "worldmap_land.json")
+    try:
+        with open(p, encoding="utf-8") as f:
+            data = f.read()
+    except Exception:
+        data = "[]"
+    resp = app.response_class(data, mimetype="application/json")
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    return resp
+
+
 @app.route("/api/tsmom")
 def api_tsmom():
     """สถานะ TSMOM-D1 directional engine: signal ensemble + position + state (compute-in-code, 0 token)."""
