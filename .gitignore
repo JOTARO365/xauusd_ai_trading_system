@@ -17,5 +17,6 @@ reports/
 # multi-pair collector runtime data (regenerated)
 data/pairs/
 data/pair_context.json
+data/algo_switches.json
 data/speech_log.json
 data/speech_summary_cache.json

@@ -188,9 +188,13 @@ Batch B — sequential (shared interfaces §4 frozen before T-01):
          | RESULT 2026-07-23: VirtualOrder shape == §4.1 (9 keys); all 8 pairs fetch+evaluate OK via
          |   broker map (symbol-param end-to-end); non-momentum/stand-down → None. `python agents/algo_registry.py`.
 
-[ ] T-03 | agent: worker | scope: agents/shadow_switches.py, agents/shadow_cost.py, data/algo_switches.json
+[DONE] T-03 | agent: worker | scope: agents/shadow_switches.py, agents/shadow_cost.py, data/algo_switches.json (gitignored runtime), .gitignore
          | output: TTL-cached switch store (regime_adaptive idiom) + measured per-symbol cost_pips;
          |         seed switches = all 8 combos SHADOW
+         | RESULT 2026-07-23: switches combos_in/state_of/set_state OK, missing→SHADOW default, toggle verified.
+         |   cost_pips measured/pair: XAUUSD 30 (==old flat const ✓), XAUJPY 97, XAUEUR 60, XAG 51, EUR 19, ...
+         |   → per-pair cost is load-bearing (flat-30 badly under-costs XAU-crosses). switches file is runtime
+         |   (dashboard-edited, gitignored); shadow works without it (missing combo ⇒ SHADOW).
 
 [ ] T-04 | agent: worker | scope: agents/shadow_engine.py
          | input: T-01..T-03 + get_ohlcv(symbol) + node hook contract
