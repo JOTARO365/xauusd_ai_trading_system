@@ -1,12 +1,19 @@
-# XAUUSD AI Trading System
+# XAUUSD Algorithmic Trading System
 
-An experimental, automated multi-agent trading bot for **XAUUSD (Gold)**. A fixed
-LangGraph pipeline of Claude agents reads multi-timeframe price action + news
-sentiment, passes the setup through deterministic Python risk gates, and executes
-on **MetaTrader 5**. State, trades and per-agent token cost are persisted to
-**Supabase** (with a local JSON fallback).
+An automated, **rule-based** trading bot for **XAUUSD (Gold)**. Entry, stop-loss and
+take-profit are **computed deterministically from price data** by regime-routed
+algorithms — the system does **not** ask a language model to predict trades. It runs
+on **MetaTrader 5**, persists trades + cost to **Supabase** (local JSON fallback), and
+ships a Flask dashboard on port 5050.
 
-> ⚠️ This is an experimental trading system that places **real orders with real
+> **Design invariant — SELECTION vs EXECUTION.** *Selection* (which market regime /
+> which algorithm is eligible) may use context, including an optional news-sentiment
+> layer; *execution* (the actual entry price, SL, TP and size) is always a fixed
+> deterministic formula. The bot never invents a price. Rationale: on gold, short-horizon
+> **direction is not predictable**, but **volatility / regime is** — so the model (when
+> used at all) only routes, and the math does the rest.
+
+> ⚠️ This is an experimental trading system that can place **real orders with real
 > money**. It is not financial advice and carries real risk of loss. See
 > [Disclaimer](#disclaimer).
 
@@ -16,14 +23,12 @@ on **MetaTrader 5**. State, trades and per-agent token cost are persisted to
 
 | Layer | What's actually used (traced to code) |
 |---|---|
-| Language | Python 3.11+ |
-| Orchestration | LangGraph (`langgraph>=1.2`) — fixed `StateGraph`, no checkpointer |
-| LLM provider | **Anthropic Claude** via `langchain-anthropic` (`market_advisor`, `analyst`, `decision_maker`) and the raw `anthropic` SDK (`chart_watcher`, `reporter`, `lesson_learner`) |
-| Models (`agents/llm_models.py`) | `claude-sonnet-4-6` → chart_watcher, market_advisor, analyst, decision_maker · `claude-haiku-4-5-20251001` → reporter. Override per-agent with `MODEL_<AGENT>` env vars. |
-| Embeddings (optional) | Google Gemini (`google-genai`) — used only by the Lesson-Retrieval RAG cache |
+| Language | Python 3.11+ (NumPy for the algo/indicator math) |
+| **Entry engine (live)** | **Deterministic, regime-routed algorithms** — `scripts/regime_lib.py` (regime detect + per-regime entry), `agents/regime_executor.py` / `agents/regime_tick.py`, `agents/tsmom_manager.py` (TSMOM-D1). No LLM in the entry path when `REGIME_LIVE=true`. |
+| Sentiment layer (optional) | **Anthropic Claude** — reads news/macro → a *bias/regime hint* only (never an entry). Legacy LangGraph pipeline (`market_advisor`/`analyst`/`decision_maker`) is retained but is **not** the live entry path under `REGIME_LIVE`. |
 | Broker | MetaTrader 5 (`MetaTrader5` Python lib — **Windows only**) |
 | Database | Supabase (Postgres + REST via the `supabase` client) with a `logs/trades.json` fallback |
-| News/sentiment | X/Twitter via `twscrape`, ForexFactory/Investing scraping (`connectors/web_news.py`) |
+| Market data | MT5 price feed (`connectors/price_feed.py`, `connectors/pair_collector.py`) · GDELT + X/ForexFactory for news context |
 | Dashboard | Flask + Waitress (port 5050) |
 | Process mgr | PM2 (`main`, `dashboard`, `auto-deploy`) |
 
@@ -36,124 +41,88 @@ on **MetaTrader 5**. State, trades and per-agent token cost are persisted to
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                        AI Agent Pipeline                          │
-│                                                                  │
-│  ChartWatcher ──→ MarketAdvisor ──→ Analyst ──→ DecisionMaker   │
-│       │                                              │            │
-│  (H4/H1/M15                                   Python risk gates  │
-│  multi-TF analysis,                           → Claude quality   │
-│  4-component trend,                             check            │
-│  entry scoring)                                      │            │
-│                                              MT5 open_order()    │
-└──────────────────────────────────────────────────────────────────┘
-         ↕ PostgreSQL / Supabase
+┌────────────────────────────────────────────────────────────────────┐
+│                 Deterministic Algo Pipeline (REGIME_LIVE)          │
+│                                                                    │
+│  MT5 price ─→ regime detect ─→ route to algo ─→ deterministic     │
+│  (M15/H1/H4/D1)  (ER/ADX/vol)   (TREND breakout /   entry+SL+TP    │
+│                                  RANGE fade /       (math)         │
+│      ▲                           RISK-OFF stand-down)   │          │
+│      │ optional: news/sentiment ─→ regime/bias hint     ▼          │
+│      │  (Claude — SELECTION only, never an entry)   risk gates     │
+│      │                                              (_run_gates)   │
+│  parallel: TSMOM-D1 engine (validated defensive)        │         │
+│            + multi-pair data collector (gold-complex)   ▼         │
+│                                                  MT5 open_order()  │
+└────────────────────────────────────────────────────────────────────┘
+         ↕ Supabase (Postgres/REST) · logs/trades.json fallback
 ┌──────────────────────┐
-│  Dashboard (port 5050)│  ← Docker-ready
-│  Flask + Waitress    │
+│  Dashboard (port 5050)│  ← Docker-ready · Flask + Waitress
 └──────────────────────┘
 ```
 
 ---
 
-## How the AI Pipeline Works (LangGraph)
+## How the Algo System Works
 
-The trading pipeline runs as a **state machine** — each step is a node in a graph, and the system decides which path to take based on real-time conditions.
-
-### Graph Flow
-
-<p align="center">
-  <img src="docs/langgraph_state.png" alt="LangGraph state machine" width="360">
-</p>
-
-> **Legend** — 🟢 AI nodes (Claude) · 🟠 position-mgmt / reporter / accounting · 🔵 `_entry` router.
-> Edge colors = the 3 auto-selected paths: 🟧 **orange** = skip-AI · 🟩 **green** = full cycle · 🟥 **red** = network-degraded.
-> Regenerate with `python scripts/gen_graph_png.py` after editing the graph.
-
-<details>
-<summary>Text version (ASCII)</summary>
+Under `REGIME_LIVE=true` the live entry path is **pure Python** — no LLM call decides a
+trade. Each cycle:
 
 ```
-Every cycle (~15 min normal / ~5 min with open position)
-                        │
-                    [_entry]
-                   /        \
-           skip_ai?          full cycle
-               │                  │
-        [position_mgmt]       [chart_watcher]
-               │                  │
-              END             [market_advisor]
-                              /           \
-                    net_degraded?        OK
-                         │                │
-                    [accounting]       [news_gatherer]
-                         │                │
-                        END          [analyst]
-                                          │
-                                    [decision_maker]
-                                          │
-                                   [position_mgmt]
-                                          │
-                                     [reporter]
-                                          │
-                                    [accounting]
-                                          │
-                                         END
+Every cycle (~5s tick for algo/exit mgmt · entry evaluated on bar-close)
+        │
+   MT5 price (M15/H1/H4/D1)
+        │
+   detect_regime(ER, ADX, vol_pct)          # scripts/regime_lib.py
+        │
+   ├─ RISK-OFF (vol_pct ≥ 0.80)  → stand down (no entry)
+   ├─ TREND    (ADX ≥ 25, ER↑)   → breakout entry (STOP order)
+   ├─ RANGE    (ADX ≤ 20, ER↓)   → mean-reversion fade (LIMIT, gated)
+   └─ NEUTRAL                     → stand down
+        │
+   deterministic entry + SL + TP + size  (math, not prediction)
+        │
+   anti-fade / risk gates  (_run_gates — HTF-fade, counter-spike, daily-loss, streak)
+        │
+   MT5 open_order()
 ```
 
-</details>
+Running in parallel, independent of the regime router:
 
-### What Each Node Does
+- **TSMOM-D1 engine** (`agents/tsmom_manager.py`) — a time-series-momentum sleeve on
+  daily bars (the one directional sleeve that survived validation, as a *defensive*
+  momentum tilt, not alpha). Wide chandelier stop, exits on momentum flip.
+- **Exit management** — vol-adaptive trailing stop (buffer = `TRAILING_ATR_MULT × ATR`),
+  break-even, momentum-exit, zone-break — all deterministic, run on a fast poll.
+- **Gold-complex data collector** (`connectors/pair_collector.py`) — pulls OHLC + spread
+  for XAUUSD, XAGUSD and the FX/USD complex (data-only, 0 token) and computes cross-pair
+  context (breadth, USD-leg decomposition, gold/silver ratio) for the dashboard.
 
-| Node | Agent | Runs every cycle? | Description |
-|---|---|---|---|
-| `_entry` | — | Always | Checks whether to skip AI this cycle |
-| `chart_watcher` | Claude | Full cycle only | Analyzes H4/H1/M15 charts — finds S/R zones, entry signal, confidence score |
-| `market_advisor` | Claude | Full cycle only | Determines market regime (trending/sideways/volatile) and overall bias |
-| `news_gatherer` | X/Twitter | Full cycle only | Collects latest tweets related to gold and macro economy |
-| `analyst` | Claude | Full cycle only | Analyzes sentiment from news + chart combined |
-| `decision_maker` | Claude | Full cycle only | Runs deterministic Python gates, then asks Claude a final quality check → EXECUTE or SKIP |
-| `position_mgmt` | MT5 | **Always** | Manages open positions (momentum-exit, zone-break, partial close, breakeven, dynamic/post-event TP, trailing) + the inert swing campaign + manual-order scan |
-| `reporter` | Claude | Full cycle only | Logs trade result, places pending orders, summarizes P&L |
-| `accounting` | DB | Full cycle only | Records token cost and latency to database |
+> **Optional sentiment layer.** The legacy LangGraph Claude pipeline
+> (`chart_watcher → market_advisor → analyst → decision_maker`) still exists and can run
+> to produce a *news/regime bias hint*, but under `REGIME_LIVE` it does **not** place or
+> veto entries — the algo does. Set `REGIME_LIVE=false` to fall back to the old
+> LLM-decision pipeline.
 
-### 3 Paths — Chosen Automatically
+### Position & exit management (always on)
 
-**Path 1 — Full AI Cycle** (every ~15 min, or ~5 min when a position is open)
-> All nodes run — AI makes the trade decision
+Independent of any entry decision, a fast poll manages open positions every cycle
+(`position_mgmt` / `agents/position_guardian.py`): momentum-exit, zone-break close,
+break-even, dynamic/post-event TP, and the **vol-adaptive trailing stop**
+(`buffer = TRAILING_ATR_MULT × ATR(tf)` under the swing low/high — sized to the current
+volatility so a normal wick doesn't stop out a correct-direction trade). All rule-based,
+no LLM.
 
-**Path 2 — Skip AI** (between full cycles)
-> Skips all AI agents → runs only `position_mgmt` to manage open positions
-> Saves ~97% of token cost
+### Legacy LLM pipeline (dormant under `REGIME_LIVE`)
 
-**Path 3 — Network Degraded** (chart + advisor both fail)
-> Halts decision-making → runs `accounting` and exits; no new orders placed
-
-### Smart Skip Gate
-
-To stay within a token budget while running 24/7, the gate **throttles** AI calls — it force-runs AI only on genuine signals, and throttles the rest:
-
-| Condition | Behavior |
-|---|---|
-| Equity < `MIN_AI_EQUITY` | **Never runs AI** (capital floor — overrides everything); position mgmt still runs. ⚠️ unit = account currency — see note under [Decision Gates](#decision-gates--anti-fade-guards-live-reload--edits-apply-next-cycle-no-restart) |
-| First cycle after start | Always runs |
-| Price spike ≥ `AI_SPIKE_PIPS` (500) | Always runs — breaking news / flash crash (overrides throttle) |
-| Ready Mode active (price at D1/W1 HTF zone) | Runs AI, but **throttled** to once per `READY_AI_MIN_SECS` (5 min) |
-| Price within ≤ `AI_SR_PROXIMITY_PCT` (0.1%) of a **major HTF (D1/W1)** zone | Same 5-min throttle |
-| News window (8–9, 13–15, 18–19 UTC) | AI interval reduced to 3 minutes |
-| Otherwise | Normal: 15 min idle / 5 min with an open position |
-
-> **Why throttle?** Older builds treated *every* H4/H1 minor S/R level (within 0.3%) **and** Ready Mode as "never skip", so the full 4-agent pipeline fired every ~2 minutes and dominated token cost (~$24/day). The gate now only force-runs on real signals (spikes, major D1/W1 zones) and caps AI frequency to once per 5 min during those windows — the spike override still reacts instantly to fast moves in any session.
-
-### Why LangGraph?
-
-| | Before (sequential) | After (LangGraph) |
-|---|---|---|
-| State | 6 scattered globals | Single `TradingState` TypedDict |
-| Error handling | 6 duplicated try/except blocks | Isolated per node |
-| Position mgmt code | Duplicated in 2 places | Single `position_mgmt` node |
-| Cross-cycle state | Carried implicitly, easy to leak | Stateless per cycle — `compile()` has **no checkpointer**, so nothing bleeds between cycles; only `_last_chart_data`/`_last_sentiment` are carried forward explicitly |
-| Adding a new agent | Edit main.py | One `add_node()` call |
+The original design routed every cycle through a LangGraph state machine of Claude agents
+(`chart_watcher → market_advisor → analyst → decision_maker`) with a "smart skip gate" to
+throttle token cost. That pipeline is **retained but not the live entry path** when
+`REGIME_LIVE=true`. If you set `REGIME_LIVE=false`, it re-activates: the same deterministic
+risk gates (`_run_gates`) still run before any order, and the LLM adds a final quality
+check + news bias. The throttle knobs (`MIN_AI_EQUITY`, `AI_SPIKE_PIPS`, news-window
+intervals) live in [Environment Variables](#environment-variables); the graph is in
+`agents/trading_graph.py`.
 
 ---
 
@@ -270,17 +239,17 @@ Open your browser at `http://localhost:5050`. Five tabs:
 | Tab | Description |
 |---|---|
 | **Dashboard** | Portfolio equity curve (index-based x-axis), performance statistics, system-vs-manual split, trade history |
-| **Live** | Real-time bot status, AI verdict (multi-TF), the **AI-zone analysis terminal** (below), Event Radar, the **Calendar & Gold-News feed** (below), RIDE / NEWS_GATE cohort cards, manual-range override |
+| **Live** | Real-time bot status, algo/regime state + signal, TSMOM-D1 engine, the **gold-complex map + unified news feed** (GDELT + gold news with severity dots), Gold-Complex context (breadth / USD-leg / gold-silver ratio), the **S/R-zone analysis terminal** (below), cluster S/R, macro/liquidity panels, economic calendar |
 | **Analytics** | Performance breakdown, confidence calibration, CFTC COT positioning |
 | **Costs** | AI token spend, daily burn vs target, per-agent cost |
 | **Settings** | Live config editing — saves and auto-restarts via PM2 |
 
-### Chart-analysis panels (Live tab) — display-only, 0 AI cost
+### Chart-analysis panels (Live tab) — display-only, 0 LLM cost
 
 A UHAS-style analysis terminal, all computed in code by `chart_watcher` from MT5 price and served
 via `bot_status.json` — these fields are **never sent to the LLM** (no token cost, no effect on gates):
 
-- **AI-zone ladder** (H1/H4/D1/W1 support/resistance) — each zone shows a unified **0-100 strength
+- **S/R-zone ladder** (H1/H4/D1/W1 support/resistance) — each zone shows a unified **0-100 strength
   score + grade (A/B/C)**, break-vs-bounce probability with test count, break-confirmation
   (held *ยืน* / wick *ไส้เทียน*), cross-TF + Fibonacci **confluence ⚡**, HTF-major-zone **★**,
   recency + average bounce ($)
@@ -666,15 +635,26 @@ See all variables in [`.env.example`](.env.example)
 
 ## Core Features
 
-### Entry Signal
+### Entry Signal — deterministic, regime-routed (`REGIME_LIVE`)
 
-- **Multi-timeframe analysis** — H4 (major S/R zones), H1 (minor zones + structure), M15 (entry trigger)
-- **4-component H4 trend bias** — Price vs EMA200, H4 EMA50 slope, H1 EMA stack, H4 swing structure (≥3/4 required for BULLISH/BEARISH)
-- **Signal types**: SR_ZONE, STRUCTURE_PULLBACK, EMA_PULLBACK, BREAKOUT_RETEST, ENGULFING, DOJI_AT_ZONE, MOMENTUM_BREAKOUT
-- **Trend continuation (NNLB)** — H1+H4 EMA stack alignment triggers SELL/BUY without requiring a D1/W1 zone
-- **H1 structure confirmation** — higher lows / lower highs from real swing points (+8-10 pts)
-- **Bollinger Band squeeze** — BB reversal signals carry edge only when a squeeze precedes them
-- **Fibonacci confluence** — +5-15 pts when price is at a key Fib level + zone
+- **Regime detection** (`scripts/regime_lib.py`) — from Efficiency-Ratio, ADX and a
+  volatility percentile: `RISK-OFF` (vol_pct ≥ 0.80) / `TREND` (ADX ≥ 25, ER ≥ 0.35) /
+  `RANGE` (ADX ≤ 20, ER ≤ 0.25) / `NEUTRAL`. The regime picks *which* algorithm is eligible.
+- **One algorithm per regime** — TREND → breakout (STOP order beyond structure);
+  RANGE → mean-reversion fade (LIMIT, extra-gated); RISK-OFF / NEUTRAL → **stand down**
+  (no trade is a valid, common output).
+- **Deterministic entry / SL / TP** — computed from price + ATR + S/R structure, never a
+  model prediction. SL/TP are ATR- and structure-derived; size is fixed-fractional.
+- **TSMOM-D1** — a separate daily time-series-momentum sleeve (`agents/tsmom_manager.py`),
+  the one directional edge that survived the validation gauntlet (as a *defensive* tilt).
+- **Honest edge status** — the offline gauntlet (intrabar, net-of-cost, OOS, PSR, null)
+  found **no tradeable directional edge** in the breakout/fade/scalp families on gold; the
+  live system therefore leans on regime/volatility structure + strict risk management, not
+  on a claimed direction predictor. See [Known Limitations](#known-limitations).
+
+> The old LLM signal taxonomy (SR_ZONE, EMA_PULLBACK, MOMENTUM_BREAKOUT, 4-component trend
+> bias, Fib/BB confluence scoring) belongs to the dormant LLM pipeline
+> (`REGIME_LIVE=false`), not the live algo path.
 
 ### Risk Management
 
@@ -686,21 +666,22 @@ See all variables in [`.env.example`](.env.example)
 - **Daily loss limit** — halts trading when max_daily_loss % is reached
 - **Momentum exit** — closes positions early when strong counter-momentum detected (loss ≥100 pips + M15 momentum, or M1 spike ≥500 pips)
 
-### Decision Layer — news-first entry hierarchy
+### Risk gates & anti-fade guards (`_run_gates`)
 
-The entry flow follows **news → price action → analysis → order**:
+Every entry — algo or (dormant) LLM path — passes the same deterministic Python gates
+before an order is sent. These are **hard filters, not predictions**:
 
-- **Anti-fade guards** (run before everything, both NNLB and normal mode):
-  - **Counter-spike** — never enter against a fresh ≥`COUNTER_SPIKE_PIPS` move (price spiking up = no SELL; usually a news move)
-  - **News-first** — when the analyst/macro-regime bias is clear (conf ≥ `NEWS_BIAS_MIN_CONF`), entries against it are blocked
-  - **HTF-fade** — no SELL at a D1/W1 SUPPORT, no BUY at a D1/W1 RESISTANCE (fading major levels = high failure odds)
-  - **News-override (option C)** — a counter-H4-trend entry is allowed only when it matches the news direction AND price action confirms (with-spike ≥ `NEWS_CONFIRM_PIPS`, or at a supporting HTF zone)
-- **Replay-proven confidence gates** (validated over 489 real closed trades):
-  - Floor **62%** for every entry (`MIN_TECH_CONF`) — the 50-59 band had WR 23.5% (−3,807 THB); HTF zones no longer lower the floor
-  - **Asian session (0-7 UTC): every entry needs ≥72%** (`ASIAN_MIN_CONF`) — Asian averaged −115/trade
-- **Deterministic Python gates** (quantitative filters in `_run_gates()`) run before calling Claude
-- **Claude receives only a compact summary** — asked only "is the setup quality good enough?"
-- **Capital floor** — equity below `MIN_AI_EQUITY` skips all AI calls; position management keeps running. ⚠️ The threshold is in the **account's currency** (code default `150` is THB-scale; a USD account should use ~`5` — `.env.example` ships `5`)
+- **Anti-fade guards:**
+  - **Counter-spike** — never enter against a fresh ≥`COUNTER_SPIKE_PIPS` move (usually news).
+  - **HTF-fade** — no SELL at a D1/W1 SUPPORT, no BUY at a D1/W1 RESISTANCE (fading major levels = high failure odds).
+  - **News-first** — when a clear news/macro bias exists (from the optional sentiment layer), entries against it are blocked; a counter-trend entry is allowed only when it *matches* the news direction and price action confirms.
+- **Session / confidence floors** (replay-tuned over real closed trades): base floor `MIN_TECH_CONF` (62); Asian session 0–7 UTC needs `ASIAN_MIN_CONF` (72).
+- **Portfolio circuit-breakers:** `MAX_DAILY_LOSS`, losing-streak protection, `MAX_OPEN_TRADES`, cluster-aware sizing.
+- **Capital floor** — `MIN_AI_EQUITY` gates the (optional) LLM layer; the algo entry + position management keep running below it. ⚠️ The threshold is in the **account's currency** (code default `150` is THB-scale; a USD account should use ~`5` — `.env.example` ships `5`).
+
+> **Iron rule:** confidence thresholds, SL/TP defaults and the anti-fade guards
+> (`_run_gates`) are load-bearing — do not change them without an explicit reason and
+> a replay/validation check.
 
 ### Trade Management
 
@@ -720,7 +701,7 @@ The entry flow follows **news → price action → analysis → order**:
 - **Per-agent token accounting, multi-provider ready** — each agent's model comes from `agents/llm_models.py` (`MODEL_<AGENT>` env override) and `accountant._normalize_usage()` accepts Anthropic / OpenAI-compatible / LangChain usage objects
 - **Smoke test** — `python scripts/smoke_test.py` checks config knobs + entry guards after a refactor
 - **Strategy versioning** — all new trades include `strategy_version=2` to distinguish from legacy data
-- **Dashboard** — Flask web UI on port 5050: a UHAS-style analysis terminal (AI-zone ladder with 0-100 score/grade + break-bounce %/confluence/FVG/liquidity/volume/market-structure/entry-tech panels) plus a combined economic-calendar + gold-news feed with click-to-expand event scenarios (countdown, surprise panels, 15y stats, MACD-style reaction histogram) — all display-only, computed in code (no LLM cost)
+- **Dashboard** — Flask web UI on port 5050: a UHAS-style analysis terminal (S/R-zone ladder with 0-100 score/grade + break-bounce %/confluence/FVG/liquidity/volume/market-structure/entry-tech panels) plus a combined economic-calendar + gold-news feed with click-to-expand event scenarios (countdown, surprise panels, 15y stats, MACD-style reaction histogram) — all display-only, computed in code (no LLM cost)
 - **PM2 process manager** — auto-restart, live config changes via dashboard
 
 ---
