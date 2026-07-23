@@ -1601,6 +1601,24 @@ def api_speech_summary():
         return jsonify({"ok": False, "note": str(e)[:80]})
 
 
+@app.route("/api/speech-bias")
+def api_speech_bias():
+    """gold-direction bias จาก keyword ในข่าว speech (deterministic, 0 token, poll ได้). cache 60s."""
+    title = request.args.get("title", "")
+    if not title:
+        return jsonify({"ok": False, "note": "ไม่มี title"})
+
+    def _compute():
+        try:
+            from connectors.speech_summary import bias_from_news
+            b = bias_from_news(title)
+            b["ok"] = True
+            return b
+        except Exception as e:
+            return {"ok": False, "note": str(e)[:60]}
+    return jsonify(_cached(f"speech-bias:{title}", _compute, ttl=60))
+
+
 @app.route("/api/regime")
 def api_regime():
     """สรุป macro regime จาก agents/prompts/macro_regime.md (ไฟล์เดียวกับที่ analyst อ่าน)

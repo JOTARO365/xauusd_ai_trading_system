@@ -46,6 +46,37 @@ def _gnews(q, n=8):
     return out
 
 
+# keyword → ทิศทางทอง: hawkish = ทองลง / dovish + safe-haven = ทองขึ้น (Fed-speak ↔ gold)
+_HAWKISH = ("rate hike", "raise rate", "higher for longer", "inflation", "hawkish", "tighten",
+            "restrictive", "strong economy", "vigilant", "overheat", "hot economy", "sticky inflation")
+_DOVISH = ("rate cut", "cut rate", "lower rate", "dovish", "easing", "ease", "stimulus", "patient",
+           "pause", "slowdown", "weak", "recession", "accommodative", "soft landing", "cooling")
+_SAFEHAVEN = ("war", "conflict", "sanction", "crisis", "geopolit", "attack", "escalat", "tension",
+              "safe haven", "safe-haven", "uncertainty", "turmoil")
+
+
+def bias_score(heads):
+    """คะแนน gold bias −100..+100 (ทองลง↔ทองขึ้น) จาก keyword ในพาดหัว. deterministic, 0 token."""
+    text = " ".join(heads).lower()
+    haw = sum(text.count(k) for k in _HAWKISH)
+    dov = sum(text.count(k) for k in _DOVISH)
+    sh = sum(text.count(k) for k in _SAFEHAVEN)
+    up, down = dov + sh, haw                          # ทองขึ้น = dovish+risk-off ; ทองลง = hawkish
+    tot = up + down
+    score = 0 if tot == 0 else round((up - down) / tot * 100)
+    label = ("ทองขึ้น (dovish / risk-off)" if score > 15
+             else "ทองลง (hawkish)" if score < -15 else "กลาง / ยังไม่ชัด")
+    return {"score": score, "label": label, "hawkish": haw, "dovish": dov, "safehaven": sh, "n_heads": len(heads)}
+
+
+def bias_from_news(title):
+    """fetch ข่าว speech → คะแนน bias + พาดหัว. (0 token — ใช้ keyword ล้วน)."""
+    heads = _gnews(_query_of(title), n=12)
+    b = bias_score(heads)
+    b["headlines"] = heads[:6]
+    return b
+
+
 def summarize_speech(title, key):
     """คืน {ok, summary, sources, cached} — cache ต่อ speech (TTL 1 วัน). ต้องเปิด flag ที่ endpoint ก่อนเรียก."""
     try:
