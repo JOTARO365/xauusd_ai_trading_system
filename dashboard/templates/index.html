@@ -1745,10 +1745,14 @@
         <span><span class="wm-dot ok"></span>Global Context — ศูนย์เทรดทอง + geopolitical risk (safe-haven driver)</span>
         <span id="wm-attention" style="text-transform:none;letter-spacing:0;font-family:var(--mono);font-size:11px;color:var(--muted)"><span class="wm-dot idle"></span>GDELT — โหลด...</span>
       </div>
-      <div style="position:relative;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#0a1410 0%,#050807 78%)">
+      <div style="position:relative;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:#020a08">
         <div id="wm-map" style="width:100%;line-height:0"></div>
-        <div style="position:absolute;bottom:8px;left:12px;font-size:10px;color:var(--muted);font-family:var(--mono);pointer-events:none">
-          <span style="color:var(--green)">●</span> trading hub&nbsp;&nbsp;<span style="color:var(--cyan)">●</span> central bank&nbsp;&nbsp;<span style="color:var(--amber)">●</span> risk zone&nbsp;&nbsp;<span style="color:var(--red)">●</span> live event (GDELT)
+        <div style="position:absolute;bottom:7px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:11px;font-size:9px;color:var(--text-dim,#888);font-family:var(--mono);letter-spacing:.3px;padding:5px 14px;background:rgba(2,10,8,0.72);border:1px solid var(--border);border-radius:4px;pointer-events:none">
+          <span><span style="color:#ffd700">●</span> gold mine</span>
+          <span><span style="color:#f59e0b">◆</span> chokepoint</span>
+          <span><span style="color:#8ab4f8">●</span> central bank</span>
+          <span><span style="color:#44ff88">▲</span>/<span style="color:#ff4444">▼</span> hub move</span>
+          <span><span style="color:#ff4444">◉</span> live event</span>
         </div>
       </div>
       <div style="margin-top:8px;border:1px solid var(--border);border-radius:6px;overflow:hidden">
@@ -4055,42 +4059,49 @@ function setTvbYears(y) {
 }
 
 // ── WM-style globe: gold trading hubs + central banks + geopolitical risk zones (safe-haven drivers) ──
-const WM_POINTS = [
-  {name:'London · LBMA', lat:51.51, lng:-0.13, kind:'hub'},
-  {name:'New York · COMEX', lat:40.71, lng:-74.01, kind:'hub'},
-  {name:'Shanghai · SGE', lat:31.23, lng:121.47, kind:'hub'},
-  {name:'Zurich', lat:47.37, lng:8.54, kind:'hub'},
-  {name:'Hong Kong', lat:22.32, lng:114.17, kind:'hub'},
-  {name:'Dubai · DGCX', lat:25.20, lng:55.27, kind:'hub'},
-  {name:'Mumbai', lat:19.08, lng:72.88, kind:'hub'},
-  {name:'Fed · Washington', lat:38.90, lng:-77.04, kind:'cb'},
-  {name:'ECB · Frankfurt', lat:50.11, lng:8.68, kind:'cb'},
-  {name:'PBOC · Beijing', lat:39.90, lng:116.40, kind:'cb'},
-  {name:'⚠ Strait of Hormuz', lat:26.57, lng:56.25, kind:'risk'},
-  {name:'⚠ Ukraine', lat:49.0, lng:32.0, kind:'risk'},
-  {name:'⚠ Taiwan Strait', lat:24.5, lng:119.5, kind:'risk'},
-  {name:'⚠ Red Sea', lat:20.0, lng:38.0, kind:'risk'},
+// financial/gold hubs — สีตาม move ของ instrument ที่ผูก (จาก /api/pair-moves)
+const WM_HUBS = [
+  {name:'London · LBMA', lat:51.51, lng:-0.13, sym:'XAUUSD'},
+  {name:'New York · COMEX', lat:40.71, lng:-74.01, sym:'XAUUSD'},
+  {name:'Chicago · CME', lat:41.88, lng:-87.63, sym:'XAUUSD'},
+  {name:'Shanghai · SGE', lat:31.23, lng:121.47, sym:'XAUUSD'},
+  {name:'Zurich', lat:47.37, lng:8.54, sym:'XAUUSD'},
+  {name:'Dubai · DGCX', lat:25.20, lng:55.27, sym:'XAUUSD'},
+  {name:'Tokyo', lat:35.69, lng:139.69, sym:'USDJPY'},
+  {name:'Sydney', lat:-33.86, lng:151.21, sym:'AUDUSD'},
 ];
 // ── flat 2D world map (equirectangular) — อ่านง่ายกว่า globe 3D. โปรเจ็กชัน lat/lng → x/y เชิงเส้น ──
 const WM_W = 1000, WM_LAT_TOP = 84, WM_LAT_BOT = -58, WM_S = 1000 / 360;
 const WM_H = Math.round((WM_LAT_TOP - WM_LAT_BOT) * WM_S);   // ~394 (สัดส่วนไม่บิดเบี้ยว)
 const wmX = lng => (lng + 180) * WM_S;
 const wmY = lat => (WM_LAT_TOP - lat) * WM_S;
-let _wmMapInit = false, _wmLand = null;
+let _wmMapInit = false, _wmLand = null, _wmLayers = null, _wmMoves = {}, _wmGdelt = [];
 
 const _wmEsc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const _wmUrl = u => /^https?:\/\//i.test(u || '') ? _wmEsc(u) : '#';   // allowlist http(s) เท่านั้น (กัน javascript:/attr break-out)
 const _wmShort = name => name.replace(/^⚠\s*/, '').split(' · ')[0];
 
+// move → สี (WM: green-up / red-down / neutral); null = ไม่มี data
+const _moveCol = pct => pct == null ? '#3b82f6' : (pct > 0.03 ? '#44ff88' : (pct < -0.03 ? '#ff4444' : '#888'));
+const _hubMove = sym => (_wmMoves[sym] || {}).pct;
+function _cbMove(ccy) {   // ความแข็งของสกุลเงิน CB จาก pair ที่ collect (null ถ้าไม่มี)
+  const m = _wmMoves;
+  if (ccy === 'EUR') return m.EURUSD ? m.EURUSD.pct : null;
+  if (ccy === 'AUD') return m.AUDUSD ? m.AUDUSD.pct : null;
+  if (ccy === 'JPY') return m.USDJPY ? -m.USDJPY.pct : null;   // JPY แข็ง = USDJPY ลง
+  if (ccy === 'CHF') return m.USDCHF ? -m.USDCHF.pct : null;
+  return null;
+}
+
 function _wmGraticule() {
   let g = '';
   for (let lng = -180; lng <= 180; lng += 30) {
     const x = wmX(lng).toFixed(1);
-    g += `<line x1="${x}" y1="0" x2="${x}" y2="${WM_H}" stroke="#16241d" stroke-width="0.5"/>`;
+    g += `<line x1="${x}" y1="0" x2="${x}" y2="${WM_H}" stroke="#0a2a20" stroke-width="0.4"/>`;
   }
   for (let lat = -30; lat <= 60; lat += 30) {
     const y = wmY(lat).toFixed(1);
-    g += `<line x1="0" y1="${y}" x2="${WM_W}" y2="${y}" stroke="#16241d" stroke-width="0.5"/>`;
+    g += `<line x1="0" y1="${y}" x2="${WM_W}" y2="${y}" stroke="#0a2a20" stroke-width="0.4"/>`;
   }
   return g;
 }
@@ -4105,29 +4116,55 @@ function _wmLandPath(rings) {
   return d;
 }
 
-function _wmDotSvg(p) {
-  const x = wmX(p.lng), y = wmY(p.lat);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return '';  // กัน NaN จาก data เพี้ยน
-  if (y < -12 || y > WM_H + 12) return '';                    // นอกกรอบ (เช่น Antarctica) ข้าม
-  const c = p.kind === 'live' ? ((p.sev || 0) > 0.6 ? '#ef4444' : '#f59e0b')
-    : (p.kind === 'risk' ? '#f59e0b' : (p.kind === 'cb' ? '#60a5fa' : '#4ade80'));
-  const r = p.kind === 'live' ? (2.6 + 2.6 * (p.sev || 0)) : (p.kind === 'risk' ? 3.4 : 3);
+// marker เดียว (WM style: dark ring lift-off + glow/pulse). opt: {title,label,labelCol,glow,pulse,ring}
+function _mk(lat, lng, r, fill, opt) {
+  opt = opt || {};
+  const x = wmX(lng), y = wmY(lat);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || y < -12 || y > WM_H + 12) return '';
   const xs = x.toFixed(1), ys = y.toFixed(1), rs = r.toFixed(1);
-  const halo = (p.kind === 'live' || p.kind === 'risk')
-    ? `<circle cx="${xs}" cy="${ys}" r="${rs}" fill="${c}" opacity="0.4">`
+  let s = '';
+  if (opt.pulse) {
+    s += `<circle cx="${xs}" cy="${ys}" r="${rs}" fill="${fill}" opacity="0.4">`
       + `<animate attributeName="r" values="${rs};${(r*2.8).toFixed(1)};${rs}" dur="2.2s" repeatCount="indefinite"/>`
-      + `<animate attributeName="opacity" values="0.4;0;0.4" dur="2.2s" repeatCount="indefinite"/></circle>` : '';
-  const showLabel = p.kind !== 'live' || (p.sev || 0) >= 0.6;
-  const lbl = showLabel
-    ? `<text x="${(x + r + 2.5).toFixed(1)}" y="${(y + 3).toFixed(1)}" fill="${c}" font-size="9" `
-      + `font-family="ui-monospace,monospace" opacity="0.9">${_wmEsc(p.short || p.name)}</text>` : '';
-  return `${halo}<circle cx="${xs}" cy="${ys}" r="${rs}" fill="${c}" stroke="#050807" stroke-width="0.5">`
-    + `<title>${_wmEsc(p.name)}</title></circle>${lbl}`;
+      + `<animate attributeName="opacity" values="0.4;0;0.4" dur="2.2s" repeatCount="indefinite"/></circle>`;
+  } else if (opt.glow) {
+    s += `<circle cx="${xs}" cy="${ys}" r="${(r*2.3).toFixed(1)}" fill="${fill}" opacity="0.16"/>`;
+  }
+  s += `<circle cx="${xs}" cy="${ys}" r="${rs}" fill="${fill}" stroke="#020a08" stroke-width="${opt.ring === false ? 0 : 0.7}">`
+    + `<title>${_wmEsc(opt.title || '')}</title></circle>`;
+  if (opt.label) s += `<text x="${(x + r + 2.3).toFixed(1)}" y="${(y + 3).toFixed(1)}" fill="${opt.labelCol || fill}" `
+    + `font-size="8.5" font-family="var(--mono),monospace" opacity="0.92" style="text-shadow:0 0 3px #020a08">${_wmEsc(opt.label)}</text>`;
+  return s;
 }
 
-function renderWmDots(pts) {
+// วาดทุก layer เข้า <g id=wm-dots> — ลำดับ: mines → waterways → central banks → hubs → GDELT live (บนสุด)
+function renderAllLayers() {
   const g = document.getElementById('wm-dots');
-  if (g) g.innerHTML = pts.map(_wmDotSvg).join('');
+  if (!g) return;
+  const L = _wmLayers || {};
+  let s = '';
+  (L.gold_mines || []).forEach(m => s += _mk(m.lat, m.lng, 1.7,
+    m.mineral === 'Silver' ? '#c0c0c0' : '#ffd700', { ring: false, title: `${m.name} · ${m.mineral} mine` }));
+  (L.waterways || []).forEach(w => s += _mk(w.lat, w.lng, 2.1, '#f59e0b',
+    { title: w.name, label: _wmShort(w.name).replace(/\b\w+/g, t => t[0] + t.slice(1).toLowerCase()) }));
+  const _cbMajor = { Fed: 1, ECB: 1, BoJ: 1, PBoC: 1, BoE: 1, SNB: 1 };   // label เฉพาะตัวใหญ่ (ลด clutter)
+  (L.central_banks || []).forEach(b => {
+    const mv = _cbMove(b.ccy);
+    s += _mk(b.lat, b.lng, 3, _moveCol(mv), { glow: mv != null && Math.abs(mv) > 0.2, labelCol: '#8ab4f8',
+      label: _cbMajor[b.short] ? b.short : '', title: `${b.name}${mv != null ? ` · ${b.ccy} ${mv > 0 ? '+' : ''}${mv}%` : ''}` });
+  });
+  WM_HUBS.forEach(h => {
+    const mv = _hubMove(h.sym), col = _moveCol(mv);
+    s += _mk(h.lat, h.lng, 3.4, col, { glow: mv != null, labelCol: col,
+      label: `${_wmShort(h.name)}${mv != null ? ` ${mv > 0 ? '+' : ''}${mv}%` : ''}`,
+      title: `${h.name}${mv != null ? ` · ${h.sym} ${mv > 0 ? '+' : ''}${mv}%` : ''}` });
+  });
+  (_wmGdelt || []).forEach(e => {
+    const sev = e.sev || 0;
+    s += _mk(e.lat, e.lng, 2.6 + 2.6 * sev, sev > 0.6 ? '#ff4444' : '#f59e0b',
+      { pulse: true, label: sev >= 0.6 ? e.name : '', title: `${e.name} · ${e.count} ข่าว` });
+  });
+  g.innerHTML = s;
 }
 
 async function initWmMap() {
@@ -4136,24 +4173,25 @@ async function initWmMap() {
   if (!el) return;
   _wmMapInit = true;
   try { _wmLand = await (await fetch('/api/worldmap')).json(); } catch (_e) { _wmLand = []; }
+  try { _wmLayers = await (await fetch('/api/map-layers')).json(); } catch (_e) { _wmLayers = {}; }
   el.innerHTML =
     `<svg viewBox="0 0 ${WM_W} ${WM_H}" width="100%" preserveAspectRatio="xMidYMid meet" style="display:block">`
+    + `<rect x="0" y="0" width="${WM_W}" height="${WM_H}" fill="#020a08"/>`   // WM ocean: near-black green
     + _wmGraticule()
-    + `<path d="${_wmLandPath(_wmLand || [])}" fill="#12211a" stroke="#2c4a3a" stroke-width="0.5" stroke-linejoin="round"/>`
+    + `<path d="${_wmLandPath(_wmLand || [])}" fill="#0a2018" stroke="#0f5040" stroke-width="0.5" stroke-linejoin="round"/>`
     + `<g id="wm-dots"></g></svg>`;
-  renderWmDots(WM_POINTS.map(p => ({...p, short: _wmShort(p.name)})));   // static hubs ทันที
-  loadWorldMonitor();                                                     // แล้ว merge live GDELT
+  renderAllLayers();          // static layers ทันที (mines/waterways/cb/hubs)
+  loadWorldMonitor();         // แล้ว merge GDELT live + pair-moves
 }
 
 // ── live GDELT geopolitical signals → map live dots + attention/headline (WorldMonitor upstream) ──
 async function loadWorldMonitor() {
   try {
     const d = await (await fetch('/api/worldmonitor')).json();
-    // แผนที่: static hubs + live event dots (per-country, สีตาม severity). live เฉพาะเมื่อ d.ok (กันโชว์ stale)
-    const base = WM_POINTS.map(p => ({...p, short: _wmShort(p.name)}));
-    const live = (d.ok ? (d.events || []) : []).map(e => ({
-      name: `${e.name} · ${e.count} ข่าว`, short: e.name, lat: e.lat, lng: e.lng, kind: 'live', sev: e.sev}));
-    renderWmDots(base.concat(live));
+    // GDELT live events + pair-moves → วาดทุก layer ใหม่ (live เฉพาะเมื่อ d.ok กันโชว์ stale)
+    _wmGdelt = d.ok ? (d.events || []) : [];
+    try { _wmMoves = ((await (await fetch('/api/pair-moves')).json()).moves) || {}; } catch (_e3) {}
+    renderAllLayers();
     // attention gauge + top headline
     const at = document.getElementById('wm-attention');
     if (at) {
