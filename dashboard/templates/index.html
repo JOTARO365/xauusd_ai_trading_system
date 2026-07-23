@@ -1720,14 +1720,18 @@
     <!-- AI SENTIMENT (SELECTION layer) — LLM อ่านข่าว X + ตัวเลขเศรษฐกิจ → guide เลือก regime (display-only, 0 token) -->
     <!-- GLOBAL CONTEXT — WorldMonitor-style globe: gold trading hubs + geopolitical risk (safe-haven drivers) -->
     <section id="wm-globe-section" style="margin-bottom:10px">
-      <div class="section-title"><span class="wm-dot ok"></span>Global Context — ศูนย์เทรดทอง + จุดเสี่ยง geopolitical (ตัวขับ safe-haven)</div>
+      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <span><span class="wm-dot ok"></span>Global Context — ศูนย์เทรดทอง + geopolitical risk (safe-haven driver)</span>
+        <span id="wm-attention" style="text-transform:none;letter-spacing:0;font-family:var(--mono);font-size:11px;color:var(--muted)"><span class="wm-dot idle"></span>GDELT — โหลด...</span>
+      </div>
       <div style="position:relative;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:radial-gradient(ellipse at center,#0a120a 0%,#050505 72%)">
         <div id="wm-globe" style="width:100%;height:440px"></div>
         <div id="wm-globe-fallback" style="display:none;padding:48px;text-align:center;color:var(--muted);font-size:12px;font-family:var(--mono)">🌐 globe ต้องต่อเน็ต (globe.gl CDN) + WebGL — offline/ไม่รองรับ = ไม่แสดง</div>
         <div style="position:absolute;bottom:9px;left:13px;font-size:10px;color:var(--muted);font-family:var(--mono);pointer-events:none">
-          <span style="color:var(--green)">●</span> trading hub&nbsp;&nbsp;<span style="color:var(--cyan)">●</span> central bank&nbsp;&nbsp;<span style="color:var(--amber)">●</span> risk zone&nbsp;&nbsp;·&nbsp;หมุนอัตโนมัติ · ลากหมุน/ซูมได้
+          <span style="color:var(--green)">●</span> trading hub&nbsp;&nbsp;<span style="color:var(--cyan)">●</span> central bank&nbsp;&nbsp;<span style="color:var(--amber)">●</span> risk zone&nbsp;&nbsp;<span style="color:var(--red)">●</span> live event&nbsp;&nbsp;·&nbsp;หมุนอัตโนมัติ
         </div>
       </div>
+      <div id="wm-headline" style="margin-top:5px;font-size:11px;font-family:var(--mono);color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
     </section>
 
     <section id="ai-sentiment-section" style="margin-bottom:10px">
@@ -3467,6 +3471,7 @@ async function loadLivePrice() {
     loadAlgoJournal();      // Trade score — algo journal win-rate/exp_R (throttled, server-cached)
     loadAlgoStatus();   // System status — algo mode / regime / signal
     loadTsmom();        // TSMOM-D1 engine — signal ensemble / position / state
+    loadWorldMonitor(); // GDELT geopolitical signals — globe live dots + attention/headline
 
     // Live ticker
     const bidEl  = document.getElementById('px-bid');
@@ -4062,7 +4067,7 @@ const WM_ARCS = [
   {startLat:40.71,startLng:-74.01,endLat:31.23,endLng:121.47},  // NY↔Shanghai
   {startLat:51.51,startLng:-0.13,endLat:25.20,endLng:55.27},    // London↔Dubai
 ];
-let _wmGlobeInit = false;
+let _wmGlobeInit = false, _wmGlobeObj = null;
 function initWmGlobe() {
   if (_wmGlobeInit) return;
   const el = document.getElementById('wm-globe');
@@ -4087,11 +4092,46 @@ function initWmGlobe() {
     g.controls().autoRotate = true; g.controls().autoRotateSpeed = 0.42;
     const resize = () => g.width(el.clientWidth).height(440);
     resize(); window.addEventListener('resize', resize);
+    _wmGlobeObj = g; loadWorldMonitor();
   } catch (_e) {
     _wmGlobeInit = false;
     const fb = document.getElementById('wm-globe-fallback');
     if (fb) { fb.style.display = 'block'; el.style.display = 'none'; }
   }
+}
+
+// ── live GDELT geopolitical signals → globe live dots + attention/headline (WorldMonitor upstream) ──
+async function loadWorldMonitor() {
+  try {
+    const d = await (await fetch('/api/worldmonitor')).json();
+    // globe: static hubs + live event dots (per-country, สีตาม severity)
+    if (_wmGlobeObj) {
+      const live = (d.ok ? (d.events || []) : []).map(e => ({
+        name: `🔴 ${e.name} · ${e.count} events`, lat: e.lat, lng: e.lng, kind: 'live', sev: e.sev }));
+      const col = x => x.kind === 'live' ? (x.sev > 0.6 ? '#ef4444' : '#f59e0b')
+        : (x.kind === 'risk' ? '#f59e0b' : (x.kind === 'cb' ? '#60a5fa' : '#4ade80'));
+      _wmGlobeObj.pointsData(WM_POINTS.concat(live))
+        .pointColor(col)
+        .pointAltitude(x => x.kind === 'live' ? 0.04 + 0.14 * (x.sev || 0) : (x.kind === 'risk' ? 0.09 : 0.03))
+        .pointRadius(x => x.kind === 'live' ? 0.4 + 0.5 * (x.sev || 0) : 0.55);
+    }
+    // attention gauge + top headline
+    const at = document.getElementById('wm-attention'), hl = document.getElementById('wm-headline');
+    if (at) {
+      if (d.ok && d.attention != null) {
+        const lvl = d.attention > 0.6 ? 'สูง' : (d.attention > 0.3 ? 'ปานกลาง' : 'ต่ำ');
+        const c = d.attention > 0.6 ? 'var(--red)' : (d.attention > 0.3 ? 'var(--amber)' : 'var(--green)');
+        at.innerHTML = `<span class="wm-dot ${d.attention>0.6?'alert':(d.attention>0.3?'warn':'ok')}"></span>` +
+          `GDELT attention <b style="color:${c}">${lvl}</b> · ${d.n_articles} ข่าว/48h`;
+      } else { at.innerHTML = '<span class="wm-dot idle"></span>GDELT — รอ data (offline/rate-limit)'; }
+    }
+    if (hl) {
+      if (d.ok && d.headlines && d.headlines.length) {
+        const h = d.headlines[0];
+        hl.innerHTML = `<span style="color:var(--muted)">${h.country || ''}</span> · ${h.title}`;
+      } else { hl.textContent = '—'; }
+    }
+  } catch (_e) {}
 }
 
 async function loadTsmom() {

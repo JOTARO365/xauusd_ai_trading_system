@@ -817,6 +817,29 @@ def _tsmom_vs_bh(years=None):
         return None
 
 
+@app.route("/api/worldmonitor")
+def api_worldmonitor():
+    """live geopolitical/gold signals จาก GDELT (WorldMonitor upstream, ฟรี 0-token). serve file +
+    background refresh ถ้า stale (non-blocking). feed globe live risk dots + SELECTION/risk layer."""
+    p = os.path.join(_BASE, "..", "data", "worldmonitor.json")
+    out = {"ok": False, "events": [], "headlines": [], "attention": None}
+    try:
+        with open(p, encoding="utf-8") as f:
+            out = json.load(f)
+    except Exception:
+        pass
+    # background refresh ถ้า stale (ไม่ block request)
+    try:
+        stale = (not os.path.exists(p)) or (_time_mod.time() - os.path.getmtime(p) > 1800)
+        if stale:
+            import threading
+            from connectors.worldmonitor import refresh
+            threading.Thread(target=refresh, daemon=True).start()
+    except Exception:
+        pass
+    return jsonify(out)
+
+
 @app.route("/api/tsmom")
 def api_tsmom():
     """สถานะ TSMOM-D1 directional engine: signal ensemble + position + state (compute-in-code, 0 token)."""
