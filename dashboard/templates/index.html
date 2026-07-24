@@ -4712,11 +4712,19 @@ async function loadShadowMatrix(force) {
     // ── STRATEGY ROLLUP: การ์ดต่อกลยุทธ์ (กำไร/ขาดทุนรวมทุกคู่) ──
     if (strat) strat.innerHTML = (d.by_algo || []).map(a => {
       const pl = a.sum_R || 0, col = rC(a.exp_R);
-      return `<div style="flex:1;min-width:210px;border:1px solid var(--border);border-left:3px solid ${col};border-radius:8px;padding:9px 12px;background:var(--surface)">
-        <div style="font-weight:700;font-size:13px">${a.algo_id} <span style="color:var(--muted);font-size:10px;font-weight:400">${a.regime}</span></div>
-        <div style="font-family:var(--mono);font-size:18px;font-weight:700;color:${col};margin:2px 0">${fx(pl,1)}R <span style="font-size:11px;color:var(--muted)">รวม (net)</span></div>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--muted)">n=${a.n} · WR ${a.wr == null ? '—' : a.wr + '%'} · exp ${fx(a.exp_R)}R · คู่กำไร ${a.pairs_pos}/${a.pairs_traded}</div>
-        ${a.best ? `<div style="font-family:var(--mono);font-size:10px;color:var(--muted)">ดีสุด ${a.best[0]} ${fx(a.best[1])} · แย่สุด ${a.worst[0]} ${fx(a.worst[1])}</div>` : ''}
+      const nm = a.name || a.algo_id;
+      const badge = a.live
+        ? `<span style="background:var(--green);color:#0e1117;font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:6px">🟢 LIVE${a.live_symbol ? ' ' + a.live_symbol : ''}</span>`
+        : (a.algo_id === 'mean_reversion' ? `<span style="background:#555;color:#ddd;font-size:9px;padding:1px 5px;border-radius:4px;margin-left:6px">CUT</span>` : '');
+      const metric = a.headline
+        ? `<div style="font-family:var(--mono);font-size:14px;font-weight:700;margin:3px 0">${a.headline}</div>`
+        : `<div style="font-family:var(--mono);font-size:18px;font-weight:700;color:${col};margin:2px 0">${fx(pl,1)}R <span style="font-size:11px;color:var(--muted)">รวม (net)</span></div>
+           <div style="font-family:var(--mono);font-size:11px;color:var(--muted)">n=${a.n} · WR ${a.wr == null ? '—' : a.wr + '%'} · exp ${fx(a.exp_R)}R · คู่กำไร ${a.pairs_pos}/${a.pairs_traded}</div>
+           ${a.best ? `<div style="font-family:var(--mono);font-size:10px;color:var(--muted)">ดีสุด ${a.best[0]} ${fx(a.best[1])} · แย่สุด ${a.worst[0]} ${fx(a.worst[1])}</div>` : ''}`;
+      return `<div style="flex:1;min-width:210px;border:1px solid var(--border);border-left:3px solid ${a.live ? 'var(--green)' : col};border-radius:8px;padding:9px 12px;background:var(--surface)">
+        <div style="font-weight:700;font-size:13px">${nm} <span style="color:var(--muted);font-size:10px;font-weight:400">${a.regime}</span>${badge}</div>
+        ${metric}
+        ${a.note ? `<div style="font-size:9px;color:var(--muted);margin-top:3px">${a.note}</div>` : ''}
       </div>`;
     }).join('') || '<div style="color:var(--muted);font-size:12px">ยังไม่มีข้อมูล — กำลังเก็บ (SHADOW_ENGINE)</div>';
 
@@ -4733,7 +4741,7 @@ async function loadShadowMatrix(force) {
     body.innerHTML = rows.map(r => {
       const regime = r.algo_id === 'mean_reversion' ? 'RANGE' : (r.algo_id === 'regime_momentum' ? 'TREND' : '—');
       return `<tr style="text-align:left;border-top:1px solid #262a31">
-        <td style="padding:4px 8px">${r.algo_id}</td>
+        <td style="padding:4px 8px">${r.algo_id}${r.live ? ' <span style="color:var(--green);font-size:9px;font-weight:700">🟢LIVE</span>' : ''}</td>
         <td style="padding:4px 8px;font-weight:700">${r.symbol}</td>
         <td style="padding:4px 8px;color:var(--muted)">${regime}</td>
         <td style="padding:4px 8px">${r.n}</td>

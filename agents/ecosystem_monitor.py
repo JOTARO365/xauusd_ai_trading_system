@@ -21,21 +21,27 @@ _ECO = [
     ("AUD", "AUDUSD",      ["AUDUSD"],                       "risk_fx"),
     ("BTC", "BTC",         ["BTCUSD", "BITCOIN"],            "risk"),
 ]
-_DEAD = 0.03           # deadband % — ต่ำกว่านี้ = FLAT (กัน noise พลิก sign)
+_DEAD = 0.01           # deadband % — ต่ำกว่านี้ = FLAT (ทอง $0.4/ชม; เดิม 0.03=$1.2 ใหญ่ไป ขึ้น "นิ่ง" บ่อย)
 _TYP_W = 100           # window (H1 bars) สำหรับ correlation "ปกติ"
 
 
 def _move_1h(mt5, symbol, hclose):
-    """(%เปลี่ยน ~1ชม, ราคาปัจจุบัน) — tick เทียบ close ของแท่ง H1 ก่อนหน้า (≈1ชม ที่แล้ว)."""
+    """(%เปลี่ยน rolling ~60นาที, ราคาปัจจุบัน) — tick เทียบ close ~60 นาทีที่แล้ว (M15×4 = window คงที่
+    ไม่ผูกกับต้นชั่วโมง กัน bias reset ทุกต้น ชม.). fallback H1 (since hour start) ถ้า M15 ไม่พร้อม."""
     tick = mt5.symbol_info_tick(symbol)
     price = float(tick.bid) if tick and tick.bid else None
     ref = None
-    if hclose:
+    m15 = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_M15, 0, 6)
+    if m15 is not None and len(m15) >= 5:
+        ref = float(m15[-5]["close"])         # close ของแท่ง M15 ~60 นาทีก่อน (rolling)
+        if price is None:
+            price = float(m15[-1]["close"])
+    if (price is None or not ref) and hclose:  # fallback: H1 series
         ts = sorted(hclose)
         if price is None:
             price = hclose[ts[-1]]
-        if len(ts) >= 2:
-            ref = hclose[ts[-2]]              # close เมื่อ ~1 ชม ที่แล้ว
+        if not ref and len(ts) >= 2:
+            ref = hclose[ts[-2]]
     if price is None or not ref:
         return None, price
     return round((price - ref) / ref * 100, 2), price

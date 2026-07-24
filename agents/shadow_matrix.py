@@ -29,6 +29,14 @@ _DYING_EXP_R = -0.05
 _MIN_SPAN_DAYS = 60
 _N_READY = {"scalp": 100, "swing": 20}
 
+# display metadata — ให้เมทริกซ์โชว์ตรงกับที่เทรดจริง (ชื่อ + สถานะ live). ไม่แตะ algo_id/data pipeline.
+_ALGO_META = {
+    "regime_momentum": {"name": "Momentum Breakout", "regime": "TREND", "live_symbol": "XAUUSD",
+                        "note": "= algo ที่เทรดจริงบน XAUUSD (intraday · signal momentum_breakout · tag ALGO-mom)"},
+    "mean_reversion":  {"name": "Mean-Reversion (z-fade)", "regime": "RANGE", "live_symbol": None,
+                        "note": "CUT 07-19 (OOS −EV) — shadow/reference เท่านั้น ไม่ได้ใช้จริง"},
+}
+
 
 def _read(path):
     out = []
@@ -122,6 +130,7 @@ def build():
         b = bt.get((algo_id, symbol))                  # backtest ref ต่อ (algo, คู่) — momentum + mean_reversion
         rows.append({"algo_id": algo_id, "symbol": symbol, "klass": klass,
                      "state": _sw.state_of(algo_id, symbol),
+                     "live": (symbol == _ALGO_META.get(algo_id, {}).get("live_symbol")),
                      "backtest_exp_R": (b.get("exp_R") if b else None),
                      "backtest_n": (b.get("n") if b else None), **stat})
     counts = {"ready": 0, "collecting": 0, "dying": 0}
@@ -150,10 +159,33 @@ def build():
         a["sum_R"] = round(a["sum_R"], 1)
         a["exp_R"] = round(a["sum_R"] / a["n"], 3) if a["n"] else None
         a["wr"] = round(a["wins"] / a["n"] * 100, 1) if a["n"] else None
+        m = _ALGO_META.get(a["algo_id"], {})
+        a["name"] = m.get("name", a["algo_id"])
+        a["note"] = m.get("note")
+        a["live_symbol"] = m.get("live_symbol")
+        a["live"] = bool(m.get("live_symbol"))          # momentum = live บน XAUUSD (engine แยก)
+    by_algo_list = list(by_algo.values())
+    # TSMOM-D1 = engine ที่ 2 ที่เทรดจริงบนทอง (metric = Sharpe/equity คนละแบบ momentum → field headline แยก)
+    try:
+        from agents.shadow_tsmom import summary as _ts_summary
+        _g = next((r for r in (_ts_summary().get("rows") or [])
+                   if str(r.get("symbol", "")).upper().startswith("XAU")), None)
+        if _g and _g.get("sharpe") is not None:
+            _hl = f"Sharpe {_g['sharpe']} · OOS {'+' if (_g.get('sr_oos') or 0) > 0 else ''}{_g.get('sr_oos')}"
+        else:
+            _hl = (_g or {}).get("note") or "เก็บ data"
+        _tn = (_g or {}).get("n_days")
+    except Exception:
+        _hl, _tn = "เก็บ data", None
+    by_algo_list.append({"algo_id": "TSMOM-D1", "name": "TSMOM-D1 (daily)", "regime": "TREND · D1",
+                         "live": getattr(_cfg, "TSMOM_LIVE", False), "live_symbol": "XAUUSD",
+                         "note": "directional รายวัน · เทรดจริงบนทอง · ดูรายละเอียด TSMOM section",
+                         "headline": _hl, "n": _tn, "wr": None, "exp_R": None, "sum_R": None,
+                         "pairs_pos": None, "pairs_traded": None, "best": None, "worst": None})
     return {"ok": True, "generated": datetime.now(timezone.utc).isoformat()[:16] + "Z",
             "engine_on": getattr(_cfg, "SHADOW_ENGINE", False),
             "n_ready": _N_READY, "ready_exp_R": _READY_EXP_R, "min_span_days": _MIN_SPAN_DAYS,
-            "counts": counts, "rows": rows, "by_algo": list(by_algo.values()),
+            "counts": counts, "rows": rows, "by_algo": by_algo_list,
             "note": "forward shadow, net of measured spread, swap excluded. backtest_exp_R = in-sample "
                     "reference only — never pool with shadow."}
 

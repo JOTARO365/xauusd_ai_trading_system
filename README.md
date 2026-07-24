@@ -91,7 +91,12 @@ Running in parallel, independent of the regime router:
 
 - **TSMOM-D1 engine** (`agents/tsmom_manager.py`) — a time-series-momentum sleeve on
   daily bars (the one directional sleeve that survived validation, as a *defensive*
-  momentum tilt, not alpha). Wide chandelier stop, exits on momentum flip.
+  momentum tilt, not alpha). Wide chandelier stop, exits on momentum flip. With
+  `TSMOM_LIVE=true` it becomes the sole directional engine and the intraday momentum
+  engine stands down (hand-off); set `TSMOM_COEXIST=true` to run **both** engines together
+  so the system takes both BUY and SELL intraday opportunities. `ALGO_MAX_SAME_DIR=1` then
+  stops the two engines from stacking the *same* direction (opposite side still allowed),
+  and `ALGO_MAX_STACK` caps total concurrent ALGO positions.
 - **Exit management** — vol-adaptive trailing stop (buffer = `TRAILING_ATR_MULT × ATR`),
   break-even, momentum-exit, zone-break — all deterministic, run on a fast poll.
 - **Gold-complex data collector** (`connectors/pair_collector.py`) — pulls OHLC + spread
