@@ -6412,14 +6412,14 @@ function renderEventCard(bs) {
    BACKTEST
    ════════════════════════════════════════════════════════════ */
 function _btRow(key, b) {
-  const pnlCls = b.pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+  const pnlColor = b.pnl >= 0 ? 'var(--green)' : 'var(--red)';
   const pnlSign = b.pnl >= 0 ? '+' : '';
   const wrColor = b.win_rate >= 55 ? 'var(--green)' : b.win_rate >= 45 ? 'var(--gold)' : 'var(--red)';
   return `<tr>
-    <td>${key}</td>
+    <td style="font-weight:600">${key}</td>
     <td class="num">${b.count}</td>
-    <td class="num" style="color:${wrColor};font-weight:700">${b.win_rate}%</td>
-    <td class="num"><span class="${pnlCls}">${pnlSign}${b.pnl.toFixed(2)}</span></td>
+    <td class="num" style="color:${wrColor};font-weight:700;font-size:13px">${b.win_rate}%</td>
+    <td class="num" style="color:${pnlColor};font-weight:700;font-size:13px">${pnlSign}${b.pnl.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿</td>
   </tr>`;
 }
 
@@ -6762,6 +6762,8 @@ function _bootstrap() {
   setInterval(loadAlgoJournal, 15000);      // Trade score — algo journal — realtime
   setInterval(loadShadowMatrix, 30000); setInterval(loadShadowTsmom, 30000);     // Batch B — multi-pair shadow matrix
   setInterval(loadRegimeAnalytics, 60000);  // regime analytics + ALGO monitor (N-gauge) — compute live, refresh 60s
+  setInterval(() => { const t = document.getElementById('tab-backtest');   // Performance Breakdown — ค่าปัจจุบัน ระหว่างเปิด Analytics
+    if (t && t.classList.contains('active')) loadBacktest(); }, 30000);
   loadDeskTicker();
   setInterval(loadDeskTicker, 3600000);  // desk top-ticker macro/COT — hourly poll (daily/weekly data)
   setInterval(loadCotCard, 3600000);     // COT data is weekly — hourly poll is sufficient
