@@ -188,7 +188,7 @@ def summary():
                         "maxdd_pct": round(float(((eq - peak) / peak).min()) * 100, 1),
                         "since": rows[0]["ts"][:10] if rows else None})
         else:
-            row["note"] = "collecting (need >=30 D1 bars forward)"
+            row["note"] = f"collecting {len(rets)}/30 D1 bars (Sharpe จะขึ้นเมื่อครบ)"
         out.append(row)
     return {"ok": True, "generated": datetime.now(timezone.utc).isoformat()[:16] + "Z",
             "engine_on": getattr(_cfg, "SHADOW_TSMOM", False), "rows": out,

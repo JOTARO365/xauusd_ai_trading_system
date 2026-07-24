@@ -4614,8 +4614,8 @@ async function loadShadowMatrix() {
     const body = document.getElementById('sm-body'), meta = document.getElementById('sm-meta');
     if (!body || !d.ok) return;
     const c = d.counts || {};
-    if (meta) meta.textContent = `engine ${d.engine_on ? 'ON' : 'OFF'} · ready ${c.ready || 0} · `
-      + `collecting ${c.collecting || 0} · dying ${c.dying || 0} · ready ต้อง n≥${(d.n_ready || {}).scalp} + exp_R>+${d.ready_exp_R}R + span≥${d.min_span_days}d · ${d.generated}`;
+    if (meta) meta.textContent = `engine ${d.engine_on ? 'ON' : 'OFF'} · ready ${c.ready || 0} · collecting ${c.collecting || 0} · dying ${c.dying || 0}`
+      + ` · n=0 = ยังไม่มีสัญญาณ (momentum ยิงเฉพาะ TREND breakout) · promote เมื่อ n≥${(d.n_ready || {}).scalp}+exp_R>+${d.ready_exp_R}R+span≥${d.min_span_days}d · ${d.generated}`;
     const badgeColor = { ready: 'var(--green)', collecting: 'var(--muted)', dying: 'var(--red)' };
     const rC = v => v == null ? 'var(--muted)' : (v > 0 ? 'var(--green)' : (v < 0 ? 'var(--red)' : 'var(--text)'));
     const fx = (v, d2 = 3) => v == null ? '—' : (v > 0 ? '+' : '') + Number(v).toFixed(d2);
