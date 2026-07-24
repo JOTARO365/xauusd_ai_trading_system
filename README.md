@@ -239,7 +239,7 @@ Open your browser at `http://localhost:5050`. Five tabs:
 | Tab | Description |
 |---|---|
 | **Dashboard** | Portfolio equity curve (index-based x-axis), performance statistics, system-vs-manual split, trade history |
-| **Live** | Real-time bot status, algo/regime state + signal, TSMOM-D1 engine, the **gold-complex map + unified news feed** (GDELT + gold news with severity dots), Gold-Complex context (breadth / USD-leg / gold-silver ratio), the **S/R-zone analysis terminal** (below), cluster S/R, macro/liquidity panels, economic calendar |
+| **Live** | Real-time bot status, algo/regime state + signal, TSMOM-D1 engine, the **gold-complex map + unified news feed** (GDELT + gold news with severity dots), Gold-Complex context (breadth / USD-leg / gold-silver ratio), the **Ecosystem Monitor** (cross-asset co-movement vs gold + sentiment, 30 s refresh), the **S/R-zone analysis terminal** (below), cluster S/R, macro/liquidity panels, economic calendar |
 | **Analytics** | Performance breakdown, confidence calibration, CFTC COT positioning |
 | **Costs** | AI token spend, daily burn vs target, per-agent cost |
 | **Settings** | Live config editing — saves and auto-restarts via PM2 |
@@ -260,6 +260,26 @@ via `bot_status.json` — these fields are **never sent to the LLM** (no token c
   **entry-tech** (wait-for-wick-retrace = tighter SL, reversal next-candle confirmation) ·
   **double top/bottom** with measured-move target
 - **Fibonacci** retracement · **Macro strip** (DXY / 10Y / real-yield) · **CFTC COT** positioning
+
+### Ecosystem Monitor (Live tab) — cross-asset co-movement, 0 LLM cost
+
+A real-time panel (**refresh 30 s**) that reads the whole gold ecosystem live from MT5 and shows how
+each asset is moving *right now* relative to gold — computed in code, **read-only** on MT5, no LLM
+call (`agents/ecosystem_monitor.py` → `/api/ecosystem`):
+
+- **10-asset universe** on the same MT5 feed (so timestamps align): USD index, S&P 500, Nasdaq, VIX,
+  silver, WTI oil, EURUSD, USDJPY, AUDUSD, BTC.
+- Per asset: last **1 h** % move · **WITH / AGAINST** gold (co-move sign) · the *typical* rolling H1
+  correlation · a **⚠ divergence** flag when the current move contradicts that typical correlation
+  (e.g. usually inverse but co-moving now), plus a WITH/AGAINST count.
+- A **sentiment banner** synthesising the pattern into a regime read — 🛡️ *safe-haven* (gold ↑,
+  stocks ↓, VIX ↑), 🟢 *risk-on beta* (gold ↑ with stocks ↑, VIX ↓), 💵 *USD-driven* (gold vs a
+  falling dollar), or ⚪ *mixed*.
+
+Correlation uses returns (not price levels) aligned by timestamp to avoid spurious readings. Like
+every panel here it is **context for analysis only — it never feeds an entry or gate** (SELECTION vs
+EXECUTION invariant). Optionally snapshot the driver history to `data/drv_*.json` for offline work
+with `python scripts/export_drivers.py`.
 
 ### Calendar & Gold-News feed (Live tab)
 

@@ -1813,6 +1813,27 @@
       </div>
     </section>
 
+    <section id="ecosystem-section" style="margin-bottom:10px">
+      <div class="section-title"><span class="wm-dot ok"></span>Ecosystem Monitor — ระบบนิเวศทอง co-move real-time (1h · refresh 30s · display-only, 0 token)</div>
+      <div style="padding:9px 14px;border:1px solid var(--border);border-left:3px solid var(--cyan,#60a5fa);border-radius:8px;font-family:var(--mono);font-size:12px;overflow-x:auto">
+        <div id="eco-banner" style="display:flex;align-items:center;gap:10px;padding:6px 10px;margin-bottom:8px;border-radius:6px;background:var(--bg2,#12161d)">
+          <span id="eco-emoji" style="font-size:18px">⚪</span>
+          <span><b id="eco-label" style="font-size:13px">—</b> <span id="eco-detail" style="color:var(--text-dim,#9aa3b8)"></span></span>
+          <span id="eco-gold" style="margin-left:auto;font-weight:700"></span>
+        </div>
+        <div id="eco-counts" style="font-size:11px;color:var(--muted);margin-bottom:6px"></div>
+        <table style="width:100%;min-width:560px;border-collapse:collapse;text-align:left">
+          <thead><tr style="color:var(--muted);text-align:left">
+            <th style="padding:3px 8px">asset</th><th style="padding:3px 8px">ราคา</th>
+            <th style="padding:3px 8px">1h%</th><th style="padding:3px 8px">vs ทอง</th>
+            <th style="padding:3px 8px">corr ปกติ</th><th style="padding:3px 8px"></th>
+          </tr></thead>
+          <tbody id="eco-rows"><tr><td colspan="6" style="padding:8px;color:var(--muted)">— รอข้อมูล (MT5 ต้องเปิด) —</td></tr></tbody>
+        </table>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">vs ทอง = ทิศทาง 1h เทียบทอง (ตาม=WITH, สวน=AGAINST) · corr ปกติ = correlation H1 100 แท่ง · ⚠ = ตอนนี้วิ่งผิดจาก corr ปกติ (divergence) · intermarket = บริบทวิเคราะห์ ไม่ป้อน entry/gate</div>
+      </div>
+    </section>
+
     <section id="ai-sentiment-section" style="margin-bottom:10px">
       <div class="section-title">AI Sentiment (SELECTION) — LLM อ่านข่าว/ตัวเลข · algo ตัดสิน entry ด้วยตนเอง</div>
       <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:9px 14px;border:1px solid var(--border);border-left:3px solid var(--cyan,#60a5fa);border-radius:8px;font-family:var(--mono);font-size:12px">
@@ -3588,6 +3609,7 @@ async function loadLivePrice() {
     loadTsmom();        // TSMOM-D1 engine — signal ensemble / position / state
     loadWorldMonitor(); // GDELT geopolitical signals — globe live dots + attention/headline
     loadPairContext();  // gold-complex cross-pair context (breadth / USD-leg / gold-silver ratio)
+    loadEcosystem();    // ecosystem monitor (co-move vs gold + sentiment) — live MT5, display-only
 
     // Live ticker
     const bidEl  = document.getElementById('px-bid');
@@ -4444,6 +4466,43 @@ function _renderNewsList() {
       + `<span style="display:block;color:var(--muted);font-size:9px;margin-top:2px;font-family:var(--mono)">${_wmEsc(it.source || '')} · ${tm}</span></span>`
       + `<span style="flex:0 0 auto;margin-top:1px;font-size:11px">${trend}</span></div>`;
   }).join('');
+}
+
+async function loadEcosystem() {
+  try {
+    const d = await (await fetch('/api/ecosystem')).json();
+    const tb = document.getElementById('eco-rows');
+    if (!tb) return;
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.innerHTML = v; };
+    if (!d.ok || !d.rows) {
+      tb.innerHTML = '<tr><td colspan="6" style="padding:8px;color:var(--muted)">' + (d.error || '— ไม่มีข้อมูล —') + '</td></tr>';
+      return;
+    }
+    const g = d.gold || {}, s = d.sentiment || {};
+    set('eco-emoji', s.emoji || '⚪'); set('eco-label', s.label || '—'); set('eco-detail', s.detail || '');
+    if (g.move !== null && g.move !== undefined) {
+      const gc = g.move > 0 ? 'var(--green)' : (g.move < 0 ? 'var(--red)' : 'var(--muted)');
+      set('eco-gold', `ทอง ${g.price ? g.price.toLocaleString() : ''} <span style="color:${gc}">${g.move >= 0 ? '+' : ''}${g.move}%/1h</span>`);
+    }
+    set('eco-counts', `วิ่งตามทอง (WITH): <b style="color:var(--text)">${d.n_with}</b> · สวนทาง (AGAINST): <b style="color:var(--amber,#f59e0b)">${d.n_against}</b>`);
+    const relBadge = r => r.rel === 'WITH' ? '<span style="color:var(--green)">▲ ตาม</span>'
+      : (r.rel === 'AGAINST' ? '<span style="color:var(--red)">▼ สวน</span>' : '<span style="color:var(--muted)">– นิ่ง</span>');
+    tb.innerHTML = d.rows.map(r => {
+      const mv = (r.move === null || r.move === undefined) ? '<span style="color:var(--muted)">—</span>'
+        : `<span style="color:${r.move > 0 ? 'var(--green)' : (r.move < 0 ? 'var(--red)' : 'var(--muted)')}">${r.move >= 0 ? '+' : ''}${r.move}%</span>`;
+      const tc = (r.typ_corr === null || r.typ_corr === undefined) ? '<span style="color:var(--muted)">—</span>'
+        : `<span style="color:${r.typ_corr > 0 ? 'var(--green)' : 'var(--red)'}">${r.typ_corr > 0 ? '+' : ''}${r.typ_corr.toFixed(2)}</span>`;
+      const price = (r.price === null || r.price === undefined) ? '—' : r.price.toLocaleString();
+      return `<tr style="text-align:left;border-top:1px solid var(--border)${r.diverge ? ';background:rgba(245,158,11,0.08)' : ''}">
+        <td style="padding:3px 8px;font-weight:700">${r.label}</td>
+        <td style="padding:3px 8px">${price}</td>
+        <td style="padding:3px 8px">${mv}</td>
+        <td style="padding:3px 8px">${relBadge(r)}</td>
+        <td style="padding:3px 8px">${tc}</td>
+        <td style="padding:3px 8px">${r.diverge ? '<span style="color:var(--amber,#f59e0b)">⚠ diverge</span>' : ''}</td>
+      </tr>`;
+    }).join('');
+  } catch (_e) {}
 }
 
 async function loadTsmom() {
@@ -6761,6 +6820,7 @@ function _bootstrap() {
   initWmMap();                                     // WM flat map — วาด SVG แผนที่แบน + จุด (idempotent)
   setInterval(_tickCountdowns, 1000);   // live countdowns in the combined feed
   setInterval(fetchData, 10000);
+  setInterval(loadEcosystem, 30000);    // ecosystem monitor refresh ทุก 30 วิ (server cache 30s)
   setInterval(fetchCalendar, 1800000);
   setInterval(loadEventStats, 3600000);
   setInterval(loadEventScenario, 3600000);

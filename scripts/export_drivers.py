@@ -33,6 +33,10 @@ GROUPS = {
     "USDJPY": ["USDJPY"],
     "DXY":    ["DXY", "USDX", "USDIDX", "USDOLLAR", "DX"],
     "XAG":    ["XAG"],
+    # equity indices ที่ขับทอง (risk-on/off) — keyword prefix เจาะจง กัน false-match (เช่น 'NDX'→AI_INDX#)
+    "SPX":    ["US500"],       # S&P 500  (US500Cash#)
+    "NDX":    ["US100"],       # Nasdaq 100 (US100Cash#)
+    "VIX":    ["VIX"],         # VIX (futures — front contract)
 }
 
 

@@ -1438,6 +1438,16 @@ def api_macro_quant():
     return jsonify(_cached("macro-quant", _c, ttl=15))
 
 
+@app.route("/api/ecosystem")
+def api_ecosystem():
+    """Ecosystem Monitor — ทั้งระบบนิเวศทอง (USD/หุ้น/VIX/silver/oil/FX/BTC) co-move กับทอง 1h real-time
+    + sentiment สังเคราะห์ (safe-haven/risk-on/USD-driven). live MT5, read-only, 0 token, display-only."""
+    def _c():
+        from agents.ecosystem_monitor import ecosystem
+        return ecosystem()
+    return jsonify(_cached("ecosystem", _c, ttl=30))
+
+
 @app.route("/api/algo-journal")
 def api_algo_journal():
     """Trade score realtime — สรุป algo journal (momentum signal / fade / pending lifecycle จริง):
