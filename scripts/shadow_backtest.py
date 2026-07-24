@@ -148,9 +148,10 @@ def _report_md(rows):
                  f"{r['avg_hold']} | {b['TP']}/{b['SL']}/{b['TIMEOUT']} | {r['cost_pips']} | {r['span_years']}y |")
     # honest verdict line
     L.append("\n## Read this before trusting any number\n")
-    L.append("- **In-sample historical replay — NOT validated edge.** No deflated-Sharpe, no OOS/PBO, no "
-             "purge/embargo. With one strategy across 8 pairs this is 8 trials of multiple testing; the "
-             "best-looking pair is the most likely to be noise.\n")
+    _npairs = len(ok_rows)
+    L.append(f"- **In-sample historical replay — NOT validated edge.** No deflated-Sharpe, no OOS/PBO, no "
+             f"purge/embargo. With one strategy across {_npairs} pairs this is {_npairs} trials of multiple "
+             "testing; the best-looking pair is the most likely to be noise.\n")
     L.append("- **exp_R (net)** already subtracts each pair's measured median spread (cost_pips). A pair is only "
              "interesting if **exp_R net > 0 with a usable sample** (rule of thumb n≥100). exp_R gross shows how "
              "much of the edge the spread eats.\n")
