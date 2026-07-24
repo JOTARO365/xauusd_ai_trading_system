@@ -669,8 +669,8 @@
     }
 
     /* Column alignment */
-    td.num, th.num { text-align: right; font-family: var(--mono); font-feature-settings: "tnum"; }
-    td.center, th.center { text-align: center; }
+    td.num, th.num { text-align: left; font-family: var(--mono); font-feature-settings: "tnum"; }
+    td.center, th.center { text-align: left; }
 
     /* Trade ledger: zebra + tighter rows so 25 rows read as a scannable list, not a wall */
     #trade-tbody td { padding: 7px 14px; }
@@ -1106,7 +1106,7 @@
       font-family: var(--mono);
       background: var(--bg2);
     }
-    .agent-table th.num, .agent-table td.num { text-align: right; font-family: var(--mono); }
+    .agent-table th.num, .agent-table td.num { text-align: left; font-family: var(--mono); }
     .agent-table td {
       padding: 11px 14px;
       border-bottom: 1px solid var(--border);
@@ -1903,7 +1903,7 @@
       <div id="stm-meta" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px">—</div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px">
-          <thead><tr style="color:var(--muted);text-align:right">
+          <thead><tr style="color:var(--muted);text-align:left">
             <th style="text-align:left;padding:4px 8px">สินทรัพย์</th><th style="padding:4px 8px">pos</th>
             <th style="padding:4px 8px">D1 days</th><th style="padding:4px 8px">Sharpe</th>
             <th style="padding:4px 8px">IS</th><th style="padding:4px 8px">OOS</th>
@@ -2277,7 +2277,7 @@
       <div id="ds-totals" style="font-size:12px;font-family:var(--mono);color:var(--muted);margin:6px 0 10px">—</div>
       <div style="overflow-x:auto">
         <table id="ds-table" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
-          <thead><tr style="text-align:right;color:var(--muted);border-bottom:1px solid var(--border)">
+          <thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--border)">
             <th style="text-align:left;padding:4px 8px">เวลา</th><th style="text-align:left">เทคนิค</th>
             <th>ทิศ</th><th>P/L ฿</th><th style="text-align:left">เหตุผลเข้า</th><th style="text-align:left">เหตุผลออก/ขาดทุน</th>
           </tr></thead>
@@ -2291,7 +2291,7 @@
       <div id="ra-verdict" style="font-size:12px;font-family:var(--mono);color:var(--muted);margin:6px 0 10px">—</div>
       <div style="overflow-x:auto">
         <table id="ra-table" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
-          <thead><tr style="text-align:right;color:var(--muted);border-bottom:1px solid var(--border)">
+          <thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--border)">
             <th style="text-align:left;padding:4px 8px">Regime</th><th style="text-align:left">Algo</th>
             <th>ทองในสภาวะนี้</th><th>N</th><th>WR</th><th>Expectancy</th><th>Score</th><th>Grade</th>
           </tr></thead>
@@ -4702,9 +4702,9 @@ async function loadShadowTsmom() {
     const posTxt = p => p == null ? '—' : (p > 0 ? '<span style="color:var(--green)">▲BUY</span>' : (p < 0 ? '<span style="color:var(--red)">▼SELL</span>' : 'flat'));
     body.innerHTML = (d.rows || []).map(r => {
       if (r.note) return `<tr style="border-top:1px solid #262a31"><td style="text-align:left;padding:4px 8px;font-weight:700">${r.symbol}</td>`
-        + `<td style="text-align:right;padding:4px 8px">${posTxt(r.pos)}</td>`
-        + `<td colspan="7" style="text-align:right;padding:4px 8px;color:var(--muted)">${r.note}</td></tr>`;
-      return `<tr style="text-align:right;border-top:1px solid #262a31">
+        + `<td style="text-align:left;padding:4px 8px">${posTxt(r.pos)}</td>`
+        + `<td colspan="7" style="text-align:left;padding:4px 8px;color:var(--muted)">${r.note}</td></tr>`;
+      return `<tr style="text-align:left;border-top:1px solid #262a31">
         <td style="text-align:left;padding:4px 8px;font-weight:700">${r.symbol}</td>
         <td style="padding:4px 8px">${posTxt(r.pos)}</td>
         <td style="padding:4px 8px">${r.n_days}</td>
@@ -4735,12 +4735,12 @@ async function loadOwnerEdge() {
       const body = rows.map(r => {
         const nc = r.net >= 0 ? 'var(--green)' : 'var(--red)';
         const out = (r.top3_pct != null && r.top3_pct > 60) ? ` <span style="color:var(--gold)" title="net ${r.top3_pct}% มาจาก 3 ออเดอร์ใหญ่ = outlier">⚠${r.top3_pct}%</span>` : '';
-        return `<tr style="text-align:right"><td style="text-align:left;padding:2px 8px">${r.key}</td>`
+        return `<tr style="text-align:left"><td style="text-align:left;padding:2px 8px">${r.key}</td>`
           + `<td>${r.n}</td><td>${Math.round(r.win_rate * 100)}%</td>`
           + `<td style="color:${nc}">${r.net >= 0 ? '+' : ''}${r.net}${out}</td><td>${r.avg}</td><td>${r.pf}</td></tr>`;
       }).join('');
       return `<div style="margin-bottom:8px"><div style="color:var(--gold);font-size:11px;margin:4px 0">${title}</div>`
-        + `<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="color:var(--muted);text-align:right">`
+        + `<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="color:var(--muted);text-align:left">`
         + `<th style="text-align:left;padding:2px 8px">—</th><th>n</th><th>WR</th><th>net฿</th><th>avg฿</th><th>PF</th></tr></thead>`
         + `<tbody>${body}</tbody></table></div>`;
     };
@@ -4783,7 +4783,7 @@ function renderDay(date) {
     const mark = isPend ? ' <span style="color:var(--cyan,#4fd1e0);font-size:9px">◇PEND</span>'
                : isOpen ? ' <span style="color:var(--gold);font-size:9px">●OPEN</span>' : '';
     const bg = isPend ? ';background:rgba(79,209,224,0.05)' : (isOpen ? ';background:rgba(244,196,48,0.05)' : '');
-    return `<tr style="text-align:right;border-bottom:1px solid var(--border)${bg}">`
+    return `<tr style="text-align:left;border-bottom:1px solid var(--border)${bg}">`
       + `<td style="text-align:left;padding:4px 8px">${t.time}${mark}</td>`
       + `<td style="text-align:left;color:var(--muted)">${t.tech}</td>`
       + `<td style="color:${dc}">${t.dir || '—'}</td>`
@@ -4808,7 +4808,7 @@ async function loadRegimeAnalytics() {
       const ex = r.exp_R != null ? (r.exp_R >= 0 ? '+' : '') + r.exp_R.toFixed(3) + 'R' : '—';
       const sc = r.score != null ? r.score : '—';
       const exCol = r.exp_R != null ? (r.exp_R >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--muted)';
-      return `<tr style="text-align:right;border-bottom:1px solid var(--border)">
+      return `<tr style="text-align:left;border-bottom:1px solid var(--border)">
         <td style="text-align:left;padding:4px 8px;font-weight:600">${r.regime}</td>
         <td style="text-align:left;color:var(--muted)">${r.algo}</td>
         <td>${r.freq_pct}%</td><td>${r.n || '—'}</td><td>${wr}</td>
