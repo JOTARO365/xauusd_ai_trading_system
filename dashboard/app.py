@@ -22,6 +22,8 @@ import urllib.request
 from config import MT5_LOGIN, MT5_PASSWORD, MT5_SERVER, SYMBOL
 
 app = Flask(__name__)
+app.config["TEMPLATES_AUTO_RELOAD"] = True   # แก้ index.html → เห็นทันทีโดยไม่ต้อง restart dashboard
+app.jinja_env.auto_reload = True
 
 _BASE = os.path.dirname(__file__)
 

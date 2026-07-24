@@ -25,10 +25,10 @@
       --border3:   #333333;
 
       /* accent = WM green (แทน gold เดิม — ชื่อ var คงไว้ให้ทุก usage อัปเดตเอง) */
-      --gold:      #4ade80;
-      --gold-2:    #22c55e;
-      --gold-dim:  rgba(74,222,128,0.10);
-      --gold-glow: rgba(74,222,128,0.30);
+      --gold:      #e8b04b;
+      --gold-2:    #cf9835;
+      --gold-dim:  rgba(232,176,75,0.12);
+      --gold-glow: rgba(232,176,75,0.30);
 
       --cyan:      #60a5fa;
       --cyan-dim:  rgba(96,165,250,0.12);
@@ -1614,7 +1614,7 @@
       </div>
       <div class="chart-card">
         <div class="chart-title">Win / Loss Distribution</div>
-        <canvas id="winlossChart" height="110"></canvas>
+        <div style="height:120px;position:relative"><canvas id="winlossChart"></canvas></div>
       </div>
     </div>
   </section>
@@ -3123,10 +3123,12 @@ function initCharts() {
     },
     options: {
       responsive: true,
-      cutout: '70%',
+      maintainAspectRatio: false,
+      cutout: '72%',
       plugins: {
         legend: {
-          labels: { color: tickColor, font: { size: 11, family: 'JetBrains Mono' }, boxWidth: 10, padding: 14 }
+          position: 'right',
+          labels: { color: tickColor, font: { size: 11, family: 'JetBrains Mono' }, boxWidth: 10, padding: 12 }
         }
       }
     },
