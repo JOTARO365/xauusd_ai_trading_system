@@ -55,7 +55,7 @@ def _tick() -> None:
     """เรียกทุก interval. เช็คราคา vs level → เข้า order ถ้าทะลุ. fail-soft (thread ต้องไม่ตาย)."""
     if not (getattr(config, "REGIME_LIVE", False) and getattr(config, "REGIME_LIVE_TICK", False)):
         return
-    if getattr(config, "TSMOM_LIVE", False):            # TSMOM = directional engine → tick momentum งดเข้า
+    if getattr(config, "TSMOM_LIVE", False) and not getattr(config, "TSMOM_COEXIST", False):   # TSMOM → tick งดเข้า (เว้นแต่ COEXIST=true → intraday ทำงานคู่ TSMOM)
         return
     if getattr(config, "REGIME_PENDING", False):        # pending mode จัดการ entry แล้ว → tick ไม่เข้าซ้ำ
         return
