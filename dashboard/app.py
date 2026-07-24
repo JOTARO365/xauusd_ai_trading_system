@@ -1414,7 +1414,7 @@ def api_algo_status():
         if tsmom:                                            # โหมด TSMOM: momentum/fade ปิด → ไม่โชว์ signal เก่า
             signal = None
             disabled = list(disabled) + ["momentum-intraday", "fade-pending"]
-        return {"regime_live": live, "mode": mode, "regime": regime, "signal": signal, "disabled": disabled}
+        return {"ok": True, "regime_live": live, "mode": mode, "regime": regime, "signal": signal, "disabled": disabled}
     return jsonify(_cached("algo-status", _c, ttl=15))
 
 
