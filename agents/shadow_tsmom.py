@@ -26,7 +26,8 @@ sys.path.insert(0, _BASE)
 LOOKBACKS = [63, 126, 252]
 _LOGDIR = os.path.join(_BASE, "logs", "shadow")
 _PROBE = os.path.join(_BASE, "data", "universe_probe.json")
-_DEFAULT_UNIVERSE = ["BTCUSD", "XAUUSD", "XAGUSD"]        # trend-family; gold = validated reference
+_DEFAULT_UNIVERSE = ["XAUUSD", "XAGUSD", "XAUEUR", "XAUJPY", "AUDUSD", "EURUSD", "USDCHF", "USDJPY",
+                     "BTCUSD", "WTIUSD"]                  # ทุกคู่ (data collection; gold = validated ref)
 
 
 def _iso(ts):

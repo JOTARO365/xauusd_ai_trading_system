@@ -173,9 +173,10 @@ def momentum_levels(i, high, low, close, atr_v, point=None):
             "sl_pips": sl_pips, "tp_pips": round(sl_pips * RR)}
 
 
-def algo_mean_reversion(i, close, atr_v):
-    """[DEPRECATED จาก routing 07-19 — P2 OOS พิสูจน์ −EV both periods] คงไว้อ้างอิง backtest เท่านั้น.
-    RANGE: z-score fade |s|>1.25 (Avellaneda) + OU half-life gate. entry = คำนวณจาก data (ไม่ prediction)."""
+def algo_mean_reversion(i, close, atr_v, point=None):
+    """[cut จาก routing live 07-19 — P2 OOS −EV; ใช้ shadow/data-collection ได้] RANGE: z-score fade
+    |s|>1.25 (Avellaneda) + OU half-life gate. entry = คำนวณจาก data. point=None → ทอง (thread ต่อคู่)."""
+    pt = POINT if point is None else point
     if i < MR_WIN or np.isnan(atr_v[i]) or atr_v[i] == 0:
         return None
     w = close[i - MR_WIN + 1:i + 1]
@@ -191,9 +192,9 @@ def algo_mean_reversion(i, close, atr_v):
         return None
     # zone-based SL: วางเลย band ที่ S_STOP·std (entry ที่ z-extreme คือเป้า stop-hunt), floor ด้วย ATR กันแคบเกิน
     sl_price = m - S_STOP * sd if d == "BUY" else m + S_STOP * sd
-    atr_floor = round(ATR_SL * atr_v[i] / POINT)
-    sl_pips = max(round(abs(close[i] - sl_price) / POINT), atr_floor)
-    tp_pips = max(round(abs(close[i] - m) / POINT), atr_floor)             # TP = กลับสู่ mean
+    atr_floor = round(ATR_SL * atr_v[i] / pt)
+    sl_pips = max(round(abs(close[i] - sl_price) / pt), atr_floor)
+    tp_pips = max(round(abs(close[i] - m) / pt), atr_floor)             # TP = กลับสู่ mean
     return {"algo": "mean_reversion", "dir": d, "s": round(float(s), 2),
             "sl_pips": sl_pips, "tp_pips": tp_pips,
             "max_hold_bars": max(1, round(TIME_STOP_K * hl))}   # OU time-stop: ไม่ revert ใน ~3×half-life → thesis ตาย (≥1 bar)

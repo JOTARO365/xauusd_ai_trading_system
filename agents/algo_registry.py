@@ -10,10 +10,14 @@ strategy is introduced here; a new non-XAUUSD algo is Batch D, only after shadow
 
 Frozen interfaces — docs/ARCHITECTURE_batchB.md §4.1/§4.2.
 """
-from agents.regime_shadow import compute_shadow_signal
+import numpy as np
 
-# gold-complex universe (mirror connectors/pair_collector.COLLECT) — the pairs an algo may be eligible for
-UNIVERSE = ["XAUUSD", "XAGUSD", "XAUEUR", "XAUJPY", "AUDUSD", "EURUSD", "USDCHF", "USDJPY"]
+from agents.regime_shadow import compute_shadow_signal, _MIN_BARS
+import regime_lib as R    # regime_shadow ใส่ scripts/ ลง sys.path แล้ว → import ได้
+
+# full universe (mirror connectors/pair_collector.COLLECT) — the instruments an algo may be eligible for
+UNIVERSE = ["XAUUSD", "XAGUSD", "XAUEUR", "XAUJPY", "AUDUSD", "EURUSD", "USDCHF", "USDJPY",
+            "BTCUSD", "WTIUSD"]
 
 
 class Algo:
@@ -64,7 +68,41 @@ class RegimeMomentumAlgo(Algo):
         }
 
 
-ALGO_REGISTRY = {a.algo_id: a for a in (RegimeMomentumAlgo(),)}
+class MeanReversionAlgo(Algo):
+    """RANGE z-score fade (regime_lib.algo_mean_reversion) — เข้าเฉพาะ regime=RANGE. cut จาก live (P2 −EV OOS)
+    แต่ shadow ไว้เก็บ data ว่ากำไรใน RANGE/คู่ไหนบ้าง. symbol-param ผ่าน point (pip ต่อคู่)."""
+    algo_id = "mean_reversion"
+    version = 1
+    klass = "scalp"
+    eligible_pairs = UNIVERSE
+
+    def evaluate(self, symbol, bars, ctx=None, point=None):
+        high, low, close, times = bars
+        n = len(close)
+        if n < _MIN_BARS:
+            return None
+        er = R.efficiency_ratio(close); adx_v = R.adx(high, low, close)
+        volpct = R.vol_percentile(close); atr_v = R.atr(high, low, close)
+        i = n - 2                                          # last CLOSED bar (เหมือน momentum)
+        if R.detect_regime(er[i], adx_v[i], volpct[i]) != "RANGE":
+            return None                                    # mean-reversion เข้าเฉพาะ RANGE
+        sig = R.algo_mean_reversion(i, close, atr_v, point=point)
+        if not sig:
+            return None
+        bar_ts = None
+        try:
+            from datetime import datetime, timezone
+            bar_ts = datetime.fromtimestamp(int(times[i]), timezone.utc).isoformat()
+        except Exception:
+            return None
+        return {
+            "algo_id": self.algo_id, "symbol": symbol, "dir": sig["dir"],
+            "entry": float(close[i]), "sl_pips": sig["sl_pips"], "tp_pips": sig["tp_pips"],
+            "regime": "RANGE", "bar_ts": bar_ts, "klass": self.klass,
+        }
+
+
+ALGO_REGISTRY = {a.algo_id: a for a in (RegimeMomentumAlgo(), MeanReversionAlgo())}
 
 
 def get(algo_id):
