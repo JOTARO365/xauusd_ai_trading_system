@@ -68,13 +68,21 @@ def realized_split():
     if algo_deals:
         ts = min(int(d.time) for d in algo_deals)
         first_algo = datetime.fromtimestamp(ts, timezone.utc).isoformat()[:16]
+    # unrealized: ไม้ที่ยังเปิดอยู่ (float) — กันพลาดว่า realized-only ทำให้ดูขาดทุน (ต้องดึงก่อน shutdown)
+    pos = mt5.positions_get() or []
+    open_algo = round(sum(p.profit for p in pos if p.magic == magic), 2)
+    open_manual = round(sum(p.profit for p in pos if p.magic == 0), 2)
+    n_open_algo = sum(1 for p in pos if p.magic == magic)
+    n_open_manual = sum(1 for p in pos if p.magic == 0)
     mt5.shutdown()
     algo = [d.profit for d in algo_deals]
     manual = [d.profit for d in deals if d.magic == 0]
     other = [d.profit for d in deals if d.magic not in (magic, 0)]
     return {"magic": magic, "since": frm.isoformat()[:10], "first_algo_deal": first_algo, "n_all": len(deals),
             "total_all": round(sum(d.profit for d in deals), 2),
-            "algo": _stats(algo), "manual": _stats(manual), "other": _stats(other)}
+            "algo": _stats(algo), "manual": _stats(manual), "other": _stats(other),
+            "open_algo": open_algo, "open_manual": open_manual,
+            "n_open_algo": n_open_algo, "n_open_manual": n_open_manual}
 
 
 def mechanical_entry():
@@ -105,6 +113,14 @@ def _report(rl, mech):
         L.append(f"| {label} | {s['n']} | {s['wr']} | **{s['total']:+.2f}** | {s['avg_win']} | {s['avg_loss']} | "
                  f"{s['rr']} | {s['breakeven_wr']}% | {s['ev_verdict']} |")
     L.append(f"| รวมทุกกลุ่ม | {rl['n_all']} | | **{rl['total_all']:+.2f}** | | | | | |")
+    a_tot = (rl.get("algo") or {}).get("total", 0) + rl.get("open_algo", 0)
+    m_tot = (rl.get("manual") or {}).get("total", 0) + rl.get("open_manual", 0)
+    L.append("\n## Unrealized (ไม้เปิดอยู่ · float) + รวม\n")
+    L.append(f"- **ALGO (บอท): realized {(rl.get('algo') or {}).get('total',0):+.2f} + float {rl.get('open_algo',0):+.2f} "
+             f"(เปิด {rl.get('n_open_algo',0)} ไม้) = รวม {a_tot:+.2f}**\n")
+    L.append(f"- manual (คน): realized {(rl.get('manual') or {}).get('total',0):+.2f} + float {rl.get('open_manual',0):+.2f} "
+             f"(เปิด {rl.get('n_open_manual',0)} ไม้) = รวม {m_tot:+.2f}\n")
+    L.append("- ⚠️ float ยังไม่ล็อก (ไม้เปิดกลับตัวได้ → กำไรลอยหาย). realized = ที่ booked จริง.\n")
     L.append("\n## Mechanical entry edge (algo_journal momentum counterfactual — no management)\n")
     if mech.get("error"):
         L.append(f"- {mech['error']}\n")
@@ -115,13 +131,14 @@ def _report(rl, mech):
     L.append("\n## อ่านผล\n")
     a = rl.get("algo") or {}
     m = rl.get("manual") or {}
-    if a.get("n") and m.get("n"):
-        L.append(f"- **บอท (algo) {a['ev_verdict']}: {a['total']:+.2f}** (WR {a['wr']}% vs breakeven {a['breakeven_wr']}%) · "
-                 f"**manual {m['ev_verdict']}: {m['total']:+.2f}** (WR {m['wr']}% vs {m['breakeven_wr']}%).\n")
-        L.append("- ถ้า algo −EV แต่บัญชีกำไร → **กำไรมาจาก manual ไม่ใช่บอท**. shadow/counterfactual ที่ติดลบ = "
-                 "สอดคล้องกับ algo live ที่ติดลบ (ไม่ใช่ paradox) — ตรงกับ AUDIT_quant.md ว่า entry ไม่มี edge.\n")
-    L.append("- ⚠️ n เล็ก = ยังเป็น hypothesis ไม่ใช่ข้อสรุปตายตัว (algo n มักน้อยเพราะ TSMOM_LIVE กด intraday). "
-             "ปล่อยเก็บต่อ + re-run เป็นระยะ.\n")
+    if a.get("n"):
+        L.append(f"- **บอท: realized {a['total']:+.2f} ({a['ev_verdict']}, closed n={a['n']}, WR {a['wr']}%) "
+                 f"แต่ + float = รวม {a_tot:+.2f}** → net {'บวก' if a_tot >= 0 else 'ลบ'} ถ้านับไม้เปิด.\n")
+    if m.get("n"):
+        L.append(f"- **manual: realized {m['total']:+.2f} ({m['ev_verdict']}, closed n={m['n']}, WR {m['wr']}%)** — กำไรบัญชีส่วนใหญ่มาจากนี่.\n")
+    L.append(f"- ⚠️ **n บอทเล็กมาก (closed n={a.get('n')}) → สรุป edge ไม่ได้ทั้ง +/−.** realized ติดลบ ≠ บอทแย่, "
+             "float บวก ≠ บอทมี edge (ยังไม่ล็อก). ปล่อยเก็บ n≥100 แล้ว re-run. entry เชิงกล (shadow/counterfactual) "
+             "ยังติดลบ = ตรง AUDIT_quant.md.\n")
     return "\n".join(L)
 
 
