@@ -1962,7 +1962,9 @@ def _pair_collector_loop():
 
 if __name__ == "__main__":
     import threading
+    _port = int(os.getenv("DASH_PORT") or 5050)
     threading.Thread(target=_warm_cache, daemon=True).start()
-    threading.Thread(target=_pair_collector_loop, daemon=True, name="pair-collector").start()
+    if os.getenv("DASH_NO_COLLECT", "").lower() not in ("1", "true"):   # test instance: ข้าม collector กัน MT5 ชน
+        threading.Thread(target=_pair_collector_loop, daemon=True, name="pair-collector").start()
     from waitress import serve
-    serve(app, host="0.0.0.0", port=5050, threads=4)
+    serve(app, host="0.0.0.0", port=_port, threads=4)
