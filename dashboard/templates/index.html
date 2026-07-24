@@ -17,12 +17,12 @@
       /* ── WorldMonitor palette (dark terminal-intelligence, green signal) ── */
       --bg:        #050505;
       --bg2:       #0a0a0a;
-      --surface:   #111111;
-      --surface2:  #151515;
-      --surface3:  #1b1b1b;
-      --border:    #222222;
-      --border2:   #2a2a2a;
-      --border3:   #333333;
+      --surface:   #131210;
+      --surface2:  #181613;
+      --surface3:  #1e1b16;
+      --border:    #262320;
+      --border2:   #2e2a24;
+      --border3:   #38332a;
 
       /* accent = WM green (แทน gold เดิม — ชื่อ var คงไว้ให้ทุก usage อัปเดตเอง) */
       --gold:      #e8b04b;
@@ -659,6 +659,11 @@
     /* Column alignment */
     td.num, th.num { text-align: right; font-family: var(--mono); font-feature-settings: "tnum"; }
     td.center, th.center { text-align: center; }
+
+    /* Trade ledger: zebra + tighter rows so 25 rows read as a scannable list, not a wall */
+    #trade-tbody td { padding: 7px 14px; }
+    #trade-tbody tr:nth-child(even) { background: rgba(255,255,255,0.018); }
+    #trade-tbody tr:hover { background: var(--gold-dim); }
 
     /* Badges */
     .badge {
@@ -3175,8 +3180,8 @@ function updateStats(stats) {
   const pnl  = stats.total_pnl || 0;
   const tpnl = stats.today_pnl || 0;
 
-  setVal('total-pnl',  (pnl  >= 0 ? '+' : '') + pnl.toFixed(2),  ' THB', pnl  >= 0 ? 'green' : 'red');
-  setVal('today-pnl',  (tpnl >= 0 ? '+' : '') + tpnl.toFixed(2), ' THB', tpnl >= 0 ? 'green' : 'red');
+  setVal('total-pnl',  (pnl  >= 0 ? '+' : '') + pnl.toFixed(2),  ' ฿', pnl  >= 0 ? 'green' : 'red');
+  setVal('today-pnl',  (tpnl >= 0 ? '+' : '') + tpnl.toFixed(2), ' ฿', tpnl >= 0 ? 'green' : 'red');
 
   const todayTrades = document.getElementById('today-trades-sub');
   if (todayTrades) todayTrades.textContent = (stats.today_trades || 0) + ' trades';
