@@ -22,7 +22,7 @@ from loguru import logger
 from agents import algo_registry as _reg
 from agents import shadow_switches as _sw
 from agents import shadow_cost as _cost
-from agents.shadow_resolve import resolve_signal
+from agents.shadow_resolve_managed import resolve_managed   # paper order ผ่าน BE+trailing (สถิติสมจริง)
 
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _LOGDIR = os.path.join(_BASE, "logs", "shadow")
@@ -107,11 +107,11 @@ def _apply(algo_id, symbol, bars, point, digits, cost_pips, max_hold=_DEFAULT_MA
         res = (rec.get("outcome") or {}).get("result")
         if res in ("TP", "SL", "TIMEOUT"):
             continue                                     # terminal — skip
-        out = resolve_signal(rec, high, low, close, times,
-                             point=rec.get("point", point),
-                             cost_pips=rec.get("cost_pips", cost_pips),
-                             max_hold_bars=max_hold,
-                             price_digits=rec.get("price_digits", digits))
+        out = resolve_managed(rec, high, low, close, times,
+                              point=rec.get("point", point),
+                              cost_pips=rec.get("cost_pips", cost_pips),
+                              max_hold_bars=max_hold,
+                              price_digits=rec.get("price_digits", digits))
         if out is not None and out != rec.get("outcome"):
             rec["outcome"] = out
             changed = True
