@@ -35,7 +35,7 @@ from loguru import logger
 
 import config as _cfg
 from config import SYMBOL
-from connectors.mt5_connector import SYSTEM_MAGIC, _calc_pip_value, _safe_comment, _locked
+from connectors.mt5_connector import SYSTEM_MAGIC, _calc_pip_value, _safe_comment, _locked, _pick_filling
 
 SWG_TAG = "SWG-"                 # comment prefix แยก swing ออกจาก scalp
 _REENTRY_COOLDOWN_H = 4          # ห้ามเปิด campaign ใหม่ภายใน N ชม. หลังปิด (กัน churn)
@@ -86,7 +86,7 @@ def _place_leg(direction: str, lot: float, sl_price: float, tp_price: float, leg
         "magic":        SYSTEM_MAGIC,
         "comment":      _safe_comment(f"{SWG_TAG}{direction}L{leg_idx}"),
         "type_time":    mt5.ORDER_TIME_GTC,
-        "type_filling": mt5.ORDER_FILLING_IOC,
+        "type_filling": _pick_filling(SYMBOL),
     }
     result = mt5.order_send(req)
     if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
@@ -122,7 +122,7 @@ def _close_all_legs(reason: str) -> int:
             "magic":        SYSTEM_MAGIC,
             "comment":      _safe_comment(f"{SWG_TAG}EXIT"),
             "type_time":    mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_IOC,
+            "type_filling": _pick_filling(SYMBOL),
         }
         r = mt5.order_send(req)
         if r and r.retcode == mt5.TRADE_RETCODE_DONE:

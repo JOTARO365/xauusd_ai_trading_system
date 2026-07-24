@@ -51,6 +51,29 @@ _MAX_ORDER_RETRIES = 2
 _RETRY_DELAY_SEC   = 0.5
 
 
+def _filling_modes(symbol):
+    """โหมด filling ที่ broker ประกาศว่ารองรับสำหรับ symbol นี้ เรียง best-first.
+    อ่าน symbol_info.filling_mode (bit 2 = IOC, bit 1 = FOK) → บอทพกพาข้าม broker ได้เอง
+    (XM/GOLD# รองรับ IOC, บาง broker/XAUUSD รับแค่ FOK/RETURN → เดิม hardcode IOC เจอ 10030).
+    RETURN ต่อท้ายเสมอเป็น last-resort (execution แบบ Request/Instant). query ไม่ได้ → ลองทุกโหมด (IOC ก่อน = พฤติกรรมเดิม)."""
+    try:
+        fm = int(mt5.symbol_info(symbol).filling_mode)
+    except Exception:
+        fm = 0
+    modes = []
+    if fm & 2:  modes.append(mt5.ORDER_FILLING_IOC)   # SYMBOL_FILLING_IOC
+    if fm & 1:  modes.append(mt5.ORDER_FILLING_FOK)   # SYMBOL_FILLING_FOK
+    if not modes:                                     # อ่านไม่ได้/broker ไม่ประกาศ → คง IOC ก่อน แล้วปล่อย fallback ไล่
+        modes = [mt5.ORDER_FILLING_IOC, mt5.ORDER_FILLING_FOK]
+    modes.append(mt5.ORDER_FILLING_RETURN)
+    return modes
+
+
+def _pick_filling(symbol):
+    """filling mode ที่เหมาะสุดที่ broker รองรับ (best-first). open_order มี 10030 fallback ไล่ที่เหลือให้."""
+    return _filling_modes(symbol)[0]
+
+
 def is_algo_trading_enabled() -> bool:
     """ตรวจว่าปุ่ม Algo Trading ใน MT5 terminal เปิดอยู่หรือไม่"""
     try:
@@ -423,7 +446,7 @@ def _close_position(pos) -> bool:
         "magic":        SYSTEM_MAGIC,
         "comment":      _safe_comment("CONFLICT_CLOSE"),
         "type_time":    mt5.ORDER_TIME_GTC,
-        "type_filling": mt5.ORDER_FILLING_IOC,
+        "type_filling": _pick_filling(SYMBOL),
     }
     result = mt5.order_send(req)
     if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
@@ -657,13 +680,15 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         "magic": 20260429,
         "comment": _safe_comment(comment),
         "type_time": mt5.ORDER_TIME_GTC,
-        "type_filling": mt5.ORDER_FILLING_IOC,
+        "type_filling": _pick_filling(SYMBOL),
     }
 
     # ── Send order — retry สำหรับ requote / price_changed ───────────────
     result    = None
     last_err  = ""
     is_buy    = direction.upper() == "BUY"
+    _fill_modes = _filling_modes(SYMBOL)          # broker-supported, best-first; request ตั้ง [0] ไว้แล้ว (_pick_filling)
+    _fill_idx   = 0
 
     for attempt in range(_MAX_ORDER_RETRIES + 1):
         if attempt > 0:
@@ -691,6 +716,11 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         if result.retcode == mt5.TRADE_RETCODE_DONE:
             break
         last_err = f"{result.retcode} — {result.comment}"
+        if result.retcode == mt5.TRADE_RETCODE_INVALID_FILL and _fill_idx + 1 < len(_fill_modes):
+            _fill_idx += 1                          # broker ไม่รับ filling mode นี้ (10030) → ไล่โหมดถัดไปที่รองรับ
+            request["type_filling"] = _fill_modes[_fill_idx]
+            logger.warning(f"[FILL] broker ไม่รับ filling mode (10030) → ลองโหมด {_fill_modes[_fill_idx]}")
+            continue
         if result.retcode not in _RETRYABLE_RETCODES:
             break   # error ถาวร ไม่ต้อง retry
         logger.warning(f"Order retryable error (attempt {attempt+1}): {last_err}")
@@ -1169,7 +1199,7 @@ def _partial_close_pos(pos, lot: float, tick) -> bool:
         "magic":        SYSTEM_MAGIC,
         "comment":      _safe_comment("PARTIAL"),
         "type_time":    mt5.ORDER_TIME_GTC,
-        "type_filling": mt5.ORDER_FILLING_IOC,
+        "type_filling": _pick_filling(SYMBOL),
     }
     result = mt5.order_send(req)
     if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
@@ -1615,7 +1645,7 @@ def manage_momentum_exit() -> int:
             "magic":        SYSTEM_MAGIC,
             "comment":      _safe_comment("MOMENTUM_EXIT"),
             "type_time":    mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_IOC,
+            "type_filling": _pick_filling(SYMBOL),
         }
         result = mt5.order_send(req)
         if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
@@ -1709,7 +1739,7 @@ def manage_zone_break_close(chart_data: dict) -> int:
                 "magic":        SYSTEM_MAGIC,
                 "comment":      _safe_comment("ZONE_BREAK"),
                 "type_time":    mt5.ORDER_TIME_GTC,
-                "type_filling": mt5.ORDER_FILLING_IOC,
+                "type_filling": _pick_filling(SYMBOL),
             })
             if req is None or req.retcode != mt5.TRADE_RETCODE_DONE:
                 logger.error(
