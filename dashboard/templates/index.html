@@ -616,6 +616,18 @@
     }
     .filter-row select:focus, .filter-row select:hover { border-color: var(--gold); }
 
+    /* shadow-matrix filter dropdowns (themed, not browser-default) */
+    .filter-select {
+      background: var(--surface2); border: 1px solid var(--border2); color: var(--text);
+      padding: 4px 26px 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer;
+      outline: none; font-family: var(--mono); letter-spacing: 0.3px;
+      -webkit-appearance: none; appearance: none;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23e8b04b'/></svg>");
+      background-repeat: no-repeat; background-position: right 9px center;
+    }
+    .filter-select:focus, .filter-select:hover { border-color: var(--gold); }
+    .filter-select option { background: var(--surface); color: var(--text); }
+
     .table-wrap { overflow-x: auto; }
 
     table {

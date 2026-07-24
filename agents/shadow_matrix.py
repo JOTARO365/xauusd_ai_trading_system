@@ -117,7 +117,7 @@ def build():
         klass = getattr(algo, "klass", "scalp")
         recs = _read(os.path.join(_LOGDIR, f"{algo_id}__{symbol}.jsonl"))
         stat = _aggregate(recs, klass)
-        b = bt.get(symbol)
+        b = bt.get(symbol) if algo_id == "regime_momentum" else None   # backtest ทำแค่ momentum → algo อื่น = ไม่มี ref
         rows.append({"algo_id": algo_id, "symbol": symbol, "klass": klass,
                      "state": _sw.state_of(algo_id, symbol),
                      "backtest_exp_R": (b.get("exp_R") if b else None),
