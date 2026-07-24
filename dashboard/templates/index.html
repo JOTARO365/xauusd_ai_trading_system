@@ -1859,15 +1859,27 @@
 
     <!-- BATCH B — Multi-pair SHADOW matrix: regime_momentum ทุกคู่ (forward record + backtest ref, promotion badge) -->
     <section id="shadow-matrix-section" style="margin-bottom:10px">
-      <div class="section-title">Shadow Matrix — regime momentum ทุกคู่ (SHADOW · net spread · badge พร้อมโปรโมท)</div>
-      <div id="sm-meta" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px">—</div>
+      <div class="section-title">Shadow Matrix — ทุกกลยุทธ์ × ทุกคู่ (กลยุทธ์ไหนกำไรใน regime ไหน · SHADOW 0 order)</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+        <select id="sm-f-algo" onchange="loadShadowMatrix(true)" class="filter-select" style="padding:3px 8px">
+          <option value="">ทุกกลยุทธ์</option>
+          <option value="regime_momentum">momentum (TREND)</option>
+          <option value="mean_reversion">mean-reversion (RANGE)</option>
+        </select>
+        <select id="sm-f-pair" onchange="loadShadowMatrix(true)" class="filter-select" style="padding:3px 8px">
+          <option value="">ทุกคู่</option>
+        </select>
+        <span id="sm-meta" style="font-family:var(--mono);font-size:11px;color:var(--muted)">—</span>
+      </div>
+      <!-- STRATEGY ROLLUP: แต่ละกลยุทธ์กำไร/ขาดทุนเท่าไหร่รวมทุกคู่ -->
+      <div id="sm-strategy" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"></div>
       <div style="overflow-x:auto">
         <table id="sm-table" style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px">
           <thead><tr style="color:var(--muted);text-align:right">
-            <th style="text-align:left;padding:4px 8px">คู่</th><th style="padding:4px 8px">state</th>
-            <th style="padding:4px 8px">n</th><th style="padding:4px 8px">open</th><th style="padding:4px 8px">WR%</th>
-            <th style="padding:4px 8px">exp_R (fwd)</th><th style="padding:4px 8px">ΣR</th>
-            <th style="padding:4px 8px">backtest R</th><th style="padding:4px 8px">span</th><th style="padding:4px 8px">badge</th>
+            <th style="text-align:left;padding:4px 8px">กลยุทธ์</th><th style="text-align:left;padding:4px 8px">คู่</th>
+            <th style="padding:4px 8px">regime</th><th style="padding:4px 8px">n</th><th style="padding:4px 8px">open</th>
+            <th style="padding:4px 8px">WR%</th><th style="padding:4px 8px">exp_R (fwd)</th><th style="padding:4px 8px">ΣR</th>
+            <th style="padding:4px 8px">backtest R</th><th style="padding:4px 8px">badge</th>
           </tr></thead>
           <tbody id="sm-body"><tr><td colspan="10" style="color:var(--muted);padding:6px 8px">—</td></tr></tbody>
         </table>
@@ -4612,35 +4624,56 @@ async function loadAlgoJournal() {
   } catch (_e) {}
 }
 
-let _smLast = 0;
-async function loadShadowMatrix() {
-  if (Date.now() - _smLast < 25000) return;     // throttle (server cache 30s)
+let _smLast = 0, _smPairInit = false;
+async function loadShadowMatrix(force) {
+  if (!force && Date.now() - _smLast < 25000) return;     // throttle (server cache 30s)
   _smLast = Date.now();
   try {
     const d = await (await fetch('/api/shadow-matrix')).json();
     const body = document.getElementById('sm-body'), meta = document.getElementById('sm-meta');
+    const strat = document.getElementById('sm-strategy');
     if (!body || !d.ok) return;
     const c = d.counts || {};
-    if (meta) meta.textContent = `engine ${d.engine_on ? 'ON' : 'OFF'} · ready ${c.ready || 0} · collecting ${c.collecting || 0} · dying ${c.dying || 0}`
-      + ` · n=0 = ยังไม่มีสัญญาณ (momentum ยิงเฉพาะ TREND breakout) · promote เมื่อ n≥${(d.n_ready || {}).scalp}+exp_R>+${d.ready_exp_R}R+span≥${d.min_span_days}d · ${d.generated}`;
-    const badgeColor = { ready: 'var(--green)', collecting: 'var(--muted)', dying: 'var(--red)' };
     const rC = v => v == null ? 'var(--muted)' : (v > 0 ? 'var(--green)' : (v < 0 ? 'var(--red)' : 'var(--text)'));
     const fx = (v, d2 = 3) => v == null ? '—' : (v > 0 ? '+' : '') + Number(v).toFixed(d2);
-    body.innerHTML = (d.rows || []).map(r => {
-      const sym = r.symbol + (r.klass === 'swing' ? ' <span style="color:var(--muted);font-size:10px">sw</span>' : '');
+    if (meta) meta.textContent = `engine ${d.engine_on ? 'ON' : 'OFF'} · ${d.generated} · SHADOW 0 order`;
+
+    // ── STRATEGY ROLLUP: การ์ดต่อกลยุทธ์ (กำไร/ขาดทุนรวมทุกคู่) ──
+    if (strat) strat.innerHTML = (d.by_algo || []).map(a => {
+      const pl = a.sum_R || 0, col = rC(a.exp_R);
+      return `<div style="flex:1;min-width:210px;border:1px solid var(--border);border-left:3px solid ${col};border-radius:8px;padding:9px 12px;background:var(--surface)">
+        <div style="font-weight:700;font-size:13px">${a.algo_id} <span style="color:var(--muted);font-size:10px;font-weight:400">${a.regime}</span></div>
+        <div style="font-family:var(--mono);font-size:18px;font-weight:700;color:${col};margin:2px 0">${fx(pl,1)}R <span style="font-size:11px;color:var(--muted)">รวม (net)</span></div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted)">n=${a.n} · WR ${a.wr == null ? '—' : a.wr + '%'} · exp ${fx(a.exp_R)}R · คู่กำไร ${a.pairs_pos}/${a.pairs_traded}</div>
+        ${a.best ? `<div style="font-family:var(--mono);font-size:10px;color:var(--muted)">ดีสุด ${a.best[0]} ${fx(a.best[1])} · แย่สุด ${a.worst[0]} ${fx(a.worst[1])}</div>` : ''}
+      </div>`;
+    }).join('') || '<div style="color:var(--muted);font-size:12px">ยังไม่มีข้อมูล — กำลังเก็บ (SHADOW_ENGINE)</div>';
+
+    // populate pair filter once
+    const fPair = document.getElementById('sm-f-pair'), fAlgo = document.getElementById('sm-f-algo');
+    if (fPair && !_smPairInit) {
+      const pairs = [...new Set((d.rows || []).map(r => r.symbol))];
+      fPair.innerHTML = '<option value="">ทุกคู่</option>' + pairs.map(p => `<option value="${p}">${p}</option>`).join('');
+      _smPairInit = true;
+    }
+    const selAlgo = fAlgo ? fAlgo.value : '', selPair = fPair ? fPair.value : '';
+    const badgeColor = { ready: 'var(--green)', collecting: 'var(--muted)', dying: 'var(--red)' };
+    const rows = (d.rows || []).filter(r => (!selAlgo || r.algo_id === selAlgo) && (!selPair || r.symbol === selPair));
+    body.innerHTML = rows.map(r => {
+      const regime = r.algo_id === 'mean_reversion' ? 'RANGE' : (r.algo_id === 'regime_momentum' ? 'TREND' : '—');
       return `<tr style="text-align:right;border-top:1px solid #262a31">
-        <td style="text-align:left;padding:4px 8px;font-weight:700">${sym}</td>
-        <td style="padding:4px 8px;color:var(--muted)">${r.state}</td>
+        <td style="text-align:left;padding:4px 8px">${r.algo_id}</td>
+        <td style="text-align:left;padding:4px 8px;font-weight:700">${r.symbol}</td>
+        <td style="padding:4px 8px;color:var(--muted)">${regime}</td>
         <td style="padding:4px 8px">${r.n}</td>
         <td style="padding:4px 8px;color:var(--muted)">${r.n_open || 0}</td>
         <td style="padding:4px 8px">${r.wr == null ? '—' : r.wr}</td>
         <td style="padding:4px 8px;color:${rC(r.exp_R)}">${fx(r.exp_R)}</td>
         <td style="padding:4px 8px;color:${rC(r.sum_R)}">${r.n ? fx(r.sum_R, 1) : '—'}</td>
-        <td style="padding:4px 8px;color:${rC(r.backtest_exp_R)};opacity:.75">${fx(r.backtest_exp_R)}</td>
-        <td style="padding:4px 8px;color:var(--muted)">${r.span_days ? r.span_days + 'd' : '—'}</td>
+        <td style="padding:4px 8px;color:${rC(r.backtest_exp_R)};opacity:.7">${fx(r.backtest_exp_R)}</td>
         <td style="padding:4px 8px;color:${badgeColor[r.badge]};font-weight:600">${r.badge}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="10" style="color:var(--muted);padding:6px 8px">ไม่มีข้อมูล</td></tr>';
+    }).join('') || '<tr><td colspan="10" style="color:var(--muted);padding:6px 8px">ไม่มีข้อมูลตามตัวกรอง</td></tr>';
   } catch (_e) {}
 }
 

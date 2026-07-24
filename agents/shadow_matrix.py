@@ -125,10 +125,33 @@ def build():
     counts = {"ready": 0, "collecting": 0, "dying": 0}
     for r in rows:
         counts[r["badge"]] = counts.get(r["badge"], 0) + 1
+    # ── strategy rollup: แต่ละกลยุทธ์กำไร/ขาดทุนเท่าไหร่รวมทุกคู่ (regime = domain ของ algo) ──
+    _REGIME = {"regime_momentum": "TREND", "mean_reversion": "RANGE"}
+    by_algo = {}
+    for r in rows:
+        a = by_algo.setdefault(r["algo_id"], {"algo_id": r["algo_id"], "regime": _REGIME.get(r["algo_id"], "—"),
+                                              "n": 0, "wins": 0, "sum_R": 0.0, "pairs_traded": 0,
+                                              "pairs_pos": 0, "best": None, "worst": None})
+        a["n"] += r["n"]; a["sum_R"] += (r["sum_R"] or 0.0)
+        if r["n"]:
+            a["pairs_traded"] += 1
+            if r["exp_R"] is not None and r["exp_R"] > 0:
+                a["pairs_pos"] += 1
+            if r["by_result"]:
+                a["wins"] += r["by_result"].get("TP", 0)
+            if r["exp_R"] is not None:
+                if a["best"] is None or r["exp_R"] > a["best"][1]:
+                    a["best"] = [r["symbol"], r["exp_R"]]
+                if a["worst"] is None or r["exp_R"] < a["worst"][1]:
+                    a["worst"] = [r["symbol"], r["exp_R"]]
+    for a in by_algo.values():
+        a["sum_R"] = round(a["sum_R"], 1)
+        a["exp_R"] = round(a["sum_R"] / a["n"], 3) if a["n"] else None
+        a["wr"] = round(a["wins"] / a["n"] * 100, 1) if a["n"] else None
     return {"ok": True, "generated": datetime.now(timezone.utc).isoformat()[:16] + "Z",
             "engine_on": getattr(_cfg, "SHADOW_ENGINE", False),
             "n_ready": _N_READY, "ready_exp_R": _READY_EXP_R, "min_span_days": _MIN_SPAN_DAYS,
-            "counts": counts, "rows": rows,
+            "counts": counts, "rows": rows, "by_algo": list(by_algo.values()),
             "note": "forward shadow, net of measured spread, swap excluded. backtest_exp_R = in-sample "
                     "reference only — never pool with shadow."}
 
