@@ -84,10 +84,12 @@ def backtest_pair(logical, broker):
     return _aggregate(logical, broker, trades, cost_pips, point, times, n, momentum_bars)
 
 
-def _aggregate(logical, broker, trades, cost_pips, point, times, n, momentum_bars):
+def _aggregate(logical, broker, trades, cost_pips, point, times, n, momentum_bars,
+               algo_id="regime_momentum"):
     span_years = round((int(times[-1]) - int(times[0])) / (365.25 * 24 * 3600), 2)
-    res = {"logical": logical, "broker": broker, "ok": True, "cost_pips": round(cost_pips, 1),
-           "bars": n, "span_years": span_years, "momentum_bars": momentum_bars, "n": len(trades)}
+    res = {"algo_id": algo_id, "logical": logical, "broker": broker, "ok": True,
+           "cost_pips": round(cost_pips, 1), "bars": n, "span_years": span_years,
+           "momentum_bars": momentum_bars, "n": len(trades)}
     if not trades:
         res.update({"note": "no non-overlapping trades"})
         return res
@@ -113,6 +115,52 @@ def _aggregate(logical, broker, trades, cost_pips, point, times, n, momentum_bar
         "first": _iso(times[0])[:10], "last": _iso(times[-1])[:10],
     })
     return res
+
+
+def backtest_pair_mr(logical, broker):
+    """Mean-reversion (RANGE z-score fade) backtest — mirrors agents.MeanReversionAlgo exactly:
+    only fires when detect_regime==RANGE, uses algo_mean_reversion's zone-SL + OU time-stop max_hold.
+    Same no-look-ahead resolver + measured cost + non-overlapping single-position as momentum."""
+    got = _fetch(broker)
+    if got is None:
+        return {"algo_id": "mean_reversion", "logical": logical, "broker": broker, "ok": False,
+                "note": "no/insufficient bars"}
+    rates, point, digits = got
+    if point is None:
+        return {"algo_id": "mean_reversion", "logical": logical, "broker": broker, "ok": False,
+                "note": "no symbol point"}
+    high = rates["high"].astype(float); low = rates["low"].astype(float)
+    close = rates["close"].astype(float); times = rates["time"]
+    cost_pips = SC.cost_pips(logical)
+
+    er = R.efficiency_ratio(close); adx_v = R.adx(high, low, close)
+    volpct = R.vol_percentile(close); atr_v = R.atr(high, low, close)
+    n = len(close)
+
+    trades = []
+    range_bars = 0
+    flat_until = -1
+    for i in range(_MIN_BARS, n - 1):
+        if R.detect_regime(er[i], adx_v[i], volpct[i]) != "RANGE":
+            continue                                     # MR fires only in RANGE (== live shadow algo)
+        sig = R.algo_mean_reversion(i, close, atr_v, point=point)
+        if not sig:
+            continue
+        range_bars += 1
+        if i <= flat_until:                              # in a trade → non-overlapping
+            continue
+        rec = {"dir": sig["dir"], "entry": float(close[i]),
+               "sl_pips": sig["sl_pips"], "tp_pips": sig["tp_pips"], "bar_ts": _iso(times[i])}
+        mh = sig.get("max_hold_bars") or MAX_HOLD        # OU time-stop from the signal itself
+        out = resolve_signal(rec, high, low, close, times, point=point, cost_pips=cost_pips,
+                             max_hold_bars=mh, price_digits=digits, i0=i)
+        if out is None or out.get("result") == "OPEN":
+            break
+        trades.append({"i": i, "dir": rec["dir"], "regime": "RANGE", **out})
+        flat_until = i + out["bars_held"]
+
+    return _aggregate(logical, broker, trades, cost_pips, point, times, n, range_bars,
+                      algo_id="mean_reversion")
 
 
 def run_all():

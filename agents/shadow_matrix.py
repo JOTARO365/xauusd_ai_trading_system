@@ -49,10 +49,12 @@ def _read(path):
 
 
 def _load_backtest():
-    """{symbol: exp_R_in_sample} from the committed backtest json, if present."""
+    """{(algo_id, symbol): row} from the committed backtest json, if present.
+    Rows without algo_id default to regime_momentum (backward-compat with pre-MR files)."""
     try:
         rows = json.load(open(_BACKTEST, encoding="utf-8"))
-        return {r["logical"]: r for r in rows if r.get("ok") and r.get("n")}
+        return {(r.get("algo_id", "regime_momentum"), r["logical"]): r
+                for r in rows if r.get("ok") and r.get("n")}
     except Exception:
         return {}
 
@@ -117,7 +119,7 @@ def build():
         klass = getattr(algo, "klass", "scalp")
         recs = _read(os.path.join(_LOGDIR, f"{algo_id}__{symbol}.jsonl"))
         stat = _aggregate(recs, klass)
-        b = bt.get(symbol) if algo_id == "regime_momentum" else None   # backtest ทำแค่ momentum → algo อื่น = ไม่มี ref
+        b = bt.get((algo_id, symbol))                  # backtest ref ต่อ (algo, คู่) — momentum + mean_reversion
         rows.append({"algo_id": algo_id, "symbol": symbol, "klass": klass,
                      "state": _sw.state_of(algo_id, symbol),
                      "backtest_exp_R": (b.get("exp_R") if b else None),
