@@ -5307,6 +5307,7 @@ function toggleAccordion(headerEl) {
 let _calEvents  = [];    // ใช้ร่วมโดย Event Radar (Live tab)
 let _eventStats     = null;  // สถิติ event-reaction 15 ปี จาก /api/event-stats
 let _eventScenarios = null;  // conditional scenarios (C2 M2) จาก /api/event-scenario
+let _calFilter = 'all';      // chip filter ด้านบน: all | usd | gold | unreleased
 
 async function loadEventStats() {
   try {
@@ -5426,6 +5427,14 @@ async function fetchCalendar() {
 
 // Detailed economic calendar (UHAS-style) — summary chips, day groups + remaining count,
 // live countdown, gold★ tag, expected-impact %, A/F/P; click a gold event → expand scenario stats.
+// "เกี่ยวกับทอง" (นิยามผู้ใช้) = ข่าว USD ทั้งหมด (ดอลลาร์ขับทอง) + ประกาศดอกเบี้ยธนาคารกลาง ECB/Fed (EUR/USD)
+function _isGoldRelated(e) {
+  if ((e.currency || '').toUpperCase() === 'USD') return true;
+  const t = (e.title || '').toLowerCase();
+  return /rate decision|interest rate|refinancing rate|deposit facility rate|rate statement|monetary policy|ecb|fomc|federal funds/.test(t);
+}
+function _setCalFilter(f) { _calFilter = f; renderCalendarDetailed(_calEvents); }
+
 function renderCalendarDetailed(events) {
   const el = document.getElementById('cal-detailed');
   if (!el) return;
@@ -5442,20 +5451,26 @@ function renderCalendarDetailed(events) {
   const expOf = key => { const s = scMap[key]; if (!s || !s.hot) return 0; return ((s.hot.magnitude_pct || 0) + ((s.cool && s.cool.magnitude_pct) || 0)) / 2; };
 
   const usdN  = evs.filter(e => (e.currency || '') === 'USD').length;
-  const goldN = evs.filter(e => _scenarioKey(e.title)).length;
+  const goldN = evs.filter(_isGoldRelated).length;
   const unrel = evs.filter(e => !isRel(e)).length;
+  // chip ด้านบน = filter กดได้จริง (all / USD / เกี่ยวกับทอง = USD+ECB/Fed rate / ยังไม่ออก)
+  const _pred = { all: () => true, usd: e => (e.currency || '') === 'USD',
+                  gold: _isGoldRelated, unreleased: e => !isRel(e) };
+  const shown = evs.filter(_pred[_calFilter] || _pred.all);
+  const chip = (f, label, n, g) => `<span class="cal-chip${g ? ' gold' : ''}" onclick="_setCalFilter('${f}')" style="cursor:pointer${_calFilter === f ? ';outline:1.5px solid var(--gold);outline-offset:1px' : ''}">${label} <b>${n}</b></span>`;
   let html = `<div class="cal-summary">
-    <span class="cal-chip">ทั้งหมด <b>${evs.length}</b></span>
-    <span class="cal-chip">USD <b>${usdN}</b></span>
-    <span class="cal-chip gold">★ เกี่ยวกับทอง <b>${goldN}</b></span>
-    <span class="cal-chip">ยังไม่ออก <b>${unrel}</b></span>
+    ${chip('all', 'ทั้งหมด', evs.length)}
+    ${chip('usd', 'USD', usdN)}
+    ${chip('gold', '★ เกี่ยวกับทอง', goldN, true)}
+    ${chip('unreleased', 'ยังไม่ออก', unrel)}
     <span class="cal-legend"><span><i style="background:var(--red)"></i>High</span><span><i style="background:var(--amber)"></i>Med</span><span><i style="background:var(--muted2)"></i>Low</span></span>
   </div>`;
+  if (!shown.length) { el.innerHTML = html + '<div style="color:var(--muted);font-size:11px;padding:8px;font-family:var(--mono)">ไม่มีข่าวในตัวกรองนี้</div>'; return; }
 
   const dayKey = ms => { const d = new Date(ms); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
   const todayK = dayKey(now);
   const groups = {};
-  evs.forEach(e => {
+  shown.forEach(e => {
     const ts = e.timestamp_iso ? Date.parse(e.timestamp_iso) : NaN;
     const k = isNaN(ts) ? 'zzz-tba' : dayKey(ts);
     (groups[k] = groups[k] || []).push([e, ts]);
@@ -5478,13 +5493,15 @@ function renderCalendarDetailed(events) {
       let actCol = 'var(--text)';
       const an = parseFloat(act.replace(/[^0-9.\-]/g, '')), fn = parseFloat(String(fc).replace(/[^0-9.\-]/g, ''));
       if (rel && !isNaN(an) && !isNaN(fn)) actCol = an > fn ? 'var(--green)' : an < fn ? 'var(--red)' : 'var(--text)';
-      const detail = gold ? `<div class="cal-detail" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px" onclick="event.stopPropagation()">${buildScenarioDetail(key, e)}</div>` : '';
+      const detail = (gold || !isSpeech)
+        ? `<div class="cal-detail" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px" onclick="event.stopPropagation()">${gold ? buildScenarioDetail(key, e) : buildBasicDetail(e)}</div>`
+        : '';
       const spClick = isSpeech ? ` onclick="openSpeechModal(this)" data-sp-title="${_wmEsc(e.title || '')}" data-sp-time="${timeStr}" data-sp-ccy="${_wmEsc(e.currency || '')}" data-sp-imp="${impLbl(e.impact)}" style="cursor:pointer"` : '';
-      html += `<div class="cal-card ${impCls(e.impact)} ${isToday ? 'is-today-card' : ''} ${gold ? 'has-scenario' : ''} ${isSpeech ? 'is-speech' : ''}"${gold ? ' onclick="_toggleCalCard(this)"' : spClick}>
+      html += `<div class="cal-card ${impCls(e.impact)} ${isToday ? 'is-today-card' : ''} ${(gold || !isSpeech) ? 'has-scenario' : ''} ${isSpeech ? 'is-speech' : ''}"${!isSpeech ? ' onclick="_toggleCalCard(this)"' : spClick}>
         <div class="cal-hd">
           <span class="cal-time" style="min-width:40px">${timeStr}</span>
           <span class="cal-badge-inline ${impCls(e.impact)}">${impLbl(e.impact)}</span>
-          <span class="cal-curr" style="margin:0">${gold ? '★ ' : ''}${e.currency || ''}</span>
+          <span class="cal-curr" style="margin:0">${_isGoldRelated(e) ? '★ ' : ''}${e.currency || ''}</span>
           <span class="cal-name" style="margin:0;padding:0;flex:1;min-width:120px">${isSpeech ? '<span style="color:var(--red);font-weight:700" title="live speech">🔴▶ </span>' : ''}${e.title || ''}${th ? `<span style="display:block;font-size:9px;color:var(--muted);font-weight:400;margin-top:1px">${th}</span>` : ''}</span>
           ${expStr}${cd}
         </div>
@@ -5492,7 +5509,7 @@ function renderCalendarDetailed(events) {
           <span>A <b style="color:${rel ? actCol : 'var(--muted)'}">${rel ? act : '·'}</b></span>
           <span>F <b style="color:var(--text-dim)">${fc}</b></span>
           <span>P <b style="color:var(--text-dim)">${pv}</b></span>
-          ${gold ? '<span style="color:var(--gold);font-size:9px;margin-left:auto">คลิกดูสถิติ ▾</span>' : (isSpeech ? '<span style="color:var(--red);font-size:9px;margin-left:auto">▶ คลิกดู live + ราคา</span>' : '')}
+          ${gold ? '<span style="color:var(--gold);font-size:9px;margin-left:auto">คลิกดูสถิติ ▾</span>' : (isSpeech ? '<span style="color:var(--red);font-size:9px;margin-left:auto">▶ คลิกดู live + ราคา</span>' : '<span style="color:var(--muted);font-size:9px;margin-left:auto">คลิกดูรายละเอียด ▾</span>')}
         </div>${detail}</div>`;
     });
     html += `</div></div>`;
@@ -5658,6 +5675,29 @@ function _esReactionsHtml(reactions) {
 // + MACD histogram + surprise curve + provenance) for one calendar event —
 // rendered inline inside a feed accordion. Countdown ticks via the global .es-cd ticker.
 const MONTH_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// Basic expandable detail for non-scenario events (data releases / non-gold) — Impact + A/F/P +
+// a generic gold-relevance note (so every card is clickable, not just the CPI/NFP/FOMC ones).
+function buildBasicDetail(e) {
+  const act = (e.actual || '').trim(), rel = !!act && act !== 'pending' && act !== '—';
+  const fc = e.forecast || '—', pv = e.previous || '—', ccy = e.currency || '';
+  const imp = (e.impact || '').toLowerCase();
+  const impTxt = imp.includes('high') ? 'HIGH' : imp.includes('med') ? 'MEDIUM' : 'LOW';
+  const th = _thaiEventName(e.title) || '';
+  let note = `ข่าว ${ccy} — มีผลกับทองผ่านค่าเงิน/ดอกเบี้ย: ตัวเลขแข็ง (ดีกว่าคาด) → ` +
+             (ccy === 'USD' ? 'ดอลลาร์แข็ง กดทองลง' : 'มักหนุนทอง') + ' · อ่อน (แย่กว่าคาด) → ตรงข้าม';
+  if (rel && fc !== '—') {
+    const an = parseFloat(String(act).replace(/[^0-9.\-]/g, '')), fn = parseFloat(String(fc).replace(/[^0-9.\-]/g, ''));
+    if (!isNaN(an) && !isNaN(fn))
+      note = `Actual ${act} vs Forecast ${fc} → ` + (an > fn ? 'ดีกว่าคาด' : an < fn ? 'แย่กว่าคาด' : 'ตรงคาด') +
+             (ccy === 'USD' ? ' (ดีกว่า = ดอลลาร์แข็ง มักกดทอง)' : '');
+  }
+  return `<div style="font-size:11px;font-family:var(--mono);line-height:1.7">
+    <div><span style="color:var(--muted)">Impact</span> <b>${impTxt}</b> · <span style="color:var(--muted)">สกุล</span> <b>${ccy}</b>${th ? ' · ' + th : ''}</div>
+    <div><span style="color:var(--muted)">Actual</span> <b>${rel ? act : 'ยังไม่ออก'}</b> · <span style="color:var(--muted)">Forecast</span> <b>${fc}</b> · <span style="color:var(--muted)">Previous</span> <b>${pv}</b></div>
+    <div style="color:var(--text-dim);margin-top:4px">${note}</div>
+  </div>`;
+}
 
 function buildScenarioDetail(key, ev) {
   const sc = (_eventScenarios && _eventScenarios.scenarios) || {};
