@@ -1887,8 +1887,8 @@
       <div id="sm-strategy" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"></div>
       <div style="overflow-x:auto">
         <table id="sm-table" style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px">
-          <thead><tr style="color:var(--muted);text-align:right">
-            <th style="text-align:left;padding:4px 8px">กลยุทธ์</th><th style="text-align:left;padding:4px 8px">คู่</th>
+          <thead><tr style="color:var(--muted);text-align:left">
+            <th style="padding:4px 8px">กลยุทธ์</th><th style="padding:4px 8px">คู่</th>
             <th style="padding:4px 8px">regime</th><th style="padding:4px 8px">n</th><th style="padding:4px 8px">open</th>
             <th style="padding:4px 8px">WR%</th><th style="padding:4px 8px">exp_R (fwd)</th><th style="padding:4px 8px">ΣR</th>
             <th style="padding:4px 8px">backtest R</th><th style="padding:4px 8px">badge</th>
@@ -4673,9 +4673,9 @@ async function loadShadowMatrix(force) {
     const rows = (d.rows || []).filter(r => (!selAlgo || r.algo_id === selAlgo) && (!selPair || r.symbol === selPair));
     body.innerHTML = rows.map(r => {
       const regime = r.algo_id === 'mean_reversion' ? 'RANGE' : (r.algo_id === 'regime_momentum' ? 'TREND' : '—');
-      return `<tr style="text-align:right;border-top:1px solid #262a31">
-        <td style="text-align:left;padding:4px 8px">${r.algo_id}</td>
-        <td style="text-align:left;padding:4px 8px;font-weight:700">${r.symbol}</td>
+      return `<tr style="text-align:left;border-top:1px solid #262a31">
+        <td style="padding:4px 8px">${r.algo_id}</td>
+        <td style="padding:4px 8px;font-weight:700">${r.symbol}</td>
         <td style="padding:4px 8px;color:var(--muted)">${regime}</td>
         <td style="padding:4px 8px">${r.n}</td>
         <td style="padding:4px 8px;color:var(--muted)">${r.n_open || 0}</td>
