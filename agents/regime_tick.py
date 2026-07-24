@@ -81,9 +81,13 @@ def _tick() -> None:
             return
         from connectors.mt5_connector import get_open_positions, open_order
         # stack guard: ถือครบ ALGO_MAX_STACK ไม้ = ข้าม (dict-safe — get_open_positions คืน dict)
-        _algo_open = sum(1 for p in (get_open_positions() or [])
-                         if str((p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or "").startswith("ALGO"))
-        if _algo_open >= getattr(config, "ALGO_MAX_STACK", 1):
+        _cmt = lambda p: str((p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or "")
+        _pdir = lambda p: (p.get("direction") if isinstance(p, dict) else getattr(p, "direction", None))
+        _algo = [p for p in (get_open_positions() or []) if _cmt(p).startswith("ALGO")]
+        if len(_algo) >= getattr(config, "ALGO_MAX_STACK", 1):
+            return
+        # same-direction guard: กัน 2 engine (TSMOM/intraday) เข้าซ้อนทิศเดียวกัน (ALGO_MAX_SAME_DIR=1 → ห้ามดับเบิลทางเดียว; ฝั่งตรงข้ามยังเข้าได้)
+        if sum(1 for p in _algo if _pdir(p) == d) >= getattr(config, "ALGO_MAX_SAME_DIR", 1):
             return
         from agents.algo_sizing import standdown_for_size         # small-acct guard: min-lot เสี่ยงเกินเพดาน = ข้าม
         _skip, _si = standdown_for_size(_cache["sl_pips"])

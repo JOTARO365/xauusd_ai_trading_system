@@ -236,6 +236,8 @@ REGIME_SHADOW_FILL    = os.getenv("REGIME_SHADOW_FILL", "false").lower() == "tru
 # ALGO_MAX_STACK = จำนวนไม้ ALGO ที่ถือพร้อมกันได้ (no-stack เดิม=1). ทุน/margin cap เองว่าวางได้อีกไหม
 # (ไม้ปิด/margin ว่าง → เข้าใหม่อัตโนมัติ). ยังผ่าน MAX_OPEN guard ต่อทิศ + margin check. default 1.
 ALGO_MAX_STACK        = int(os.getenv("ALGO_MAX_STACK") or 1)
+# ALGO_MAX_SAME_DIR = ไม้ ALGO ทิศทางเดียวกันที่ถือพร้อมกันได้ (1 = ห้าม 2 engine เข้าซ้อนทางเดียวกัน; ยังเปิดฝั่งตรงข้ามได้)
+ALGO_MAX_SAME_DIR     = int(os.getenv("ALGO_MAX_SAME_DIR") or 1)
 
 # ALGO_SIZE_STANDDOWN = safety guard บัญชีเล็ก: ก่อนเปิดไม้ ALGO เช็คว่าถ้าเปิดที่ MIN_LOT จะเสี่ยงเกิน
 # ALGO_MAX_TRADE_RISK_PCT ไหม (min-lot ใหญ่เกินทุน). เกิน → ข้ามไม้ (stand down) ไม่ over-risk. ramp อัตโนมัติ
@@ -365,7 +367,7 @@ def reload_config():
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
     global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT, REGIME_SHADOW
     global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING, REGIME_SR_ENTRY, REGIME_PENDING_FADE, REGIME_SR_EXIT
-    global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK
+    global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK, ALGO_MAX_SAME_DIR
     global ALGO_SIZE_STANDDOWN, ALGO_MAX_TRADE_RISK_PCT
     global TSMOM_LIVE, TSMOM_SHADOW, TSMOM_COEXIST, TSMOM_LOOKBACKS, TSMOM_SL_ATR, TSMOM_SL_PIPS, TSMOM_SL_CAP_FALLBACK
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
@@ -382,6 +384,7 @@ def reload_config():
     REGIME_SR_RISK_PCT       = float(os.getenv("REGIME_SR_RISK_PCT") or 0.005)
     REGIME_SHADOW_FILL       = os.getenv("REGIME_SHADOW_FILL", "false").lower() == "true"   # algo paper-fill
     ALGO_MAX_STACK           = int(os.getenv("ALGO_MAX_STACK") or 1)                        # ไม้ ALGO พร้อมกัน
+    ALGO_MAX_SAME_DIR        = int(os.getenv("ALGO_MAX_SAME_DIR") or 1)                      # ไม้ ALGO ทิศเดียวกันสูงสุด
     ALGO_SIZE_STANDDOWN      = os.getenv("ALGO_SIZE_STANDDOWN", "true").lower() == "true"    # small-acct guard
     ALGO_MAX_TRADE_RISK_PCT  = float(os.getenv("ALGO_MAX_TRADE_RISK_PCT") or 0.02)           # เพดาน risk/ไม้
     TSMOM_LIVE               = os.getenv("TSMOM_LIVE", "false").lower() == "true"            # TSMOM directional engine
