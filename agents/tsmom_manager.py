@@ -103,7 +103,21 @@ def _close(pos, reason, shadow):
         logger.error(f"[TSMOM] close #{pos.get('ticket')} failed: {e}")
 
 
-def _reconcile(target, atr, shadow):
+def _entry_cond_ok(rates, R):
+    """gate เปิดไม้ใหม่: ADX/vol(D1) ต้องถึงเกณฑ์ (default 0 = ปิด gate → True เสมอ). fail-soft."""
+    min_adx = float(getattr(_cfg, "TSMOM_MIN_ADX", 0) or 0)
+    min_vol = float(getattr(_cfg, "TSMOM_MIN_VOLPCT", 0) or 0)
+    if not (min_adx or min_vol):
+        return True
+    try:
+        adx = float(R.adx(rates["high"], rates["low"], rates["close"])[-2])
+        vp = float(R.vol_percentile(rates["close"])[-2])
+    except Exception:
+        return True
+    return not ((min_adx and adx < min_adx) or (min_vol and vp < min_vol))
+
+
+def _reconcile(target, atr, shadow, can_open=True):
     from connectors.mt5_connector import get_open_positions
     tsmom = [p for p in (get_open_positions() or [])
              if str(p.get("comment") or "").startswith(COMMENT)]
@@ -115,11 +129,15 @@ def _reconcile(target, atr, shadow):
             _state("STAND-DOWN", "signal FLAT · ไม่มี position")
         return True
     if cur is None:
+        if not can_open:                                    # entry-gate (ADX/vol) ไม่ถึง → ไม่เปิดใหม่
+            _state("STAND-DOWN", "เงื่อนไข entry (ADX/vol) ไม่ถึง → ไม่เปิดใหม่"); return True
         return _open(target, atr, shadow)                   # fail → ไม่ mark bar (retry รอบหน้า)
     if cur["direction"] == target:
         _state("HOLD", f"ถือ {target} ตามเทรนด์ D1 · #{cur['ticket']}"); return True
-    _close(cur, f"flip → {target}", shadow)                  # ทิศกลับ → ปิด+เปิดตรงข้าม
-    return _open(target, atr, shadow)
+    _close(cur, f"flip → {target}", shadow)                  # ทิศกลับ → ปิด
+    if not can_open:                                         # flip แต่เงื่อนไขไม่ถึง → ปิดเฉยๆ ไม่เปิดใหม่
+        _state("FLAT", "flip · เงื่อนไข entry ไม่ถึง → ปิด ไม่เปิดใหม่"); return True
+    return _open(target, atr, shadow)                        # เปิดตรงข้าม
 
 
 def manage_tsmom():
@@ -136,11 +154,14 @@ def manage_tsmom():
             return None                                      # ยังไม่มีแท่ง D1 ใหม่ → ไม่ทำซ้ำ
         import regime_lib as R
         target = _signal(rates["close"])
+        if target == "SELL" and getattr(_cfg, "TSMOM_LONG_ONLY", False):   # gate: long-only (ขา SELL −EV; audit + segment ยืนยัน)
+            target = "FLAT"
         atr = float(R.atr(rates["high"], rates["low"], rates["close"], 22)[-2])
         if atr <= 0:
             return None
+        can_open = _entry_cond_ok(rates, R)                 # gate: min ADX/vol (default off → True)
         shadow = getattr(_cfg, "TSMOM_SHADOW", False) and not getattr(_cfg, "TSMOM_LIVE", False)
-        if _reconcile(target, atr, shadow):                 # set bar เฉพาะเมื่อสำเร็จ (open fail → retry รอบหน้า)
+        if _reconcile(target, atr, shadow, can_open):       # set bar เฉพาะเมื่อสำเร็จ (open fail → retry รอบหน้า)
             _last_d1_ts = closed_ts
         return {"target": target, "atr": atr, "shadow": shadow}
     except Exception as e:

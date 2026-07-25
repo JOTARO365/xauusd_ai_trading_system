@@ -253,6 +253,9 @@ ALGO_MAX_TRADE_RISK_PCT = float(os.getenv("ALGO_MAX_TRADE_RISK_PCT") or 0.02)   
 TSMOM_LIVE       = os.getenv("TSMOM_LIVE", "false").lower() == "true"
 TSMOM_SHADOW     = os.getenv("TSMOM_SHADOW", "false").lower() == "true"      # log target เฉยๆ ไม่วาง order
 TSMOM_COEXIST    = os.getenv("TSMOM_COEXIST", "false").lower() == "true"     # true → intraday engine ทำงานคู่ TSMOM (ไม่ hand-off) = เข้า BUY+SELL ทั้ง 2 ทาง; cap ด้วย ALGO_MAX_STACK
+TSMOM_LONG_ONLY  = os.getenv("TSMOM_LONG_ONLY", "false").lower() == "true"   # เข้าเฉพาะ BUY (segment: ขา SELL −EV, LONG-only เพิ่มกำไรรวม)
+TSMOM_MIN_ADX    = float(os.getenv("TSMOM_MIN_ADX") or 0)                    # เข้าเฉพาะ ADX(D1) ≥ นี้ (0 = off; overfit-risk n น้อย)
+TSMOM_MIN_VOLPCT = float(os.getenv("TSMOM_MIN_VOLPCT") or 0)                 # เข้าเฉพาะ vol_percentile(D1) ≥ นี้ (0 = off)
 TSMOM_LOOKBACKS  = os.getenv("TSMOM_LOOKBACKS", "63,126,252")                # ensemble lookback (วัน D1)
 TSMOM_SL_ATR     = float(os.getenv("TSMOM_SL_ATR") or 3.0)                   # chandelier disaster SL (× ATR D1)
 # TSMOM_SL_PIPS > 0 = override SL เป็นค่าคงที่ (points) แทน chandelier — สำหรับบัญชีเล็กให้เปิด order ได้.
@@ -371,7 +374,7 @@ def reload_config():
     global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING, REGIME_SR_ENTRY, REGIME_PENDING_FADE, REGIME_SR_EXIT
     global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK, ALGO_MAX_SAME_DIR, ALGO_ENTRY_HOURS
     global ALGO_SIZE_STANDDOWN, ALGO_MAX_TRADE_RISK_PCT
-    global TSMOM_LIVE, TSMOM_SHADOW, TSMOM_COEXIST, TSMOM_LOOKBACKS, TSMOM_SL_ATR, TSMOM_SL_PIPS, TSMOM_SL_CAP_FALLBACK
+    global TSMOM_LIVE, TSMOM_SHADOW, TSMOM_COEXIST, TSMOM_LONG_ONLY, TSMOM_MIN_ADX, TSMOM_MIN_VOLPCT, TSMOM_LOOKBACKS, TSMOM_SL_ATR, TSMOM_SL_PIPS, TSMOM_SL_CAP_FALLBACK
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
     SPECIALIST_ENABLED       = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"
     REGIME_SHADOW            = os.getenv("REGIME_SHADOW", "false").lower() == "true"
@@ -393,6 +396,9 @@ def reload_config():
     TSMOM_LIVE               = os.getenv("TSMOM_LIVE", "false").lower() == "true"            # TSMOM directional engine
     TSMOM_SHADOW             = os.getenv("TSMOM_SHADOW", "false").lower() == "true"
     TSMOM_COEXIST            = os.getenv("TSMOM_COEXIST", "false").lower() == "true"         # intraday engine ทำงานคู่ TSMOM
+    TSMOM_LONG_ONLY          = os.getenv("TSMOM_LONG_ONLY", "false").lower() == "true"       # เข้าเฉพาะ BUY
+    TSMOM_MIN_ADX            = float(os.getenv("TSMOM_MIN_ADX") or 0)                        # เข้าเฉพาะ ADX(D1) ≥ นี้
+    TSMOM_MIN_VOLPCT         = float(os.getenv("TSMOM_MIN_VOLPCT") or 0)                     # เข้าเฉพาะ vol% ≥ นี้
     TSMOM_LOOKBACKS          = os.getenv("TSMOM_LOOKBACKS", "63,126,252")
     TSMOM_SL_ATR             = float(os.getenv("TSMOM_SL_ATR") or 3.0)
     TSMOM_SL_PIPS            = float(os.getenv("TSMOM_SL_PIPS") or 0)                        # fixed SL override (บัญชีเล็ก)
