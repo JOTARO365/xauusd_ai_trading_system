@@ -530,12 +530,14 @@ async def main():
     try:
         while True:
             # ── ตรวจตลาดปิด (เสาร์/อาทิตย์/daily close) ─────────────
+            config.reload_config()                      # ให้ WEEKEND_RUN toggle ติดโดยไม่ต้อง restart
             should_sleep, sleep_secs, sleep_reason = market_sleep_status()
             while should_sleep:
                 chunk = min(1800, sleep_secs)  # รอสูงสุด 30 นาทีต่อรอบ
                 mins_left = sleep_secs // 60
                 console.print(f"  [dim]💤 {sleep_reason} — รอ {mins_left} นาที...[/dim]")
                 await asyncio.sleep(chunk)
+                config.reload_config()                  # reload กลาง sleep → เปิด WEEKEND_RUN แล้วตื่นได้
                 should_sleep, sleep_secs, sleep_reason = market_sleep_status()
 
             # ── Auto-reconnect MT5 ถ้าหลุด ────────────────────────────────
