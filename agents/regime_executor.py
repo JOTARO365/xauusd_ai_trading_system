@@ -89,6 +89,10 @@ def run_regime_executor():
         _hb("SIZE-STANDDOWN", f"regime=TREND {sig.get('dir')} · min-lot มีความเสี่ยง {_si.get('risk_pct',0)*100:.1f}% "
             f"> เพดาน {_si.get('ceiling',0)*100:.0f}% (เงินทุนไม่เพียงพอ SL {sig.get('sl_pips')}p) → ข้าม", regime="TREND")
         return None
+    from agents.algo_gate import entry_hour_ok
+    if not entry_hour_ok():                                   # session gate (ALGO_ENTRY_HOURS · ว่าง=ทุกชม default)
+        _hb("SESSION-GATE", "นอกช่วง ALGO_ENTRY_HOURS → งดเข้า", regime="TREND")
+        return None
     _hb("ENTER", f"{sig.get('dir')} SL={sig.get('sl_pips')}p TP={sig.get('tp_pips')}p → ส่งคำสั่ง", regime="TREND")
     _last_bar = rec["bar_ts"]
     from connectors.mt5_connector import open_order

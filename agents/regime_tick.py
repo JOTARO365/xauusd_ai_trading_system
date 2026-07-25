@@ -79,6 +79,9 @@ def _tick() -> None:
             d = "SELL"
         else:
             return
+        from agents.algo_gate import entry_hour_ok
+        if not entry_hour_ok():                              # session gate (ALGO_ENTRY_HOURS · ว่าง=ทุกชม default)
+            return
         from connectors.mt5_connector import get_open_positions, open_order
         # stack guard: ถือครบ ALGO_MAX_STACK ไม้ = ข้าม (dict-safe — get_open_positions คืน dict)
         _cmt = lambda p: str((p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or "")
