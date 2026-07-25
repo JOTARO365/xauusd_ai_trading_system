@@ -240,6 +240,14 @@ ALGO_MAX_STACK        = int(os.getenv("ALGO_MAX_STACK") or 1)
 ALGO_MAX_SAME_DIR     = int(os.getenv("ALGO_MAX_SAME_DIR") or 1)
 # ALGO_ENTRY_HOURS = allow-list ชั่วโมง UTC ที่ intraday algo เข้าได้ (เช่น "0-13"=Asian+London). ว่าง = ทุกชั่วโมง (default, ไม่กรอง)
 ALGO_ENTRY_HOURS      = os.getenv("ALGO_ENTRY_HOURS", "")
+# MULTI_SYMBOL_LIVE = master toggle: multi_symbol_executor วางออเดอร์จริงบน symbol ที่ toggle=LIVE (default OFF = 0 order; ต้องเปิด + toggle combo LIVE 2 ชั้น)
+MULTI_SYMBOL_LIVE     = os.getenv("MULTI_SYMBOL_LIVE", "false").lower() == "true"
+# ALGO_SL_MULT = SL multiplier ต่อ symbol "SYM:mult,..." (WTIUSD:0.7 = validated; ตัวอื่น default 1.0)
+ALGO_SL_MULT          = os.getenv("ALGO_SL_MULT", "WTIUSD:0.7")
+# MSE_MAX_POSITIONS = ไม้สูงสุดที่ multi_symbol_executor ถือพร้อมกันต่อ combo (stack ทีละไม้ต่อ signal-bar ใหม่)
+MSE_MAX_POSITIONS     = int(os.getenv("MSE_MAX_POSITIONS") or 1)
+# MSE_MAX_TOTAL = เพดานรวมไม้ MSE ทุก symbol (กัน exposure บวมเมื่อเปิดหลายคู่พร้อมกัน). 0 = ไม่จำกัดรวม (per-symbol เท่านั้น)
+MSE_MAX_TOTAL         = int(os.getenv("MSE_MAX_TOTAL") or 0)
 
 # ALGO_SIZE_STANDDOWN = safety guard บัญชีเล็ก: ก่อนเปิดไม้ ALGO เช็คว่าถ้าเปิดที่ MIN_LOT จะเสี่ยงเกิน
 # ALGO_MAX_TRADE_RISK_PCT ไหม (min-lot ใหญ่เกินทุน). เกิน → ข้ามไม้ (stand down) ไม่ over-risk. ramp อัตโนมัติ
@@ -372,7 +380,7 @@ def reload_config():
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
     global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT, REGIME_SHADOW
     global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING, REGIME_SR_ENTRY, REGIME_PENDING_FADE, REGIME_SR_EXIT
-    global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK, ALGO_MAX_SAME_DIR, ALGO_ENTRY_HOURS
+    global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK, ALGO_MAX_SAME_DIR, ALGO_ENTRY_HOURS, MULTI_SYMBOL_LIVE, ALGO_SL_MULT, MSE_MAX_POSITIONS, MSE_MAX_TOTAL
     global ALGO_SIZE_STANDDOWN, ALGO_MAX_TRADE_RISK_PCT
     global TSMOM_LIVE, TSMOM_SHADOW, TSMOM_COEXIST, TSMOM_LONG_ONLY, TSMOM_MIN_ADX, TSMOM_MIN_VOLPCT, TSMOM_LOOKBACKS, TSMOM_SL_ATR, TSMOM_SL_PIPS, TSMOM_SL_CAP_FALLBACK
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
@@ -391,6 +399,10 @@ def reload_config():
     ALGO_MAX_STACK           = int(os.getenv("ALGO_MAX_STACK") or 1)                        # ไม้ ALGO พร้อมกัน
     ALGO_MAX_SAME_DIR        = int(os.getenv("ALGO_MAX_SAME_DIR") or 1)                      # ไม้ ALGO ทิศเดียวกันสูงสุด
     ALGO_ENTRY_HOURS         = os.getenv("ALGO_ENTRY_HOURS", "")                             # allow-list ชม UTC (ว่าง=ทุกชม)
+    MULTI_SYMBOL_LIVE        = os.getenv("MULTI_SYMBOL_LIVE", "false").lower() == "true"     # master: executor multi-symbol วางออเดอร์จริง (default OFF)
+    ALGO_SL_MULT             = os.getenv("ALGO_SL_MULT", "WTIUSD:0.7")                        # SL mult ต่อ symbol "SYM:mult,..."
+    MSE_MAX_POSITIONS        = int(os.getenv("MSE_MAX_POSITIONS") or 1)                       # ไม้สูงสุด/combo ที่ executor ถือ
+    MSE_MAX_TOTAL            = int(os.getenv("MSE_MAX_TOTAL") or 0)                            # เพดานรวมไม้ MSE ทุก symbol (0=ไม่จำกัด)
     ALGO_SIZE_STANDDOWN      = os.getenv("ALGO_SIZE_STANDDOWN", "true").lower() == "true"    # small-acct guard
     ALGO_MAX_TRADE_RISK_PCT  = float(os.getenv("ALGO_MAX_TRADE_RISK_PCT") or 0.02)           # เพดาน risk/ไม้
     TSMOM_LIVE               = os.getenv("TSMOM_LIVE", "false").lower() == "true"            # TSMOM directional engine

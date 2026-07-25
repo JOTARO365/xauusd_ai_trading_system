@@ -16,7 +16,7 @@ from agents.regime_shadow import compute_shadow_signal, _MIN_BARS
 import regime_lib as R    # regime_shadow ใส่ scripts/ ลง sys.path แล้ว → import ได้
 
 # full universe (mirror connectors/pair_collector.COLLECT) — the instruments an algo may be eligible for
-UNIVERSE = ["XAUUSD", "XAGUSD", "XAUEUR", "XAUJPY", "AUDUSD", "EURUSD", "USDCHF", "USDJPY",
+UNIVERSE = ["XAUUSD", "XAGUSD", "XAUEUR", "XAUJPY", "AUDUSD", "EURUSD", "GBPUSD", "USDCHF", "USDJPY",
             "BTCUSD", "WTIUSD"]
 
 

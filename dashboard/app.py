@@ -167,6 +167,8 @@ _CONFIG_SPEC: dict[str, str] = {
     "NEWS_GATE": "false", "NEWS_GATE_OPPOSE": "40", "NEWS_OPPOSE_PENALTY": "8",
     "NEWS_AGREE_RELAX": "5", "NEWS_GATE_HARD_FLOOR": "58", "NEWS_GATE_MIN_N": "3",
     "NEWS_GATE_MAX_AGE_MIN": "60",
+    # ── Multi-symbol live engine (WTI ฯลฯ) — master gate; ต่อ combo toggle=LIVE ที่ Shadow Matrix ──
+    "MULTI_SYMBOL_LIVE": "false", "ALGO_SL_MULT": "WTIUSD:0.7",
     # ── NNLB ──
     "NNLB_MODE": "false", "NNLB_BASE_EQUITY": "100",
     "NNLB_EQUITY_PER_LOT": "100", "NNLB_MAX_LOSS_PCT": "25",
@@ -1371,6 +1373,24 @@ def api_shadow_matrix():
         from agents.shadow_matrix import build
         return build()
     return jsonify(_cached("shadow-matrix", _c, ttl=30))
+
+
+@app.route("/api/shadow-switch", methods=["POST"])
+def api_shadow_switch():
+    """Toggle combo (algo,symbol) → SHADOW/LIVE/OFF (data/algo_switches.json). LIVE = executor วางออเดอร์จริง
+    (ต้องเปิด master MULTI_SYMBOL_LIVE ด้วย). validate state. 0 token."""
+    from agents import shadow_switches as _sw
+    body = request.get_json(silent=True) or {}
+    algo = (body.get("algo") or "").strip()
+    symbol = (body.get("symbol") or "").strip()
+    state = (body.get("state") or "").strip().upper()
+    if not algo or not symbol:
+        return jsonify({"ok": False, "error": "algo/symbol required"}), 400
+    if state not in _sw._VALID:
+        return jsonify({"ok": False, "error": f"state ต้องเป็น {sorted(_sw._VALID)}"}), 400
+    ok = _sw.set_state(algo, symbol, state)
+    _data_cache.pop("shadow-matrix", None)            # ให้ matrix สะท้อน state ใหม่ทันที
+    return jsonify({"ok": ok, "algo": algo, "symbol": symbol, "state": state})
 
 
 @app.route("/api/shadow-tsmom")

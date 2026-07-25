@@ -1903,6 +1903,9 @@
           <option value="">ทุกคู่</option>
         </select>
         <span id="sm-meta" style="font-family:var(--mono);font-size:11px;color:var(--muted)">—</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--muted)">master วางออเดอร์จริง (multi-symbol):
+          <button id="sm-master" onclick="toggleMultiSymbolLive()" class="filter-select"
+                  style="padding:2px 10px;cursor:pointer;font-weight:700">…</button></span>
       </div>
       <!-- STRATEGY ROLLUP: แต่ละกลยุทธ์กำไร/ขาดทุนเท่าไหร่รวมทุกคู่ -->
       <div id="sm-strategy" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"></div>
@@ -1913,8 +1916,9 @@
             <th style="padding:4px 8px">regime</th><th style="padding:4px 8px">n</th><th style="padding:4px 8px">open</th>
             <th style="padding:4px 8px">WR%</th><th style="padding:4px 8px">exp_R (fwd)</th><th style="padding:4px 8px">ΣR</th>
             <th style="padding:4px 8px">backtest (managed)</th><th style="padding:4px 8px">badge</th>
+            <th style="padding:4px 8px">switch</th>
           </tr></thead>
-          <tbody id="sm-body"><tr><td colspan="10" style="color:var(--muted);padding:6px 8px">—</td></tr></tbody>
+          <tbody id="sm-body"><tr><td colspan="11" style="color:var(--muted);padding:6px 8px">—</td></tr></tbody>
         </table>
       </div>
       <div style="color:var(--muted);font-size:10px;margin-top:5px">forward shadow = OOS จริง (re-collecting) · <b>backtest (managed)</b> = paper order ผ่าน BE+trailing เหมือน live (net spread) · promote เมื่อ badge=ready (manual)</div>
@@ -4751,9 +4755,54 @@ async function loadShadowMatrix(force) {
         <td style="padding:4px 8px;color:${rC(r.sum_R)}">${r.n ? fx(r.sum_R, 1) : '—'}</td>
         <td style="padding:4px 8px;color:${rC(r.backtest_exp_R)}">${fx(r.backtest_exp_R)}${r.backtest_n ? ` <span style="color:var(--muted);font-size:10px">n${r.backtest_n}·WR${r.backtest_wr}%</span>` : ''}</td>
         <td style="padding:4px 8px;color:${badgeColor[r.badge]};font-weight:600">${r.badge}</td>
+        <td style="padding:4px 8px">
+          <select class="filter-select" style="padding:2px 6px;font-size:11px"
+            onchange="setShadowSwitch('${r.algo_id}','${r.symbol}',this.value)">
+            ${['SHADOW','LIVE','OFF'].map(s => `<option value="${s}"${r.state === s ? ' selected' : ''}>${s}</option>`).join('')}
+          </select>
+        </td>
       </tr>`;
-    }).join('') || '<tr><td colspan="10" style="color:var(--muted);padding:6px 8px">ไม่มีข้อมูลตามตัวกรอง</td></tr>';
+    }).join('') || '<tr><td colspan="11" style="color:var(--muted);padding:6px 8px">ไม่มีข้อมูลตามตัวกรอง</td></tr>';
+    refreshMasterToggle();
   } catch (_e) {}
+}
+
+// ── multi-symbol live toggles (combo + master). LIVE ต้องเปิด master ด้วยจึงวางออเดอร์จริง ──
+async function setShadowSwitch(algo, symbol, state) {
+  try {
+    const r = await (await fetch('/api/shadow-switch', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ algo, symbol, state })
+    })).json();
+    if (!r.ok) { alert('เปลี่ยน switch ไม่สำเร็จ: ' + (r.error || '')); return; }
+    loadShadowMatrix(true);
+  } catch (_e) { alert('เชื่อมต่อ /api/shadow-switch ไม่ได้'); }
+}
+
+async function refreshMasterToggle() {
+  const btn = document.getElementById('sm-master'); if (!btn) return;
+  try {
+    const cfg = await (await fetch('/api/config')).json();
+    const on = String(cfg.MULTI_SYMBOL_LIVE).toLowerCase() === 'true';
+    btn.textContent = on ? 'ON' : 'OFF';
+    btn.style.background = on ? 'var(--green)' : '#555';
+    btn.style.color = on ? '#0e1117' : '#ddd';
+    btn.dataset.on = on ? '1' : '0';
+  } catch (_e) { btn.textContent = '?'; }
+}
+
+async function toggleMultiSymbolLive() {
+  const btn = document.getElementById('sm-master'); if (!btn) return;
+  const next = btn.dataset.on === '1' ? 'false' : 'true';
+  if (next === 'true' && !confirm('เปิด master วางออเดอร์จริงบน symbol อื่น (นอกทอง)?\ncombo ที่ toggle=LIVE เท่านั้นจึงจะเข้าออเดอร์จริง — SHADOW ยังเป็น paper ปกติ')) return;
+  try {
+    const r = await (await fetch('/api/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ MULTI_SYMBOL_LIVE: next })
+    })).json();
+    if (r && r.error) { alert('บันทึกไม่สำเร็จ: ' + r.error); return; }
+    refreshMasterToggle();
+  } catch (_e) { alert('เชื่อมต่อ /api/config ไม่ได้'); }
 }
 
 let _stmLast = 0;

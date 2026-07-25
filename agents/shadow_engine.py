@@ -160,10 +160,16 @@ def tick(force=False):
     eligible = _reg.combos(universe)
 
     active = _sw.combos_in(_sw.SHADOW, eligible)
-    live = _sw.combos_in(_sw.LIVE, eligible)             # v1: no non-XAU live path → run LIVE as shadow + warn
-    for a, s in live:
-        logger.warning(f"[SHADOW] {a}:{s} state=LIVE has no live path in v1 — running as SHADOW")
-    active = active + live
+    live = _sw.combos_in(_sw.LIVE, eligible)
+    if getattr(_cfg, "MULTI_SYMBOL_LIVE", False):
+        # executor (multi_symbol_executor) เป็นเจ้าของ combo LIVE แล้ว → อย่า paper-fill ซ้ำ (กัน double-count)
+        for a, s in live:
+            logger.debug(f"[SHADOW] {a}:{s} state=LIVE → executor จัดการ (ข้าม paper-fill)")
+    else:
+        # master OFF: ไม่มี live path → รัน LIVE เป็น shadow (เก็บ data ต่อ) + เตือน
+        for a, s in live:
+            logger.warning(f"[SHADOW] {a}:{s} state=LIVE แต่ MULTI_SYMBOL_LIVE=off → running as SHADOW")
+        active = active + live
     if not active:
         return {"combos": 0, "new": 0, "resolved": 0}
 

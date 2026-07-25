@@ -362,6 +362,15 @@ def node_position_mgmt(state: TradingState) -> dict:
             logger.info(f"[SHADOW] {_st['new']} new · {_st['resolved']} resolved · {_st['combos']} combos")
     except Exception as _se:
         logger.error(f"[GRAPH:shadow_engine] {_se}")
+    # multi-symbol live executor: วางออเดอร์จริงบน symbol อื่น (WTI ฯลฯ) ต่อ combo LIVE. gated MULTI_SYMBOL_LIVE
+    # (default OFF → 0 order) + ต่อ combo ต้อง toggle=LIVE. fail-soft. ทองไม่กระทบ (คนละ symbol/คนละ engine).
+    try:
+        from agents.multi_symbol_executor import tick as _mse_tick
+        _me = _mse_tick()
+        if _me and (_me.get("opened") or _me.get("managed")):
+            logger.info(f"[MSE] {_me['opened']} opened · {_me['managed']} managed · {_me['combos']} combos")
+    except Exception as _mee:
+        logger.error(f"[GRAPH:multi_symbol_executor] {_mee}")
     # forward TSMOM-D1 equity tracker (trend-follower, per symbol). gated SHADOW_TSMOM. fail-soft. 0 order.
     try:
         from agents.shadow_tsmom import tick as _tsmom_tick

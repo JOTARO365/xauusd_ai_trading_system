@@ -578,9 +578,11 @@ def _clamp_stops_level(price, sl, tp, is_buy, no_tp, stops_min, point):
 def open_order(direction: str, sl_pips: float, tp_pips: float,
                comment: str = "", min_rr: float | None = None,
                confidence_scale: float = 1.0, lot: float | None = None,
-               shadow: bool = False) -> dict:
+               shadow: bool = False, symbol: str | None = None,
+               max_open_override: int | None = None) -> dict:
+    symbol = symbol or SYMBOL                          # multi-symbol: ระบุ symbol อื่นได้ (default = ทอง; caller เดิมไม่กระทบ)
     if _cfg.DRY_RUN or shadow:                        # shadow = algo paper-fill (ไม่ใช้ทุน, ไม่วางจริง)
-        tick = mt5.symbol_info_tick(SYMBOL)
+        tick = mt5.symbol_info_tick(symbol)
         price = (tick.ask if direction.upper() == "BUY" else tick.bid) if tick else 0.0
         tag = "SHADOW" if shadow and not _cfg.DRY_RUN else "DRY_RUN"
         logger.warning(f"[{tag}] would have opened {direction} @ {price:.2f} SL={sl_pips}p TP={tp_pips}p")
@@ -599,12 +601,12 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         logger.error("Cannot get account info")
         return {"success": False, "error": "No account info"}
 
-    tick = mt5.symbol_info_tick(SYMBOL)
+    tick = mt5.symbol_info_tick(symbol)
     if tick is None:
-        logger.error(f"Cannot get tick for {SYMBOL}")
+        logger.error(f"Cannot get tick for {symbol}")
         return {"success": False, "error": "No tick data"}
 
-    sym_info = mt5.symbol_info(SYMBOL)
+    sym_info = mt5.symbol_info(symbol)
     point      = sym_info.point
     stops_min  = sym_info.trade_stops_level * point   # ระยะ SL/TP ขั้นต่ำจากราคาปัจจุบัน
 
@@ -651,14 +653,16 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
 
         # ตรวจจำนวน order ต่อฝั่ง (สอดคล้องกับ check_open_slot)
         dir_type = 0 if direction.upper() == "BUY" else 1
-        open_positions = mt5.positions_get(symbol=SYMBOL) or []
+        open_positions = mt5.positions_get(symbol=symbol) or []
         same_dir_count = sum(1 for p in open_positions if p.type == dir_type)
-        effective_limit = MONEY_MANAGEMENT["max_open_trades"] + count_protected_slots()
+        # cap ต่อฝั่ง: default = MAX_OPEN_TRADES (ทอง) — MSE ส่ง override เพื่อ stack symbol อื่นได้เองโดยไม่แตะ cap ทอง
+        base_limit = max_open_override if max_open_override is not None else MONEY_MANAGEMENT["max_open_trades"]
+        effective_limit = base_limit + count_protected_slots(symbol)
         if same_dir_count >= effective_limit:
             return {"success": False, "error": "Max open trades reached"}
 
         # ตรวจ margin ก่อนส่ง — คำนวณ margin ที่ต้องการสำหรับ lot นี้
-        margin_needed = mt5.order_calc_margin(order_type, SYMBOL, lot, price)
+        margin_needed = mt5.order_calc_margin(order_type, symbol, lot, price)
         if margin_needed is not None and account.equity < margin_needed:
             logger.warning(f"Margin ไม่เพียงพอ: ต้องการ {margin_needed:.2f}, equity {account.equity:.2f}")
             safe_lot = round((account.equity * 0.9) / (margin_needed / lot), 2) if lot > 0 else 0
@@ -670,7 +674,7 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
 
     request = {
         "action": mt5.TRADE_ACTION_DEAL,
-        "symbol": SYMBOL,
+        "symbol": symbol,
         "volume": lot,
         "type": order_type,
         "price": price,
@@ -680,20 +684,20 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         "magic": 20260429,
         "comment": _safe_comment(comment),
         "type_time": mt5.ORDER_TIME_GTC,
-        "type_filling": _pick_filling(SYMBOL),
+        "type_filling": _pick_filling(symbol),
     }
 
     # ── Send order — retry สำหรับ requote / price_changed ───────────────
     result    = None
     last_err  = ""
     is_buy    = direction.upper() == "BUY"
-    _fill_modes = _filling_modes(SYMBOL)          # broker-supported, best-first; request ตั้ง [0] ไว้แล้ว (_pick_filling)
+    _fill_modes = _filling_modes(symbol)          # broker-supported, best-first; request ตั้ง [0] ไว้แล้ว (_pick_filling)
     _fill_idx   = 0
 
     for attempt in range(_MAX_ORDER_RETRIES + 1):
         if attempt > 0:
             _time.sleep(_RETRY_DELAY_SEC)
-            tick = mt5.symbol_info_tick(SYMBOL)
+            tick = mt5.symbol_info_tick(symbol)
             if tick is None:
                 break
             price = tick.ask if is_buy else tick.bid
@@ -735,7 +739,7 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
     logger.info(f"Order opened: {direction} {lot} lots @ {price} SL={sl:.2f} TP={tp:.2f}")
 
     # ขยับ SL ฝั่งตรงข้ามทุก order มาหน้าทุนทันที (ไม่รอ 1000 pips)
-    n = _force_breakeven_opposing(direction)
+    n = _force_breakeven_opposing(direction, symbol)
     logger.info(f"Force-BE result: {n} opposing position(s) protected after opening {direction}")
 
     return {
@@ -1000,13 +1004,14 @@ def get_pending_orders() -> list:
 BREAKEVEN_BUFFER_PIPS  = 200    # fallback เมื่อ _cfg ยังไม่โหลด
 
 
-def count_protected_slots() -> int:
+def count_protected_slots(symbol: str | None = None) -> int:
     """คืนจำนวน open positions ที่ SL อยู่หน้าทุนแล้ว (ไม่มีความเสี่ยงขาดทุน)
-    ใช้เพิ่ม slot สำหรับ order ใหม่ — 1 protected position = 1 extra slot"""
-    positions = mt5.positions_get(symbol=SYMBOL)
+    ใช้เพิ่ม slot สำหรับ order ใหม่ — 1 protected position = 1 extra slot. symbol=None → ทอง (default)"""
+    symbol = symbol or SYMBOL
+    positions = mt5.positions_get(symbol=symbol)
     if not positions:
         return 0
-    info = mt5.symbol_info(SYMBOL)
+    info = mt5.symbol_info(symbol)
     point = info.point if info else 0.01
     buf = getattr(_cfg, "BE_BUFFER_PIPS", BREAKEVEN_BUFFER_PIPS)
     count = 0
@@ -1380,18 +1385,19 @@ def manage_partial_close() -> int:
     return closed
 
 
-def _force_breakeven_opposing(new_direction: str) -> int:
+def _force_breakeven_opposing(new_direction: str, symbol: str | None = None) -> int:
     """เมื่อเปิด order ใหม่ ขยับ SL ของทุก position ฝั่งตรงข้ามมาหน้าทุนทันที
-    ไม่รอ BREAKEVEN_TRIGGER_PIPS — trigger เพราะมี order ฝั่งตรงข้ามเปิดใหม่"""
-    info = mt5.symbol_info(SYMBOL)
+    ไม่รอ BREAKEVEN_TRIGGER_PIPS — trigger เพราะมี order ฝั่งตรงข้ามเปิดใหม่. symbol=None → ทอง (default)"""
+    symbol = symbol or SYMBOL
+    info = mt5.symbol_info(symbol)
     if info is None:
         logger.warning("Force-BE: symbol_info None")
         return 0
-    positions = mt5.positions_get(symbol=SYMBOL)
+    positions = mt5.positions_get(symbol=symbol)
     if not positions:
         logger.debug("Force-BE: no open positions")
         return 0
-    tick = mt5.symbol_info_tick(SYMBOL)
+    tick = mt5.symbol_info_tick(symbol)
     if tick is None:
         logger.warning("Force-BE: tick None")
         return 0
@@ -1446,7 +1452,7 @@ def _force_breakeven_opposing(new_direction: str) -> int:
 
         req = {
             "action":   mt5.TRADE_ACTION_SLTP,
-            "symbol":   SYMBOL,
+            "symbol":   symbol,
             "position": pos.ticket,
             "sl":       new_sl,
             "tp":       pos.tp,
