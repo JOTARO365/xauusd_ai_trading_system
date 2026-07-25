@@ -1393,6 +1393,15 @@ def api_shadow_switch():
     return jsonify({"ok": ok, "algo": algo, "symbol": symbol, "state": state})
 
 
+@app.route("/api/real-edge")
+def api_real_edge():
+    """edge จริงจากไม้ปิดบนเงินจริง (logs/real_fills, เขียนโดย MSE ตอนไม้ปิด). display-only, 0 token."""
+    def _c():
+        from agents.real_edge import build
+        return build()
+    return jsonify(_cached("real-edge", _c, ttl=30))
+
+
 @app.route("/api/shadow-tsmom")
 def api_shadow_tsmom():
     """Batch B / Phase 2: forward TSMOM-D1 equity per symbol (BTC/gold/silver) — annualized Sharpe + OOS.

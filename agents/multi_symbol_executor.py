@@ -24,6 +24,7 @@ from agents import shadow_switches as _sw
 
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _STATE = os.path.join(_BASE, "data", "mse_state.json")
+_FILLS = os.path.join(_BASE, "logs", "real_fills")     # real closed-trade journal ต่อ combo (edge จริงจากเงินจริง)
 _BARS_COUNT = 600
 _MIN_BARS = 520
 
@@ -238,6 +239,80 @@ def _manage(broker, positions, bars, point, digits, combo_state):
     return moved
 
 
+# ── real closed-trade capture (edge จริงจากไม้ที่ปิดแล้ว — leakage-free features) ──────
+def _now_iso():
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _entry_features(bars, point):
+    """snapshot feature ที่แท่งปิดล่าสุด (รู้ได้ตอนเข้าไม้ = ไม่ leak outcome)."""
+    try:
+        import regime_lib as R
+        high, low, close, times = bars
+        er = R.efficiency_ratio(close); adx = R.adx(high, low, close)
+        vol = R.vol_percentile(close); atr = R.atr(high, low, close)
+        i = len(close) - 2
+        from datetime import datetime, timezone
+        hour = datetime.fromtimestamp(int(times[i]), timezone.utc).hour
+        av = float(atr[i]) if atr[i] == atr[i] else 0.0
+        return {"er": round(float(er[i]), 4), "adx": round(float(adx[i]), 2),
+                "vol_pct": round(float(vol[i]), 3), "atr": round(av, 4),
+                "atr_pips": round(av / point, 1) if point else 0, "hour": hour,
+                "regime": R.detect_regime(er[i], adx[i], vol[i])}
+    except Exception:
+        return {}
+
+
+def _append_fill(algo_id, symbol, rec):
+    try:
+        os.makedirs(_FILLS, exist_ok=True)
+        with open(os.path.join(_FILLS, f"{algo_id}__{symbol}.jsonl"), "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
+    except OSError:
+        pass
+
+
+def _record_closed(algo_id, symbol, ticket, ctx):
+    """ดึง realized จาก deal history by **position_id** (ไม่พึ่ง magic — broker reset magic=0 ตอนปิด SL/TP).
+    คำนวณ realized_R เทียบ sl_dist เริ่มต้น → append real-fill journal."""
+    try:
+        import MetaTrader5 as mt5
+        deals = mt5.history_deals_get(position=int(ticket))
+        if not deals:
+            return False
+        profit = sum(float(d.profit) + float(d.swap) + float(d.commission) for d in deals)
+        exit_px = float(deals[-1].price)
+        entry = float(ctx.get("entry") or (deals[0].price if deals else 0.0))
+        sl_dist = float(ctx.get("sl_dist") or 0.0)
+        is_buy = ctx.get("dir") == "BUY"
+        rr = (((exit_px - entry) if is_buy else (entry - exit_px)) / sl_dist) if sl_dist > 0 else None
+        _append_fill(algo_id, symbol, {
+            "algo_id": algo_id, "symbol": symbol, "ticket": int(ticket), "dir": ctx.get("dir"),
+            "entry": round(entry, 5), "exit": round(exit_px, 5),
+            "realized_R": round(rr, 3) if rr is not None else None, "profit": round(profit, 2),
+            "opened_ts": ctx.get("opened_ts"), "closed_ts": _now_iso(),
+            "features": ctx.get("features", {})})
+        logger.info(f"[MSE] closed {algo_id}:{symbol} #{ticket} R={round(rr,3) if rr is not None else '—'} pnl={round(profit,2)}")
+        return True
+    except Exception as e:
+        logger.debug(f"[MSE] record close #{ticket} fail: {e}")
+        return False
+
+
+def _reconcile_closed(algo_id, symbol, positions, combo_state):
+    """ticket ที่เคยถือแต่หายจาก open = ปิดแล้ว → บันทึก real-fill + ลบออกจาก state."""
+    tickets = combo_state.get("tickets") or {}
+    if not tickets:
+        return 0
+    open_ids = {str(p.ticket) for p in positions}
+    closed = [t for t in list(tickets) if t not in open_ids]
+    for tk in closed:
+        _record_closed(algo_id, symbol, tk, tickets[tk])
+        tickets.pop(tk, None)
+    return len(closed)
+
+
 # ── entry: signal เดียวกับ shadow → open_order จริง ───────────────────────
 def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max_pos=1):
     """ถ้ายังไม่ครบ max_pos + มี signal ใหม่ (bar_ts ยังไม่เคยเข้า) → open_order จริง. คืน 1 ถ้าเปิด."""
@@ -257,7 +332,9 @@ def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max
     combo_state["last_bar_ts"] = vo["bar_ts"]                   # กันเข้าซ้ำบาร์เดิม แม้ open ล้มเหลว
     if res and res.get("success") and res.get("ticket"):
         combo_state.setdefault("tickets", {})[str(res["ticket"])] = {
-            "sl_dist": sl_pips_eff * point, "dir": vo["dir"], "entry_bar_ts": vo["bar_ts"]}
+            "sl_dist": sl_pips_eff * point, "dir": vo["dir"], "entry_bar_ts": vo["bar_ts"],
+            "entry": float(res.get("price") or 0.0), "opened_ts": _now_iso(),
+            "features": _entry_features(bars, point)}          # leakage-free snapshot → real-fill edge ตอนปิด
         logger.info(f"[MSE] LIVE entry {algo_id}:{symbol} {vo['dir']} @ {res.get('price')} "
                     f"SL={sl_pips_eff:.0f}p (×{sl_mult}) ticket={res['ticket']}")
         return 1
@@ -298,6 +375,7 @@ def tick(force=False):
             ck = f"{algo_id}:{symbol}"
             cstate = state.setdefault(ck, {})
             positions = _our_positions(broker)
+            _reconcile_closed(algo_id, symbol, positions, cstate)   # จับไม้ที่ปิด → real-fill journal
             managed += _manage(broker, positions, bars, point, digits, cstate)
             room_total = (max_total <= 0) or (total_open + opened < max_total)   # global cap ยังมีที่ว่าง
             if len(positions) < max_pos and room_total:         # ผ่านทั้ง per-combo + รวมทุก symbol
