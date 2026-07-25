@@ -97,6 +97,15 @@ Running in parallel, independent of the regime router:
   so the system takes both BUY and SELL intraday opportunities. `ALGO_MAX_SAME_DIR=1` then
   stops the two engines from stacking the *same* direction (opposite side still allowed),
   and `ALGO_MAX_STACK` caps total concurrent ALGO positions.
+- **Multi-symbol live engine** (`agents/multi_symbol_executor.py`) — extends live execution
+  beyond gold to other instruments (currently **WTI oil**) via a per-combo live/shadow toggle in
+  the dashboard's Shadow Matrix. **Default OFF** behind a two-layer gate (`MULTI_SYMBOL_LIVE=false`
+  **and** every combo defaults to SHADOW), so it places zero real orders until you enable the master
+  flag *and* toggle a specific combo to LIVE. When enabled it runs the same regime-momentum signal
+  with **self-contained R/ATR-relative management** (BE + trailing — it does *not* reuse gold's
+  pip-scaled managers), a data-derived SL multiplier (WTI ×0.7, from MFE/MAE analysis) and an ATR
+  sanity clamp. Gold's path is untouched (separate symbol + engine; gold's `MAX_OPEN_TRADES` is not
+  affected). WTI is the one instrument whose momentum survived the full-history validation gauntlet.
 - **Exit management** — vol-adaptive trailing stop (buffer = `TRAILING_ATR_MULT × ATR`),
   break-even, momentum-exit, zone-break — all deterministic, run on a fast poll.
 - **Gold-complex data collector** (`connectors/pair_collector.py`) — pulls OHLC + spread
@@ -154,23 +163,30 @@ git clone git@github.com:JOTARO365/xauusd_ai_trading_system.git
 cd xauusd_ai_trading_system
 ```
 
-### 2. Install Python dependencies
+### 2. Setup — dependencies + `.env` (one-shot, recommended)
+
+```bash
+python setup.py
+```
+
+Idempotent + safe to re-run. Does everything a fresh checkout needs: Python-version check →
+`pip install -r requirements.txt` → **sync `.env`** → create runtime dirs → MT5 connectivity
+check (informational). It never starts the bot.
+
+> **`.env` sync behaviour.** If `.env` is missing it's created from `.env.example`; if it
+> **already exists**, `setup.py` **appends any new config keys without touching your existing
+> values**. So after a `git pull` that introduced new keys (e.g. the multi-symbol engine keys),
+> just re-run `python setup.py` to bring your `.env` up to date — new keys land under a dated
+> marker and any secrets you still need to fill are flagged. Your `.env` is never overwritten.
+
+Or do it manually:
 
 ```bash
 pip install -r requirements.txt
+copy .env.example .env      # Windows  (Linux/Mac: cp .env.example .env)
 ```
 
-### 3. Configure .env
-
-```bash
-# Windows
-copy .env.example .env
-
-# Linux/Mac
-cp .env.example .env
-```
-
-Open `.env` and fill in the required values (see [Environment Variables](#environment-variables) below).
+Then open `.env` and fill in the required secrets (see [Environment Variables](#environment-variables) below).
 
 ### 4. Set up the database (Supabase)
 
@@ -515,6 +531,24 @@ This registers At-LogOn / Interactive scheduled tasks for the bot + dashboard th
 > [Known Limitations](#known-limitations). Its full design lives in
 > `.claude/context/SWING_HOLD_spec.md` (local, not committed).
 
+### Multi-Symbol Live Engine (WTI etc.)
+
+Live execution on non-gold instruments via `agents/multi_symbol_executor.py`. **Default OFF** —
+two independent gates must both be on before a single real order is placed. Gold's engine and
+`MAX_OPEN_TRADES` are unaffected.
+
+| Key | Default | Description |
+|---|---|---|
+| `MULTI_SYMBOL_LIVE` | `false` | **Master gate.** OFF = the executor never runs (0 real orders). Even when ON, only combos toggled to `LIVE` in the dashboard Shadow Matrix (`data/algo_switches.json`) trade; the rest stay paper/SHADOW. Reversible instantly. |
+| `ALGO_SL_MULT` | `WTIUSD:0.7` | Per-symbol SL multiplier, `"SYM:mult,..."`. WTI `0.7` is **data-derived** (winners' MAE p75 = 0.64R → tighter stop; edge +1.13→+2.39R). Other symbols default ×1.0. |
+| `MSE_MAX_POSITIONS` | `1` | Max stacked positions **per combo** (adds one per new signal-bar, not all at once). Uses its own slot cap — does **not** touch gold's `MAX_OPEN_TRADES`. |
+| `MSE_MAX_TOTAL` | `0` | Global cap across **all** MSE symbols (guards exposure when several are live). `0` = no global cap (per-symbol only). |
+| `MSE_SL_MIN_ATR` / `MSE_SL_MAX_ATR` | `0.5` / `4.0` | Clamp the SL into `[min, max] × ATR` (safety against a broken/spiking ATR). Normal SLs (~1×ATR) are untouched; only pathological values are clamped. `0` disables that side. |
+
+> WTI's edge is validated **in-sample** (period-stable across four eras, deflated-Sharpe pass,
+> structural rationale) but **not yet forward-tested live** — run it on a **demo** account first to
+> collect forward OOS before risking real capital.
+
 ### Decision Gates & Anti-fade Guards (live-reload — edits apply next cycle, no restart)
 
 All of these live in `config.py` and are re-read by `reload_config()` every cycle. Defaults
@@ -599,6 +633,7 @@ See all variables in [`.env.example`](.env.example)
 │   ├── analyst.py             # Sentiment analysis from news + X
 │   ├── decision_maker.py      # Deterministic Python gates → Claude quality check
 │   ├── swing_manager.py       # SWING_HOLD long-term sleeve (inert unless SWING_ENABLED)
+│   ├── multi_symbol_executor.py # Live executor for non-gold symbols (WTI) — gated, self-managed R/ATR
 │   ├── position_guardian.py   # Optional fast-poll daemon for open-position mgmt
 │   ├── pending_manager.py     # Pending order management
 │   ├── news_gatherer.py       # News aggregation
@@ -992,6 +1027,18 @@ Lot progression with this preset: equity $28 (profit $3) → `lot 0.01`; equity 
   run found **no directional edge** in the Donchian-breakout / z-score-fade entries on
   gold H1 (both −EV after cost) — consistent with this project's finding that gold
   *volatility/regime* is predictable but *direction* is not.
+- **Only WTI shows a validated cross-asset edge; ML stays offline by discipline.** The
+  full-history *managed* backtest (`scripts/shadow_backtest_managed.py`) found the momentum
+  entry has **no structural edge on gold** (exp_R −0.14) — and none on BTC / EURUSD / USDJPY
+  either — with **WTI oil momentum (SL×0.7) the one exception** (period-stable across eras,
+  deflated-Sharpe pass, t≈15). An offline ML experiment (KMeans/GMM cluster-quality *filter* on
+  breakouts, `scripts/cluster_filter.py` + `scripts/validate_cluster_filter.py`) did **not**
+  improve gold momentum (features ~0 correlation, fails OOS + a permutation null) and is **not**
+  wired to live; the WTI filter validation is pending a live/MT5 run. Every ML component in the
+  repo — probability calibration (`agents/calibrator.py`), the learned trade filter
+  (`ml/train_filter.py`), the Gaussian-HMM regime classifier (`scripts/hmm_regime.py`), price
+  clustering (`agents/cluster_map.py`) — is **offline or inert** until it passes the gauntlet
+  (validated-or-off).
 - **Two sources of "default".** `config.py` fallbacks and `.env.example` starter
   values differ for several keys (SYMBOL, START_BALANCE, HEDGE_BUFFER_PIPS,
   PENDING_EXPIRY_HOURS, BE_TRIGGER_R, MIN_AI_EQUITY). What you actually run is your
