@@ -19,6 +19,17 @@ ships a Flask dashboard on port 5050.
 
 ---
 
+## Recent additions (2026-07)
+
+- **Multi-symbol live engine** (`agents/multi_symbol_executor.py`) — trade non-gold instruments (WTI first) behind a two-layer default-OFF gate, with self-contained R/ATR management and a data-derived SL multiplier. See [Multi-Symbol Live Engine](#multi-symbol-live-engine-wti-etc).
+- **Real-edge capture** (`agents/real_edge.py`) — records real closed-trade outcomes per live pair (leakage-free entry features + realized R) and surfaces per-pair real edge in the dashboard **Shadow Matrix** ("เงินจริง" column), separate from the paper-shadow numbers. Display-only until it passes the validation gauntlet (validated-or-off).
+- **`WEEKEND_RUN`** — keep the loop alive on weekends in *collect-only* mode (skip AI = 0 token, gold entries closed) so BTC/crypto edge keeps accumulating (crypto trades 24/7). Default OFF.
+- **Crypto news tag** — `bitcoin/BTC/ethereum/crypto/...` added to the X keyword defaults and a **₿ คริปโต** filter tab in the dashboard news feed.
+- **One-shot `setup.py`** — `python setup.py` installs deps and **syncs new `.env` keys after a `git pull` without overwriting your values**.
+- **Dashboard polish** — larger section headers with clearer separation, expanded sidebar quick-jump, themed toast/confirm/input dialogs (no browser popups).
+
+---
+
 ## Tech Stack
 
 | Layer | What's actually used (traced to code) |
@@ -468,7 +479,7 @@ This registers At-LogOn / Interactive scheduled tasks for the bot + dashboard th
 | `X_USERNAME` | X (Twitter) username |
 | `X_PASSWORD` | X password |
 | `X_EMAIL` | X email (for 2FA) |
-| `X_KEYWORDS` | Tweet filter keywords (word-boundary match). **Setting this overrides the code defaults entirely** (not merged) and is **not** live-reloaded — a `pm2 restart` is required. Defaults include gold/Fed/inflation plus geopolitics & macro (`Iran, Israel, ceasefire, war, oil, crude, CPI, rate cut, Hormuz, CENTCOM, Kharg, PPI, FOMC, Pakistan`) |
+| `X_KEYWORDS` | Tweet filter keywords (word-boundary match). **Setting this overrides the code defaults entirely** (not merged) and is **not** live-reloaded — a `pm2 restart` is required. Defaults include gold/Fed/inflation plus geopolitics & macro (`Iran, Israel, ceasefire, war, oil, crude, CPI, rate cut, Hormuz, CENTCOM, Kharg, PPI, FOMC, Pakistan`) **and crypto** (`bitcoin, BTC, ethereum, ETH, crypto, halving, stablecoin` — feeds the ₿ crypto news tab for weekend BTC collection) |
 
 ### Trading Config
 
@@ -509,6 +520,7 @@ This registers At-LogOn / Interactive scheduled tasks for the bot + dashboard th
 | `REPORTER_COOLDOWN_SEC` | `3600` | Min seconds between reporter perf-reports (higher = fewer Haiku tokens) |
 | `AI_IDLE_GATE` | `false` | Stretch the AI throttle when the market is genuinely quiet (measures live M15 range vs its own median, not the clock). Price-spike override still reacts instantly. **Enable on the VM only after testing.** |
 | `AI_QUIET_INTERVAL_SECS` | `1800` | When `AI_IDLE_GATE` is on and the market is quiet, run AI every 30 min (vs 15) |
+| `WEEKEND_RUN` | `false` | Keep the loop running on weekends in **collect-only** mode (skips AI = 0 token; gold/FX are closed so no entries) so BTC/crypto shadow + real-fill edge keeps accumulating. `pos_mgmt`/`shadow_engine`/`multi_symbol_executor` still run each cycle. Default OFF = normal weekend sleep. Live-reload. |
 
 ### Background Threads & Experimental Sleeves
 
@@ -634,6 +646,7 @@ See all variables in [`.env.example`](.env.example)
 │   ├── decision_maker.py      # Deterministic Python gates → Claude quality check
 │   ├── swing_manager.py       # SWING_HOLD long-term sleeve (inert unless SWING_ENABLED)
 │   ├── multi_symbol_executor.py # Live executor for non-gold symbols (WTI) — gated, self-managed R/ATR
+│   ├── real_edge.py           # Real closed-trade edge per pair (real_fills + trades.json) — display-only
 │   ├── position_guardian.py   # Optional fast-poll daemon for open-position mgmt
 │   ├── pending_manager.py     # Pending order management
 │   ├── news_gatherer.py       # News aggregation
