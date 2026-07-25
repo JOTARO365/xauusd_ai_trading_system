@@ -29,7 +29,7 @@ from connectors.pair_collector import _broker_map, COLLECT  # noqa: E402
 
 MAX_HOLD = 48
 _MIN_BARS = R.VOL_LOOKBACK + 40          # 520 — same floor as compute_shadow_signal
-_COUNT = 20000                           # ~3.4y of H1 (broker-capped)
+_COUNT = 120000                          # ดึงประวัติเต็มที่ broker มี (paginate) — กัน bias ช่วงสั้น (เดิม 20000=~3.4ปี = ทองบูลล์ล้วน)
 
 
 def _iso(ts):
@@ -37,10 +37,23 @@ def _iso(ts):
 
 
 def _fetch(broker, count=_COUNT):
+    """ดึง H1 แบบ paginate (single call จำกัด ~20000 = สั้นเกิน bias regime) → ประวัติเต็มที่ broker มี."""
     import MetaTrader5 as mt5
-    rates = mt5.copy_rates_from_pos(broker, mt5.TIMEFRAME_H1, 0, count)
-    if rates is None or len(rates) < _MIN_BARS + 50:
+    acc, pos, dtype = {}, 0, None
+    while pos < count:
+        chunk = min(40000, count - pos)
+        rates = mt5.copy_rates_from_pos(broker, mt5.TIMEFRAME_H1, pos, chunk)
+        if rates is None or len(rates) == 0:
+            break
+        dtype = rates.dtype
+        for r in rates:
+            acc[int(r["time"])] = r
+        if len(rates) < chunk:
+            break
+        pos += len(rates)
+    if len(acc) < _MIN_BARS + 50 or dtype is None:
         return None
+    rates = np.array([acc[t] for t in sorted(acc)], dtype=dtype)
     info = mt5.symbol_info(broker)
     point = float(info.point) if info and info.point else None
     digits = int(info.digits) if info else 5
