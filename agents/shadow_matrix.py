@@ -121,6 +121,11 @@ def build():
     universe = getattr(_cfg, "SHADOW_UNIVERSE", None) or _reg.UNIVERSE
     eligible = _reg.combos(universe)
     bt = _load_backtest()
+    try:
+        from agents import real_edge as _re                 # edge จริงจากไม้ปิดเงินจริง (join ต่อ combo)
+        real = {(r["algo_id"], r["symbol"]): r for r in _re.build().get("rows", [])}
+    except Exception:
+        real = {}
     rows = []
     for algo_id, symbol in eligible:
         algo = _reg.get(algo_id)
@@ -141,7 +146,11 @@ def build():
                      "backtest_exp_R": (b.get("exp_R") if b else None),
                      "backtest_n": (b.get("n") if b else None),
                      "backtest_wr": (b.get("wr") if b else None),
-                     "backtest_managed": bool(b.get("managed")) if b else False, **stat})
+                     "backtest_managed": bool(b.get("managed")) if b else False,
+                     "real_n": (real.get((algo_id, symbol)) or {}).get("n", 0),
+                     "real_exp_R": (real.get((algo_id, symbol)) or {}).get("exp_R"),
+                     "real_wr": (real.get((algo_id, symbol)) or {}).get("wr"),
+                     "real_regime": (real.get((algo_id, symbol)) or {}).get("by_regime", {}), **stat})
     counts = {"ready": 0, "collecting": 0, "dying": 0}
     for r in rows:
         counts[r["badge"]] = counts.get(r["badge"], 0) + 1

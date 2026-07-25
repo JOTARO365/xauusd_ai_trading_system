@@ -73,6 +73,33 @@ def _segment(recs, key_fn):
     return out
 
 
+def _gold_real():
+    """gold-bot real trades จาก logs/trades.json (source=SYSTEM, ปิดแล้ว) → map เป็น regime_momentum:XAUUSD.
+    ทองเทรดผ่าน engine ตัวเอง (ไม่เขียน real_fills) → ดึงจาก trades.json. realized_R = (exit−entry)/|entry−sl|.
+    หมายเหตุ: รวมทุก system-gold (momentum+TSMOM+AI) เพราะ trades.json ไม่มี comment แยก — = edge รวมบอททอง."""
+    fp = os.path.join(_BASE, "logs", "trades.json")
+    recs = []
+    try:
+        d = json.load(open(fp, encoding="utf-8"))
+        rows = d if isinstance(d, list) else d.get("trades", [])
+        for r in rows:
+            if str(r.get("source", "")).upper() != "SYSTEM":
+                continue
+            if str(r.get("status", "")).upper() not in ("CLOSED", "CLOSE"):
+                continue
+            entry = r.get("entry_price"); close = r.get("close_price"); sl = r.get("sl")
+            d_ = str(r.get("direction", "")).upper()
+            if not (entry and close and sl) or entry == sl:
+                continue
+            dist = abs(float(entry) - float(sl))
+            rr = (((float(close) - float(entry)) if d_ == "BUY" else (float(entry) - float(close))) / dist) if dist > 0 else None
+            recs.append({"realized_R": round(rr, 3) if rr is not None else None,
+                         "profit": float(r.get("pnl") or 0.0), "features": {}})
+    except Exception:
+        pass
+    return recs
+
+
 def build():
     """สรุป real edge ต่อ combo + segment. fail-soft."""
     rows = []
@@ -88,6 +115,13 @@ def build():
             rows.append({"algo_id": algo, "symbol": sym, **st,
                          "by_regime": _segment(recs, lambda r: (r.get("features") or {}).get("regime")),
                          "by_session": _segment(recs, lambda r: _session((r.get("features") or {}).get("hour")))})
+    # gold-bot real (trades.json) → regime_momentum:XAUUSD (ถ้ายังไม่มีจาก real_fills)
+    if not any(r["algo_id"] == "regime_momentum" and r["symbol"] == "XAUUSD" for r in rows):
+        gr = _gold_real()
+        gst = _stats(gr)
+        if gst["n"]:
+            rows.append({"algo_id": "regime_momentum", "symbol": "XAUUSD", **gst,
+                         "src": "trades.json (gold-bot รวม)", "by_regime": {}, "by_session": {}})
     from datetime import datetime, timezone
     return {"ok": True, "generated": datetime.now(timezone.utc).isoformat()[:16] + "Z",
             "rows": rows,
