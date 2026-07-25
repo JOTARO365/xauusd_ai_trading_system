@@ -4,8 +4,9 @@ Run once after `git pull`:   python setup.py
 Does everything a fresh checkout needs, then prints how to start the bot + dashboard.
 Does NOT start the live bot (that is your controlled action — real money).
 
-Steps: Python check → pip install -r requirements.txt → ensure .env (from .env.example) →
-create runtime dirs → verify MT5 terminal connectivity (informational). Idempotent + safe to re-run.
+Steps: Python check → pip install -r requirements.txt → sync .env (คีย์ใหม่จาก .env.example
+โดยไม่ทับค่าเดิม; ถ้ายังไม่มี .env → copy) → create runtime dirs → verify MT5 (informational).
+Idempotent + safe to re-run. คน pull โค้ดใหม่ที่มีคีย์ config เพิ่ม → รัน setup.py แล้วได้คีย์ครบ.
 """
 import os
 import shutil
@@ -18,6 +19,51 @@ _OK, _WARN, _ERR = "  [OK] ", "  [!]  ", "  [X]  "
 
 def step(n, title):
     print(f"\n-- {n}. {title} " + "-" * max(0, 46 - len(title)))
+
+
+def _env_keys(path):
+    """set ของ KEY ที่มีอยู่ใน env file (ข้าม comment/บรรทัดว่าง)."""
+    keys = set()
+    try:
+        with open(path, encoding="utf-8") as f:
+            for ln in f:
+                s = ln.strip()
+                if s and not s.startswith("#") and "=" in s:
+                    keys.add(s.split("=", 1)[0].strip())
+    except OSError:
+        pass
+    return keys
+
+
+def _example_kv_lines(path):
+    """list ของ (KEY, raw_line) เฉพาะบรรทัด KEY=value ใน .env.example (เก็บ inline comment + ลำดับเดิม)."""
+    out = []
+    try:
+        with open(path, encoding="utf-8") as f:
+            for ln in f:
+                s = ln.strip()
+                if s and not s.startswith("#") and "=" in s:
+                    out.append((s.split("=", 1)[0].strip(), ln.rstrip("\n")))
+    except OSError:
+        pass
+    return out
+
+
+def sync_env(env, example):
+    """เพิ่มคีย์ใหม่จาก .env.example → .env (ไม่ทับค่าเดิม, append ท้ายเท่านั้น). idempotent.
+    คืน (added_keys, secret_keys) — secret = คีย์ที่ค่า placeholder ยังต้องกรอกเอง."""
+    have = _env_keys(env)
+    missing = [(k, line) for k, line in _example_kv_lines(example) if k not in have]
+    if not missing:
+        return [], []
+    from datetime import date
+    with open(env, "a", encoding="utf-8") as f:
+        f.write(f"\n# --- {date.today().isoformat()}: {len(missing)} คีย์เพิ่มโดย setup.py (sync จาก .env.example) ---\n")
+        for _k, line in missing:
+            f.write(line + "\n")
+    added = [k for k, _ in missing]
+    secret = [k for k, line in missing if line.split("=", 1)[1].strip().endswith("_here")]
+    return added, secret
 
 
 def main():
@@ -47,11 +93,21 @@ def main():
         else:
             print(_ERR + f"pip install failed (exit {rc})"); problems.append("pip-install")
 
-    # 3. .env
+    # 3. .env  (existing → sync คีย์ใหม่จาก .env.example โดยไม่ทับค่าเดิม / missing → copy)
     step(3, "Environment file (.env)")
     env, example = os.path.join(_BASE, ".env"), os.path.join(_BASE, ".env.example")
     if os.path.exists(env):
-        print(_OK + ".env already present (not overwritten)")
+        if os.path.exists(example):
+            added, secret = sync_env(env, example)
+            if added:
+                print(_WARN + f".env sync — เพิ่ม {len(added)} คีย์ใหม่: " + ", ".join(added))
+                if secret:
+                    print(f"         ⚠️ ต้องกรอกค่าเอง (secret): " + ", ".join(secret))
+                    problems.append("env-new-secrets")
+            else:
+                print(_OK + ".env present + คีย์ครบตาม .env.example (ไม่มีคีย์ใหม่)")
+        else:
+            print(_OK + ".env already present (no .env.example to sync)")
     elif os.path.exists(example):
         shutil.copy(example, env)
         print(_WARN + "created .env from .env.example — YOU MUST fill in secrets:")
