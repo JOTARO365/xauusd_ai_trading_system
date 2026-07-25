@@ -1912,12 +1912,12 @@
             <th style="padding:4px 8px">กลยุทธ์</th><th style="padding:4px 8px">คู่</th>
             <th style="padding:4px 8px">regime</th><th style="padding:4px 8px">n</th><th style="padding:4px 8px">open</th>
             <th style="padding:4px 8px">WR%</th><th style="padding:4px 8px">exp_R (fwd)</th><th style="padding:4px 8px">ΣR</th>
-            <th style="padding:4px 8px">backtest R</th><th style="padding:4px 8px">badge</th>
+            <th style="padding:4px 8px">backtest (managed)</th><th style="padding:4px 8px">badge</th>
           </tr></thead>
           <tbody id="sm-body"><tr><td colspan="10" style="color:var(--muted);padding:6px 8px">—</td></tr></tbody>
         </table>
       </div>
-      <div style="color:var(--muted);font-size:10px;margin-top:5px">forward shadow = OOS จริง (net measured spread, ยังไม่รวม swap) · backtest R = in-sample อ้างอิงเท่านั้น ไม่ pool กัน · promote เมื่อ badge=ready (manual)</div>
+      <div style="color:var(--muted);font-size:10px;margin-top:5px">forward shadow = OOS จริง (re-collecting) · <b>backtest (managed)</b> = paper order ผ่าน BE+trailing เหมือน live (net spread) · promote เมื่อ badge=ready (manual)</div>
 
       <!-- TSMOM-D1 forward equity tracker (trend-follower, BTC/gold/silver) -->
       <div class="section-title" style="margin-top:14px">TSMOM-D1 forward — trend-follower equity (BTC · gold · silver · annualized Sharpe)</div>
@@ -4749,7 +4749,7 @@ async function loadShadowMatrix(force) {
         <td style="padding:4px 8px">${r.wr == null ? '—' : r.wr}</td>
         <td style="padding:4px 8px;color:${rC(r.exp_R)}">${fx(r.exp_R)}</td>
         <td style="padding:4px 8px;color:${rC(r.sum_R)}">${r.n ? fx(r.sum_R, 1) : '—'}</td>
-        <td style="padding:4px 8px;color:${rC(r.backtest_exp_R)};opacity:.7">${fx(r.backtest_exp_R)}</td>
+        <td style="padding:4px 8px;color:${rC(r.backtest_exp_R)}">${fx(r.backtest_exp_R)}${r.backtest_n ? ` <span style="color:var(--muted);font-size:10px">n${r.backtest_n}·WR${r.backtest_wr}%</span>` : ''}</td>
         <td style="padding:4px 8px;color:${badgeColor[r.badge]};font-weight:600">${r.badge}</td>
       </tr>`;
     }).join('') || '<tr><td colspan="10" style="color:var(--muted);padding:6px 8px">ไม่มีข้อมูลตามตัวกรอง</td></tr>';

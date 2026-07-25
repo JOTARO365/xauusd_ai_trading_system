@@ -132,7 +132,9 @@ def build():
                      "state": _sw.state_of(algo_id, symbol),
                      "live": (symbol == _ALGO_META.get(algo_id, {}).get("live_symbol")),
                      "backtest_exp_R": (b.get("exp_R") if b else None),
-                     "backtest_n": (b.get("n") if b else None), **stat})
+                     "backtest_n": (b.get("n") if b else None),
+                     "backtest_wr": (b.get("wr") if b else None),
+                     "backtest_managed": bool(b.get("managed")) if b else False, **stat})
     counts = {"ready": 0, "collecting": 0, "dying": 0}
     for r in rows:
         counts[r["badge"]] = counts.get(r["badge"], 0) + 1
