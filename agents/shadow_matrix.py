@@ -129,10 +129,15 @@ def build():
         stat = _aggregate(recs, klass)
         b = bt.get((algo_id, symbol))                  # backtest ref ต่อ (algo, คู่) — momentum + mean_reversion
         st = _sw.state_of(algo_id, symbol)
+        # exec_mode = "เทรดจริงยังไง" (แยกจาก switch): engine ทองเทรด live เอง (switch ไม่คุม) vs MSE (switch=LIVE) vs paper/off
+        engine_live = (symbol == _ALGO_META.get(algo_id, {}).get("live_symbol"))
+        exec_mode = ("LIVE_ENGINE" if engine_live else
+                     "LIVE_MSE" if st == _sw.LIVE else
+                     "OFF" if st == _sw.OFF else "SHADOW")
         rows.append({"algo_id": algo_id, "symbol": symbol, "klass": klass,
-                     "state": st,
+                     "state": st, "exec_mode": exec_mode,
                      # live = คู่ที่เทรดจริง: gold intraday engine (live_symbol) หรือ combo ที่ toggle=LIVE (MSE เช่น WTI)
-                     "live": (symbol == _ALGO_META.get(algo_id, {}).get("live_symbol")) or st == _sw.LIVE,
+                     "live": engine_live or st == _sw.LIVE,
                      "backtest_exp_R": (b.get("exp_R") if b else None),
                      "backtest_n": (b.get("n") if b else None),
                      "backtest_wr": (b.get("wr") if b else None),

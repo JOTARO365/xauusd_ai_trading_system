@@ -1892,7 +1892,8 @@
 
     <!-- BATCH B — Multi-pair SHADOW matrix: regime_momentum ทุกคู่ (forward record + backtest ref, promotion badge) -->
     <section id="shadow-matrix-section" style="margin-bottom:10px">
-      <div class="section-title">Shadow Matrix — ทุกกลยุทธ์ × ทุกคู่ (กลยุทธ์ไหนกำไรใน regime ไหน · SHADOW 0 order)</div>
+      <div class="section-title">Shadow Matrix — ทุกกลยุทธ์ × ทุกคู่ (กลยุทธ์ไหนกำไรใน regime ไหน)</div>
+      <div style="font-size:11px;color:var(--muted);margin:-2px 0 8px">คอลัมน์ <b style="color:var(--green)">เทรดจริง</b> = สถานะ execution จริง · <b>engine</b>=ทองเทรดผ่าน engine เฉพาะ (switch ไม่คุม) · <b>MSE</b>=multi-symbol executor (WTI) · <b>paper</b>=เก็บสถิติ 0 order. คอลัมน์ <b>switch</b> คุมเฉพาะระบบ shadow/MSE ไม่กระทบ engine ทอง</div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
         <select id="sm-f-algo" onchange="loadShadowMatrix(true)" class="filter-select" style="padding:3px 8px">
           <option value="">ทุกกลยุทธ์</option>
@@ -1916,9 +1917,9 @@
             <th style="padding:4px 8px">regime</th><th style="padding:4px 8px">n</th><th style="padding:4px 8px">open</th>
             <th style="padding:4px 8px">WR%</th><th style="padding:4px 8px">exp_R (fwd)</th><th style="padding:4px 8px">ΣR</th>
             <th style="padding:4px 8px">backtest (managed)</th><th style="padding:4px 8px">badge</th>
-            <th style="padding:4px 8px">switch</th>
+            <th style="padding:4px 8px">เทรดจริง</th><th style="padding:4px 8px">switch</th>
           </tr></thead>
-          <tbody id="sm-body"><tr><td colspan="11" style="color:var(--muted);padding:6px 8px">—</td></tr></tbody>
+          <tbody id="sm-body"><tr><td colspan="12" style="color:var(--muted);padding:6px 8px">—</td></tr></tbody>
         </table>
       </div>
       <div style="color:var(--muted);font-size:10px;margin-top:5px">forward shadow = OOS จริง (re-collecting) · <b>backtest (managed)</b> = paper order ผ่าน BE+trailing เหมือน live (net spread) · promote เมื่อ badge=ready (manual)</div>
@@ -4701,6 +4702,19 @@ async function loadAlgoJournal() {
 }
 
 let _smLast = 0, _smPairInit = false;
+// pill "เทรดจริงยังไง" — แยกจาก switch: engine ทองเทรดเอง (switch=SHADOW ก็ live) vs MSE vs paper
+function execPill(mode) {
+  const M = {
+    LIVE_ENGINE: ['🟢 LIVE · engine', 'var(--green)', 'var(--green-dim)'],
+    LIVE_MSE:    ['🟢 LIVE · MSE',    'var(--green)', 'var(--green-dim)'],
+    SHADOW:      ['SHADOW · paper',   'var(--muted)', 'transparent'],
+    OFF:         ['OFF',              'var(--muted)', 'transparent'],
+  };
+  const [t, c, bg] = M[mode] || M.SHADOW;
+  return `<span title="engine=เทรดจริงผ่าน engine เฉพาะทอง · MSE=multi-symbol executor · paper=เก็บสถิติ 0 order"
+    style="color:${c};background:${bg};padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;white-space:nowrap">${t}</span>`;
+}
+
 async function loadShadowMatrix(force) {
   if (!force && Date.now() - _smLast < 25000) return;     // throttle (server cache 30s)
   _smLast = Date.now();
@@ -4756,6 +4770,7 @@ async function loadShadowMatrix(force) {
         <td style="padding:4px 8px;color:${rC(r.sum_R)}">${r.n ? fx(r.sum_R, 1) : '—'}</td>
         <td style="padding:4px 8px;color:${rC(r.backtest_exp_R)}">${fx(r.backtest_exp_R)}${r.backtest_n ? ` <span style="color:var(--muted);font-size:10px">n${r.backtest_n}·WR${r.backtest_wr}%</span>` : ''}</td>
         <td style="padding:4px 8px;color:${badgeColor[r.badge]};font-weight:600">${r.badge}</td>
+        <td style="padding:4px 8px">${execPill(r.exec_mode)}</td>
         <td style="padding:4px 8px">
           <select class="filter-select" style="padding:2px 6px;font-size:11px"
             onchange="setShadowSwitch('${r.algo_id}','${r.symbol}',this.value)">
@@ -4763,7 +4778,7 @@ async function loadShadowMatrix(force) {
           </select>
         </td>
       </tr>`;
-    }).join('') || '<tr><td colspan="11" style="color:var(--muted);padding:6px 8px">ไม่มีข้อมูลตามตัวกรอง</td></tr>';
+    }).join('') || '<tr><td colspan="12" style="color:var(--muted);padding:6px 8px">ไม่มีข้อมูลตามตัวกรอง</td></tr>';
     refreshMasterToggle();
   } catch (_e) {}
 }
