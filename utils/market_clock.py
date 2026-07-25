@@ -21,6 +21,13 @@ def _next_dt_utc(now: datetime, target_weekday: int, hour: int) -> datetime:
     )
 
 
+def is_weekend_closed(now=None) -> bool:
+    """gold/FX ปิดสุดสัปดาห์ไหม (เสาร์ทั้งวัน · อาทิตย์ก่อนเปิด · ศุกร์หลัง close). BTC/crypto ยังเทรด 24/7."""
+    now = now or datetime.now(timezone.utc)
+    wd, h = now.weekday(), now.hour
+    return (wd == 5) or (wd == 6 and h < MARKET_OPEN_SUNDAY_UTC) or (wd == 4 and h >= MARKET_CLOSE_UTC)
+
+
 def market_sleep_status() -> tuple[bool, int, str]:
     """
     ตรวจว่าควรหยุดรอหรือไม่
@@ -33,6 +40,15 @@ def market_sleep_status() -> tuple[bool, int, str]:
     """
     now = datetime.now(timezone.utc)
     wd, h = now.weekday(), now.hour  # 0=Mon … 6=Sun
+
+    # WEEKEND_RUN: เก็บ edge BTC (crypto 24/7) — วันหยุดไม่ full-sleep แต่รัน collect-only (skip AI, ไม่แตะ gold)
+    if is_weekend_closed(now):
+        try:
+            import config as _cfg
+            if getattr(_cfg, "WEEKEND_RUN", False):
+                return False, 0, "สุดสัปดาห์ — โหมดเก็บ BTC (collect-only · 0 order gold · 0 token)"
+        except Exception:
+            pass
 
     # วันเสาร์ทั้งวัน → รอถึงอาทิตย์ MARKET_OPEN_SUNDAY_UTC
     if wd == 5:

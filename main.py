@@ -285,8 +285,12 @@ def _should_skip_ai() -> tuple[bool, str]:
       5. มี open position             → threshold 5 นาที
       6. ไม่มี position (ปกติ)        → threshold 15 นาที
     """
-    from utils.market_clock import HIGH_IMPACT_HOURS_UTC
+    from utils.market_clock import HIGH_IMPACT_HOURS_UTC, is_weekend_closed
     from datetime import datetime, timezone as _tz
+
+    # WEEKEND_RUN: สุดสัปดาห์ = เก็บ BTC อย่างเดียว (skip AI 0 token; gold ปิด ไม่มี entry) — pos mgmt+shadow+MSE ยังรันผ่าน graph
+    if getattr(config, "WEEKEND_RUN", False) and is_weekend_closed():
+        return True, "สุดสัปดาห์ — เก็บ BTC (collect-only)"
 
     since = time.monotonic() - _last_ai_mono
 
