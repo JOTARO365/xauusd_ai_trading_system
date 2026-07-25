@@ -3414,45 +3414,46 @@ function renderPage() {
    ════════════════════════════════════════════════════════════ */
 async function closePosition(ticket, pnl) {
   const pnlTxt = (pnl >= 0 ? '+' : '') + Number(pnl).toFixed(2);
-  if (!confirm(`ปิด position #${ticket} ?\nP/L ปัจจุบัน: ${pnlTxt} THB`)) return;
+  if (!(await uiConfirm(`ปิด position #${ticket}?\nP/L ปัจจุบัน: ${pnlTxt} THB`, {title:'ปิดออเดอร์', ok:'ปิดเลย', danger:true}))) return;
   try {
     const res = await fetch('/api/close', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticket })
     });
     const j = await res.json();
-    if (j.ok) { alert(`ปิดออเดอร์สำเร็จ #${ticket}\nP/L: ${j.closed_pnl} THB`); fetchData(); }
-    else alert('ปิดออเดอร์ไม่สำเร็จ: ' + (j.error || 'unknown'));
-  } catch (e) { alert('error: ' + e.message); }
+    if (j.ok) { toast(`ปิดออเดอร์สำเร็จ #${ticket} · P/L: ${j.closed_pnl} THB`, 'ok'); fetchData(); }
+    else toast('ปิดออเดอร์ไม่สำเร็จ: ' + (j.error || 'unknown'), 'err');
+  } catch (e) { toast('error: ' + e.message, 'err'); }
 }
 
 async function modifyPosition(ticket) {
-  const sl = prompt(`ปรับ SL ของ #${ticket} (ราคา; 0 = ไม่ตั้ง)`);
-  if (sl === null) return;
-  const tp = prompt(`ปรับ TP ของ #${ticket} (ราคา; 0 = ไม่ตั้ง)`);
-  if (tp === null) return;
+  const v = await uiPrompt([
+    {key:'sl', label:'SL (ราคา; 0 = ไม่ตั้ง)', type:'number', placeholder:'0'},
+    {key:'tp', label:'TP (ราคา; 0 = ไม่ตั้ง)', type:'number', placeholder:'0'},
+  ], {title:`ปรับ SL / TP · #${ticket}`, ok:'บันทึก'});
+  if (v === null) return;
   try {
     const res = await fetch('/api/modify', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ticket, sl: parseFloat(sl) || 0, tp: parseFloat(tp) || 0 })
+      body: JSON.stringify({ ticket, sl: parseFloat(v.sl) || 0, tp: parseFloat(v.tp) || 0 })
     });
     const j = await res.json();
-    if (j.ok) { alert(`ปรับสำเร็จ #${ticket}\nSL: ${j.sl}  TP: ${j.tp}`); fetchData(); }
-    else alert('ปรับไม่สำเร็จ: ' + (j.error || 'unknown'));
-  } catch (e) { alert('error: ' + e.message); }
+    if (j.ok) { toast(`ปรับสำเร็จ #${ticket} · SL: ${j.sl}  TP: ${j.tp}`, 'ok'); fetchData(); }
+    else toast('ปรับไม่สำเร็จ: ' + (j.error || 'unknown'), 'err');
+  } catch (e) { toast('error: ' + e.message, 'err'); }
 }
 
 async function cancelPending(ticket) {
-  if (!confirm(`ยกเลิก pending order #${ticket} ?`)) return;
+  if (!(await uiConfirm(`ยกเลิก pending order #${ticket}?`, {title:'ยกเลิก pending', ok:'ยกเลิกออเดอร์', danger:true}))) return;
   try {
     const res = await fetch('/api/cancel-pending', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticket })
     });
     const j = await res.json();
-    if (j.ok) { alert(`ยกเลิกสำเร็จ #${ticket}`); loadMonitor(); }
-    else alert('ยกเลิกไม่สำเร็จ: ' + (j.error || 'unknown'));
-  } catch (e) { alert('error: ' + e.message); }
+    if (j.ok) { toast(`ยกเลิกสำเร็จ #${ticket}`, 'ok'); loadMonitor(); }
+    else toast('ยกเลิกไม่สำเร็จ: ' + (j.error || 'unknown'), 'err');
+  } catch (e) { toast('error: ' + e.message, 'err'); }
 }
 
 function renderTable(trades) {
@@ -4774,9 +4775,10 @@ async function setShadowSwitch(algo, symbol, state) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ algo, symbol, state })
     })).json();
-    if (!r.ok) { alert('เปลี่ยน switch ไม่สำเร็จ: ' + (r.error || '')); return; }
+    if (!r.ok) { toast('เปลี่ยน switch ไม่สำเร็จ: ' + (r.error || ''), 'err'); return; }
+    toast(`${algo}:${symbol} → ${state}`, 'ok');
     loadShadowMatrix(true);
-  } catch (_e) { alert('เชื่อมต่อ /api/shadow-switch ไม่ได้'); }
+  } catch (_e) { toast('เชื่อมต่อ /api/shadow-switch ไม่ได้', 'err'); }
 }
 
 async function refreshMasterToggle() {
@@ -4794,15 +4796,16 @@ async function refreshMasterToggle() {
 async function toggleMultiSymbolLive() {
   const btn = document.getElementById('sm-master'); if (!btn) return;
   const next = btn.dataset.on === '1' ? 'false' : 'true';
-  if (next === 'true' && !confirm('เปิด master วางออเดอร์จริงบน symbol อื่น (นอกทอง)?\ncombo ที่ toggle=LIVE เท่านั้นจึงจะเข้าออเดอร์จริง — SHADOW ยังเป็น paper ปกติ')) return;
+  if (next === 'true' && !(await uiConfirm('combo ที่ toggle=LIVE เท่านั้นจึงจะเข้าออเดอร์จริง — SHADOW ยังเป็น paper ปกติ. ทอง (GOLD#) ไม่กระทบ.', {title:'เปิดวางออเดอร์จริง (multi-symbol)?', ok:'เปิด master', danger:true}))) return;
   try {
     const r = await (await fetch('/api/config', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ MULTI_SYMBOL_LIVE: next })
     })).json();
-    if (r && r.error) { alert('บันทึกไม่สำเร็จ: ' + r.error); return; }
+    if (r && r.error) { toast('บันทึกไม่สำเร็จ: ' + r.error, 'err'); return; }
+    toast('master วางออเดอร์จริง → ' + (next === 'true' ? 'ON' : 'OFF'), next === 'true' ? 'ok' : 'info');
     refreshMasterToggle();
-  } catch (_e) { alert('เชื่อมต่อ /api/config ไม่ได้'); }
+  } catch (_e) { toast('เชื่อมต่อ /api/config ไม่ได้', 'err'); }
 }
 
 let _stmLast = 0;
@@ -6018,8 +6021,8 @@ async function loadManualRange() {
 async function setManualRange() {
   const high = parseFloat(document.getElementById('range-high').value);
   const low  = parseFloat(document.getElementById('range-low').value);
-  if (!high || !low) { alert('Please enter both High and Low'); return; }
-  if (high <= low)   { alert('High must be greater than Low'); return; }
+  if (!high || !low) { toast('กรอกทั้ง High และ Low', 'err'); return; }
+  if (high <= low)   { toast('High ต้องมากกว่า Low', 'err'); return; }
   try {
     const res  = await fetch('/api/manual-range', {
       method: 'POST',
@@ -6027,9 +6030,9 @@ async function setManualRange() {
       body: JSON.stringify({high, low}),
     });
     const data = await res.json();
-    if (data.ok) { await loadManualRange(); }
-    else { alert('Error: ' + data.error); }
-  } catch(e) { alert('Network error: ' + e); }
+    if (data.ok) { toast('ตั้ง manual range แล้ว', 'ok'); await loadManualRange(); }
+    else { toast('Error: ' + data.error, 'err'); }
+  } catch(e) { toast('Network error: ' + e, 'err'); }
 }
 
 async function clearManualRange() {
@@ -6038,7 +6041,7 @@ async function clearManualRange() {
     document.getElementById('range-high').value = '';
     document.getElementById('range-low').value  = '';
     await loadManualRange();
-  } catch(e) { alert('Network error: ' + e); }
+  } catch(e) { toast('Network error: ' + e, 'err'); }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -7129,6 +7132,116 @@ function closeSpeechModal() {
     </div>
   </div>
 </div>
+
+<!-- ═══ themed toast + confirm modal (แทน browser alert/confirm) ═══ -->
+<style>
+  #toast-wrap{position:fixed;top:16px;right:16px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  .toast{min-width:230px;max-width:370px;padding:10px 14px;border-radius:9px;font-size:13px;line-height:1.45;
+    background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--muted);color:var(--text);
+    box-shadow:0 8px 28px rgba(0,0,0,.45);white-space:pre-line;opacity:0;transform:translateX(18px);
+    transition:opacity .25s ease,transform .25s ease;pointer-events:auto}
+  .toast.show{opacity:1;transform:translateX(0)}
+  .toast-ok{border-left-color:var(--green)} .toast-err{border-left-color:var(--red)} .toast-info{border-left-color:var(--gold)}
+  .toast-title{font-weight:700;font-size:11px;letter-spacing:.4px;margin-bottom:2px;text-transform:uppercase}
+  .toast-ok .toast-title{color:var(--green)} .toast-err .toast-title{color:var(--red)} .toast-info .toast-title{color:var(--gold)}
+  #modal-overlay{position:fixed;inset:0;z-index:100000;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.62);backdrop-filter:blur(3px);opacity:0;transition:opacity .2s ease}
+  #modal-overlay.show{display:flex;opacity:1}
+  .modal-card{width:min(420px,92vw);background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:22px 22px 18px;box-shadow:0 20px 60px rgba(0,0,0,.6);transform:translateY(10px) scale(.98);transition:transform .2s ease}
+  #modal-overlay.show .modal-card{transform:none}
+  .modal-title{font-weight:700;font-size:15px;margin-bottom:10px;color:var(--text)}
+  .modal-title.danger{color:var(--red)}
+  .modal-msg{font-size:13px;color:var(--text-dim);line-height:1.55;white-space:pre-line;margin-bottom:20px}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end}
+  .modal-btn{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;
+    border:1px solid var(--border);background:transparent;color:var(--text-dim);transition:all .15s ease}
+  .modal-btn:hover{border-color:var(--muted);color:var(--text)}
+  .modal-btn.primary{background:var(--gold);border-color:var(--gold);color:#1a1400}
+  .modal-btn.primary:hover{background:var(--gold-2)}
+  .modal-btn.primary.danger{background:var(--red);border-color:var(--red);color:#fff}
+  #input-overlay{position:fixed;inset:0;z-index:100000;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.62);backdrop-filter:blur(3px);opacity:0;transition:opacity .2s ease}
+  #input-overlay.show{display:flex;opacity:1}
+  #input-overlay.show .modal-card{transform:none}
+  .modal-field{display:flex;flex-direction:column}
+  .modal-field label{font-size:11px;color:var(--muted);margin-bottom:5px}
+  .modal-field input{width:100%;padding:9px 11px;border-radius:7px;border:1px solid var(--border);
+    background:var(--bg);color:var(--text);font-size:14px;font-family:var(--mono)}
+  .modal-field input:focus{outline:none;border-color:var(--gold)}
+</style>
+<div id="toast-wrap"></div>
+<div id="modal-overlay"><div class="modal-card">
+  <div class="modal-title" id="modal-title">ยืนยัน</div>
+  <div class="modal-msg" id="modal-msg"></div>
+  <div class="modal-actions">
+    <button class="modal-btn" id="modal-cancel">ยกเลิก</button>
+    <button class="modal-btn primary" id="modal-ok">ตกลง</button>
+  </div>
+</div></div>
+<div id="input-overlay"><div class="modal-card">
+  <div class="modal-title" id="input-title">แก้ไข</div>
+  <div id="input-fields" style="display:flex;flex-direction:column;gap:13px;margin-bottom:20px"></div>
+  <div class="modal-actions">
+    <button class="modal-btn" id="input-cancel">ยกเลิก</button>
+    <button class="modal-btn primary" id="input-ok">บันทึก</button>
+  </div>
+</div></div>
+<script>
+  // toast(msg, type) — type: 'ok' | 'err' | 'info'. แทน alert(). auto-dismiss.
+  function toast(msg, type, ms){
+    const wrap=document.getElementById('toast-wrap'); if(!wrap) return;
+    const titles={ok:'สำเร็จ',err:'ผิดพลาด',info:'แจ้งเตือน'};
+    const el=document.createElement('div');
+    el.className='toast toast-'+(type||'info');
+    const t=document.createElement('div'); t.className='toast-title'; t.textContent=titles[type]||titles.info;
+    const b=document.createElement('div'); b.textContent=msg;
+    el.appendChild(t); el.appendChild(b); wrap.appendChild(el);
+    requestAnimationFrame(()=>el.classList.add('show'));
+    setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),300);}, ms||3600);
+  }
+  // uiConfirm(msg, opts) → Promise<bool>. opts: {title, ok, cancel, danger}. แทน confirm().
+  function uiConfirm(msg, opts){
+    opts=opts||{};
+    return new Promise(res=>{
+      const ov=document.getElementById('modal-overlay');
+      const t=document.getElementById('modal-title'), m=document.getElementById('modal-msg');
+      const ok=document.getElementById('modal-ok'), cn=document.getElementById('modal-cancel');
+      t.textContent=opts.title||'ยืนยัน'; t.className='modal-title'+(opts.danger?' danger':'');
+      m.textContent=msg;
+      ok.textContent=opts.ok||'ตกลง'; cn.textContent=opts.cancel||'ยกเลิก';
+      ok.className='modal-btn primary'+(opts.danger?' danger':'');
+      ov.classList.add('show');
+      const done=v=>{ ov.classList.remove('show'); ok.onclick=cn.onclick=ov.onclick=null; res(v); };
+      ok.onclick=()=>done(true); cn.onclick=()=>done(false);
+      ov.onclick=e=>{ if(e.target===ov) done(false); };
+    });
+  }
+  // uiPrompt(fields, opts) → Promise<{key:value}|null>. fields:[{key,label,type,value,placeholder}]. แทน prompt().
+  function uiPrompt(fields, opts){
+    opts=opts||{};
+    return new Promise(res=>{
+      const ov=document.getElementById('input-overlay');
+      const t=document.getElementById('input-title'), box=document.getElementById('input-fields');
+      const ok=document.getElementById('input-ok'), cn=document.getElementById('input-cancel');
+      t.textContent=opts.title||'แก้ไข'; ok.textContent=opts.ok||'บันทึก'; cn.textContent=opts.cancel||'ยกเลิก';
+      box.innerHTML=''; const inputs={};
+      (fields||[]).forEach(f=>{
+        const w=document.createElement('div'); w.className='modal-field';
+        const l=document.createElement('label'); l.textContent=f.label;
+        const i=document.createElement('input'); i.type=f.type||'text';
+        if(f.value!=null) i.value=f.value; if(f.placeholder) i.placeholder=f.placeholder;
+        w.appendChild(l); w.appendChild(i); box.appendChild(w); inputs[f.key]=i;
+      });
+      ov.classList.add('show');
+      const first=box.querySelector('input'); if(first) setTimeout(()=>{first.focus();first.select&&first.select();},50);
+      const done=v=>{ ov.classList.remove('show'); ok.onclick=cn.onclick=ov.onclick=null; res(v); };
+      ok.onclick=()=>{ const out={}; for(const k in inputs) out[k]=inputs[k].value; done(out); };
+      cn.onclick=()=>done(null);
+      ov.onclick=e=>{ if(e.target===ov) done(null); };
+    });
+  }
+</script>
 
 </body>
 </html>
