@@ -1796,6 +1796,7 @@
           <button class="ntab" onclick="switchNewsTab('gold',this)">🥇 ทองคำ</button>
           <button class="ntab" onclick="switchNewsTab('stocks',this)">📈 ตลาดหุ้น</button>
           <button class="ntab" onclick="switchNewsTab('fx',this)">💱 ค่าเงิน</button>
+          <button class="ntab" onclick="switchNewsTab('crypto',this)">₿ คริปโต</button>
           <button class="ntab" onclick="switchNewsTab('war',this)">⚔ สงคราม</button>
           <button class="ntab" onclick="switchNewsTab('sched',this)">📅 ในตาราง</button>
         </div>
@@ -4422,6 +4423,7 @@ function _catsOf(title, sched, tag) {
   if (/war|conflict|strike|attack|missile|drone|sanction|invasion|ceasefire|militar|troops|nuclear|iran|israel|gaza|ukraine|russia|hormuz|houthi|hezbollah|escalat|geopolit/.test(t)) cats.push('war');
   if (/dollar|forex|currency|\bfx\b|central bank|rate decision|rate cut|rate hike|\bfed\b|\becb\b|\bboj\b|\bpboc\b|\bboe\b|yield|treasur|inflation|\bcpi\b|\bnfp\b|payroll|\bdxy\b|euro|\byen\b|refinancing|monetary|interest rate/.test(t)) cats.push('fx');
   if (/stock|equit|shares|s&p|nasdaq|\bdow\b|earnings|wall street|bourse|index futures/.test(t)) cats.push('stocks');
+  if (/bitcoin|\bbtc\b|ethereum|\beth\b|crypto|blockchain|halving|stablecoin|altcoin|coinbase|binance|\bdefi\b/.test(t)) cats.push('crypto');
   return cats;
 }
 

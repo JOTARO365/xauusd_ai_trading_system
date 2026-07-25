@@ -571,5 +571,7 @@ X_KEYWORDS = (
         # HFM live 06-12: ทีมเจรจาอิหร่านบินไปปากีสถานวันอาทิตย์ 06-14 (multi-party talks)
         "Pakistan",
         # HFM live 06-15: กรอบ MOU ตกลง 06-14, เซ็นทางการศุกร์ 06-19 ที่ Geneva; Pezeshkian ประกาศจะเซ็น
-        "Pezeshkian", "Geneva"]
+        "Pezeshkian", "Geneva",
+        # crypto (2026-07-26: WEEKEND_RUN เก็บ edge BTC — ข่าว crypto เสาร์อาทิตย์)
+        "bitcoin", "BTC", "ethereum", "ETH", "crypto", "halving", "stablecoin", "ETF flows"]
 )
