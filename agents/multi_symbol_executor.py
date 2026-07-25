@@ -140,6 +140,27 @@ def _cfgf(name, default):
         return default
 
 
+def _clamp_sl_atr(sl_pips, bars, point):
+    """clamp sl_pips เป็นช่วง [MIN,MAX]×ATR (safety กัน ATR เพี้ยน→SL แคบ/กว้างบ้าๆ).
+    ไม่แตะ edge เคสปกติ (WTI SL~1×ATR อยู่กลางช่วง 0.5-4). ATR≤0/ปิด clamp → คืนค่าเดิม."""
+    lo = _cfgf("MSE_SL_MIN_ATR", 0.5)
+    hi = _cfgf("MSE_SL_MAX_ATR", 4.0)
+    if lo <= 0 and hi <= 0:
+        return sl_pips
+    high, low, close, _t = bars
+    atr = _simple_atr(high, low, close)
+    atr_v = atr[-1] if atr else 0.0
+    if atr_v <= 0 or point <= 0:
+        return sl_pips                                   # ไม่มี ATR ที่เชื่อได้ → ไม่ clamp
+    atr_pips = atr_v / point
+    lo_p = lo * atr_pips if lo > 0 else 0.0
+    hi_p = hi * atr_pips if hi > 0 else float("inf")
+    clamped = max(lo_p, min(sl_pips, hi_p))
+    if abs(clamped - sl_pips) > 1e-9:
+        logger.info(f"[MSE] SL clamp {sl_pips:.0f}p → {clamped:.0f}p (ATR={atr_pips:.0f}p · ช่วง {lo}-{hi}×ATR)")
+    return clamped
+
+
 def _send_sltp(broker, ticket, new_sl, tp, digits):
     """ขยับ SL ของ position (TRADE_ACTION_SLTP) บน broker symbol ใดก็ได้. คืน ok."""
     try:
@@ -228,7 +249,8 @@ def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max
         return 0
     if vo["bar_ts"] == combo_state.get("last_bar_ts"):
         return 0                                                # เข้าไม้ของบาร์นี้ไปแล้ว (dedup ต่อ signal-bar)
-    sl_pips_eff = float(vo["sl_pips"]) * sl_mult
+    sl_pips_eff = float(vo["sl_pips"]) * sl_mult                 # edge = algo SL × mult (WTI 0.7)
+    sl_pips_eff = _clamp_sl_atr(sl_pips_eff, bars, point)        # safety clamp (ไม่แตะ edge เคสปกติ)
     from connectors.mt5_connector import open_order
     res = open_order(vo["dir"], sl_pips_eff, float(vo["tp_pips"]),
                      comment=f"MSE-{algo_id}", symbol=broker, max_open_override=max_pos)
