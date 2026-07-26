@@ -4754,7 +4754,7 @@ async function renderSrPairDetail(sym) {          // ladder เหมือน�
   try {
     const d = await (await fetch('/api/sr-ladder?symbol=' + encodeURIComponent(sym))).json();
     if (!d.ok) { det.innerHTML = `<span style="color:var(--muted)">${d.error || 'ไม่มีข้อมูล'}</span>`; return; }
-    det.innerHTML = _srLadderHTML(d.zones || {}, d.price, d.point || 0.01);
+    det.innerHTML = _srLadderHTML(d.zones || {}, d.price, d.point || 0.01, sym);
   } catch (_e) { det.innerHTML = '<span style="color:var(--muted)">โหลดไม่ได้</span>'; }
 }
 
@@ -6529,8 +6529,32 @@ function renderSignals(bs) {
   el.innerHTML = html;
 }
 
-function _srLadderHTML(z, px, pipDiv) {          // ladder HTML ใช้ร่วม gold + ทุกคู่ (สไตล์เดียวกัน)
-  z = z || {}; pipDiv = pipDiv || 0.01;
+// คลิกกางแถว S/R → สถิติเชิงลึก C+D (ราคาไปไกลแค่ไหนหลังแตะ + recency/session) จาก /api/sr-level-stats
+async function toggleSrDetail(id, sym, lv, kind) {
+  const el = document.getElementById(id); if (!el) return;
+  if (el.style.display !== 'none') { el.style.display = 'none'; return; }
+  el.style.display = '';
+  if (el.dataset.loaded) return;
+  el.innerHTML = '<span style="color:var(--muted)">กำลังโหลดสถิติ…</span>';
+  try {
+    const d = await (await fetch(`/api/sr-level-stats?symbol=${encodeURIComponent(sym)}&price=${lv}&side=${kind}`)).json();
+    if (!d || d.error) { el.innerHTML = `<span style="color:var(--muted)">${(d && d.error) || 'no data'}</span>`; return; }
+    el.dataset.loaded = '1';
+    const rec = (d.recent || []).map(r => r.broke
+      ? '<span style="color:var(--red)">ทะลุ</span>' : '<span style="color:var(--green)">เด้ง</span>').join(' ');
+    const sess = Object.entries(d.by_session || {})
+      .map(([s, v]) => `${s} <b>${v.hold_pct}%</b>(${v.n})`).join(' · ');
+    el.innerHTML =
+      `<div>📊 แตะ <b>${d.n_touches}</b> ครั้ง · <b style="color:var(--green)">เด้ง ${d.held}</b> / <b style="color:var(--red)">ทะลุ ${d.broke}</b></div>
+       <div>เด้งแล้วไปเฉลี่ย <b>$${d.bounce_avg ?? '—'}</b> (สูงสุด $${d.bounce_max ?? '—'}) · ทะลุไปต่อเฉลี่ย <b>$${d.break_avg ?? '—'}</b></div>
+       <div>แตะ 5 ครั้งล่าสุด: ${rec || '—'}</div>
+       <div>ตามช่วง (hold%): ${sess || '—'}</div>
+       <div style="opacity:.65">แตะล่าสุด ${d.bars_since_touch} แท่ง H1 ก่อน</div>`;
+  } catch (_e) { el.innerHTML = '<span style="color:var(--muted)">โหลดสถิติไม่ได้</span>'; }
+}
+
+function _srLadderHTML(z, px, pipDiv, sym) {     // ladder HTML ใช้ร่วม gold + ทุกคู่ (สไตล์เดียวกัน)
+  z = z || {}; pipDiv = pipDiv || 0.01; sym = sym || 'XAUUSD';
   const setups = z.setups || [];
   const srMeta = z.sr_meta || [];
   const htf = z.htf_zone || null;
@@ -6574,11 +6598,14 @@ function _srLadderHTML(z, px, pipDiv) {          // ladder HTML ใช้ร่�
       ? `<span>โอกาส <b style="color:var(--green)">เด้ง ${m.bounce_pct}%</b> · <b style="color:var(--red)">ทะลุ ${m.break_pct}%</b> <span style="opacity:.6">(${m.n_tests} ครั้ง)</span></span>` : '';
     const extra = [m && m.why, react, bb].filter(Boolean).join(' · ');
     const whyLine = m ? `<div style="padding:0 0 2px 82px;font-size:9px;color:var(--muted);opacity:.85">${extra}</div>` : '';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:3px 0">
+    const rid = `srd-${sym.replace(/[^A-Za-z0-9]/g, '')}-${kind}-${Math.round(lv * 100)}`;
+    return `<div onclick="toggleSrDetail('${rid}','${sym}',${lv},'${kind}')" title="คลิกดูสถิติเชิงลึก (ราคาไปไกลแค่ไหนหลังแตะ + ล่าสุด/ช่วง)"
+        style="display:flex;align-items:center;gap:10px;padding:3px 0;cursor:pointer">
       <span style="width:72px;color:${color};font-weight:700">${lv.toFixed(2)}</span>
       <span style="width:52px;color:var(--muted);font-size:10px">${dist}</span>
       <span style="width:40px;color:var(--muted);font-size:10px">${st ? st + '%' : ''}</span>
-      <div style="flex:1">${bar}</div>${scoreTag}${confTag}${holdTag}${htfTag}</div>${whyLine}`;
+      <div style="flex:1">${bar}</div>${scoreTag}${confTag}${holdTag}${htfTag}<span style="color:var(--muted);font-size:9px">▾</span></div>${whyLine}
+      <div id="${rid}" style="display:none;padding:2px 0 8px 82px;font-size:10px;color:var(--dim);line-height:1.7"></div>`;
   };
   const res = (z.resistance || []).slice().sort((a, b) => b - a);
   const sup = (z.support || []).slice().sort((a, b) => b - a);
@@ -6591,7 +6618,7 @@ function _srLadderHTML(z, px, pipDiv) {          // ladder HTML ใช้ร่�
 }
 function renderZones(bs) {
   const el = document.getElementById('zone-ladder'); if (!el) return;
-  el.innerHTML = _srLadderHTML(bs.zones || {}, (bs.price_info || {}).bid, 0.01);
+  el.innerHTML = _srLadderHTML(bs.zones || {}, (bs.price_info || {}).bid, 0.01, 'XAUUSD');
 }
 
 /* ── Price Chart + AI Zones overlay (07-03) — lightweight-charts, data จาก MT5 ── */

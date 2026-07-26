@@ -1473,6 +1473,21 @@ def api_sr_ladder():
     return jsonify(_cached(f"sr-ladder:{sym or 'gold'}", _c, ttl=30))
 
 
+@app.route("/api/sr-level-stats")
+def api_sr_level_stats():
+    """touch-outcome stats ต่อเส้น S/R (section C+D ของ dropdown): ราคาไปไกลแค่ไหนหลังแตะ + recency/session.
+    on-demand ตอนคลิกกางแถว. 0 token."""
+    sym = (request.args.get("symbol") or "XAUUSD").strip()
+    price = request.args.get("price")
+    side = (request.args.get("side") or "R").strip().upper()
+    if not price:
+        return jsonify({"error": "price required"}), 400
+    def _c():
+        from agents.sr_stats import level_touch_stats
+        return level_touch_stats(sym, float(price), "R" if side == "R" else "S")
+    return jsonify(_cached(f"sr-stats:{sym}:{price}:{side}", _c, ttl=300))
+
+
 @app.route("/api/sr-book")
 def api_sr_book():
     """S/R dwell-zone ต่อทุกคู่ live/open (LEVELS book). display-only, 0 token."""
