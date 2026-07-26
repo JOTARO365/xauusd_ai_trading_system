@@ -151,6 +151,16 @@ def build():
                      "real_exp_R": (real.get((algo_id, symbol)) or {}).get("exp_R"),
                      "real_wr": (real.get((algo_id, symbol)) or {}).get("wr"),
                      "real_regime": (real.get((algo_id, symbol)) or {}).get("by_regime", {}), **stat})
+    # +row สำหรับ algo ที่มี real fills แต่ไม่ใช่ registry combo (decision_ai/tsmom_d1) → Shadow Matrix = ทุกกลยุทธ์จริง
+    _have = {(r["algo_id"], r["symbol"]) for r in rows}
+    for (a, s), rr in real.items():
+        if (a, s) in _have:
+            continue
+        zero = _aggregate([], "scalp")
+        rows.append({"algo_id": a, "symbol": s, "klass": "scalp", "state": "—", "exec_mode": "LIVE_ENGINE",
+                     "live": True, "backtest_exp_R": None, "backtest_n": None, "backtest_wr": None,
+                     "backtest_managed": False, "real_n": rr.get("n", 0), "real_exp_R": rr.get("exp_R"),
+                     "real_wr": rr.get("wr"), "real_regime": rr.get("by_regime", {}), **zero})
     counts = {"ready": 0, "collecting": 0, "dying": 0}
     for r in rows:
         counts[r["badge"]] = counts.get(r["badge"], 0) + 1
