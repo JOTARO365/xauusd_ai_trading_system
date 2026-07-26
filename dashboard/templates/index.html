@@ -3517,6 +3517,11 @@ function renderTable(trades) {
     if (resultF === 'loss' && (t.pnl == null || t.pnl >= 0)) return false;
     return true;
   });
+  // เรียง: ไม้ยังไม่ปิด (OPEN/PENDING) บนสุด แล้วใหม่ก่อน (close_time ถ้าปิด, ไม่งั้น timestamp เปิด)
+  // กันเคส trades.json append ตามเวลาเปิด → ไม้เปิดใหม่/ยังไม่ปิดตกไปหลังไม้ที่ปิดแล้ว
+  const _rank = s => (s === 'OPEN' ? 0 : s === 'PENDING' ? 1 : 2);
+  const _ts   = t => t.close_time || t.timestamp || '';
+  lastFiltered.sort((a, b) => _rank(a.status) - _rank(b.status) || _ts(b).localeCompare(_ts(a)));
   currentPage = 1;
   renderPage();
 }
