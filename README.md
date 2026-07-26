@@ -251,6 +251,14 @@ copy .env.example .env      # Windows  (Linux/Mac: cp .env.example .env)
 
 Then open `.env` and fill in the required secrets (see [Environment Variables](#environment-variables) below).
 
+> **Broker symbols live in `.env` (one structure).** Brokers name instruments differently
+> (XM: `GOLD#` / `OILCash#` / `BTCUSD#`; others: `XAUUSD` / `USOIL` / `BTCUSD`). Gold uses
+> `SYMBOL`; every other pair is `BROKER_SYM_<LOGICAL>` (e.g. `BROKER_SYM_WTIUSD=USOIL`) — the
+> single source `_broker_map()` reads. `python setup.py` (with MT5 logged in) **auto-detects and
+> fills these into `.env`** for your broker (ranking the real BTC/oil CFD above look-alike stocks,
+> Brent, and futures); anything it can't match, you set by hand. `data/universe_probe.json` is a
+> per-broker detection cache (gitignored) — `.env` is what actually drives symbol resolution.
+
 ### 4. Set up the database (Supabase)
 
 The bot persists trades, cycles and token-cost via the **Supabase REST client**

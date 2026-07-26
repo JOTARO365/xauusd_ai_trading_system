@@ -80,6 +80,16 @@ def main():
             if tgt == "XAGUSD":
                 sv = [n for n in all_names if n.upper().startswith(("SILVER", "XAG"))]
                 print(f"    [silver candidates: {sv[:6]}]")
+        # BTC/น้ำมัน: token กำกวม (BTCJPY/ETHBTC · MotorOil/Brent/futures) → ตัด noise + ดันตัวจริงขึ้น #1
+        elif tgt == "BTCUSD":
+            cands = [c for c in cands if not any(x in c.upper() for x in ("ETH", "LTC", "XRP", "BCH", "ADA"))]
+            cands = sorted(cands, key=lambda n: (not ("USD" in n.upper()), len(n)))
+        elif tgt == "WTIUSD":
+            _M = tuple("-" + m for m in ("JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+                                         "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"))
+            cands = [c for c in cands if not any(x in c.upper() for x in ("BRENT", "UKOIL") + _M)]
+            cands = sorted(cands, key=lambda n: (not any(p in n.upper()
+                           for p in ("WTI", "USOIL", "XTI", "OILCASH", "CRUDE")), len(n)))
         if not cands:
             out["unmatched"].append(tgt)
             print(f"  {tgt:8} → ❌ ไม่พบใน broker")
@@ -140,7 +150,40 @@ def main():
     with open(os.path.join(_BASE, "data", "universe_probe.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=1)
     print(f"\n→ เขียน data/universe_probe.json ({len(found)} instruments)")
+    _write_broker_syms_to_env(found)                     # structure เดียว: mirror → .env BROKER_SYM_*
     mt5.shutdown()
+
+
+def _write_broker_syms_to_env(found):
+    """mirror mapping ที่ detect ได้ → .env `BROKER_SYM_<LOGICAL>=<broker>` (source เดียวที่ _broker_map อ่าน).
+    ไม่ทับค่าที่ user ตั้งเอง (skip ถ้ามีบรรทัดนั้นแล้ว). ทอง XAUUSD ข้าม (ใช้ SYMBOL อยู่แล้ว)."""
+    env = os.path.join(_BASE, ".env")
+    if not os.path.exists(found and env or ""):
+        return
+    try:
+        lines = open(env, encoding="utf-8").readlines()
+    except OSError:
+        return
+    existing = {ln.split("=", 1)[0].strip() for ln in lines
+                if ln.strip() and not ln.strip().startswith("#") and "=" in ln}
+    added = []
+    for logical, sym in found.items():
+        if logical == "XAUUSD":
+            continue                                     # ทองใช้ SYMBOL
+        key = f"BROKER_SYM_{logical}"
+        if key in existing:
+            continue                                     # ไม่ทับค่าที่ตั้งเอง
+        added.append(f"{key}={sym}\n")
+    if not added:
+        return
+    if lines and not lines[-1].endswith("\n"):
+        lines[-1] += "\n"
+    from datetime import date
+    lines.append(f"\n# --- {date.today().isoformat()}: broker symbols (probe_universe → .env) ---\n")
+    lines += added
+    with open(env, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+    print(f"→ เขียน BROKER_SYM_* {len(added)} คู่ลง .env")
 
 
 if __name__ == "__main__":

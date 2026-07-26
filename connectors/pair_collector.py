@@ -35,20 +35,28 @@ def _tfmap(mt5):
 
 
 def _broker_map():
-    """logical → broker symbol จาก universe_probe.json (probe ต่อโบรกเกอร์). fallback = logical.
-    +override มือ: .env BROKER_SYM_<LOGICAL>=<broker> (เผื่อ probe จับชื่อแปลกไม่ได้ เช่น BROKER_SYM_WTIUSD=USOIL)."""
-    out = {}
+    """logical → broker symbol. **source เดียว = .env `BROKER_SYM_<LOGICAL>`** (ต่อโบรกเกอร์).
+    ทอง XAUUSD → BROKER_SYM_XAUUSD หรือ config.SYMBOL. universe_probe.json = fallback เก่า (กัน setup ที่ยังไม่ย้าย)."""
     try:
-        p = json.load(open(_PROBE, encoding="utf-8"))
-        inst = p.get("instruments", {})
-        out = {k: (inst.get(k, {}).get("broker_symbol") or k) for k in COLLECT if k in inst}
+        import config as _cfg                          # โหลดก่อน (trigger load_dotenv) → os.getenv เห็น .env จริง
     except Exception:
-        out = {}
-    for k in COLLECT:                                  # .env override ชนะ probe (per-broker manual fix)
+        _cfg = None
+    out = {}
+    for k in COLLECT:                                  # .env = primary (structure เดียว)
         ov = os.getenv(f"BROKER_SYM_{k}")
         if ov and ov.strip():
             out[k] = ov.strip()
-    return out
+    # ทอง: default จาก SYMBOL (ใช้กันทั้งระบบอยู่แล้ว) ถ้าไม่ได้ตั้ง BROKER_SYM_XAUUSD
+    if "XAUUSD" not in out and _cfg and getattr(_cfg, "SYMBOL", None):
+        out["XAUUSD"] = _cfg.SYMBOL
+    if out:
+        return out
+    try:                                               # fallback: universe_probe.json (backward-compat)
+        p = json.load(open(_PROBE, encoding="utf-8"))
+        inst = p.get("instruments", {})
+        return {k: (inst.get(k, {}).get("broker_symbol") or k) for k in COLLECT if k in inst}
+    except Exception:
+        return {}
 
 
 def _write_json(path, obj):
