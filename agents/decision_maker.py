@@ -82,7 +82,7 @@ def _log_gate_block(reason: str, chart_data: dict, sentiment_data: dict | None =
         logger.debug(f"gate_block log failed: {e}")
 
 SYSTEM_PROMPT = json.dumps(
-    json.loads(Path("agents/prompts/decision_maker.json").read_text(encoding="utf-8")),
+    json.loads((Path(__file__).resolve().parent / "prompts" / "decision_maker.json").read_text(encoding="utf-8")),
     separators=(",", ":"),  # minified — saves ~15% tokens vs pretty-printed
 )
 

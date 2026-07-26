@@ -20,7 +20,7 @@ def _log_file() -> str:
     if "XAU" in sym or "GOLD" in sym:
         return "logs/trades.json"
     return f"logs/{sym.lower()}_trades.json"
-_REPORTER_PROMPT   = Path("agents/prompts/reporter.md").read_text(encoding="utf-8")
+_REPORTER_PROMPT   = (Path(__file__).resolve().parent / "prompts" / "reporter.md").read_text(encoding="utf-8")
 _ANALYSIS_COOLDOWN = int(os.getenv("REPORTER_COOLDOWN_SEC") or 14400)  # 4h — perf report ไม่ต้องถี่ (Track-1 07-03: 1h→4h ลด token)
 _COOLDOWN_FILE     = "logs/reporter_last_run.txt"
 _last_usage = None   # set after each API call — read by accountant

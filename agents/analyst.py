@@ -18,11 +18,11 @@ _llm = ChatAnthropic(
 ).with_structured_output(AnalystOutput, include_raw=True)
 
 SYSTEM_PROMPT = json.dumps(
-    json.loads(Path("agents/prompts/analyst.json").read_text(encoding="utf-8")),
+    json.loads((Path(__file__).resolve().parent / "prompts" / "analyst.json").read_text(encoding="utf-8")),
     separators=(",", ":"),
 )
 
-_REGIME_PATH = Path("agents/prompts/macro_regime.md")
+_REGIME_PATH = (Path(__file__).resolve().parent / "prompts" / "macro_regime.md")
 
 
 def _regime_context() -> str:

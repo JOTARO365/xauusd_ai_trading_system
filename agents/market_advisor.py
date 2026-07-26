@@ -16,7 +16,7 @@ _llm = ChatAnthropic(
 ).with_structured_output(MarketAdvisorOutput, include_raw=True)
 
 SYSTEM_PROMPT = json.dumps(
-    json.loads(Path("agents/prompts/market_advisor.json").read_text(encoding="utf-8")),
+    json.loads((Path(__file__).resolve().parent / "prompts" / "market_advisor.json").read_text(encoding="utf-8")),
     separators=(",", ":"),
 )
 
