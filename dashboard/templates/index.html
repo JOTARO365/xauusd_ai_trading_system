@@ -2117,9 +2117,13 @@
     <!-- KEY LEVELS — AI zones ladder (UHAS-style ชิ้น 1, 07-03) -->
     <section>
       <div class="section-title">LEVELS &mdash; S/R Book</div>
+      <div id="sr-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
+        <button class="ntab active" onclick="setSrTab('',this)">🥇 ทอง</button>
+      </div>
       <div class="chart-card" style="padding:14px 18px">
         <div id="zone-ladder" style="font-family:var(--mono);font-size:12px">Loading…</div>
         <div id="fib-panel" style="font-family:var(--mono);margin-top:8px"></div>
+        <div id="sr-pair-detail" style="display:none;font-family:var(--mono);font-size:12px"></div>
       </div>
       <!-- S/R book ต่อทุกคู่ที่ live/open (dwell-zone) -->
       <div class="chart-card" style="padding:12px 16px;margin-top:12px">
@@ -3637,7 +3641,7 @@ async function loadLivePrice() {
       setT('ai-sent-tweets', (bs.sent_tweets || 0) + ' โพสต์');
       setT('ai-sent-summary', bs.sent_summary || '—');
     }
-    loadClusterMap(); loadSrBook();   // Price-Cluster decision-support (throttled, server-cached)
+    loadClusterMap(); loadSrBook(); populateSrTabs();   // Price-Cluster decision-support (throttled, server-cached)
     loadOwnerGate();    // Owner-gate advisory — เตือน mid-vol / manual short
     loadMacroQuant();   // Macro/News quant — ข่าว+เศรษฐกิจ → gold bias (throttled, server-cached)
     loadLiquidityProxy();   // Liquidity/order-flow proxy (throttled, server-cached)
@@ -4627,6 +4631,51 @@ async function loadSrBook() {
       </tr>`;
     }).join('') || '<tr><td colspan="5" style="color:var(--muted);padding:6px 8px">ยังไม่มีคู่ live (toggle LIVE ที่ Shadow Matrix)</td></tr>';
   } catch (_e) {}
+}
+
+let _srTab = '';   // '' = ทอง (zone-ladder); คู่อื่น = cluster S/R detail
+async function populateSrTabs() {
+  const box = document.getElementById('sr-tabs'); if (!box) return;
+  try {
+    const d = await (await fetch('/api/live-symbols')).json();
+    if (!d.ok || !d.symbols) return;
+    box.innerHTML = d.symbols.map(x => {
+      const v = x.logical === 'XAUUSD' ? '' : x.logical;
+      const lbl = x.logical === 'XAUUSD' ? '🥇 ทอง' : x.logical;
+      return `<button class="ntab${v === _srTab ? ' active' : ''}" onclick="setSrTab('${v}',this)">${lbl}</button>`;
+    }).join('');
+  } catch (_e) {}
+}
+function setSrTab(sym, btn) {
+  _srTab = sym || '';
+  document.querySelectorAll('#sr-tabs .ntab').forEach(b => b.classList.toggle('active', b === btn));
+  const ladder = document.getElementById('zone-ladder'), fib = document.getElementById('fib-panel'), det = document.getElementById('sr-pair-detail');
+  if (!_srTab) {   // ทอง → zone-ladder เดิม
+    if (ladder) ladder.style.display = ''; if (fib) fib.style.display = ''; if (det) det.style.display = 'none';
+  } else {         // คู่อื่น → cluster S/R detail
+    if (ladder) ladder.style.display = 'none'; if (fib) fib.style.display = 'none'; if (det) det.style.display = '';
+    renderSrPairDetail(_srTab);
+  }
+  // sync กราฟให้ตามคู่ที่เลือก
+  const sel = document.getElementById('chart-sym'); if (sel) { sel.value = _srTab; setChartSym(_srTab); }
+}
+async function renderSrPairDetail(sym) {
+  const det = document.getElementById('sr-pair-detail'); if (!det) return;
+  det.innerHTML = 'Loading…';
+  try {
+    const d = await (await fetch('/api/cluster-map?symbol=' + encodeURIComponent(sym))).json();
+    if (!d.ok) { det.innerHTML = `<span style="color:var(--muted)">${d.error || 'ไม่มีข้อมูล'}</span>`; return; }
+    const mC = d.momentum === 'up' ? 'var(--green)' : (d.momentum === 'down' ? 'var(--red)' : 'var(--muted)');
+    const row = (lbl, z, col) => `<div style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid #262a31">
+      <span style="color:${col}">${lbl}</span><span>${z ? z.level + ` <span style='color:var(--muted);font-size:10px'>${z.touches}t · ${z.dist_atr}ATR</span>` : '—'}</span></div>`;
+    det.innerHTML =
+      `<div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <b>${sym}</b><span>ราคา ${d.price} · <span style="color:${mC}">${d.momentum}</span></span></div>`
+      + row('แนวต้าน', d.resistance, 'var(--red)')
+      + row('แนวรับ', d.support, 'var(--green)')
+      + `<div style="color:var(--muted);font-size:11px;margin-top:8px">dwell zones: ${(d.clusters || []).map(c => `${c.level}(${c.touches})`).join('  ') || '—'}</div>`
+      + `<div style="color:var(--muted);font-size:10px;margin-top:6px">${d.hint || ''}</div>`;
+  } catch (_e) { det.innerHTML = '<span style="color:var(--muted)">โหลดไม่ได้</span>'; }
 }
 
 let _clusterLast = 0;
