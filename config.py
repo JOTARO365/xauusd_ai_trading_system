@@ -7,7 +7,7 @@ load_dotenv(override=True)
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 # ── MT5 ──────────────────────────────────────────────────────
-MT5_LOGIN    = int(os.getenv("MT5_LOGIN", 0))
+MT5_LOGIN    = int(os.getenv("MT5_LOGIN") or 0)          # ว่าง/ไม่มี → 0 (กัน ValueError ตอนยังไม่กรอก; MT5 จะต่อไม่ได้จนกว่ากรอก)
 MT5_PASSWORD = os.getenv("MT5_PASSWORD", "")
 MT5_SERVER   = os.getenv("MT5_SERVER", "")
 
@@ -18,13 +18,13 @@ X_EMAIL    = os.getenv("X_EMAIL", "")
 
 # ── Trading ───────────────────────────────────────────────────
 SYMBOL        = os.getenv("SYMBOL", "XAUUSD")
-START_BALANCE = float(os.getenv("START_BALANCE", 5000))
+START_BALANCE = float(os.getenv("START_BALANCE") or 5000)
 
 # ── Lot size ──────────────────────────────────────────────────
 LOT_MODE  = os.getenv("LOT_MODE",  "auto")    # "auto" | "fixed"
-FIXED_LOT = float(os.getenv("FIXED_LOT", 0.01))
-MIN_LOT   = float(os.getenv("MIN_LOT",   0.01))
-MAX_LOT   = float(os.getenv("MAX_LOT",   0.01))
+FIXED_LOT = float(os.getenv("FIXED_LOT") or 0.01)
+MIN_LOT   = float(os.getenv("MIN_LOT")   or 0.01)
+MAX_LOT   = float(os.getenv("MAX_LOT")   or 0.01)
 
 # ── Portfolio Protection ─────────────────────────────────────
 # True  = เปิดระบบป้องกัน (max trades / daily loss)
@@ -35,8 +35,8 @@ PORTFOLIO_PROTECTION = os.getenv("PORTFOLIO_PROTECTION", "true").lower() != "fal
 # เปิด order โดยไม่ตั้ง TP เมื่อมี event ใหญ่ หรือ momentum แรงมาก
 # แล้วตั้ง TP ภายหลังเมื่อตลาดสงบ
 NO_TP_ON_EVENT     = os.getenv("NO_TP_ON_EVENT",     "true").lower() != "false"
-NO_TP_EVENT_MINS   = int(os.getenv("NO_TP_EVENT_MINS",   "20"))   # ถ้า event อยู่ใน X นาที
-NO_TP_WAIT_MINUTES = int(os.getenv("NO_TP_WAIT_MINUTES", "30"))   # รอ X นาทีก่อนตั้ง TP
+NO_TP_EVENT_MINS   = int(os.getenv("NO_TP_EVENT_MINS")   or 20)   # ถ้า event อยู่ใน X นาที
+NO_TP_WAIT_MINUTES = int(os.getenv("NO_TP_WAIT_MINUTES") or 30)   # รอ X นาทีก่อนตั้ง TP
 
 # ── Dynamic TP Extension ─────────────────────────────────────
 # True  = ขยับ TP ออกอัตโนมัติเมื่อ momentum แรงและราคาใกล้ TP
@@ -312,7 +312,7 @@ def reload_config():
     global SHADOW_TSMOM, SHADOW_TSMOM_UNIVERSE
     load_dotenv(override=True)
     SYMBOL        = os.getenv("SYMBOL", "XAUUSD")
-    START_BALANCE = float(os.getenv("START_BALANCE", 5000))
+    START_BALANCE = float(os.getenv("START_BALANCE") or 5000)
     LOT_MODE      = os.getenv("LOT_MODE",  "auto")
     FIXED_LOT     = float(os.getenv("FIXED_LOT", 0.01))
     MIN_LOT       = float(os.getenv("MIN_LOT",   0.01))
