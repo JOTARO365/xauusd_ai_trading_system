@@ -32,6 +32,8 @@ class Algo:
     version: int = 1
     klass: str = "scalp"                 # "scalp"→ promotion needs n≥100 ; "swing"→ n≥20
     eligible_pairs: list = UNIVERSE
+    timeframe: str = "H1"                 # bars ที่ evaluate ต้องการ — caller (MSE/shadow_engine) ดึงตาม tf นี้
+    mgmt: str = "managed"                 # การจัดการไม้: "managed"=BE+trailing (SL/TP) · "tsmom_flip"=ปิดเมื่อสัญญาณกลับ
 
     def evaluate(self, symbol, bars, ctx=None, point=None):
         raise NotImplementedError
@@ -102,7 +104,56 @@ class MeanReversionAlgo(Algo):
         }
 
 
-ALGO_REGISTRY = {a.algo_id: a for a in (RegimeMomentumAlgo(), MeanReversionAlgo())}
+class TSMOMDailyAlgo(Algo):
+    """Time-Series Momentum รายวัน (D1) — ensemble majority vote ของ sign(close[i]−close[i−L]) L=63/126/252
+    (มิเรอร์ agents.tsmom_manager._signal + scripts.tsmom_pairs_screen). ไม่มี TP → **exit-on-flip**
+    (ถือจนสัญญาณกลับ) + disaster SL 3×ATR(D1). timeframe=D1, mgmt=tsmom_flip.
+
+    eligible = UNIVERSE − XAUUSD: ทองมี tsmom_manager (TSMOM_LIVE) เทรดอยู่แล้ว → ตัดออกกันเทรดซ้ำ.
+    klass=swing: D1 ยิง ~รายวัน N น้อย → promotion bar n≥20."""
+    algo_id = "tsmom_d1"
+    version = 1
+    klass = "swing"
+    timeframe = "D1"
+    mgmt = "tsmom_flip"
+    eligible_pairs = [p for p in UNIVERSE if p != "XAUUSD"]
+    LOOKBACKS = (63, 126, 252)
+    SL_ATR = 3.0
+
+    def signal_dir(self, close, i):
+        """ensemble vote ที่บาร์ i (closed) → 'BUY'/'SELL'/None(FLAT). ใช้ทั้ง entry + flip-exit."""
+        votes = 0
+        for L in self.LOOKBACKS:
+            if i - L >= 0:
+                votes += int(np.sign(close[i] - close[i - L]))
+        return "BUY" if votes > 0 else ("SELL" if votes < 0 else None)
+
+    def evaluate(self, symbol, bars, ctx=None, point=None):
+        high, low, close, times = bars
+        n = len(close)
+        if n < max(self.LOOKBACKS) + 5 or not point:
+            return None
+        i = n - 2                                          # บาร์ D1 ปิดล่าสุด (เหมือน momentum/mean_rev)
+        direction = self.signal_dir(close, i)
+        if direction is None:
+            return None
+        atr = R.atr(high, low, close)
+        av = float(atr[i]) if atr[i] == atr[i] else 0.0    # NaN guard
+        if av <= 0:
+            return None
+        try:
+            from datetime import datetime, timezone
+            bar_ts = datetime.fromtimestamp(int(times[i]), timezone.utc).isoformat()
+        except Exception:
+            return None
+        return {
+            "algo_id": self.algo_id, "symbol": symbol, "dir": direction,
+            "entry": float(close[i]), "sl_pips": (self.SL_ATR * av) / point, "tp_pips": 0.0,   # 0 = no-TP (exit-on-flip)
+            "regime": "TSMOM", "bar_ts": bar_ts, "klass": self.klass,
+        }
+
+
+ALGO_REGISTRY = {a.algo_id: a for a in (RegimeMomentumAlgo(), MeanReversionAlgo(), TSMOMDailyAlgo())}
 
 
 def get(algo_id):

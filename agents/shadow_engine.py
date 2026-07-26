@@ -81,6 +81,52 @@ def _new_record(vo, cost_pips, point, digits):
     }
 
 
+def _resolve_tsmom_flip(rec, high, low, close, times, *, point, cost_pips, digits, lookbacks=(63, 126, 252)):
+    """paper resolve สำหรับ tsmom_d1 = exit-on-flip (มิเรอร์ scripts.tsmom_pairs_screen / tsmom_manager):
+    เดินหน้าจากบาร์เข้า → ปิดเมื่อ ensemble vote กลับข้าง หรือ disaster SL (3×ATR ตั้งตอนเข้า) โดน.
+    map flip→TP/SL ตาม R (schema by_result). net cost ×1 (round-trip เก็บใน cost_pips). คืน outcome หรือ OPEN(tail)."""
+    import numpy as np
+    from datetime import datetime, timezone
+    direction = rec["dir"]; entry_px = float(rec["entry"])
+    sl_dist = float(rec.get("sl_pips", 0)) * point
+    if sl_dist <= 0:
+        return None
+    try:
+        entry_ep = int(datetime.fromisoformat(rec["bar_ts"]).timestamp())
+    except Exception:
+        return None
+    i0 = next((k for k in range(len(times) - 1, -1, -1) if int(times[k]) == entry_ep), None)
+    if i0 is None:
+        return None
+    is_buy = direction == "BUY"
+    sign = 1 if is_buy else -1
+    sl = entry_px - sl_dist if is_buy else entry_px + sl_dist
+    cost = cost_pips * point
+    n = len(close)
+    mfe = mae = 0.0
+
+    def _out(result, exit_px, j):
+        r = (sign * (exit_px - entry_px) - cost) / sl_dist
+        ts = datetime.fromtimestamp(int(times[j]), timezone.utc).isoformat()
+        return {"result": result, "realized_R": round(r, 3), "realized_R_gross": round(r, 3),
+                "bars_held": int(j - i0), "exit_price": round(float(exit_px), digits), "exit_ts": ts,
+                "mfe_R": round(mfe, 2), "mae_R": round(mae, 2)}
+
+    for j in range(i0 + 1, n):
+        fav = sign * (float(high[j] if is_buy else low[j]) - entry_px) / sl_dist
+        adv = sign * (float(low[j] if is_buy else high[j]) - entry_px) / sl_dist
+        mfe = max(mfe, fav); mae = min(mae, adv)
+        if (is_buy and float(low[j]) <= sl) or ((not is_buy) and float(high[j]) >= sl):
+            return _out("SL", sl, j)                          # disaster SL โดน
+        votes = sum(int(np.sign(close[j] - close[j - L])) for L in lookbacks if j - L >= 0)
+        newdir = "BUY" if votes > 0 else ("SELL" if votes < 0 else None)
+        if newdir and newdir != direction:                   # flip → ปิดที่ close
+            exit_px = float(close[j])
+            r = (sign * (exit_px - entry_px) - cost) / sl_dist
+            return _out("TP" if r >= 0 else "SL", exit_px, j)
+    return {"result": "OPEN", "bars_held": n - 1 - i0}        # tail: ยังไม่จบ
+
+
 def _apply(algo_id, symbol, bars, point, digits, cost_pips, max_hold=_DEFAULT_MAX_HOLD):
     """Pure-ish core (no MT5): capture new signal + resolve open ones for ONE combo. Returns a summary.
     Testable directly with injected bars. Each signal resolves at the cost/point stored on its record."""
@@ -99,7 +145,8 @@ def _apply(algo_id, symbol, bars, point, digits, cost_pips, max_hold=_DEFAULT_MA
         changed = True
         new = 1
 
-    # 2) resolve every open record against forward bars
+    # 2) resolve every open record against forward bars (per-algo: tsmom = exit-on-flip · อื่น = managed BE/trail)
+    mgmt = getattr(algo, "mgmt", "managed")
     resolved = 0
     for rec in rows:
         if rec.get("kind") != "signal":
@@ -107,11 +154,17 @@ def _apply(algo_id, symbol, bars, point, digits, cost_pips, max_hold=_DEFAULT_MA
         res = (rec.get("outcome") or {}).get("result")
         if res in ("TP", "SL", "TIMEOUT"):
             continue                                     # terminal — skip
-        out = resolve_managed(rec, high, low, close, times,
-                              point=rec.get("point", point),
-                              cost_pips=rec.get("cost_pips", cost_pips),
-                              max_hold_bars=max_hold,
-                              price_digits=rec.get("price_digits", digits))
+        if mgmt == "tsmom_flip":
+            out = _resolve_tsmom_flip(rec, high, low, close, times,
+                                      point=rec.get("point", point),
+                                      cost_pips=rec.get("cost_pips", cost_pips),
+                                      digits=rec.get("price_digits", digits))
+        else:
+            out = resolve_managed(rec, high, low, close, times,
+                                  point=rec.get("point", point),
+                                  cost_pips=rec.get("cost_pips", cost_pips),
+                                  max_hold_bars=max_hold,
+                                  price_digits=rec.get("price_digits", digits))
         if out is not None and out != rec.get("outcome"):
             rec["outcome"] = out
             changed = True
@@ -123,13 +176,18 @@ def _apply(algo_id, symbol, bars, point, digits, cost_pips, max_hold=_DEFAULT_MA
     return {"combo": f"{algo_id}:{symbol}", "new": new, "resolved": resolved, "rows": len(rows)}
 
 
-def _bars(broker_symbol, count=_BARS_COUNT):
-    """(high, low, close, times) for a broker symbol from MT5 H1, or None. fail-soft."""
+def _bars(broker_symbol, tf="H1", count=None):
+    """(high, low, close, times) ตาม timeframe ของ algo (H1 default · D1 = tsmom). fail-soft → None."""
     try:
         import MetaTrader5 as mt5
         from connectors.price_feed import get_ohlcv
-        rates = get_ohlcv(symbol=broker_symbol, timeframe=mt5.TIMEFRAME_H1, count=count)
-        if rates is None or len(rates) < 520:
+        tfmap = {"H1": mt5.TIMEFRAME_H1, "H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1}
+        mt5_tf = tfmap.get(tf, mt5.TIMEFRAME_H1)
+        if count is None:
+            count = 400 if tf == "D1" else _BARS_COUNT
+        min_bars = 282 if tf == "D1" else 520
+        rates = get_ohlcv(symbol=broker_symbol, timeframe=mt5_tf, count=count)
+        if rates is None or len(rates) < min_bars:
             return None
         return (rates["high"].astype(float), rates["low"].astype(float),
                 rates["close"].astype(float), rates["time"])
@@ -180,7 +238,8 @@ def tick(force=False):
     for algo_id, symbol in active:
         try:
             broker = bmap.get(symbol, symbol)
-            bars = _bars(broker)
+            _algo = _reg.get(algo_id)
+            bars = _bars(broker, getattr(_algo, "timeframe", "H1"))
             if bars is None:
                 continue
             point, digits = _symbol_meta(broker)

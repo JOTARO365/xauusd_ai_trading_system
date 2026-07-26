@@ -67,13 +67,18 @@ def _save_state(state):
 
 
 # ── MT5 helpers (fail-soft) ───────────────────────────────────────────────
-def _bars(broker, count=_BARS_COUNT):
-    """(high, low, close, times) H1 สำหรับ broker symbol หรือ None."""
+def _bars(broker, tf="H1", count=None):
+    """(high, low, close, times) ตาม timeframe ของ algo (H1 = regime/mean_rev · D1 = tsmom). หรือ None."""
     try:
         import MetaTrader5 as mt5
         from connectors.price_feed import get_ohlcv
-        rates = get_ohlcv(symbol=broker, timeframe=mt5.TIMEFRAME_H1, count=count)
-        if rates is None or len(rates) < _MIN_BARS:
+        tfmap = {"H1": mt5.TIMEFRAME_H1, "H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1}
+        mt5_tf = tfmap.get(tf, mt5.TIMEFRAME_H1)
+        if count is None:
+            count = 400 if tf == "D1" else _BARS_COUNT       # D1 ~400 บาร์พอ L=252 + buffer
+        min_bars = 282 if tf == "D1" else _MIN_BARS          # tsmom ต้อง ≥ max(LOOKBACK 252)+30
+        rates = get_ohlcv(symbol=broker, timeframe=mt5_tf, count=count)
+        if rates is None or len(rates) < min_bars:
             return None
         return (rates["high"].astype(float), rates["low"].astype(float),
                 rates["close"].astype(float), rates["time"])
@@ -241,6 +246,59 @@ def _manage(broker, positions, bars, point, digits, combo_state):
     return moved
 
 
+# ── tsmom management: exit-on-flip (ปิดไม้เมื่อสัญญาณ D1 กลับ; ไม่ BE/trail; disaster SL คงเดิม) ──
+def _close_position(broker, p, digits):
+    """ปิด position ด้วย market order ฝั่งตรงข้าม (TRADE_ACTION_DEAL). คืน ok. fail-soft."""
+    try:
+        import MetaTrader5 as mt5
+        from connectors.mt5_connector import SYSTEM_MAGIC
+        tick = mt5.symbol_info_tick(broker)
+        if not tick:
+            return False
+        is_buy = (p.type == mt5.ORDER_TYPE_BUY)
+        try:
+            from connectors.mt5_connector import _pick_filling
+            filling = _pick_filling(broker)
+        except Exception:
+            filling = mt5.ORDER_FILLING_IOC
+        req = {"action": mt5.TRADE_ACTION_DEAL, "symbol": broker, "position": int(p.ticket),
+               "volume": float(p.volume),
+               "type": mt5.ORDER_TYPE_SELL if is_buy else mt5.ORDER_TYPE_BUY,
+               "price": tick.bid if is_buy else tick.ask, "deviation": 30,
+               "magic": SYSTEM_MAGIC, "comment": "MSE-flip-exit",
+               "type_time": mt5.ORDER_TIME_GTC, "type_filling": filling}
+        r = mt5.order_send(req)
+        if r is None or r.retcode != mt5.TRADE_RETCODE_DONE:
+            logger.debug(f"[MSE] close fail ticket={p.ticket}: {r.retcode if r else mt5.last_error()}")
+            return False
+        return True
+    except Exception as e:
+        logger.debug(f"[MSE] close exc ticket={getattr(p,'ticket','?')}: {e}")
+        return False
+
+
+def _manage_tsmom(algo_id, symbol, broker, positions, bars, point, digits, combo_state):
+    """tsmom = ถือจนสัญญาณ D1 กลับ. re-evaluate; ถ้ามีสัญญาณ dir ตรงข้าม → ปิดไม้ (market).
+    disaster SL (ตั้งตอนเข้า) คงเดิม — ไม่ BE/trail. FLAT/บาร์ไม่พอ → ถือต่อ (กัน false-close)."""
+    if not positions:
+        return 0
+    import MetaTrader5 as mt5
+    algo = _reg.get(algo_id)
+    vo = algo.evaluate(symbol, bars, point=point) if algo else None
+    new_dir = vo.get("dir") if vo else None
+    if not new_dir:                                       # ไม่มีสัญญาณชัด → ถือต่อ (ไม่ปิด)
+        return 0
+    closed = 0
+    tickets = combo_state.get("tickets") or {}
+    for p in positions:
+        pos_dir = "BUY" if p.type == mt5.ORDER_TYPE_BUY else "SELL"
+        if new_dir != pos_dir and _close_position(broker, p, digits):
+            tickets.pop(str(p.ticket), None)
+            closed += 1
+            logger.info(f"[MSE] tsmom flip → close {algo_id}:{symbol} #{p.ticket} ({pos_dir}→{new_dir})")
+    return closed
+
+
 # ── real closed-trade capture (edge จริงจากไม้ที่ปิดแล้ว — leakage-free features) ──────
 def _now_iso():
     from datetime import datetime, timezone
@@ -394,7 +452,10 @@ def tick(force=False):
     for algo_id, symbol in live:
         try:
             broker = bmap.get(symbol, symbol)
-            bars = _bars(broker)
+            algo_obj = _reg.get(algo_id)
+            tf = getattr(algo_obj, "timeframe", "H1")
+            mgmt = getattr(algo_obj, "mgmt", "managed")
+            bars = _bars(broker, tf)
             if bars is None:
                 continue
             point, digits = _meta(broker)
@@ -406,7 +467,11 @@ def tick(force=False):
             if positions is None:                            # fetch fail → ข้าม combo รอบนี้ (ห้าม manage ด้วยข้อมูลพัง)
                 continue
             # ไม้ปิด → บันทึกโดย trade_recorder (universal, comment MSE-<algo>) แล้ว — MSE ไม่ record ซ้ำ
-            managed += _manage(broker, positions, bars, point, digits, cstate)
+            # management ตาม algo: tsmom = exit-on-flip · อื่น = BE+trailing (SL/TP)
+            if mgmt == "tsmom_flip":
+                managed += _manage_tsmom(algo_id, symbol, broker, positions, bars, point, digits, cstate)
+            else:
+                managed += _manage(broker, positions, bars, point, digits, cstate)
             room_total = (max_total <= 0) or (total_open + opened < max_total)   # global cap ยังมีที่ว่าง
             if len(positions) < max_pos and room_total:         # ผ่านทั้ง per-combo + รวมทุก symbol
                 op = _maybe_enter(algo_id, symbol, broker, bars, point,
