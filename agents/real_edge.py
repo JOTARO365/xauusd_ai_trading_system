@@ -128,13 +128,8 @@ def build():
             rows.append({"algo_id": algo, "symbol": sym, **st,
                          "by_regime": _segment(recs, lambda r: (r.get("features") or {}).get("regime")),
                          "by_session": _segment(recs, lambda r: _session((r.get("features") or {}).get("hour")))})
-    # gold-bot real (trades.json) → regime_momentum:XAUUSD (ถ้ายังไม่มีจาก real_fills)
-    if not any(r["algo_id"] == "regime_momentum" and r["symbol"] == "XAUUSD" for r in rows):
-        gr = _gold_real()
-        gst = _stats(gr)
-        if gst["n"]:
-            rows.append({"algo_id": "regime_momentum", "symbol": "XAUUSD", **gst,
-                         "src": "trades.json (gold-bot รวม)", "by_regime": {}, "by_session": {}})
+    # gold edge แยก algo แล้วผ่าน trade_recorder → real_fills/<algo>__XAUUSD (regime_momentum/tsmom_d1/decision_ai)
+    # ไม่ lump trades.json อีก (แยกตาม comment ต่อ algo ตาม design). _gold_real เหลือไว้ fallback debug เท่านั้น
     from datetime import datetime, timezone
     return {"ok": True, "generated": datetime.now(timezone.utc).isoformat()[:16] + "Z",
             "rows": rows,

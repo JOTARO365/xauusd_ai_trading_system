@@ -362,6 +362,14 @@ def node_position_mgmt(state: TradingState) -> dict:
             logger.info(f"[SHADOW] {_st['new']} new · {_st['resolved']} resolved · {_st['combos']} combos")
     except Exception as _se:
         logger.error(f"[GRAPH:shadow_engine] {_se}")
+    # central trade-recorder: จับ comment ไม้ทองตอนเปิด → บันทึกไม้ปิดต่อ algo (real_fills) แยก edge. fail-soft
+    try:
+        from agents.trade_recorder import tick as _rec_tick
+        _rc = _rec_tick()
+        if _rc and _rc.get("closed"):
+            logger.info(f"[REC] {_rc['closed']} ไม้ปิด → real_fills (แยก algo)")
+    except Exception as _rce:
+        logger.error(f"[GRAPH:trade_recorder] {_rce}")
     # multi-symbol live executor: วางออเดอร์จริงบน symbol อื่น (WTI ฯลฯ) ต่อ combo LIVE. gated MULTI_SYMBOL_LIVE
     # (default OFF → 0 order) + ต่อ combo ต้อง toggle=LIVE. fail-soft. ทองไม่กระทบ (คนละ symbol/คนละ engine).
     try:
