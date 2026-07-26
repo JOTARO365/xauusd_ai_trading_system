@@ -86,3 +86,25 @@ scripts/           one-off utilities
 3. **Workers may not touch** `agents/` gate logic, money management, or
    `agents/prompts/*.json` unless the task explicitly whitelists that file
    AND the user approved the design. *Why:* iron rules above.
+
+## Structural-Change Rule — keep README + setup in sync (mandatory)
+
+Any **structural change** to the system MUST update `README.md` **and**
+`setup.py` / `.env.example` in the same change. Structural change =
+a new agent/module/engine, a new config or `.env` key, a new feature/flag,
+a changed run/deploy step, or a changed data/control flow.
+
+- **New `.env` / config key** → add it to `.env.example` (with an inline
+  comment + sane default) so `setup.py sync_env()` propagates it to a fresh
+  `git pull`. A key that exists in `config.py` but not `.env.example` will be
+  silently missing after pull — the class of bug that leaves a fresh clone
+  stuck (e.g. `WEEKEND_RUN` defaulting off → bot waits for market).
+- **New feature / module / run step** → document it in `README.md` (what it
+  does, how to turn it on/off, kill switch).
+- `setup.py` itself needs editing only when the bootstrap *steps* change
+  (new dependency, new runtime dir, new sync source); day-to-day it just
+  needs `.env.example` kept complete.
+
+*Why:* others pull and run this repo. Docs + `.env.example` are the only
+things a fresh clone sees — if they drift from the code, a fresh run breaks
+or silently misbehaves.
