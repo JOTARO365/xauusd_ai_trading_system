@@ -255,6 +255,8 @@ MSE_SL_MAX_ATR        = float(os.getenv("MSE_SL_MAX_ATR") or 4.0)
 WEEKEND_RUN           = os.getenv("WEEKEND_RUN", "false").lower() == "true"
 # WEEKEND_INTERVAL_SECS = interval ต่ำสุดของ loop วันหยุด (ห่างกว่าปกติ = ลด token; default 1800 = 30 นาที)
 WEEKEND_INTERVAL_SECS = int(os.getenv("WEEKEND_INTERVAL_SECS") or 1800)
+# AUTO_SL_PCT_OTHER = ระยะ auto-SL ของคู่ที่ไม่ใช่ทอง (orphan sl==0) = % ของราคา (ทองใช้ AUTO_SL_PIPS/DEFAULT_SL_PIPS เดิม)
+AUTO_SL_PCT_OTHER     = float(os.getenv("AUTO_SL_PCT_OTHER") or 0.01)
 
 # ALGO_SIZE_STANDDOWN = safety guard บัญชีเล็ก: ก่อนเปิดไม้ ALGO เช็คว่าถ้าเปิดที่ MIN_LOT จะเสี่ยงเกิน
 # ALGO_MAX_TRADE_RISK_PCT ไหม (min-lot ใหญ่เกินทุน). เกิน → ข้ามไม้ (stand down) ไม่ over-risk. ramp อัตโนมัติ
@@ -387,7 +389,7 @@ def reload_config():
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
     global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT, REGIME_SHADOW
     global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING, REGIME_SR_ENTRY, REGIME_PENDING_FADE, REGIME_SR_EXIT
-    global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK, ALGO_MAX_SAME_DIR, ALGO_ENTRY_HOURS, MULTI_SYMBOL_LIVE, ALGO_SL_MULT, MSE_MAX_POSITIONS, MSE_MAX_TOTAL, MSE_SL_MIN_ATR, MSE_SL_MAX_ATR, WEEKEND_RUN, WEEKEND_INTERVAL_SECS
+    global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK, ALGO_MAX_SAME_DIR, ALGO_ENTRY_HOURS, MULTI_SYMBOL_LIVE, ALGO_SL_MULT, MSE_MAX_POSITIONS, MSE_MAX_TOTAL, MSE_SL_MIN_ATR, MSE_SL_MAX_ATR, WEEKEND_RUN, WEEKEND_INTERVAL_SECS, AUTO_SL_PCT_OTHER
     global ALGO_SIZE_STANDDOWN, ALGO_MAX_TRADE_RISK_PCT
     global TSMOM_LIVE, TSMOM_SHADOW, TSMOM_COEXIST, TSMOM_LONG_ONLY, TSMOM_MIN_ADX, TSMOM_MIN_VOLPCT, TSMOM_LOOKBACKS, TSMOM_SL_ATR, TSMOM_SL_PIPS, TSMOM_SL_CAP_FALLBACK
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
@@ -414,6 +416,7 @@ def reload_config():
     MSE_SL_MAX_ATR           = float(os.getenv("MSE_SL_MAX_ATR") or 4.0)                       # clamp SL ≤ n×ATR (0=ปิด)
     WEEKEND_RUN              = os.getenv("WEEKEND_RUN", "false").lower() == "true"             # รัน loop วันหยุด (เก็บ BTC)
     WEEKEND_INTERVAL_SECS   = int(os.getenv("WEEKEND_INTERVAL_SECS") or 1800)                 # loop ห่างวันหยุด (ลด token)
+    AUTO_SL_PCT_OTHER       = float(os.getenv("AUTO_SL_PCT_OTHER") or 0.01)                    # auto-SL คู่ non-gold = %ราคา
     ALGO_SIZE_STANDDOWN      = os.getenv("ALGO_SIZE_STANDDOWN", "true").lower() == "true"    # small-acct guard
     ALGO_MAX_TRADE_RISK_PCT  = float(os.getenv("ALGO_MAX_TRADE_RISK_PCT") or 0.02)           # เพดาน risk/ไม้
     TSMOM_LIVE               = os.getenv("TSMOM_LIVE", "false").lower() == "true"            # TSMOM directional engine

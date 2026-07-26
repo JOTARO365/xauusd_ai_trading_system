@@ -1240,46 +1240,38 @@ def ensure_sl_protection() -> int:
     ปิดด้วย AUTO_SL_PROTECT=false. เรียกเป็นตัวแรกใน node_position_mgmt → manage_* ตัวอื่นดูแลต่อได้."""
     if not getattr(_cfg, "AUTO_SL_PROTECT", True):
         return 0
-    info = mt5.symbol_info(SYMBOL)
-    if info is None:
-        return 0
-    positions = mt5.positions_get(symbol=SYMBOL)
+    positions = mt5.positions_get()                 # ทุก symbol (ทอง + WTI/BTC/คู่อื่น) ไม่ใช่แค่ทอง
     if not positions:
         return 0
-    tick = mt5.symbol_info_tick(SYMBOL)
-    if tick is None:
-        return 0
-
-    point     = info.point
-    stops_min = (info.trade_stops_level or 0) * point
-    # AUTO_SL_PIPS แยกจาก SL บอท — user เทรดมือรู้สึก 1000p ($10) จากราคาชิดไป
-    # ตั้งกว้างขึ้นได้ (เช่น 2000-3000) โดยไม่กระทบ DEFAULT_SL_PIPS ของไม้ SYSTEM
-    sl_pips   = float(getattr(_cfg, "AUTO_SL_PIPS", 0) or 0) \
-                or float(MONEY_MANAGEMENT["default_sl_pips"])
+    # AUTO_SL_PIPS แยกจาก SL บอท (ทอง). คู่อื่น pip-scale ต่างกัน → ใช้ % ของราคาแทน (AUTO_SL_PCT_OTHER)
+    sl_pips   = float(getattr(_cfg, "AUTO_SL_PIPS", 0) or 0) or float(MONEY_MANAGEMENT["default_sl_pips"])
+    pct_other = float(getattr(_cfg, "AUTO_SL_PCT_OTHER", 0.01) or 0.01)
     protected = 0
 
     for pos in positions:
         if pos.sl != 0:
             continue
+        info = mt5.symbol_info(pos.symbol); tick = mt5.symbol_info_tick(pos.symbol)
+        if info is None or tick is None:
+            continue
+        point = info.point; digits = int(info.digits or 2)
+        stops_min = (info.trade_stops_level or 0) * point
         is_buy = pos.type == 0
-        if is_buy:
-            ref    = tick.bid
-            new_sl = ref - sl_pips * point
-            if stops_min > 0 and ref - new_sl < stops_min:
+        ref = tick.bid if is_buy else tick.ask
+        dist = (sl_pips * point) if pos.symbol == SYMBOL else (ref * pct_other)   # ทอง=pips เดิม · คู่อื่น=%ราคา
+        new_sl = (ref - dist) if is_buy else (ref + dist)
+        if stops_min > 0:
+            if is_buy and ref - new_sl < stops_min:
                 new_sl = ref - stops_min
-        else:
-            ref    = tick.ask
-            new_sl = ref + sl_pips * point
-            if stops_min > 0 and new_sl - ref < stops_min:
+            elif not is_buy and new_sl - ref < stops_min:
                 new_sl = ref + stops_min
-
-        if _set_sl_tp(pos.ticket, round(new_sl, 2), pos.tp):
+        req = {"action": mt5.TRADE_ACTION_SLTP, "symbol": pos.symbol, "position": pos.ticket,
+               "sl": round(new_sl, digits), "tp": pos.tp}       # symbol-aware + round ตาม digits ของคู่นั้น (ไม่ hardcode 2)
+        r = mt5.order_send(req)
+        if r is not None and r.retcode == mt5.TRADE_RETCODE_DONE:
             protected += 1
-            logger.warning(
-                f"AUTO-SL: ออเดอร์ไม่มี SL ticket={pos.ticket} "
-                f"{'BUY' if is_buy else 'SELL'} magic={pos.magic} "
-                f"→ ตั้ง SL={new_sl:.2f} ({sl_pips:.0f}p จากราคา {ref:.2f})"
-            )
+            logger.warning(f"AUTO-SL: {pos.symbol} ticket={pos.ticket} {'BUY' if is_buy else 'SELL'} "
+                           f"magic={pos.magic} → SL={round(new_sl, digits)} (จากราคา {ref})")
     return protected
 
 
