@@ -1738,18 +1738,28 @@ def api_gap_monitor():
         if _MT5_AVAILABLE and _ensure_mt5():
             import MetaTrader5 as _m
             from connectors.price_feed import get_ohlcv
-            r = get_ohlcv(SYMBOL, _m.TIMEFRAME_H1, 2)
+            try:
+                from connectors.pair_collector import _broker_map
+                _inv = {v: k for k, v in _broker_map().items()}
+            except Exception:
+                _inv = {}
+            r = get_ohlcv(SYMBOL, _m.TIMEFRAME_H1, 2)                # ราคาปิดศุกร์ทอง (อ้างอิง gap)
             if r is not None and len(r):
                 xm_close = float(r[-1]["close"])
-            info = _m.symbol_info(SYMBOL)
-            pt = info.point if info else 0.01
-            proj = spot or xm_close                                # ราคาคาดตอนเปิด (weekend=spot 24/7)
-            for p in (_m.positions_get(symbol=SYMBOL) or []):
+            for p in (_m.positions_get() or []):                    # ทุกไม้ที่เปิดอยู่ ทุก symbol (ทอง+WTI/BTC + magic เก่า/manual)
+                info = _m.symbol_info(p.symbol)
+                pt = info.point if (info and info.point) else 0.01
+                is_gold = (p.symbol == SYMBOL)
                 d = "BUY" if p.type == 0 else "SELL"
                 sl = float(p.sl)
+                # ทอง(weekend) ตลาดปิด→ใช้ spot 24/7 เดา; คู่อื่นใช้ราคา MT5 สด (BTC 24/7 จริง, WTI ปิด=frozen)
+                proj = spot if (is_gold and spot) else float(p.price_current)
                 hit = bool(sl and proj and ((d == "SELL" and proj >= sl) or (d == "BUY" and proj <= sl)))
+                dg = round((info.digits if info else 2))
                 positions.append({
-                    "ticket": p.ticket, "dir": d, "entry": round(p.price_open, 2), "sl": round(sl, 2),
+                    "ticket": p.ticket, "symbol": _inv.get(p.symbol, p.symbol), "dir": d,
+                    "entry": round(p.price_open, dg), "sl": round(sl, dg), "pnl": round(p.profit, 2),
+                    "proj_by": "spot24/7" if (is_gold and spot) else "MT5",
                     "hit": hit, "dist_pt": round(abs((proj - sl) / pt)) if (sl and proj) else None,
                     "be": bool(sl and ((d == "BUY" and sl >= p.price_open) or (d == "SELL" and sl <= p.price_open)))})
     except Exception:

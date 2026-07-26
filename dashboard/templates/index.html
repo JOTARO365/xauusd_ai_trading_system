@@ -3181,8 +3181,11 @@ async function loadGapMonitor() {
         ? (p.be ? '<span style="color:var(--green)">จะชน SL แต่ BE = ปิดกำไร ✓</span>'
                 : '<span style="color:var(--red)">⚠ จะชน SL = ขาดทุน</span>')
         : `<span style="color:var(--muted)">ปลอดภัย (ห่าง ${p.dist_pt}pt)</span>`;
-      return `<div style="padding:2px 0;font-family:var(--mono);font-size:12px">TK${p.ticket} ${p.dir} · SL ${p.sl} — ${tag}</div>`;
-    }).join('') || '<div style="color:var(--muted)">ไม่มีไม้ทองเปิด</div>';
+      const pc = p.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+      return `<div style="padding:2px 0;font-family:var(--mono);font-size:12px">
+        <b>${p.symbol}</b> TK${p.ticket} ${p.dir} · SL ${p.sl} · <span style="color:${pc}">${p.pnl >= 0 ? '+' : ''}${p.pnl}</span>
+        <span style="color:var(--muted);font-size:10px">(${p.proj_by})</span> — ${tag}</div>`;
+    }).join('') || '<div style="color:var(--muted)">ไม่มีไม้ระบบเปิด</div>';
     body.innerHTML =
       `<div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:8px">
          <div>ทอง 24/7: <b>${d.spot ?? '—'}</b></div>
