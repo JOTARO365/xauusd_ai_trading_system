@@ -44,10 +44,7 @@ def sync_mt5_history_to_db(days: int = 365) -> int:
     from collections import defaultdict
     pos_deals: dict[int, list] = defaultdict(list)
     for d in deals:
-        from config import SYMBOL
-        if d.symbol != SYMBOL:
-            continue
-        pos_deals[d.position_id].append(d)
+        pos_deals[d.position_id].append(d)   # ทุก symbol — กรองระดับ position ด้วย magic ด้านล่าง (กันไม้ปิด magic=0 หลุด)
 
     meta_map = _trade_meta_from_logs()   # Fix 1: กู้ decision context จาก trades.json
     synced = 0
@@ -57,6 +54,11 @@ def sync_mt5_history_to_db(days: int = 365) -> int:
 
         if entry_deal is None:
             continue
+
+        from config import SYMBOL as _SYM
+        from connectors.mt5_connector import SYSTEM_MAGIC as _MAG
+        if entry_deal.symbol != _SYM and entry_deal.magic != _MAG:
+            continue   # เอา: ทอง (ทุก source) + ไม้บอททุก symbol (magic ระบบ) · ข้าม manual คู่อื่น
 
         ticket = entry_deal.order   # order ticket = trade key
 
@@ -78,12 +80,11 @@ def sync_mt5_history_to_db(days: int = 365) -> int:
             closed_at = datetime.utcfromtimestamp(last_exit.time).isoformat()
             pnl = round(sum(d.profit + d.swap + d.commission for d in dlist), 2)
 
-        from config import SYMBOL
         from connectors.mt5_connector import SYSTEM_MAGIC
         trade = {
             "ticket":        ticket,
             "account_login": account_login,
-            "symbol":        SYMBOL,
+            "symbol":        entry_deal.symbol,      # symbol จริงต่อคู่ (GOLD#/OILCash#/BTCUSD#) ไม่ fix ทอง
             "source":        "SYSTEM" if entry_deal.magic == SYSTEM_MAGIC else "MANUAL",
             "direction":     "BUY" if entry_deal.type == 0 else "SELL",
             "status":        "CLOSED" if is_closed else "OPEN",

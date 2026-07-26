@@ -25,9 +25,11 @@ def _get_account_login() -> int:
 
 
 def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list[dict] | None:
-    normed = _norm(symbol)
-    # รวมทุก alias ที่ map ไปยัง instrument เดียวกัน (เช่น GOLD, GOLD#, XAUUSD → XAUUSD)
-    symbols = list({k for k, v in _ALIASES.items() if v == normed} | {normed, symbol.upper()})
+    all_sym = symbol is not None and str(symbol).lower() == "all"    # "all" = ทุกคู่ (gold + WTI/BTC)
+    if not all_sym:
+        normed = _norm(symbol)
+        # รวมทุก alias ที่ map ไปยัง instrument เดียวกัน (เช่น GOLD, GOLD#, XAUUSD → XAUUSD)
+        symbols = list({k for k, v in _ALIASES.items() if v == normed} | {normed, symbol.upper()})
 
     login = account_login if account_login is not None else _get_account_login()
 
@@ -43,8 +45,9 @@ def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list
                 "trend,sr_zone,sr_strength,pa_action,sentiment,analysis,"
                 "strategy_version"
             )
-            .in_("symbol", symbols)
         )
+        if not all_sym:
+            q = q.in_("symbol", symbols)
         if login:
             q = q.eq("account_login", login)
         res = q.order("opened_at", desc=True).limit(500).execute()

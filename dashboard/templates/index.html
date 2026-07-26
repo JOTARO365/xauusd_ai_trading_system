@@ -1241,6 +1241,10 @@
       <h1 id="dashboard-title">XAU/USD &middot; GOLD DESK</h1>
     </div>
     <div class="live-dot"></div>
+    <select id="sys-sel" onchange="setActiveSystem(this.value)" class="filter-select" style="margin-left:12px;padding:4px 26px 4px 10px">
+      <option value="xauusd">ทอง (XAUUSD)</option>
+      <option value="all">ทุกคู่ (รวม WTI/BTC)</option>
+    </select>
   </div>
   <div class="header-right">
     <div class="ticker" id="live-ticker">
@@ -3133,6 +3137,12 @@ let currentPage = 1;
 const PAGE_SIZE = 20;
 let lastFiltered = [];
 let activeSystem = 'xauusd';
+function setActiveSystem(v) {                     // ทอง / ทุกคู่ (all = รวม WTI/BTC จาก DB)
+  activeSystem = v || 'xauusd';
+  try { fetchData(); } catch (e) {}
+  try { loadAccounting(); } catch (e) {}
+  try { loadMonitor(); } catch (e) {}
+}
 let _lastBid = null, _lastAsk = null;
 let _equityHistory = [];
 let _eqLabels = [];            // index → real trade-time label (equity curve ใช้แกน index เว้นเท่ากัน)
@@ -4641,7 +4651,7 @@ async function populateSrTabs() {
     if (!d.ok || !d.symbols) return;
     box.innerHTML = d.symbols.map(x => {
       const v = x.logical === 'XAUUSD' ? '' : x.logical;
-      const lbl = x.logical === 'XAUUSD' ? '🥇 ทอง' : x.logical;
+      const lbl = x.logical === 'XAUUSD' ? 'ทอง' : x.logical;
       return `<button class="ntab${v === _srTab ? ' active' : ''}" onclick="setSrTab('${v}',this)">${lbl}</button>`;
     }).join('');
   } catch (_e) {}
