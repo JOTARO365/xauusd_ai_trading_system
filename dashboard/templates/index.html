@@ -4665,16 +4665,33 @@ async function renderSrPairDetail(sym) {
   try {
     const d = await (await fetch('/api/cluster-map?symbol=' + encodeURIComponent(sym))).json();
     if (!d.ok) { det.innerHTML = `<span style="color:var(--muted)">${d.error || 'ไม่มีข้อมูล'}</span>`; return; }
+    const px = d.price;
+    const cl = (d.clusters || []).slice();
+    const maxT = Math.max(1, ...cl.map(c => c.touches || 0));
+    const row = (c, kind) => {                       // สไตล์เดียวกับ zone-ladder ทอง: level | dist | strength% | bar
+      const color = kind === 'R' ? 'var(--red)' : 'var(--green)';
+      const dg = c.level - px, dist = (dg > 0 ? '+' : '') + dg.toFixed(2);
+      const st = Math.round((c.touches || 0) / maxT * 100);
+      const bar = `<div style="height:4px;width:${Math.min(st, 100)}%;background:${color};border-radius:2px;opacity:.7"></div>`;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:3px 0">
+        <span style="width:82px;color:${color};font-weight:700">${c.level.toFixed(2)}</span>
+        <span style="width:60px;color:var(--muted);font-size:10px">${dist}</span>
+        <span style="width:40px;color:var(--muted);font-size:10px">${st}%</span>
+        <div style="flex:1">${bar}</div>
+        <span style="color:var(--muted);font-size:10px">${c.touches || 0}t</span></div>`;
+    };
+    const above = cl.filter(c => c.level > px).sort((a, b) => b.level - a.level);
+    const below = cl.filter(c => c.level <= px).sort((a, b) => b.level - a.level);
     const mC = d.momentum === 'up' ? 'var(--green)' : (d.momentum === 'down' ? 'var(--red)' : 'var(--muted)');
-    const row = (lbl, z, col) => `<div style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid #262a31">
-      <span style="color:${col}">${lbl}</span><span>${z ? z.level + ` <span style='color:var(--muted);font-size:10px'>${z.touches}t · ${z.dist_atr}ATR</span>` : '—'}</span></div>`;
     det.innerHTML =
-      `<div style="display:flex;justify-content:space-between;margin-bottom:6px">
-        <b>${sym}</b><span>ราคา ${d.price} · <span style="color:${mC}">${d.momentum}</span></span></div>`
-      + row('แนวต้าน', d.resistance, 'var(--red)')
-      + row('แนวรับ', d.support, 'var(--green)')
-      + `<div style="color:var(--muted);font-size:11px;margin-top:8px">dwell zones: ${(d.clusters || []).map(c => `${c.level}(${c.touches})`).join('  ') || '—'}</div>`
-      + `<div style="color:var(--muted);font-size:10px;margin-top:6px">${d.hint || ''}</div>`;
+      `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:11px;color:var(--muted)">
+        <b style="color:var(--text)">${sym}</b><span>dwell-zone S/R (H1) · <span style="color:${mC}">${d.momentum}</span></span></div>`
+      + above.map(c => row(c, 'R')).join('')
+      + `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;margin:3px 0;border-top:1px dashed var(--border);border-bottom:1px dashed var(--border)">
+          <span style="width:82px;color:var(--gold);font-weight:700">${px}</span>
+          <span style="color:var(--muted);font-size:10px">◄ ราคาปัจจุบัน</span></div>`
+      + below.map(c => row(c, 'S')).join('')
+      + `<div style="color:var(--muted);font-size:10px;margin-top:8px">${d.hint || ''}</div>`;
   } catch (_e) { det.innerHTML = '<span style="color:var(--muted)">โหลดไม่ได้</span>'; }
 }
 
@@ -6556,18 +6573,34 @@ function setChartTf(tf) {
   loadCandles(true);
 }
 
-// overlay ระบบใหม่: cluster S/R (dwell-zone) + Donchian levels ที่ algo ใช้ (จาก /api/cluster-map)
+// เส้น S/R ค่อยๆ fade-in (alpha 0→target) — ดูสไตล์ขึ้น. honor prefers-reduced-motion
+const _reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function _fadeLine(line, rgb, target) {
+  if (_reducedMotion) { try { line.applyOptions({ color: `rgba(${rgb},${target})` }); } catch (e) {} return; }
+  const t0 = performance.now();
+  const step = now => {
+    const a = Math.min(target, (now - t0) / 480 * target);
+    try { line.applyOptions({ color: `rgba(${rgb},${a.toFixed(3)})` }); } catch (e) {}
+    if (a < target) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+// overlay: cluster S/R (dwell-zone) + Donchian — per-symbol, fade-in
 function drawClusterLines(d) {
-  if (!_candleSeries || !d || !d.ok) return;   // cluster S/R = per-symbol (ทุกคู่)
+  if (!_candleSeries || !d || !d.ok) return;
   _clusterLines.forEach(l => { try { _candleSeries.removePriceLine(l); } catch (e) {} });
   _clusterLines = [];
-  const add = (price, color, title, style) => { if (price != null) _clusterLines.push(_candleSeries.createPriceLine({
-    price, color, lineWidth: 2, lineStyle: style, axisLabelVisible: true, title })); };
-  if (d.resistance) add(d.resistance.level, 'rgba(239,68,68,0.9)', `C·R ${d.resistance.touches}t`, LightweightCharts.LineStyle.Solid);
-  if (d.support) add(d.support.level, 'rgba(74,222,128,0.9)', `C·S ${d.support.touches}t`, LightweightCharts.LineStyle.Solid);
+  const add = (price, rgb, alpha, title, style) => {
+    if (price == null) return;
+    const line = _candleSeries.createPriceLine({ price, color: `rgba(${rgb},0)`, lineWidth: 2,
+      lineStyle: style, axisLabelVisible: true, title });
+    _clusterLines.push(line); _fadeLine(line, rgb, alpha);
+  };
+  if (d.resistance) add(d.resistance.level, '239,68,68', 0.9, `C·R ${d.resistance.touches}t`, LightweightCharts.LineStyle.Solid);
+  if (d.support) add(d.support.level, '74,222,128', 0.9, `C·S ${d.support.touches}t`, LightweightCharts.LineStyle.Solid);
   if (d.donchian) {
-    add(d.donchian.buy, 'rgba(74,222,128,0.85)', 'Donchian BUY', LightweightCharts.LineStyle.Dashed);
-    add(d.donchian.sell, 'rgba(74,222,128,0.85)', 'Donchian SELL', LightweightCharts.LineStyle.Dashed);
+    add(d.donchian.buy, '74,222,128', 0.85, 'Donchian BUY', LightweightCharts.LineStyle.Dashed);
+    add(d.donchian.sell, '74,222,128', 0.85, 'Donchian SELL', LightweightCharts.LineStyle.Dashed);
   }
 }
 
