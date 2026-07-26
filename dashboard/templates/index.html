@@ -4879,10 +4879,12 @@ async function loadShadowMatrix(force) {
         <td style="padding:4px 8px;color:${badgeColor[r.badge]};font-weight:600">${r.badge}</td>
         <td style="padding:4px 8px">${execPill(r.exec_mode)}</td>
         <td style="padding:4px 8px">
-          <select class="filter-select" style="padding:2px 24px 2px 9px;font-size:11px"
-            onchange="setShadowSwitch('${r.algo_id}','${r.symbol}',this.value)">
-            ${['SHADOW','LIVE','OFF'].map(s => `<option value="${s}"${r.state === s ? ' selected' : ''}>${s}</option>`).join('')}
-          </select>
+          ${['SHADOW','LIVE','OFF'].includes(r.state)
+            ? `<select class="filter-select" style="padding:2px 24px 2px 9px;font-size:11px"
+                onchange="setShadowSwitch('${r.algo_id}','${r.symbol}',this.value)">
+                ${['SHADOW','LIVE','OFF'].map(s => `<option value="${s}"${r.state === s ? ' selected' : ''}>${s}</option>`).join('')}
+              </select>`
+            : `<span style="color:var(--muted);font-size:11px" title="display-only (backtest/real reference) — ไม่มี live switch">—</span>`}
         </td>
       </tr>`;
     }).join('') || '<tr><td colspan="13" style="color:var(--muted);padding:6px 8px">ไม่มีข้อมูลตามตัวกรอง</td></tr>';
