@@ -139,12 +139,13 @@ def build():
         exec_mode = ("LIVE_ENGINE" if engine_live else
                      "LIVE_MSE" if st == _sw.LIVE else
                      "OFF" if st == _sw.OFF else "SHADOW")
-        # switch descriptor: ทอง regime = toggle จริง REGIME_SHADOW_FILL (LIVE/PAPER, REGIME_LIVE คง true=AI ปิด) · อื่น = shadow-switch combo (MSE)
+        # unify: ทองใช้ switch เดียวกับทุกคู่ (shadow_switches SHADOW/LIVE/OFF). engine อ่าน gold_state เดียวกัน → display/engine ตรงกัน
         switch_kind, switch_state = "combo", st
-        if engine_live and algo_id == "regime_momentum":
-            paper = bool(getattr(_cfg, "REGIME_SHADOW_FILL", False))
-            switch_kind, switch_state = "regime_gold", ("PAPER" if paper else "LIVE")
-            exec_mode = "PAPER_ENGINE" if paper else "LIVE_ENGINE"
+        if engine_live:
+            gst = _sw.gold_state(algo_id)
+            switch_state = gst
+            exec_mode = ("LIVE_ENGINE" if gst == _sw.LIVE else
+                         "PAPER_ENGINE" if gst == _sw.SHADOW else "OFF")
         rows.append({"algo_id": algo_id, "symbol": symbol, "klass": klass,
                      "state": st, "exec_mode": exec_mode,
                      "switch_kind": switch_kind, "switch_state": switch_state,
@@ -163,16 +164,17 @@ def build():
     _have = {(r["algo_id"], r["symbol"]) for r in rows}
     _reg_ids = {a for a, _ in eligible}                    # algo ids ที่ registry จัดการใน loop บนแล้ว
     _extra = set(real) | {k for k in bt if k[0] not in _reg_ids}
-    _tsmom_live = bool(getattr(_cfg, "TSMOM_LIVE", False))
     for (a, s) in _extra:
         if (a, s) in _have:
             continue
         b = bt.get((a, s))
         rr = real.get((a, s)) or {}
         zero = _aggregate([], "scalp")
-        # tsmom_d1:XAUUSD = engine ทอง (tsmom_manager) → switch จริง LIVE/OFF ↔ TSMOM_LIVE · อื่น = reference (no switch)
+        # tsmom_d1:XAUUSD = engine ทอง (tsmom_manager อ่าน shadow_switches) → combo switch เหมือนทุกคู่ · อื่น = reference (no switch)
         if a == "tsmom_d1" and s == "XAUUSD":
-            sk, ss, em, lv = "tsmom_gold", ("LIVE" if _tsmom_live else "OFF"), ("LIVE_ENGINE" if _tsmom_live else "OFF"), _tsmom_live
+            gst = _sw.gold_state("tsmom_d1")
+            sk, ss, lv = "combo", gst, (gst == _sw.LIVE)
+            em = ("LIVE_ENGINE" if gst == _sw.LIVE else "PAPER_ENGINE" if gst == _sw.SHADOW else "OFF")
         else:
             sk, ss, em, lv = "none", "—", ("LIVE_ENGINE" if rr else "SHADOW"), bool(rr)
         rows.append({"algo_id": a, "symbol": s, "klass": "scalp", "state": "—",

@@ -16,6 +16,7 @@ from loguru import logger
 
 import config as _cfg
 from agents.regime_shadow import _bars_from_feed, compute_shadow_signal
+from agents import shadow_switches as _sw          # unify: dashboard switch คุม real/paper/off เหมือนทุกคู่
 
 _LOG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs", "regime_live.jsonl")
 _last_bar = None                                    # dedup: 1 order / H1 bar ต่อ process run
@@ -93,6 +94,10 @@ def run_regime_executor():
     if not entry_hour_ok():                                   # session gate (ALGO_ENTRY_HOURS · ว่าง=ทุกชม default)
         _hb("SESSION-GATE", "นอกช่วง ALGO_ENTRY_HOURS → งดเข้า", regime="TREND")
         return None
+    st = _sw.gold_state("regime_momentum")                   # unify: switch = single control (LIVE=จริง · SHADOW=paper · OFF=งด)
+    if st == _sw.OFF:
+        _hb("SWITCH-OFF", "dashboard switch = OFF → งดเข้า", regime="TREND")
+        return None
     _hb("ENTER", f"{sig.get('dir')} SL={sig.get('sl_pips')}p TP={sig.get('tp_pips')}p → ส่งคำสั่ง", regime="TREND")
     _last_bar = rec["bar_ts"]
     from connectors.mt5_connector import open_order
@@ -101,7 +106,7 @@ def run_regime_executor():
     tp_pips = sr_tp_pips(sig["dir"], rec["close"], sig["sl_pips"], sig["tp_pips"])
     res = open_order(sig["dir"], sig["sl_pips"], tp_pips, comment="ALGO-mom",
                      lot=algo_lot(sig["sl_pips"]),          # DRY_RUN/cap/lot-clamp ในตัว
-                     shadow=getattr(_cfg, "REGIME_SHADOW_FILL", False))
+                     shadow=(st == _sw.SHADOW))              # SHADOW → paper-fill
     out = {"ts": datetime.now(timezone.utc).isoformat(), "bar_ts": rec["bar_ts"],
            "regime": rec["regime"], "close": rec["close"], "signal": sig, "order": res}
     _log(out)

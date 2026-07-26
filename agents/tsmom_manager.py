@@ -8,6 +8,7 @@ SL = chandelier 3×ATR(D1) disaster stop. flag-gated (TSMOM_LIVE/SHADOW), fail-s
 ⚠️ bypass DecisionMaker เหมือน ALGO path เดิม (deterministic). risk guards เดิม (daily-loss/MAX_RISK_PCT) binding.
 """
 import config as _cfg
+from agents import shadow_switches as _sw          # unify: dashboard switch คุม real/paper/off เหมือนทุกคู่
 
 try:
     from loguru import logger
@@ -160,7 +161,11 @@ def manage_tsmom():
         if atr <= 0:
             return None
         can_open = _entry_cond_ok(rates, R)                 # gate: min ADX/vol (default off → True)
-        shadow = getattr(_cfg, "TSMOM_SHADOW", False) and not getattr(_cfg, "TSMOM_LIVE", False)
+        # unify: dashboard switch (shadow_switches tsmom_d1:XAUUSD) คุม real/paper/off เหมือนทุกคู่ (derive จาก .env ถ้ายังไม่ toggle)
+        st = _sw.gold_state("tsmom_d1")
+        if st == _sw.OFF:
+            can_open = False                                # OFF = ไม่เปิดใหม่ (ยัง manage/close ไม้เดิมได้ กัน orphan)
+        shadow = (st == _sw.SHADOW)
         if _reconcile(target, atr, shadow, can_open):       # set bar เฉพาะเมื่อสำเร็จ (open fail → retry รอบหน้า)
             _last_d1_ts = closed_ts
         return {"target": target, "atr": atr, "shadow": shadow}

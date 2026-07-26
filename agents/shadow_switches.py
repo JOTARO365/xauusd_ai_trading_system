@@ -47,6 +47,25 @@ def state_of(algo_id, symbol, default=SHADOW):
     return st if st in _VALID else default
 
 
+def gold_state(algo_id):
+    """resolve state ของ engine ทอง (XAUUSD) แบบ migration-safe: ถ้ามี switch entry ชัด → ใช้เลย;
+    ถ้ายังไม่มี → derive จาก .env flag เดิม (กัน regress live path ก่อน user toggle). engine + dashboard ใช้ตัวเดียวกัน = ตรงกันเสมอ.
+      tsmom_d1     : TSMOM_LIVE→LIVE · TSMOM_SHADOW→SHADOW · อื่น→OFF
+      regime_momentum: REGIME_LIVE=false→OFF · REGIME_SHADOW_FILL→SHADOW · อื่น→LIVE"""
+    explicit = _load().get(_key(algo_id, "XAUUSD"))
+    if explicit in _VALID:
+        return explicit
+    import config as _cfg
+    if algo_id == "tsmom_d1":
+        return (LIVE if getattr(_cfg, "TSMOM_LIVE", False)
+                else SHADOW if getattr(_cfg, "TSMOM_SHADOW", False) else OFF)
+    if algo_id == "regime_momentum":
+        if not getattr(_cfg, "REGIME_LIVE", False):
+            return OFF
+        return SHADOW if getattr(_cfg, "REGIME_SHADOW_FILL", False) else LIVE
+    return state_of(algo_id, "XAUUSD")
+
+
 def combos_in(state, eligible):
     """Of the `eligible` (algo_id, symbol) tuples, those currently in `state`
     (missing keys count as SHADOW). `eligible` typically = algo_registry.combos(universe)."""
