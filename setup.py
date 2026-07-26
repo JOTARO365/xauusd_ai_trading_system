@@ -216,6 +216,20 @@ def main():
     except Exception as e:
         print(_WARN + f"MT5 check skipped: {e}")
 
+    # 6. broker symbol map — probe symbol ของ "โบรกเกอร์เครื่องนี้" (ชื่อต่างกัน: GOLD#/OILCash# vs XAUUSD/USOIL)
+    step(6, "Broker symbol map (multi-symbol BTC/WTI/…)")
+    probe_json = os.path.join(_BASE, "data", "universe_probe.json")
+    if os.path.exists(probe_json):
+        print(_OK + "universe_probe.json มีแล้ว (เปลี่ยนโบรกเกอร์ → ลบไฟล์นี้ + รัน setup ใหม่)")
+    else:
+        rc = subprocess.call([sys.executable, os.path.join("scripts", "probe_universe.py")])
+        if rc == 0 and os.path.exists(probe_json):
+            print(_OK + "ตรวจ symbol โบรกเกอร์นี้แล้ว → data/universe_probe.json")
+        else:
+            print(_WARN + "probe ไม่สำเร็จ (MT5 ยัง login ไหม?) — multi-symbol (BTC/WTI) ยังไม่ทำงาน "
+                  "(ทองยังเทรดได้ผ่าน SYMBOL). รันภายหลัง: python scripts/probe_universe.py")
+            problems.append("broker-symbol-probe")
+
     # summary + next steps
     print("\n" + "=" * 60)
     if problems:

@@ -35,13 +35,20 @@ def _tfmap(mt5):
 
 
 def _broker_map():
-    """logical → broker symbol จาก universe_probe.json (validated). fallback = logical เอง."""
+    """logical → broker symbol จาก universe_probe.json (probe ต่อโบรกเกอร์). fallback = logical.
+    +override มือ: .env BROKER_SYM_<LOGICAL>=<broker> (เผื่อ probe จับชื่อแปลกไม่ได้ เช่น BROKER_SYM_WTIUSD=USOIL)."""
+    out = {}
     try:
         p = json.load(open(_PROBE, encoding="utf-8"))
         inst = p.get("instruments", {})
-        return {k: (inst.get(k, {}).get("broker_symbol") or k) for k in COLLECT if k in inst}
+        out = {k: (inst.get(k, {}).get("broker_symbol") or k) for k in COLLECT if k in inst}
     except Exception:
-        return {}
+        out = {}
+    for k in COLLECT:                                  # .env override ชนะ probe (per-broker manual fix)
+        ov = os.getenv(f"BROKER_SYM_{k}")
+        if ov and ov.strip():
+            out[k] = ov.strip()
+    return out
 
 
 def _write_json(path, obj):

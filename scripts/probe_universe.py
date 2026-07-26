@@ -30,6 +30,9 @@ TARGETS = {
     "XAUAUD": [("XAU", "GOLD"), ("AUD",)], "XAUGBP": [("XAU", "GOLD"), ("GBP",)],
     "AUDUSD": [("AUD",), ("USD",)], "USDCHF": [("USD",), ("CHF",)],
     "USDJPY": [("USD",), ("JPY",)], "EURUSD": [("EUR",), ("USD",)],
+    # crypto + oil — ชื่อต่างโบรกเกอร์เยอะ (BTCUSD/BTCUSD#/Bitcoin · OILCash#/USOIL/XTIUSD/WTI/CRUDE)
+    "BTCUSD": [("BTC", "BITCOIN"), ("USD",)],
+    "WTIUSD": [("WTI", "USOIL", "XTIUSD", "XTI", "OILCASH", "CRUDE", "USCRUDE")],
 }
 _USD_METAL = {"XAUUSD", "XAGUSD"}                              # กรอง cross ออกจาก metal-USD
 

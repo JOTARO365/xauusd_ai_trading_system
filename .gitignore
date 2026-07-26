@@ -20,3 +20,5 @@ data/pair_context.json
 data/algo_switches.json
 data/speech_log.json
 data/speech_summary_cache.json
+# broker symbol map — per-broker (ชื่อ symbol ต่างโบรกเกอร์: GOLD#/OILCash# vs XAUUSD/USOIL) → แต่ละคน probe เอง
+data/universe_probe.json
