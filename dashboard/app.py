@@ -652,11 +652,14 @@ def api_data():
     usd_thb = get_usd_thb()
     # MT5 account + 7-day sync is the slow part — served stale-while-revalidate
     # (background refresh) so the 10s frontend poll never blocks on a fresh sync.
-    account = _cached(
-        f"mt5acct:{system}",
-        lambda: get_mt5_account(data_to_sync=data),
-        ttl=30,
-    ) if system == "xauusd" else {}
+    # account = บัญชี MT5 เดียวกันทุก system → "all"/"xauusd" คืน account (กันโชว์ MT5 disconnect หลอก);
+    # "all" ไม่ sync per-symbol (data_to_sync=None) — sync ทำที่ system=xauusd อยู่แล้ว
+    if system == "xauusd":
+        account = _cached(f"mt5acct:{system}", lambda: get_mt5_account(data_to_sync=data), ttl=30)
+    elif system == "all":
+        account = _cached("mt5acct:all", lambda: get_mt5_account(data_to_sync=None), ttl=30)
+    else:
+        account = {}
     trades  = data.get("trades", [])
     stats   = calc_stats(trades)
 
