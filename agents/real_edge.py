@@ -13,6 +13,7 @@ import os
 
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _FILLS = os.path.join(_BASE, "logs", "real_fills")
+_RETIRED = {"decision_ai"}                 # algo ปลดระวาง (AI pipeline เลิกใช้ 07-26) — ซ่อนจาก dashboard, ไฟล์ real_fills ยังเก็บไว้เป็นประวัติ
 _MIN_SEG = 8                                                # n ขั้นต่ำต่อ bucket ถึงจะโชว์ segment
 _SESSIONS = [("Asian", 0, 7), ("London", 7, 13), ("NY", 13, 22), ("Late", 22, 24)]
 
@@ -124,6 +125,8 @@ def build():
             if not recs:
                 continue
             algo, _, sym = fn[:-6].partition("__")
+            if algo in _RETIRED:                             # ปลดระวาง (ไม่ใช้แล้ว) → ซ่อนจาก dashboard
+                continue
             st = _stats(recs)
             rows.append({"algo_id": algo, "symbol": sym, **st,
                          "by_regime": _segment(recs, lambda r: (r.get("features") or {}).get("regime")),
