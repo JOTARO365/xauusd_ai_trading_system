@@ -11,7 +11,7 @@ from loguru import logger
 
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _CACHE = os.path.join(_BASE, "data", "weekly_outlook.json")
-_MODEL = os.getenv("WEEKLY_OUTLOOK_MODEL", "claude-opus-4-6")   # env-override เผื่อ model id เปลี่ยน
+_MODEL = os.getenv("WEEKLY_OUTLOOK_MODEL", "claude-opus-4-8")   # env-override เผื่อ model id เปลี่ยน
 
 
 def _iso_week(dt=None):
@@ -71,7 +71,52 @@ def _gather():
         ctx["gold_price"] = round(float(t.bid), 2) if t else None
     except Exception:
         ctx["gold_price"] = None
+    # 7. macro strip (DXY/10y yield/real yield) — backdrop มหภาค
+    ms = _read_json(os.path.join(_BASE, "data", "macro_strip.json"), {})
+    ctx["macro_strip"] = {k: ms.get(k) for k in ("dxy", "y10", "real_yield", "updated") if k in ms}
+    # 8. regime + risk-on/off
+    rs = _read_json(os.path.join(_BASE, "data", "regime_state.json"), {})
+    ctx["regime_state"] = {k: rs.get(k) for k in
+                           ("fed_dir", "real_rate_sign", "sentiment_tilt", "cpi_yoy", "fed_funds", "real_rate", "shift") if k in rs}
+    rr = _read_json(os.path.join(_BASE, "data", "risk_regime_now.json"), {})
+    ctx["risk_regime"] = {k: rr.get(k) for k in ("regime", "vix", "gold_ctx_yr") if k in rr}
+    # 9. cross-asset drivers: DXY(UUP proxy) + silver — % เปลี่ยน 5 วัน (H1 ~120 บาร์) = ทิศทาง
+    ctx["drivers"] = {"DXY": _ohlc_sum(_read_json(os.path.join(_BASE, "data", "drv_dxy_h1.json"), [])),
+                      "silver": _ohlc_sum(_read_json(os.path.join(_BASE, "data", "drv_xag_h1.json"), []))}
+    # 10. เทคนิคทองเอง: กรอบสัปดาห์ (W1) + วัน (D1) high/low/ATR/เทรนด์
+    ctx["gold_tech"] = {"weekly": _ohlc_sum(_read_json(os.path.join(_BASE, "data", "xau_w1.json"), []), n=4),
+                        "daily": _ohlc_sum(_read_json(os.path.join(_BASE, "data", "xau_d1.json"), []), n=10)}
+    # 11. worldmonitor (ภูมิรัฐศาสตร์/ความเสี่ยงโลก) → เฝ้าระวัง
+    wm = _read_json(os.path.join(_BASE, "data", "worldmonitor.json"), {})
+    ctx["world"] = {"attention": wm.get("attention"),
+                    "events": (wm.get("events") or [])[:6],
+                    "headlines": [h.get("title") if isinstance(h, dict) else h
+                                  for h in (wm.get("headlines") or [])[:8]]}
+    # 12. event reliability + baseline
+    es = _read_json(os.path.join(_BASE, "data", "event_stats.json"), {})
+    ctx["event_baseline_abs_pct"] = es.get("baseline_avg_abs_pct")
+    ic = _read_json(os.path.join(_BASE, "data", "impact_calibration.json"), {})
+    ctx["news_reliability"] = {"status": ic.get("status"), "tiers": ic.get("tiers")}
     return ctx
+
+
+def _ohlc_sum(arr, n=10):
+    """สรุป OHLC array [[ts,o,h,l,c,v],...] → last/high/low/%chg/atr (compact, กัน token). None ถ้าว่าง."""
+    try:
+        if not arr or len(arr) < 3:
+            return None
+        seg = arr[-max(n, 3):]
+        closes = [float(r[4]) for r in seg]
+        highs = [float(r[2]) for r in seg]
+        lows = [float(r[3]) for r in seg]
+        last = closes[-1]
+        ref = closes[0]
+        trs = [highs[i] - lows[i] for i in range(len(seg))]
+        atr = round(sum(trs) / len(trs), 3)
+        return {"last": round(last, 3), "high": round(max(highs), 3), "low": round(min(lows), 3),
+                "pct_chg": round((last - ref) / ref * 100, 2) if ref else None, "atr": atr, "bars": len(seg)}
+    except Exception:
+        return None
 
 
 _PROMPT = """คุณคือนักวิเคราะห์ตลาดทองคำ (XAUUSD) มืออาชีพ เขียนภาษาไทย.
@@ -86,17 +131,22 @@ _PROMPT = """คุณคือนักวิเคราะห์ตลาด�
 2-4 บรรทัด: เกิดอะไร ข่าว/ตัวเลขสำคัญ ราคาทองตอบสนองยังไง (จาก sentiment + headlines + macro_regime)
 
 ## 🎯 ทิศทาง & Bias สัปดาห์นี้
-ทิศทางหลักที่น่าจะเป็น (ขึ้น/ลง/sideways) + เหตุผลจาก macro_regime + COT + sentiment. ระบุความมั่นใจ (สูง/กลาง/ต่ำ)
+ทิศทางหลักที่น่าจะเป็น (ขึ้น/ลง/sideways) + ระบุความมั่นใจ (สูง/กลาง/ต่ำ). อ้างอิงข้อมูลจริงที่ให้:
+- **DXY/ดอลลาร์** (drivers.DXY %chg, macro_strip.dxy) — ดอลลาร์แข็ง = กดทอง (inverse)
+- **real yield / 10y** (macro_strip.real_yield/y10, regime_state.real_rate_sign) — real yield ขึ้น = ลบต่อทอง
+- **Fed/CPI stance** (regime_state.fed_dir/cpi_yoy/fed_funds) · **COT** positioning · **news sentiment**
+- **regime/risk** (risk_regime.regime/vix) · **เงิน** (drivers.silver) ยืนยันโลหะ
+- **เทคนิคทอง** (gold_tech.weekly/daily high/low/atr): ทองอยู่โซนไหน ใกล้แนวรับ/ต้านสัปดาห์ไหน
 
 ## 🗓️ ปฏิทิน & Scenario สัปดาห์นี้
 ต่อ event สำคัญใน calendar: วันเวลา + ถ้าเลข hot→ทองไปทางไหน / cool→ทองไปทางไหน
 **ใช้ตัวเลขจาก event_scenarios ที่ให้มา** (magnitude% + n) เป็นหลัก อย่าเดาเอง. ถ้า event ไหนไม่มีใน scenarios บอกว่า "ไม่มีสถิติ"
 
 ## ⚠️ เฝ้าระวัง (Risk Factors)
-ปัจจัยที่ต้องระวังสัปดาห์นี้ตาม sentiment (geopolitics/Fed/DXY/yields ฯลฯ) — bullet สั้นๆ
+ปัจจัยที่ต้องระวังสัปดาห์นี้ — bullet สั้นๆ. ใช้ world.events/headlines (ภูมิรัฐศาสตร์) + risk_regime.vix + event ใหญ่ในปฏิทิน
 
 ## 🔍 Macro ที่ต้องติดตาม
-ตัวชี้วัด/ธีม macro ที่ควรจับตาต่อเนื่อง (ไม่ใช่แค่สัปดาห์นี้) — bullet สั้นๆ
+ตัวชี้วัด/ธีม macro ที่ควรจับตาต่อเนื่อง (Fed path, real yield, DXY trend, CPI จาก regime_state) — bullet สั้นๆ
 
 จบด้วยประโยคเดียว: **สรุป 1 บรรทัด** สำหรับสัปดาห์นี้.
 """
@@ -120,7 +170,7 @@ def build(force=False):
         ctx = _gather()
         llm = ChatAnthropic(model=_MODEL, api_key=_cfg.ANTHROPIC_API_KEY,
                             max_tokens=2200, temperature=0.4, timeout=90)
-        msg = _PROMPT.format(context=json.dumps(ctx, ensure_ascii=False)[:14000])
+        msg = _PROMPT.format(context=json.dumps(ctx, ensure_ascii=False)[:24000])   # Opus รับได้เยอะ; กันข้อมูลท้ายหาย
         resp = llm.invoke(msg)
         md = resp.content if isinstance(resp.content, str) else str(resp.content)
         from datetime import datetime, timezone
