@@ -127,6 +127,12 @@ def backfill(days=365):
         from collections import defaultdict
     except Exception as e:
         return {"error": str(e)}
+    try:                                                     # standalone: init/attach MT5 (bot init ตอน boot แล้ว)
+        from connectors.price_feed import connect_mt5, is_mt5_connected
+        if not is_mt5_connected():
+            connect_mt5()
+    except Exception:
+        pass
     deals = mt5.history_deals_get(datetime.now() - timedelta(days=days), datetime.now())
     if not deals:
         return {"error": "no deals (MT5 ต่อ + login?)"}
