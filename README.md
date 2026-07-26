@@ -21,8 +21,11 @@ ships a Flask dashboard on port 5050.
 
 ## Recent additions (2026-07)
 
+- **Unified Live Control** — every strategy×pair (gold included) is turned on/off from **one** switch (LIVE / SHADOW / OFF) in the dashboard **Shadow Matrix**; the gold engines now read the same switch. See [Live Control](#live-control--turning-strategies-onoff-shadow-matrix).
+- **TSMOM-D1 as a full registry algo** (`agents/algo_registry.py` `TSMOMDailyAlgo`) — daily time-series-momentum on every pair (ensemble vote L=63/126/252, 3×ATR disaster stop, **exit-on-flip**), with its own paper-resolver and live close-on-flip in the multi-symbol executor. Per-pair backtest committed to `docs/reports/shadow_backtest.json`.
+- **Per-algo real edge via order comment** (`agents/trade_recorder.py`) — captures the comment when a trade *opens* (survives the broker stripping `deal.comment` on SL/TP close), attributes each closed trade to its algo, and computes real edge **per strategy** (not lumped) — with a one-shot `backfill` from MT5 order history.
 - **Multi-symbol live engine** (`agents/multi_symbol_executor.py`) — trade non-gold instruments (WTI first) behind a two-layer default-OFF gate, with self-contained R/ATR management and a data-derived SL multiplier. See [Multi-Symbol Live Engine](#multi-symbol-live-engine-wti-etc).
-- **Real-edge capture** (`agents/real_edge.py`) — records real closed-trade outcomes per live pair (leakage-free entry features + realized R) and surfaces per-pair real edge in the dashboard **Shadow Matrix** ("เงินจริง" column), separate from the paper-shadow numbers. Display-only until it passes the validation gauntlet (validated-or-off).
+- **Real-edge capture** (`agents/real_edge.py`) — records real closed-trade outcomes per live pair (leakage-free entry features + realized R) and surfaces per-pair real edge in the dashboard **Shadow Matrix** ("เงินจริง" column), separate from the paper-shadow numbers. Display-only until it passes the validation gauntlet (validated-or-off). *(The legacy `decision_ai` LLM sleeve is retired from the live path and hidden from the matrix.)*
 - **`WEEKEND_RUN`** — keep the loop alive on weekends in *collect-only* mode (skip AI = 0 token, gold entries closed) so BTC/crypto edge keeps accumulating (crypto trades 24/7). Default OFF.
 - **Crypto news tag** — `bitcoin/BTC/ethereum/crypto/...` added to the X keyword defaults and a **₿ คริปโต** filter tab in the dashboard news feed.
 - **One-shot `setup.py`** — `python setup.py` installs deps and **syncs new `.env` keys after a `git pull` without overwriting your values**.
@@ -148,6 +151,48 @@ risk gates (`_run_gates`) still run before any order, and the LLM adds a final q
 check + news bias. The throttle knobs (`MIN_AI_EQUITY`, `AI_SPIKE_PIPS`, news-window
 intervals) live in [Environment Variables](#environment-variables); the graph is in
 `agents/trading_graph.py`.
+
+---
+
+## Live Control — turning strategies on/off (Shadow Matrix)
+
+Every **strategy × pair** combo has one switch in the dashboard **Shadow Matrix** — the
+*same* control for gold and for every other instrument. No `.env` editing for day-to-day use.
+
+![Shadow Matrix — per-combo live / shadow / off switches, backtest vs real edge per strategy×pair](docs/img/shadow-matrix-live-control.png)
+
+| Switch | Meaning | Places real orders? |
+|--------|---------|---------------------|
+| **LIVE**   | trade for real | ✅ yes (non-gold combos also need `MULTI_SYMBOL_LIVE=true`) |
+| **SHADOW** | paper-fill — collect forward performance, zero capital | ❌ no |
+| **OFF**    | stand down — no new entries (existing positions still managed) | ❌ no |
+
+- **Gold** (`regime_momentum:XAUUSD`, `tsmom_d1:XAUUSD`) uses the **same switch** as every
+  other pair. The gold engines (`regime_executor` / `regime_tick` / `tsmom_manager`) read the
+  switch directly (`shadow_switches.gold_state`); until you toggle it, the state is *derived*
+  from the legacy `.env` flags (`TSMOM_LIVE`, `REGIME_LIVE`, `REGIME_SHADOW_FILL`) so behaviour
+  is unchanged on first upgrade. `REGIME_LIVE` stays the master "algo-entry mode" (keeps the LLM
+  pipeline dormant); setting a gold combo to OFF does **not** re-wake the LLM.
+- **Non-gold** combos require the master gate **`MULTI_SYMBOL_LIVE=true`** as well — a two-layer
+  safety net (master flag **and** the per-combo switch must both be LIVE before any real order).
+- The **exec** column shows what is actually happening: `🟢 LIVE · engine` (gold),
+  `🟢 LIVE · MSE` (multi-symbol), `📄 PAPER · engine`, `SHADOW · paper`, or `OFF`.
+- Each row also shows the **in-sample backtest** exp_R and the **real closed-trade edge**
+  ("เงินจริง") per strategy×pair, attributed by the order comment — so you can compare
+  backtest-promise against live reality per algo. Committed backtest data lives in
+  `docs/reports/shadow_backtest.json` (regenerate with `scripts/shadow_backtest_managed.py`
+  and `scripts/tsmom_backtest_pairs.py`).
+
+**Kill switches** (instant, live-reload — no restart needed):
+
+| Scope | Action |
+|-------|--------|
+| One combo | set its switch to **OFF** (or SHADOW) in the dashboard |
+| All non-gold live | **`MULTI_SYMBOL_LIVE=false`** |
+| Everything (mock execution) | **`DRY_RUN=true`** — logs "would have placed", 0 real orders |
+
+Toggling from the dashboard writes `data/algo_switches.json` (per-combo) or `.env` (master
+flags); changes take effect on the next cycle via `reload_config()`.
 
 ---
 
