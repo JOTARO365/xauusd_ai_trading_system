@@ -2033,7 +2033,10 @@
     <section>
       <div class="section-title" style="display:flex;align-items:center">
         <span>Price Chart &mdash; AI Zones Overlay</span>
-        <span style="margin-left:auto;display:flex;gap:4px">
+        <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+          <select id="chart-sym" onchange="setChartSym(this.value)" class="filter-select" style="padding:3px 8px;font-size:11px">
+            <option value="">XAUUSD · ทอง</option>
+          </select>
           <button class="tf-btn active" data-tf="M15" onclick="setChartTf('M15')">M15</button>
           <button class="tf-btn" data-tf="H1"  onclick="setChartTf('H1')">H1</button>
           <button class="tf-btn" data-tf="H4"  onclick="setChartTf('H4')">H4</button>
@@ -6151,6 +6154,7 @@ async function loadMonitor() {
     renderSignals(bs);
     if (!_calEvents.length) fetchCalendar();   // เผื่อเปิด Live tab ก่อน calendar โหลดรอบแรก
     renderEventCard(bs);
+    populateChartSymbols();  // อัปเดตรายการคู่ที่เปิด live/open (dropdown)
     await loadCandles();    // init/refresh กราฟ (throttle ในตัว) — await กัน race ตอนวาดเส้นโซนครั้งแรก
     drawZoneLines(bs);      // ทับโซน AI ลงบนกราฟ
     loadGateBlocks();
@@ -6396,7 +6400,24 @@ function renderZones(bs) {
 }
 
 /* ── Price Chart + AI Zones overlay (07-03) — lightweight-charts, data จาก MT5 ── */
-let _chart = null, _candleSeries = null, _zoneLines = [], _clusterLines = [], _chartTf = 'M15', _lastCandleLoad = 0;
+let _chart = null, _candleSeries = null, _zoneLines = [], _clusterLines = [], _chartTf = 'M15', _lastCandleLoad = 0, _chartSym = '';
+
+function setChartSym(s) {                       // เลือกคู่ (ว่าง=ทอง). non-gold → ซ่อน overlay AI zones (gold-specific)
+  _chartSym = s || '';
+  if (_chartSym) { _zoneLines.forEach(l => { try { _candleSeries.removePriceLine(l); } catch(e){} }); _zoneLines = [];
+                   _clusterLines.forEach(l => { try { _candleSeries.removePriceLine(l); } catch(e){} }); _clusterLines = []; }
+  loadCandles(true);
+}
+async function populateChartSymbols() {
+  const sel = document.getElementById('chart-sym'); if (!sel) return;
+  try {
+    const d = await (await fetch('/api/live-symbols')).json();
+    if (!d.ok || !d.symbols) return;
+    const cur = sel.value;
+    sel.innerHTML = d.symbols.map(x => `<option value="${x.logical === 'XAUUSD' ? '' : x.logical}">${x.label}</option>`).join('');
+    sel.value = cur;
+  } catch (_e) {}
+}
 
 function initChart() {
   if (_chart || !window.LightweightCharts) return;
@@ -6433,7 +6454,7 @@ async function loadCandles(force) {
   if (!force && now - _lastCandleLoad < 25000) return;   // throttle 25s (backend cache 10s)
   _lastCandleLoad = now;
   try {
-    const r = await fetch('/api/candles?tf=' + _chartTf + '&count=250');
+    const r = await fetch('/api/candles?tf=' + _chartTf + '&count=250' + (_chartSym ? '&symbol=' + encodeURIComponent(_chartSym) : ''));
     const d = await r.json();
     if (d.ok && d.candles && d.candles.length) {
       _candleSeries.setData(d.candles); _setChartMsg('');
@@ -6451,6 +6472,7 @@ function setChartTf(tf) {
 
 // overlay ระบบใหม่: cluster S/R (dwell-zone) + Donchian levels ที่ algo ใช้ (จาก /api/cluster-map)
 function drawClusterLines(d) {
+  if (_chartSym) return;                        // overlay = gold-only
   if (!_candleSeries || !d || !d.ok) return;
   _clusterLines.forEach(l => { try { _candleSeries.removePriceLine(l); } catch (e) {} });
   _clusterLines = [];
@@ -6465,6 +6487,7 @@ function drawClusterLines(d) {
 }
 
 function drawZoneLines(bs) {
+  if (_chartSym) return;                        // overlay = gold-only
   if (!_candleSeries) return;
   _zoneLines.forEach(l => { try { _candleSeries.removePriceLine(l); } catch (e) {} });
   _zoneLines = [];

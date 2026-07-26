@@ -1586,25 +1586,60 @@ if _MT5_AVAILABLE:
 def api_candles():
     """แท่งเทียนจาก MT5 สำหรับ price chart (lightweight-charts) — cache 10s"""
     tf = request.args.get("tf", "M15").upper()
+    sym_arg = (request.args.get("symbol", "") or "").strip()     # logical (ว่าง=ทอง). map เป็น broker symbol
     try:
         count = min(int(request.args.get("count", 250)), 500)
     except ValueError:
         count = 250
     if tf not in ("M15", "H1", "H4", "D1"):
         return jsonify({"ok": False, "error": "bad tf", "candles": []}), 400
+    broker = SYMBOL
+    if sym_arg:
+        try:
+            from connectors.pair_collector import _broker_map
+            broker = _broker_map().get(sym_arg, sym_arg)
+        except Exception:
+            broker = sym_arg
 
     def _fetch():
         if not _MT5_AVAILABLE or not _ensure_mt5():
-            return {"ok": False, "error": "MT5 not connected (dashboard process)", "symbol": SYMBOL, "candles": []}
-        rates = mt5.copy_rates_from_pos(SYMBOL, _TF_MAP[tf], 0, count)
+            return {"ok": False, "error": "MT5 not connected (dashboard process)", "symbol": sym_arg or SYMBOL, "candles": []}
+        rates = mt5.copy_rates_from_pos(broker, _TF_MAP[tf], 0, count)
         if rates is None or len(rates) == 0:
-            return {"ok": False, "symbol": SYMBOL,
-                    "error": f"no bars for '{SYMBOL}' — {mt5.last_error()} (ตรวจ SYMBOL ใน .env ตรงกับ broker symbol ไหม)",
+            return {"ok": False, "symbol": sym_arg or SYMBOL, "broker": broker,
+                    "error": f"no bars for '{broker}' — {mt5.last_error()}",
                     "candles": []}
-        return {"ok": True, "tf": tf, "symbol": SYMBOL, "candles": [
+        return {"ok": True, "tf": tf, "symbol": sym_arg or SYMBOL, "broker": broker, "candles": [
             {"time": int(r["time"]), "open": float(r["open"]), "high": float(r["high"]),
              "low": float(r["low"]), "close": float(r["close"])} for r in rates]}
-    return jsonify(_cached(f"candles:{tf}:{count}", _fetch, ttl=10))
+    return jsonify(_cached(f"candles:{broker}:{tf}:{count}", _fetch, ttl=10))
+
+
+@app.route("/api/live-symbols")
+def api_live_symbols():
+    """คู่ที่ดูได้ในกราф: ทอง (engine) + combo ที่ toggle LIVE + คู่ที่มี open position. 0 token."""
+    out = [{"logical": "XAUUSD", "label": "XAUUSD · ทอง"}]
+    seen = {"XAUUSD"}
+    try:
+        from agents import algo_registry as _reg, shadow_switches as _sw
+        for _a, s in _sw.combos_in(_sw.LIVE, _reg.combos(_reg.UNIVERSE)):
+            if s not in seen:
+                out.append({"logical": s, "label": f"{s} · LIVE"}); seen.add(s)
+    except Exception:
+        pass
+    try:                                                          # + คู่ที่มี MSE open position จริง
+        if _MT5_AVAILABLE and _ensure_mt5():
+            from connectors.mt5_connector import SYSTEM_MAGIC
+            from connectors.pair_collector import _broker_map
+            inv = {v: k for k, v in _broker_map().items()}
+            for p in (mt5.positions_get() or []):
+                if p.magic == SYSTEM_MAGIC and p.symbol != SYMBOL:
+                    lg = inv.get(p.symbol, p.symbol)
+                    if lg not in seen:
+                        out.append({"logical": lg, "label": f"{lg} · open"}); seen.add(lg)
+    except Exception:
+        pass
+    return jsonify({"ok": True, "symbols": out})
 
 
 @app.route("/api/speech-history")
