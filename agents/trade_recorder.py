@@ -23,13 +23,13 @@ _COMMENT_ALGO = {"ALGO-mom": "regime_momentum", "ALGO-TSMOM": "tsmom_d1"}
 
 
 def _algo_of(comment):
-    """map comment → algo_id. MSE-* = None (MSE บันทึกเอง). อื่นๆ = decision_ai (AI/legacy/manual-system)."""
+    """map comment → algo_id. MSE-<algo> → <algo> · ALGO-mom/TSMOM → mapping · อื่น → decision_ai."""
     c = (comment or "").strip()
+    if c.startswith("MSE-"):
+        return c[4:].strip() or "mse"                # MSE-regime_momentum → regime_momentum
     for k, v in _COMMENT_ALGO.items():
         if c.startswith(k):
             return v
-    if c.startswith("MSE-"):
-        return None
     return "decision_ai"
 
 
@@ -157,16 +157,14 @@ def backfill(days=365):
         outs = [d for d in dl if d.entry in (1, 2)]
         if entry is None or not outs:
             continue
-        if entry.magic != SYSTEM_MAGIC or entry.symbol != SYMBOL:   # เฉพาะไม้บอททอง
+        if entry.magic != SYSTEM_MAGIC:                             # ไม้บอททุก symbol (ทอง + WTI/BTC)
             continue
         o = orders.get(entry.order)
         comment = (getattr(o, "comment", "") or entry.comment or "").strip()
         if not comment:
             no_comment += 1
         algo = _algo_of(comment)
-        if algo is None:                                            # MSE — ข้าม
-            continue
-        sym_lg = _logical(SYMBOL)                                   # GOLD# → XAUUSD (ตรง shadow_matrix)
+        sym_lg = _logical(entry.symbol)                             # broker → logical ต่อคู่ (GOLD#→XAUUSD, OILCash#→WTIUSD)
         tk = entry.order
         if _fill_has_ticket(algo, sym_lg, tk):
             skipped += 1
@@ -204,7 +202,7 @@ def tick(force=False):
         reg = _load_reg()
         open_ids = set()
         for p in pos:
-            if p.magic != SYSTEM_MAGIC or p.symbol != SYMBOL:   # เฉพาะทอง magic ระบบ (non-gold = MSE)
+            if p.magic != SYSTEM_MAGIC:                          # ไม้บอททุก symbol (ทอง + WTI/BTC/คู่อื่น)
                 continue
             tk = str(p.ticket)
             open_ids.add(tk)

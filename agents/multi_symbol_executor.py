@@ -403,9 +403,9 @@ def tick(force=False):
             ck = f"{algo_id}:{symbol}"
             cstate = state.setdefault(ck, {})
             positions = _our_positions(broker)
-            if positions is None:                            # fetch fail → ข้าม combo รอบนี้ (ห้าม reconcile/manage ด้วยข้อมูลพัง)
+            if positions is None:                            # fetch fail → ข้าม combo รอบนี้ (ห้าม manage ด้วยข้อมูลพัง)
                 continue
-            _reconcile_closed(algo_id, symbol, positions, cstate)   # จับไม้ที่ปิด → real-fill journal
+            # ไม้ปิด → บันทึกโดย trade_recorder (universal, comment MSE-<algo>) แล้ว — MSE ไม่ record ซ้ำ
             managed += _manage(broker, positions, bars, point, digits, cstate)
             room_total = (max_total <= 0) or (total_open + opened < max_total)   # global cap ยังมีที่ว่าง
             if len(positions) < max_pos and room_total:         # ผ่านทั้ง per-combo + รวมทุก symbol
