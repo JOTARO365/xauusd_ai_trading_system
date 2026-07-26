@@ -151,15 +151,24 @@ def build():
                      "real_exp_R": (real.get((algo_id, symbol)) or {}).get("exp_R"),
                      "real_wr": (real.get((algo_id, symbol)) or {}).get("wr"),
                      "real_regime": (real.get((algo_id, symbol)) or {}).get("by_regime", {}), **stat})
-    # +row สำหรับ algo ที่มี real fills แต่ไม่ใช่ registry combo (decision_ai/tsmom_d1) → Shadow Matrix = ทุกกลยุทธ์จริง
+    # +row สำหรับ algo ที่ไม่ใช่ registry combo — มี real fills (decision_ai/tsmom_d1) หรือมี backtest ต่อคู่ (tsmom_d1)
+    # → Shadow Matrix = ทุกกลยุทธ์จริง + เทียบ backtest-promise vs real ต่อคู่ (registry combo จัดการใน loop บนแล้ว)
     _have = {(r["algo_id"], r["symbol"]) for r in rows}
-    for (a, s), rr in real.items():
+    _reg_ids = {a for a, _ in eligible}                    # algo ids ที่ registry จัดการใน loop บนแล้ว
+    _extra = set(real) | {k for k in bt if k[0] not in _reg_ids}
+    for (a, s) in _extra:
         if (a, s) in _have:
             continue
+        b = bt.get((a, s))
+        rr = real.get((a, s)) or {}
         zero = _aggregate([], "scalp")
-        rows.append({"algo_id": a, "symbol": s, "klass": "scalp", "state": "—", "exec_mode": "LIVE_ENGINE",
-                     "live": True, "backtest_exp_R": None, "backtest_n": None, "backtest_wr": None,
-                     "backtest_managed": False, "real_n": rr.get("n", 0), "real_exp_R": rr.get("exp_R"),
+        rows.append({"algo_id": a, "symbol": s, "klass": "scalp", "state": "—",
+                     "exec_mode": "LIVE_ENGINE" if rr else "SHADOW", "live": bool(rr),
+                     "backtest_exp_R": (b.get("exp_R") if b else None),
+                     "backtest_n": (b.get("n") if b else None),
+                     "backtest_wr": (b.get("wr") if b else None),
+                     "backtest_managed": bool(b.get("managed")) if b else False,
+                     "real_n": rr.get("n", 0), "real_exp_R": rr.get("exp_R"),
                      "real_wr": rr.get("wr"), "real_regime": rr.get("by_regime", {}), **zero})
     counts = {"ready": 0, "collecting": 0, "dying": 0}
     for r in rows:

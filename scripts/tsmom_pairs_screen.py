@@ -55,7 +55,8 @@ def backtest(logical, broker):
     high = r["high"].astype(float); low = r["low"].astype(float); close = r["close"].astype(float)
     info = mt5.symbol_info(broker); point = float(info.point)
     atr = R.atr(high, low, close)
-    cost_px = SPREAD[logical] * point * 2            # round-trip (entry+exit)
+    sp = SPREAD.get(logical) or int(getattr(info, "spread", 0) or 30)   # fallback: current spread (คู่นอก dict เช่น WTI/BTC)
+    cost_px = sp * point * 2                          # round-trip (entry+exit)
     n = len(close); cut = int(n * 0.6)
     pos = "FLAT"; entry = sl = 0.0; risk = 0.0; entry_i = 0
     trades = []                                       # (R_net, is_in_sample)
@@ -85,7 +86,8 @@ def backtest(logical, broker):
     exp_R = float(allR.mean()); sd = float(allR.std(ddof=1)) if len(allR) > 1 else 0.0
     sharpe = exp_R / sd if sd > 0 else 0.0
     bar = sd * (_c_n(N_TRIALS) + 1.65) / np.sqrt(len(allR)) if sd > 0 else None
-    return {"n": len(allR), "exp_R": round(exp_R, 3), "sd_R": round(sd, 2),
+    wr = round(100.0 * sum(1 for x in allR if x > 0) / len(allR), 1)
+    return {"n": len(allR), "exp_R": round(exp_R, 3), "sd_R": round(sd, 2), "wr": wr,
             "sharpe": round(sharpe, 3), "t": round(sharpe * np.sqrt(len(allR)), 2),
             "sum_R": round(float(allR.sum()), 1), "bar": round(bar, 3) if bar else None,
             "believe": (bar is not None and exp_R > bar and len(allR) >= 100),
