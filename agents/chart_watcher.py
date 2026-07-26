@@ -15,7 +15,7 @@ from loguru import logger
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=40.0, max_retries=1)
 
 SYSTEM_PROMPT = json.dumps(
-    json.loads(Path("agents/prompts/chart_watcher.json").read_text(encoding="utf-8")),
+    json.loads((Path(__file__).resolve().parent / "prompts" / "chart_watcher.json").read_text(encoding="utf-8")),
     separators=(",", ":"),
 )
 
