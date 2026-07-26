@@ -93,19 +93,21 @@ def _gold_real():
                 continue
             if str(r.get("status", "")).upper() not in ("CLOSED", "CLOSE"):
                 continue
+            pnl = r.get("pnl")
+            if pnl is None:                                   # ต้องมี pnl (นับ WR/pnl ทุกไม้ system-closed ไม่ใช่แค่ที่มี close/sl ครบ)
+                continue
             entry = r.get("entry_price"); close = r.get("close_price"); sl = r.get("sl")
             d_ = str(r.get("direction", "")).upper()
-            if d_ not in ("BUY", "SELL"):
-                continue
-            if not (entry and close and sl) or entry == sl:
-                continue
-            entry = float(entry); close = float(close); sl = float(sl); is_buy = d_ == "BUY"
-            # reporter ทับ t["sl"] ด้วย SL live (หลัง BE/trailing) → ถ้า sl อยู่ฝั่งกำไรแล้ว = ระยะเริ่มต้นหาย → R เชื่อไม่ได้
-            bad_sl = (sl >= entry) if is_buy else (sl <= entry)
-            dist = abs(entry - sl)
-            rr = None if (bad_sl or dist <= 0) else (((close - entry) if is_buy else (entry - close)) / dist)
+            # realized_R คำนวณเฉพาะเมื่อ field ครบ + SL ยังฝั่งเสี่ยง (reporter ทับ sl หลัง BE → R เชื่อไม่ได้)
+            rr = None
+            if d_ in ("BUY", "SELL") and entry and close and sl and float(entry) != float(sl):
+                entry = float(entry); close = float(close); sl = float(sl); is_buy = d_ == "BUY"
+                bad_sl = (sl >= entry) if is_buy else (sl <= entry)
+                dist = abs(entry - sl)
+                if not bad_sl and dist > 0:
+                    rr = ((close - entry) if is_buy else (entry - close)) / dist
             recs.append({"realized_R": round(rr, 3) if rr is not None else None,
-                         "profit": float(r.get("pnl") or 0.0), "features": {}})
+                         "profit": float(pnl), "features": {}})
     except Exception:
         pass
     return recs
