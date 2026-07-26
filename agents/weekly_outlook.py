@@ -169,7 +169,7 @@ def build(force=False):
         import config as _cfg
         ctx = _gather()
         llm = ChatAnthropic(model=_MODEL, api_key=_cfg.ANTHROPIC_API_KEY,
-                            max_tokens=2200, temperature=0.4, timeout=90)
+                            max_tokens=2200, timeout=90)   # ไม่ตั้ง temperature — Opus 4.8 deprecated param นี้
         msg = _PROMPT.format(context=json.dumps(ctx, ensure_ascii=False)[:24000])   # Opus รับได้เยอะ; กันข้อมูลท้ายหาย
         resp = llm.invoke(msg)
         md = resp.content if isinstance(resp.content, str) else str(resp.content)
