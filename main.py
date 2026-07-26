@@ -290,6 +290,14 @@ def _should_skip_ai() -> tuple[bool, str]:
 
     since = time.monotonic() - _last_ai_mono
 
+    # WEEKEND_RUN: วันหยุด loop ยังรัน 5 วิปกติ (pos-mgmt/MSE/shadow/trailing) แต่ AI throttle ห่าง (ลด token)
+    if getattr(config, "WEEKEND_RUN", False):
+        from utils.market_clock import is_weekend_closed
+        if is_weekend_closed():
+            _wk = int(getattr(config, "WEEKEND_INTERVAL_SECS", 1800))
+            if since < _wk:
+                return True, f"สุดสัปดาห์ — AI ทุก {_wk//60}min (ระบบ/mgmt รันปกติ)"
+
     # 0. Capital floor — ทุนต่ำกว่าเกณฑ์ → ไม่รัน AI เลย (override ทุกอย่าง รวม spike/first cycle)
     #    pos mgmt ยังทำงานผ่าน graph; ประหยัด token ตอนพอร์ตเล็กเกินกว่าจะเทรดมีความหมาย
     #    ⚠️ REGIME_LIVE/shadow: algo เก็บ data ต่อเนื่อง (sentiment guide + journal) → ไม่ skip AI แม้ทุนไม่พอ (user 07-20)
@@ -670,12 +678,6 @@ async def main():
                     print_regime_panel(open_positions=open_pos)
                 except Exception as _pe:
                     logger.debug(f"[regime_panel] {_pe}")
-            # WEEKEND_RUN: วันหยุด loop ห่างขึ้น (AI ยังรัน sentiment/BTC แต่ลด token)
-            if getattr(config, "WEEKEND_RUN", False):
-                from utils.market_clock import is_weekend_closed
-                if is_weekend_closed():
-                    interval = max(interval, int(getattr(config, "WEEKEND_INTERVAL_SECS", 1800)))
-                    reason = f"สุดสัปดาห์ loop ห่าง (เก็บ BTC · AI on) · {reason}"
             print_cycle_end(interval, reason)
             await asyncio.sleep(interval)
     except KeyboardInterrupt:
