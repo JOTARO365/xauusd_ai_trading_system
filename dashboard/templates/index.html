@@ -1666,6 +1666,9 @@
       <div class="table-toolbar">
         <h3>Trade History</h3>
         <div class="filter-row">
+          <select id="filter-symbol" title="เลือกคู่ (สด=MT5 · คู่อื่น=จาก DB)">
+            <option value="">ทองสด (MT5)</option>
+          </select>
           <select id="filter-source">
             <option value="">All Sources</option>
             <option value="SYSTEM">System</option>
@@ -3136,6 +3139,31 @@ let allTrades = [];
 let currentPage = 1;
 const PAGE_SIZE = 20;
 let lastFiltered = [];
+let histSymbol = '';                              // '' = ทองสด (logs/MT5) · SYM = ประวัติจาก DB ต่อคู่
+
+// เติม dropdown symbol = live (engine/LIVE/open) + คู่ที่มีประวัติใน DB
+async function populateSymbolFilter() {
+  try {
+    const d = await (await fetch('/api/trade-symbols')).json();
+    const sel = document.getElementById('filter-symbol');
+    if (!sel || !d.ok) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">ทองสด (MT5)</option>'
+      + (d.symbols || []).map(s => `<option value="${s}">${s} · DB</option>`).join('');
+    sel.value = cur;                              // คงค่าที่เลือกไว้
+  } catch (_e) {}
+}
+
+// เลือกคู่: '' → ทองสด (logs) · SYM → ดึงประวัติคู่นั้นจาก DB
+async function onSymbolChange() {
+  histSymbol = document.getElementById('filter-symbol').value;
+  if (!histSymbol) { renderTable(allTrades); return; }
+  try {
+    const d = await (await fetch('/api/trades-symbol?symbol=' + encodeURIComponent(histSymbol))).json();
+    if (d.ok) { updateStats(d.stats || {}); renderTable(d.trades || []); }
+    else toast('โหลดประวัติ ' + histSymbol + ' ไม่ได้', 'err');
+  } catch (_e) { toast('เชื่อมต่อ /api/trades-symbol ไม่ได้', 'err'); }
+}
 let activeSystem = 'xauusd';
 function setActiveSystem(v) {                     // ทอง / ทุกคู่ (all = รวม WTI/BTC จาก DB)
   activeSystem = v || 'xauusd';
@@ -3604,8 +3632,8 @@ async function fetchData() {
 
   try {
     allTrades = data.trades || [];
-    updateStats(data.stats || {});
-    renderTable(allTrades);
+    if (histSymbol) { onSymbolChange(); }        // ดูประวัติ DB ต่อคู่อยู่ → คง view (ไม่ override ด้วย logs)
+    else { updateStats(data.stats || {}); renderTable(allTrades); }
   } catch (e) {
     console.error('stats/table error:', e);
     document.getElementById('last-update').textContent = 'Dashboard error: ' + e.message;
@@ -3622,8 +3650,10 @@ async function fetchData() {
     (data.account && data.account.balance ? '' : '  (MT5 offline)');
 }
 
+document.getElementById('filter-symbol').addEventListener('change', onSymbolChange);
+populateSymbolFilter();
 ['filter-source', 'filter-dir', 'filter-status', 'filter-result'].forEach(id => {
-  document.getElementById(id).addEventListener('change', () => renderTable(allTrades));
+  document.getElementById(id).addEventListener('change', () => histSymbol ? onSymbolChange() : renderTable(allTrades));
 });
 
 /* ════════════════════════════════════════════════════════════

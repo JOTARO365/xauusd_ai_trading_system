@@ -55,6 +55,7 @@ def get_trades(symbol: str = "XAUUSD", account_login: int | None = None) -> list
         for r in res.data:
             result.append({
                 "ticket":                r.get("ticket"),
+                "symbol":                r.get("symbol"),           # ให้ dashboard filter ตาม symbol ได้
                 "source":                r.get("source", "SYSTEM"),
                 "direction":             r.get("direction"),
                 "entry_type":            r.get("entry_type"),

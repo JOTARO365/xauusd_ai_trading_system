@@ -1676,6 +1676,40 @@ def api_live_symbols():
     return jsonify({"ok": True, "symbols": out})
 
 
+@app.route("/api/trade-symbols")
+def api_trade_symbols():
+    """symbol ที่มีให้เลือกใน Trade History = live (engine/LIVE/open) + คู่ที่มีประวัติใน DB. 0 token."""
+    def _c():
+        syms = set()
+        try:
+            from db.reader import get_trades, _norm
+            for t in (get_trades("all") or []):
+                if t.get("symbol"):
+                    syms.add(_norm(str(t["symbol"])))          # รวม GOLD#/GOLD/XAUUSD → XAUUSD (กัน 3 entry ซ้ำ)
+        except Exception:
+            pass
+        try:
+            for s in api_live_symbols().get_json().get("symbols", []):
+                if s.get("logical"):
+                    syms.add(str(s["logical"]).upper())
+        except Exception:
+            pass
+        return {"ok": True, "symbols": sorted(syms)}
+    return jsonify(_cached("trade-symbols", _c, ttl=60))
+
+
+@app.route("/api/trades-symbol")
+def api_trades_symbol():
+    """ประวัติเทรดต่อ symbol จาก DB (มี symbol/WTI/BTC ครบ ไม่ใช่แค่ gold logs). symbol=all → ทุกคู่. 0 token."""
+    symbol = (request.args.get("symbol") or "all").strip()
+
+    def _c():
+        from db.reader import get_trades
+        rows = get_trades(symbol) or []
+        return {"ok": True, "trades": list(reversed(rows)), "stats": calc_stats(rows), "symbol": symbol}
+    return jsonify(_cached(f"trades-sym:{symbol}", _c, ttl=15))
+
+
 @app.route("/api/speech-history")
 def api_speech_history():
     """ปฏิกิริยาราคา XAU รอบ speech ครั้งก่อน (data/speech_log.json + MT5 H1 รอบ prev ts). Phase 2, 0 token."""
