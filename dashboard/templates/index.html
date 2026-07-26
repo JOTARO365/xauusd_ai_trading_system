@@ -2118,7 +2118,7 @@
     <section>
       <div class="section-title">LEVELS &mdash; S/R Book</div>
       <div id="sr-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
-        <button class="ntab active" onclick="setSrTab('',this)">🥇 ทอง</button>
+        <button class="ntab active" onclick="setSrTab('',this)">ทอง</button>
       </div>
       <div class="chart-card" style="padding:14px 18px">
         <div id="zone-ladder" style="font-family:var(--mono);font-size:12px">Loading…</div>
@@ -6494,6 +6494,7 @@ async function populateChartSymbols() {
     const cur = sel.value;
     sel.innerHTML = d.symbols.map(x => `<option value="${x.logical === 'XAUUSD' ? '' : x.logical}">${x.label}</option>`).join('');
     sel.value = cur;
+    if (sel.value !== cur) { setChartSym(''); }   // คู่ที่ดูอยู่หลุด live แล้ว → กลับไปทอง (กัน state ค้าง)
   } catch (_e) {}
 }
 

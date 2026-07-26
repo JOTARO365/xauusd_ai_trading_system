@@ -1019,7 +1019,7 @@ def _tag_confluence(meta: list, fib_h4: dict, fib_h1: dict,
 def _build_sr_meta(h4_sr: dict, h1_sr: dict, key_lvl: dict,
                    d1_sr: dict | None, w1_sr: dict | None,
                    h4_df, h1_df,
-                   fib_h4: dict | None = None, fib_h1: dict | None = None) -> list:
+                   fib_h4: dict | None = None, fib_h1: dict | None = None, digits: int = 2) -> list:
     """Metadata ต่อ S/R level สำหรับ dashboard (07-03): strength % + เหตุผลว่าทำไมวาง level นี้
     เกณฑ์เดียวกับ setup scanner — touches (_touch_score_bonus) + HTF confluence + key-level confluence
     ไม่กระทบ logic เทรดใดๆ (display เท่านั้น)"""
@@ -1048,7 +1048,7 @@ def _build_sr_meta(h4_sr: dict, h1_sr: dict, key_lvl: dict,
             score += 3; why.append("เลขกลม")
         bars_since, avg_bounce = _touch_recency_bounce(df, lv, side)   # UHAS #2 (display-only)
         bounce_pct, break_pct, n_tests = _break_bounce_stats(df, lv, side)  # A (display-only)
-        return {"level": round(float(lv), 2), "side": side, "tf": tf, "touches": touches,
+        return {"level": round(float(lv), digits), "side": side, "tf": tf, "touches": touches,
                 "bars_since_touch": bars_since, "avg_bounce": avg_bounce,
                 "bounce_pct": bounce_pct, "break_pct": break_pct, "n_tests": n_tests,
                 "break_hold": _break_hold_status(df, lv, side),          # B (display-only)

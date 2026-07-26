@@ -275,16 +275,36 @@ def _append_fill(algo_id, symbol, rec):
         pass
 
 
+def _fill_has_ticket(algo_id, symbol, ticket):
+    """ticket นี้ถูกบันทึกใน journal แล้วหรือยัง (กัน duplicate line ตอน crash-recovery)."""
+    fp = os.path.join(_FILLS, f"{algo_id}__{symbol}.jsonl")
+    if not os.path.exists(fp):
+        return False
+    tk = f'"ticket": {int(ticket)}'
+    try:
+        with open(fp, encoding="utf-8") as f:
+            return any(tk in ln for ln in f)
+    except OSError:
+        return False
+
+
 def _record_closed(algo_id, symbol, ticket, ctx):
     """ดึง realized จาก deal history by **position_id** (ไม่พึ่ง magic — broker reset magic=0 ตอนปิด SL/TP).
     คำนวณ realized_R เทียบ sl_dist เริ่มต้น → append real-fill journal."""
     try:
         import MetaTrader5 as mt5
+        if _fill_has_ticket(algo_id, symbol, ticket):        # กัน dup (crash ระหว่าง append↔pop รอบก่อน)
+            return True
         deals = mt5.history_deals_get(position=int(ticket))
         if not deals:
             return False
         profit = sum(float(d.profit) + float(d.swap) + float(d.commission) for d in deals)
-        exit_px = float(deals[-1].price)
+        outs = [d for d in deals if getattr(d, "entry", None) == mt5.DEAL_ENTRY_OUT]   # exit = VWAP ของ OUT deals (partial-close ถูก)
+        if outs:
+            vol = sum(float(d.volume) for d in outs) or 1.0
+            exit_px = sum(float(d.price) * float(d.volume) for d in outs) / vol
+        else:
+            exit_px = float(deals[-1].price)
         entry = float(ctx.get("entry") or (deals[0].price if deals else 0.0))
         sl_dist = float(ctx.get("sl_dist") or 0.0)
         is_buy = ctx.get("dir") == "BUY"
@@ -364,7 +384,7 @@ def tick(force=False):
     from connectors.pair_collector import _broker_map
     bmap = _broker_map()
     sl_mult = _sl_mult_map()
-    max_pos = max(1, int(getattr(_cfg, "MSE_MAX_POSITIONS", 1)))   # stack ไม้/combo (1 ไม้ต่อ signal-bar ใหม่)
+    max_pos = max(1, int(getattr(_cfg, "MSE_MAX_POSITIONS", 1)))   # stack ไม้/combo (min 1; 0 ไม่ได้แปลว่า "ปิด" — ปิดที่ MULTI_SYMBOL_LIVE=false หรือ toggle SHADOW)
     max_total = int(getattr(_cfg, "MSE_MAX_TOTAL", 0))            # เพดานรวมทุก symbol (0 = ไม่จำกัด)
     total_open = _total_mse_positions() if max_total > 0 else 0    # snapshot ต้น cycle; +opened ระหว่างวนลูป
     state = _load_state()

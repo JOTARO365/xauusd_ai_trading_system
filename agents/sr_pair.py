@@ -36,22 +36,22 @@ def sr_ladder(symbol=None, count=600):
         if h1 is None:
             return {"ok": False, "error": f"ดึง bars ไม่ได้ ({broker})"}
         h4 = _df(mt5.TIMEFRAME_H4, 400)
+        point = 0.01; digits = 2
+        try:
+            info = mt5.symbol_info(broker)
+            if info and info.point:
+                point = float(info.point); digits = int(info.digits or 2)
+        except Exception:
+            pass
         h1_sr = cw.find_swing_levels(h1)
         h4_sr = cw.find_swing_levels(h4) if h4 is not None else {"resistance": [], "support": []}
         key = cw.find_key_levels(h1)
-        meta = cw._build_sr_meta(h4_sr, h1_sr, key, None, None, h4, h1)
+        meta = cw._build_sr_meta(h4_sr, h1_sr, key, None, None, h4, h1, digits=digits)   # round level ตาม digits ของคู่ (FX 5-digit ไม่ collapse)
         for m in meta:
             sc, gr = cw._score_zone(m)                # + unified score/grade (เหมือน gold)
             m["score"] = sc; m["grade"] = gr
 
-        px = round(float(h1["close"].iloc[-1]), 5)
-        point = 0.01
-        try:
-            info = mt5.symbol_info(broker)
-            if info and info.point:
-                point = float(info.point)
-        except Exception:
-            pass
+        px = round(float(h1["close"].iloc[-1]), digits)
         res = sorted({m["level"] for m in meta if m["side"] == "R"}, reverse=True)
         sup = sorted({m["level"] for m in meta if m["side"] == "S"}, reverse=True)
         return {"ok": True, "symbol": symbol or "XAUUSD", "price": px, "point": point,

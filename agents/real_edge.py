@@ -51,7 +51,7 @@ def _stats(recs):
     if not n:
         return {"n": 0, "wr": None, "exp_R": None, "sum_R": 0.0, "sum_pnl": 0.0}
     Rs = [float(r["realized_R"]) for r in rs]
-    wins = sum(1 for x in Rs if x > 0)
+    wins = sum(1 for x in Rs if x > 0.05)                   # >0.05R = win จริง (ตัด BE/scratch ที่ ~0 ออกจาก WR)
     pnl = sum(float(r.get("profit") or 0.0) for r in rs)
     return {"n": n, "wr": round(wins / n * 100, 1), "exp_R": round(sum(Rs) / n, 3),
             "sum_R": round(sum(Rs), 2), "sum_pnl": round(pnl, 2)}
