@@ -28,7 +28,7 @@ ships a Flask dashboard on port 5050.
 - **Real-edge capture** (`agents/real_edge.py`) — records real closed-trade outcomes per live pair (leakage-free entry features + realized R) and surfaces per-pair real edge in the dashboard **Shadow Matrix** ("เงินจริง" column), separate from the paper-shadow numbers. Display-only until it passes the validation gauntlet (validated-or-off). *(The legacy `decision_ai` LLM sleeve is retired from the live path and hidden from the matrix.)*
 - **`WEEKEND_RUN`** — keep the loop alive on weekends in *collect-only* mode (skip AI = 0 token, gold entries closed) so BTC/crypto edge keeps accumulating (crypto trades 24/7). Default OFF.
 - **Crypto news tag** — `bitcoin/BTC/ethereum/crypto/...` added to the X keyword defaults and a **₿ คริปโต** filter tab in the dashboard news feed.
-- **One-shot `setup.py`** — `python setup.py` installs deps and **syncs new `.env` keys after a `git pull` without overwriting your values**.
+- **One-shot `setup.py`** — `python setup.py` installs deps and syncs `.env`: adds new keys from `.env.example` (no overwrite) **and forces shared team config from `.env.shared`** (behaviour/strategy flags) while never touching secrets or per-account keys. So collaborators `git pull && python setup.py` and match the owner's config automatically.
 - **Dashboard polish** — larger section headers with clearer separation, expanded sidebar quick-jump, themed toast/confirm/input dialogs (no browser popups).
 
 ---
@@ -227,11 +227,20 @@ Idempotent + safe to re-run. Does everything a fresh checkout needs: Python-vers
 `pip install -r requirements.txt` → **sync `.env`** → create runtime dirs → MT5 connectivity
 check (informational). It never starts the bot.
 
-> **`.env` sync behaviour.** If `.env` is missing it's created from `.env.example`; if it
-> **already exists**, `setup.py` **appends any new config keys without touching your existing
-> values**. So after a `git pull` that introduced new keys (e.g. the multi-symbol engine keys),
-> just re-run `python setup.py` to bring your `.env` up to date — new keys land under a dated
-> marker and any secrets you still need to fill are flagged. Your `.env` is never overwritten.
+> **`.env` sync behaviour** (two passes):
+> 1. **`.env.example` → add-only.** Missing `.env` is created from it; an existing `.env` gets
+>    any **new** keys appended under a dated marker — existing values are never touched.
+> 2. **`.env.shared` → force team config.** `.env.shared` holds the **shared behaviour/strategy
+>    flags** the whole team runs identically (e.g. `WEEKEND_RUN`, `MULTI_SYMBOL_LIVE`,
+>    `TSMOM_LIVE`, regime flags). `setup.py` **overwrites** these in your `.env` to match — but
+>    **never touches secrets or per-account keys** (`ANTHROPIC_API_KEY`, `MT5_*`, `X_*` Twitter,
+>    `SUPABASE_*`, `TRADING_API_*`, `GEMINI`, `DATABASE_URL`, and money-size like `START_BALANCE`
+>    / `*_LOT` / `RISK_*`). It backs up to `.env.bak` and prints every `key: old → new` first.
+>
+> So the owner edits `.env.shared`, commits, pushes; collaborators `git pull && python setup.py`
+> and their config matches — while their own account credentials and balance stay untouched.
+> This is why a fresh clone that "wouldn't run on the weekend" is fixed by a re-run: `WEEKEND_RUN`
+> now comes from `.env.shared` (set to the team value) instead of the `.env.example` default.
 
 Or do it manually:
 
