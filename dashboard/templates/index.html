@@ -4811,10 +4811,11 @@ let _smLast = 0, _smPairInit = false;
 // pill "เทรดจริงยังไง" — แยกจาก switch: engine ทองเทรดเอง (switch=SHADOW ก็ live) vs MSE vs paper
 function execPill(mode) {
   const M = {
-    LIVE_ENGINE: ['🟢 LIVE · engine', 'var(--green)', 'var(--green-dim)'],
-    LIVE_MSE:    ['🟢 LIVE · MSE',    'var(--green)', 'var(--green-dim)'],
-    SHADOW:      ['SHADOW · paper',   'var(--muted)', 'transparent'],
-    OFF:         ['OFF',              'var(--muted)', 'transparent'],
+    LIVE_ENGINE:  ['🟢 LIVE · engine', 'var(--green)', 'var(--green-dim)'],
+    LIVE_MSE:     ['🟢 LIVE · MSE',    'var(--green)', 'var(--green-dim)'],
+    PAPER_ENGINE: ['📄 PAPER · engine','var(--amber,#e0a030)', 'transparent'],
+    SHADOW:       ['SHADOW · paper',   'var(--muted)', 'transparent'],
+    OFF:          ['OFF',              'var(--muted)', 'transparent'],
   };
   const [t, c, bg] = M[mode] || M.SHADOW;
   return `<span title="engine=เทรดจริงผ่าน engine เฉพาะทอง · MSE=multi-symbol executor · paper=เก็บสถิติ 0 order"
@@ -4878,18 +4879,43 @@ async function loadShadowMatrix(force) {
         <td style="padding:4px 8px;color:${r.real_n ? rC(r.real_exp_R) : 'var(--muted)'}">${r.real_n ? fx(r.real_exp_R) + ` <span style="color:var(--muted);font-size:10px">n${r.real_n}·WR${r.real_wr}%</span>` : '—'}</td>
         <td style="padding:4px 8px;color:${badgeColor[r.badge]};font-weight:600">${r.badge}</td>
         <td style="padding:4px 8px">${execPill(r.exec_mode)}</td>
-        <td style="padding:4px 8px">
-          ${['SHADOW','LIVE','OFF'].includes(r.state)
-            ? `<select class="filter-select" style="padding:2px 24px 2px 9px;font-size:11px"
-                onchange="setShadowSwitch('${r.algo_id}','${r.symbol}',this.value)">
-                ${['SHADOW','LIVE','OFF'].map(s => `<option value="${s}"${r.state === s ? ' selected' : ''}>${s}</option>`).join('')}
-              </select>`
-            : `<span style="color:var(--muted);font-size:11px" title="display-only (backtest/real reference) — ไม่มี live switch">—</span>`}
-        </td>
+        <td style="padding:4px 8px">${switchCell(r)}</td>
       </tr>`;
     }).join('') || '<tr><td colspan="13" style="color:var(--muted);padding:6px 8px">ไม่มีข้อมูลตามตัวกรอง</td></tr>';
     refreshMasterToggle();
   } catch (_e) {}
+}
+
+// ── switch cell: combo (MSE, shadow-switch) · regime_gold (LIVE/PAPER↔REGIME_SHADOW_FILL) · tsmom_gold (LIVE/OFF↔TSMOM_LIVE) ──
+function switchCell(r) {
+  const kind = r.switch_kind || (['SHADOW','LIVE','OFF'].includes(r.state) ? 'combo' : 'none');
+  const sel = (opts, cur, onch) =>
+    `<select class="filter-select" style="padding:2px 24px 2px 9px;font-size:11px" onchange="${onch}">
+      ${opts.map(s => `<option value="${s}"${cur === s ? ' selected' : ''}>${s}</option>`).join('')}
+     </select>`;
+  if (kind === 'combo')
+    return sel(['SHADOW','LIVE','OFF'], r.switch_state || r.state,
+               `setShadowSwitch('${r.algo_id}','${r.symbol}',this.value)`);
+  if (kind === 'regime_gold')   // LIVE→REGIME_SHADOW_FILL=false · PAPER→true
+    return sel(['LIVE','PAPER'], r.switch_state,
+               `setGoldFlag('REGIME_SHADOW_FILL', this.value==='PAPER'?'true':'false', 'regime ทอง → '+this.value)`);
+  if (kind === 'tsmom_gold')    // LIVE→TSMOM_LIVE=true · OFF→false
+    return sel(['LIVE','OFF'], r.switch_state,
+               `setGoldFlag('TSMOM_LIVE', this.value==='LIVE'?'true':'false', 'tsmom ทอง → '+this.value)`);
+  return `<span style="color:var(--muted);font-size:11px" title="reference (backtest/real) — ไม่มี live switch">—</span>`;
+}
+
+// ── gold engine flags (.env, live-reload) — toggle ผ่าน /api/config ──
+async function setGoldFlag(key, value, label) {
+  try {
+    const r = await (await fetch('/api/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: value })
+    })).json();
+    if (r && r.error) { toast('บันทึกไม่สำเร็จ: ' + r.error, 'err'); return; }
+    toast(label + ' (live-reload)', 'ok');
+    loadShadowMatrix(true);
+  } catch (_e) { toast('เชื่อมต่อ /api/config ไม่ได้', 'err'); }
 }
 
 // ── multi-symbol live toggles (combo + master). LIVE ต้องเปิด master ด้วยจึงวางออเดอร์จริง ──

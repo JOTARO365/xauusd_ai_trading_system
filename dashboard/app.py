@@ -169,6 +169,8 @@ _CONFIG_SPEC: dict[str, str] = {
     "NEWS_GATE_MAX_AGE_MIN": "60",
     # ── Multi-symbol live engine (WTI ฯลฯ) — master gate; ต่อ combo toggle=LIVE ที่ Shadow Matrix ──
     "MULTI_SYMBOL_LIVE": "false", "ALGO_SL_MULT": "WTIUSD:0.7",
+    # ── gold engine flags (toggle จาก switch ทองใน Shadow Matrix) ──
+    "TSMOM_LIVE": "false", "REGIME_SHADOW_FILL": "false",
     # ── NNLB ──
     "NNLB_MODE": "false", "NNLB_BASE_EQUITY": "100",
     "NNLB_EQUITY_PER_LOT": "100", "NNLB_MAX_LOSS_PCT": "25",
