@@ -159,8 +159,6 @@ intervals) live in [Environment Variables](#environment-variables); the graph is
 Every **strategy × pair** combo has one switch in the dashboard **Shadow Matrix** — the
 *same* control for gold and for every other instrument. No `.env` editing for day-to-day use.
 
-![Shadow Matrix — per-combo live / shadow / off switches, backtest vs real edge per strategy×pair](docs/img/shadow-matrix-live-control.png)
-
 | Switch | Meaning | Places real orders? |
 |--------|---------|---------------------|
 | **LIVE**   | trade for real | ✅ yes (non-gold combos also need `MULTI_SYMBOL_LIVE=true`) |
