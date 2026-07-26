@@ -3188,7 +3188,7 @@ async function loadGapMonitor() {
     }).join('') || '<div style="color:var(--muted)">ไม่มีไม้ระบบเปิด</div>';
     body.innerHTML =
       `<div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:8px">
-         <div>ทอง 24/7: <b>${d.spot ?? '—'}</b></div>
+         <div>ทอง 24/7: <b>${d.spot ?? '—'}</b> <span style="color:var(--muted);font-size:10px">${d.spot_src || ''}</span></div>
          <div>ปิดศุกร์ XM: <b>${d.xm_close ?? '—'}</b></div>
          <div>gap คาด: <b style="color:${gc}">${dir}</b></div>
          <div>ไม้เสี่ยงขาดทุน: <b style="color:${d.at_risk ? 'var(--red)' : 'var(--green)'}">${d.at_risk}</b></div>

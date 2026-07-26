@@ -1710,20 +1710,34 @@ def api_trades_symbol():
     return jsonify(_cached(f"trades-sym:{symbol}", _c, ttl=15))
 
 
-def _av_gold_spot():
-    """ทอง spot 24/7 จาก AlphaVantage GOLD_SILVER_SPOT (REST). cache นาน (limit 25/วัน). None ถ้าพลาด."""
+def _gold_spot_24_7():
+    """ทอง 24/7 (เสาร์อาทิตย์) จาก gold-token บน crypto exchange — ฟรี ไม่ต้อง key ไม่มี limit.
+    ลำดับ: Binance XAUTUSDT → PAXGUSDT → CoinGecko → AlphaVantage. คืน {price, source} หรือ None."""
     import os as _os
     import urllib.request as _u
-    k = _os.getenv("ALPHAVANTAGE_API_KEY", "")
-    if not k:
-        return None
-    try:
-        raw = _u.urlopen(f"https://www.alphavantage.co/query?function=GOLD_SILVER_SPOT&symbol=GOLD&apikey={k}",
-                         timeout=12).read().decode()
-        d = json.loads(raw)
-        return float(d["price"]) if d.get("price") else None
-    except Exception:
-        return None
+
+    def _get(url):
+        req = _u.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        return json.loads(_u.urlopen(req, timeout=10).read().decode())
+
+    for src, url, pick in (
+        ("XAUT/Binance", "https://api.binance.com/api/v3/ticker/price?symbol=XAUTUSDT", lambda d: float(d["price"])),
+        ("PAXG/Binance", "https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", lambda d: float(d["price"])),
+        ("XAUT/CoinGecko", "https://api.coingecko.com/api/v3/simple/price?ids=tether-gold&vs_currencies=usd",
+         lambda d: float(d["tether-gold"]["usd"])),
+    ):
+        try:
+            return {"price": pick(_get(url)), "source": src}
+        except Exception:
+            continue
+    k = _os.getenv("ALPHAVANTAGE_API_KEY", "")                    # fallback สุดท้าย (AV, มี limit)
+    if k:
+        try:
+            d = _get(f"https://www.alphavantage.co/query?function=GOLD_SILVER_SPOT&symbol=GOLD&apikey={k}")
+            return {"price": float(d["price"]), "source": "AV"} if d.get("price") else None
+        except Exception:
+            pass
+    return None
 
 
 @app.route("/api/gap-monitor")
@@ -1732,7 +1746,9 @@ def api_gap_monitor():
     fetch AV เฉพาะ weekend (วันธรรมดา XM สด = gap 0) · cache 1 ชม (กัน limit 25/วัน). display-only."""
     from utils.market_clock import is_weekend_closed
     weekend = is_weekend_closed()
-    spot = _cached("gap-av-spot", _av_gold_spot, ttl=3600) if weekend else None
+    _sp = _cached("gap-spot-24-7", _gold_spot_24_7, ttl=300) if weekend else None   # Binance ไม่มี limit → cache สั้น
+    spot = _sp.get("price") if _sp else None
+    spot_src = _sp.get("source") if _sp else None
     xm_close, positions = None, []
     try:
         if _MT5_AVAILABLE and _ensure_mt5():
@@ -1765,7 +1781,7 @@ def api_gap_monitor():
     except Exception:
         pass
     gap = round(spot - xm_close, 2) if (spot and xm_close) else None
-    return jsonify({"ok": True, "weekend": weekend,
+    return jsonify({"ok": True, "weekend": weekend, "spot_src": spot_src,
                     "spot": round(spot, 2) if spot else None,
                     "xm_close": round(xm_close, 2) if xm_close else None,
                     "gap": gap, "gap_usd": gap,
