@@ -8,10 +8,13 @@
 """
 import json
 import os
+import sys
 
 from loguru import logger
 
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _BASE not in sys.path:
+    sys.path.insert(0, _BASE)                    # รันตรง (python agents/trade_recorder.py) → หา config/connectors เจอ
 _REG = os.path.join(_BASE, "data", "trade_registry.json")
 _FILLS = os.path.join(_BASE, "logs", "real_fills")
 
