@@ -33,6 +33,17 @@ def _algo_of(comment):
     return "decision_ai"
 
 
+def _logical(broker):
+    """broker symbol → logical (GOLD#→XAUUSD) ให้ตรง algo_registry/shadow_matrix (เหมือน MSE ใช้ logical)."""
+    try:
+        from connectors.pair_collector import _broker_map
+        import config as _cfg
+        inv = {v: k for k, v in _broker_map().items()}
+        return inv.get(broker, "XAUUSD" if broker == _cfg.SYMBOL else broker)
+    except Exception:
+        return "XAUUSD"
+
+
 def _now_iso():
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).isoformat()
@@ -155,8 +166,9 @@ def backfill(days=365):
         algo = _algo_of(comment)
         if algo is None:                                            # MSE — ข้าม
             continue
+        sym_lg = _logical(SYMBOL)                                   # GOLD# → XAUUSD (ตรง shadow_matrix)
         tk = entry.order
-        if _fill_has_ticket(algo, SYMBOL, tk):
+        if _fill_has_ticket(algo, sym_lg, tk):
             skipped += 1
             continue
         vol = sum(float(d.volume) for d in outs) or 1.0
@@ -168,8 +180,8 @@ def backfill(days=365):
         dist = abs(e_px - sl)
         rr = None if (bad or dist <= 0) else (((exit_px - e_px) if is_buy else (e_px - exit_px)) / dist)
         profit = sum(float(d.profit) + float(d.swap) + float(d.commission) for d in dl)
-        _append_fill(algo, SYMBOL, {
-            "algo_id": algo, "symbol": SYMBOL, "ticket": int(tk),
+        _append_fill(algo, sym_lg, {
+            "algo_id": algo, "symbol": sym_lg, "ticket": int(tk),
             "dir": "BUY" if is_buy else "SELL", "entry": round(e_px, 5), "exit": round(exit_px, 5),
             "comment": comment, "realized_R": round(rr, 3) if rr is not None else None,
             "profit": round(profit, 2), "backfilled": True, "features": {}})
@@ -197,7 +209,7 @@ def tick(force=False):
             tk = str(p.ticket)
             open_ids.add(tk)
             if tk not in reg:                                # ไม้ใหม่ → จับ comment (ยังอยู่ตอนเปิด)
-                reg[tk] = {"comment": p.comment, "symbol": p.symbol, "entry": float(p.price_open),
+                reg[tk] = {"comment": p.comment, "symbol": _logical(p.symbol), "entry": float(p.price_open),
                            "sl": float(p.sl), "dir": "BUY" if p.type == 0 else "SELL", "opened_ts": _now_iso()}
         closed = [tk for tk in list(reg) if tk not in open_ids]
         done = 0
