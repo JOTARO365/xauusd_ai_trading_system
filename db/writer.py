@@ -72,6 +72,7 @@ def write_trade(trade: dict) -> bool:
             "source":               trade.get("source"),
             "direction":            trade.get("direction"),
             "entry_type":           trade.get("entry_type"),
+            "comment":              trade.get("comment"),
             "status":               trade.get("status", "OPEN"),
             "lot":                  trade.get("lot"),
             "entry_price":          trade.get("entry_price"),
@@ -102,6 +103,14 @@ def write_trade(trade: dict) -> bool:
         get_client().table("trades").upsert(row, on_conflict="ticket,account_login").execute()
         return True
     except Exception as e:
+        # ถ้ายังไม่รัน migration_add_comment.sql → column ไม่มี → retry ตัด comment (กัน gold write พัง)
+        if "comment" in row:
+            try:
+                row.pop("comment", None)
+                get_client().table("trades").upsert(row, on_conflict="ticket,account_login").execute()
+                return True
+            except Exception as e2:
+                e = e2
         # WARNING (ไม่ใช่ debug) — open-time write ที่ fail เงียบทำให้ trade ขาด metadata ใน DB
         logger.warning(f"DB write_trade FAILED ticket={ticket}: {e}")
         return False

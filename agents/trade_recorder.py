@@ -113,6 +113,62 @@ def _record(ticket, ctx):
         return False
 
 
+def backfill(days=365):
+    """กู้ไม้ทองที่ปิดไปแล้ว → attribute per-algo จาก **order.comment** (มักไม่โดนลบ ต่างจาก deal.comment)
+    + ใช้ order.sl = SL เริ่มต้นจริง (ดีกว่า live sl). เขียน real_fills (dedup). รันครั้งเดียวตอน MT5 เปิด.
+    คืน {added, skipped, no_comment}."""
+    try:
+        import MetaTrader5 as mt5
+        from connectors.mt5_connector import SYSTEM_MAGIC, SYMBOL
+        from datetime import datetime, timedelta
+        from collections import defaultdict
+    except Exception as e:
+        return {"error": str(e)}
+    deals = mt5.history_deals_get(datetime.now() - timedelta(days=days), datetime.now())
+    if not deals:
+        return {"error": "no deals (MT5 ต่อ + login?)"}
+    orders = {o.ticket: o for o in (mt5.history_orders_get(datetime.now() - timedelta(days=days), datetime.now()) or [])}
+    pos_deals = defaultdict(list)
+    for d in deals:
+        pos_deals[d.position_id].append(d)
+    added = skipped = no_comment = 0
+    for pos_id, dl in pos_deals.items():
+        entry = next((d for d in dl if d.entry == 0), None)
+        outs = [d for d in dl if d.entry in (1, 2)]
+        if entry is None or not outs:
+            continue
+        if entry.magic != SYSTEM_MAGIC or entry.symbol != SYMBOL:   # เฉพาะไม้บอททอง
+            continue
+        o = orders.get(entry.order)
+        comment = (getattr(o, "comment", "") or entry.comment or "").strip()
+        if not comment:
+            no_comment += 1
+        algo = _algo_of(comment)
+        if algo is None:                                            # MSE — ข้าม
+            continue
+        tk = entry.order
+        if _fill_has_ticket(algo, SYMBOL, tk):
+            skipped += 1
+            continue
+        vol = sum(float(d.volume) for d in outs) or 1.0
+        exit_px = sum(float(d.price) * float(d.volume) for d in outs) / vol
+        e_px = float(entry.price)
+        sl = float(getattr(o, "sl", 0) or 0)                        # order.sl = SL เริ่มต้น (ไม่ใช่ live ที่ขยับ)
+        is_buy = entry.type == 0
+        bad = sl == 0 or ((sl >= e_px) if is_buy else (sl <= e_px))
+        dist = abs(e_px - sl)
+        rr = None if (bad or dist <= 0) else (((exit_px - e_px) if is_buy else (e_px - exit_px)) / dist)
+        profit = sum(float(d.profit) + float(d.swap) + float(d.commission) for d in dl)
+        _append_fill(algo, SYMBOL, {
+            "algo_id": algo, "symbol": SYMBOL, "ticket": int(tk),
+            "dir": "BUY" if is_buy else "SELL", "entry": round(e_px, 5), "exit": round(exit_px, 5),
+            "comment": comment, "realized_R": round(rr, 3) if rr is not None else None,
+            "profit": round(profit, 2), "backfilled": True, "features": {}})
+        added += 1
+    logger.info(f"[REC] backfill: +{added} ไม้ · skip {skipped} · ไม่มี comment {no_comment}")
+    return {"added": added, "skipped": skipped, "no_comment": no_comment}
+
+
 def tick(force=False):
     """จับไม้ทองเปิด (comment) + บันทึกไม้ปิดต่อ algo. เรียกทุก cycle. fail-soft."""
     try:
@@ -158,4 +214,7 @@ if __name__ == "__main__":
     except Exception:
         pass
     import config  # noqa
-    print("recorder tick:", tick())
+    if len(sys.argv) > 1 and sys.argv[1] == "backfill":
+        print("backfill:", backfill())
+    else:
+        print("recorder tick:", tick())

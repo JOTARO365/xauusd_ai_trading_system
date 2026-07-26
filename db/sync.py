@@ -69,6 +69,7 @@ def sync_mt5_history_to_db(days: int = 365) -> int:
         o  = order_map.get(ticket)
         sl = o.sl if o and o.sl != 0.0 else None
         tp = o.tp if o and o.tp != 0.0 else None
+        comment = (getattr(o, "comment", "") or entry_deal.comment or "").strip()  # order.comment มักไม่โดนลบ → attribute algo ได้
 
         opened_at  = datetime.utcfromtimestamp(entry_deal.time).isoformat()
         is_closed  = len(exit_deals) > 0
@@ -93,6 +94,7 @@ def sync_mt5_history_to_db(days: int = 365) -> int:
             "sl":            sl,
             "tp":            tp,
             "pnl":           pnl,
+            "comment":       comment or None,       # algo comment (ALGO-mom/ALGO-TSMOM/MSE-*) → attribute per-algo
             "timestamp":     opened_at,
             "close_time":    closed_at,
         }
