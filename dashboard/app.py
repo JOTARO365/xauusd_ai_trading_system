@@ -1710,6 +1710,59 @@ def api_trades_symbol():
     return jsonify(_cached(f"trades-sym:{symbol}", _c, ttl=15))
 
 
+def _av_gold_spot():
+    """ทอง spot 24/7 จาก AlphaVantage GOLD_SILVER_SPOT (REST). cache นาน (limit 25/วัน). None ถ้าพลาด."""
+    import os as _os
+    import urllib.request as _u
+    k = _os.getenv("ALPHAVANTAGE_API_KEY", "")
+    if not k:
+        return None
+    try:
+        raw = _u.urlopen(f"https://www.alphavantage.co/query?function=GOLD_SILVER_SPOT&symbol=GOLD&apikey={k}",
+                         timeout=12).read().decode()
+        d = json.loads(raw)
+        return float(d["price"]) if d.get("price") else None
+    except Exception:
+        return None
+
+
+@app.route("/api/gap-monitor")
+def api_gap_monitor():
+    """weekend-gap monitor: ทอง spot 24/7 (AV) เทียบราคาปิดศุกร์ XM → เดา gap จันทร์ + เตือนไม้ที่จะชน SL.
+    fetch AV เฉพาะ weekend (วันธรรมดา XM สด = gap 0) · cache 1 ชม (กัน limit 25/วัน). display-only."""
+    from utils.market_clock import is_weekend_closed
+    weekend = is_weekend_closed()
+    spot = _cached("gap-av-spot", _av_gold_spot, ttl=3600) if weekend else None
+    xm_close, positions = None, []
+    try:
+        if _MT5_AVAILABLE and _ensure_mt5():
+            import MetaTrader5 as _m
+            from connectors.price_feed import get_ohlcv
+            r = get_ohlcv(SYMBOL, _m.TIMEFRAME_H1, 2)
+            if r is not None and len(r):
+                xm_close = float(r[-1]["close"])
+            info = _m.symbol_info(SYMBOL)
+            pt = info.point if info else 0.01
+            proj = spot or xm_close                                # ราคาคาดตอนเปิด (weekend=spot 24/7)
+            for p in (_m.positions_get(symbol=SYMBOL) or []):
+                d = "BUY" if p.type == 0 else "SELL"
+                sl = float(p.sl)
+                hit = bool(sl and proj and ((d == "SELL" and proj >= sl) or (d == "BUY" and proj <= sl)))
+                positions.append({
+                    "ticket": p.ticket, "dir": d, "entry": round(p.price_open, 2), "sl": round(sl, 2),
+                    "hit": hit, "dist_pt": round(abs((proj - sl) / pt)) if (sl and proj) else None,
+                    "be": bool(sl and ((d == "BUY" and sl >= p.price_open) or (d == "SELL" and sl <= p.price_open)))})
+    except Exception:
+        pass
+    gap = round(spot - xm_close, 2) if (spot and xm_close) else None
+    return jsonify({"ok": True, "weekend": weekend,
+                    "spot": round(spot, 2) if spot else None,
+                    "xm_close": round(xm_close, 2) if xm_close else None,
+                    "gap": gap, "gap_usd": gap,
+                    "positions": positions,
+                    "at_risk": sum(1 for p in positions if p["hit"] and not p["be"])})
+
+
 @app.route("/api/speech-history")
 def api_speech_history():
     """ปฏิกิริยาราคา XAU รอบ speech ครั้งก่อน (data/speech_log.json + MT5 H1 รอบ prev ts). Phase 2, 0 token."""
