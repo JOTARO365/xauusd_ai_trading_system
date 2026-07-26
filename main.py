@@ -294,7 +294,7 @@ def _should_skip_ai() -> tuple[bool, str]:
     if getattr(config, "WEEKEND_RUN", False):
         from utils.market_clock import is_weekend_closed
         if is_weekend_closed():
-            _wk = int(getattr(config, "WEEKEND_INTERVAL_SECS", 1800))
+            _wk = max(300, int(getattr(config, "WEEKEND_INTERVAL_SECS", 1800)))   # floor 5min กัน token blowout ถ้าตั้ง 0
             if since < _wk:
                 return True, f"สุดสัปดาห์ — AI ทุก {_wk//60}min (ระบบ/mgmt รันปกติ)"
 
@@ -567,22 +567,25 @@ async def main():
                 if hedge:
                     reason += "  [hedge]"
                 # Auto-pending รันเสมอแม้ slots จะเต็ม (pending ไม่ขึ้นกับ open slot)
+                # ⚠️ WEEKEND: gold/FX ปิด → ห้ามวาง pending (WEEKEND_RUN=เก็บ BTC เท่านั้น) กัน order เข้า Sunday gap
+                from utils.market_clock import is_weekend_closed as _wkc
+                _skip_pending = _wkc()
                 try:
-                    p = auto_place_pending_orders(_last_chart_data or {}, _last_sentiment_data)
+                    p = None if _skip_pending else auto_place_pending_orders(_last_chart_data or {}, _last_sentiment_data)
                     if p:
                         print_warning(f"Auto-pending: ส่งคำสั่ง {p} order ที่ key S/R levels (H4+Daily)")
                 except Exception as pe:
                     logger.error(f"Auto-pending error: {pe}")
                 # Range pending: ตรวจ stale + วาง ถ้า sideways
                 try:
-                    rp = manage_range_pending(_last_chart_data or {})
+                    rp = None if _skip_pending else manage_range_pending(_last_chart_data or {})
                     if rp:
                         print_warning(f"Range pending: ส่งคำสั่ง {rp} order ที่กรอบ sideways")
                 except Exception as rpe:
                     logger.error(f"Range pending error: {rpe}")
                 # Post-SL re-entry: หาจุดเข้าใหม่ที่ safe zone หลัง SL hit
                 try:
-                    sr = manage_sl_reentry(_last_chart_data or {})
+                    sr = None if _skip_pending else manage_sl_reentry(_last_chart_data or {})
                     if sr:
                         print_warning(f"Post-SL: ส่งคำสั่ง {sr} re-entry order ที่ safe zone")
                 except Exception as sre:
@@ -666,7 +669,8 @@ async def main():
             today = _dt.now(_timezone.utc).date()
             if today.weekday() == 0 and today != _last_weekly_pending_date:
                 _last_weekly_pending_date = today
-                wkly = place_weekly_calendar_pending(_last_chart_data or {})
+                from utils.market_clock import is_weekend_closed as _wkc2
+                wkly = None if _wkc2() else place_weekly_calendar_pending(_last_chart_data or {})
                 if wkly:
                     print_warning(f"Weekly calendar pending: ส่งคำสั่ง {wkly} orders ตามปฏิทิน")
                 else:

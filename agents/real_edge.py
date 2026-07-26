@@ -89,10 +89,15 @@ def _gold_real():
                 continue
             entry = r.get("entry_price"); close = r.get("close_price"); sl = r.get("sl")
             d_ = str(r.get("direction", "")).upper()
+            if d_ not in ("BUY", "SELL"):
+                continue
             if not (entry and close and sl) or entry == sl:
                 continue
-            dist = abs(float(entry) - float(sl))
-            rr = (((float(close) - float(entry)) if d_ == "BUY" else (float(entry) - float(close))) / dist) if dist > 0 else None
+            entry = float(entry); close = float(close); sl = float(sl); is_buy = d_ == "BUY"
+            # reporter ทับ t["sl"] ด้วย SL live (หลัง BE/trailing) → ถ้า sl อยู่ฝั่งกำไรแล้ว = ระยะเริ่มต้นหาย → R เชื่อไม่ได้
+            bad_sl = (sl >= entry) if is_buy else (sl <= entry)
+            dist = abs(entry - sl)
+            rr = None if (bad_sl or dist <= 0) else (((close - entry) if is_buy else (entry - close)) / dist)
             recs.append({"realized_R": round(rr, 3) if rr is not None else None,
                          "profit": float(r.get("pnl") or 0.0), "features": {}})
     except Exception:

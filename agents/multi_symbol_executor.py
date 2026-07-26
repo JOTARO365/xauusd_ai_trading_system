@@ -98,10 +98,12 @@ def _our_positions(broker):
     try:
         import MetaTrader5 as mt5
         from connectors.mt5_connector import SYSTEM_MAGIC
-        pos = mt5.positions_get(symbol=broker) or []
+        pos = mt5.positions_get(symbol=broker)
+        if pos is None:
+            return None                                      # fetch fail (terminal hiccup) — แยกจาก "ไม่มีไม้" กัน false-close
         return [p for p in pos if p.magic == SYSTEM_MAGIC]
     except Exception:
-        return []
+        return None
 
 
 def _total_mse_positions():
@@ -307,10 +309,16 @@ def _reconcile_closed(algo_id, symbol, positions, combo_state):
         return 0
     open_ids = {str(p.ticket) for p in positions}
     closed = [t for t in list(tickets) if t not in open_ids]
+    done = 0
     for tk in closed:
-        _record_closed(algo_id, symbol, tk, tickets[tk])
-        tickets.pop(tk, None)
-    return len(closed)
+        ctx = tickets[tk]
+        if _record_closed(algo_id, symbol, tk, ctx):         # pop เฉพาะเมื่อบันทึกสำเร็จ (กัน fill หายตอน history ยังไม่ sync)
+            tickets.pop(tk, None); done += 1
+        else:
+            ctx["_tries"] = int(ctx.get("_tries", 0)) + 1
+            if ctx["_tries"] >= 6:                           # history ไม่มา 6 รอบ → ปล่อย (กัน ctx leak)
+                tickets.pop(tk, None)
+    return done
 
 
 # ── entry: signal เดียวกับ shadow → open_order จริง ───────────────────────
@@ -346,7 +354,7 @@ def tick(force=False):
     """เรียกทุก cycle จาก node_position_mgmt. Gated ด้วย MULTI_SYMBOL_LIVE. fail-soft; 0 order เมื่อ gate ปิด.
     คืน summary dict หรือ None เมื่อ gate ปิด."""
     import config as _cfg
-    if not force and not getattr(_cfg, "MULTI_SYMBOL_LIVE", False):
+    if not getattr(_cfg, "MULTI_SYMBOL_LIVE", False):    # master gate เสมอ (force ไม่ข้าม — กันรันมือแล้ววางออเดอร์จริง)
         return None
     eligible = _reg.combos(_reg.UNIVERSE)
     live = _sw.combos_in(_sw.LIVE, eligible)
@@ -375,6 +383,8 @@ def tick(force=False):
             ck = f"{algo_id}:{symbol}"
             cstate = state.setdefault(ck, {})
             positions = _our_positions(broker)
+            if positions is None:                            # fetch fail → ข้าม combo รอบนี้ (ห้าม reconcile/manage ด้วยข้อมูลพัง)
+                continue
             _reconcile_closed(algo_id, symbol, positions, cstate)   # จับไม้ที่ปิด → real-fill journal
             managed += _manage(broker, positions, bars, point, digits, cstate)
             room_total = (max_total <= 0) or (total_open + opened < max_total)   # global cap ยังมีที่ว่าง
