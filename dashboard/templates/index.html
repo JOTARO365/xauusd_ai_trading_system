@@ -4659,39 +4659,13 @@ function setSrTab(sym, btn) {
   // sync กราฟให้ตามคู่ที่เลือก
   const sel = document.getElementById('chart-sym'); if (sel) { sel.value = _srTab; setChartSym(_srTab); }
 }
-async function renderSrPairDetail(sym) {
+async function renderSrPairDetail(sym) {          // ladder เหมือนทองเป๊ะ (reuse _srLadderHTML + sr_meta เต็ม)
   const det = document.getElementById('sr-pair-detail'); if (!det) return;
   det.innerHTML = 'Loading…';
   try {
-    const d = await (await fetch('/api/cluster-map?symbol=' + encodeURIComponent(sym))).json();
+    const d = await (await fetch('/api/sr-ladder?symbol=' + encodeURIComponent(sym))).json();
     if (!d.ok) { det.innerHTML = `<span style="color:var(--muted)">${d.error || 'ไม่มีข้อมูล'}</span>`; return; }
-    const px = d.price;
-    const cl = (d.clusters || []).slice();
-    const maxT = Math.max(1, ...cl.map(c => c.touches || 0));
-    const row = (c, kind) => {                       // สไตล์เดียวกับ zone-ladder ทอง: level | dist | strength% | bar
-      const color = kind === 'R' ? 'var(--red)' : 'var(--green)';
-      const dg = c.level - px, dist = (dg > 0 ? '+' : '') + dg.toFixed(2);
-      const st = Math.round((c.touches || 0) / maxT * 100);
-      const bar = `<div style="height:4px;width:${Math.min(st, 100)}%;background:${color};border-radius:2px;opacity:.7"></div>`;
-      return `<div style="display:flex;align-items:center;gap:10px;padding:3px 0">
-        <span style="width:82px;color:${color};font-weight:700">${c.level.toFixed(2)}</span>
-        <span style="width:60px;color:var(--muted);font-size:10px">${dist}</span>
-        <span style="width:40px;color:var(--muted);font-size:10px">${st}%</span>
-        <div style="flex:1">${bar}</div>
-        <span style="color:var(--muted);font-size:10px">${c.touches || 0}t</span></div>`;
-    };
-    const above = cl.filter(c => c.level > px).sort((a, b) => b.level - a.level);
-    const below = cl.filter(c => c.level <= px).sort((a, b) => b.level - a.level);
-    const mC = d.momentum === 'up' ? 'var(--green)' : (d.momentum === 'down' ? 'var(--red)' : 'var(--muted)');
-    det.innerHTML =
-      `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:11px;color:var(--muted)">
-        <b style="color:var(--text)">${sym}</b><span>dwell-zone S/R (H1) · <span style="color:${mC}">${d.momentum}</span></span></div>`
-      + above.map(c => row(c, 'R')).join('')
-      + `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;margin:3px 0;border-top:1px dashed var(--border);border-bottom:1px dashed var(--border)">
-          <span style="width:82px;color:var(--gold);font-weight:700">${px}</span>
-          <span style="color:var(--muted);font-size:10px">◄ ราคาปัจจุบัน</span></div>`
-      + below.map(c => row(c, 'S')).join('')
-      + `<div style="color:var(--muted);font-size:10px;margin-top:8px">${d.hint || ''}</div>`;
+    det.innerHTML = _srLadderHTML(d.zones || {}, d.price, d.point || 0.01);
   } catch (_e) { det.innerHTML = '<span style="color:var(--muted)">โหลดไม่ได้</span>'; }
 }
 
@@ -6438,10 +6412,8 @@ function renderSignals(bs) {
   el.innerHTML = html;
 }
 
-function renderZones(bs) {
-  const el = document.getElementById('zone-ladder');
-  if (!el) return;
-  const z = bs.zones || {}, px = (bs.price_info || {}).bid;
+function _srLadderHTML(z, px, pipDiv) {          // ladder HTML ใช้ร่วม gold + ทุกคู่ (สไตล์เดียวกัน)
+  z = z || {}; pipDiv = pipDiv || 0.01;
   const setups = z.setups || [];
   const srMeta = z.sr_meta || [];
   const htf = z.htf_zone || null;
@@ -6455,7 +6427,7 @@ function renderZones(bs) {
   };
   const row = (lv, kind) => {
     const color = kind === 'R' ? 'var(--red)' : 'var(--green)';
-    const dist = px ? Math.round(Math.abs(lv - px) / 0.01) + 'p' : '';
+    const dist = px ? Math.round(Math.abs(lv - px) / pipDiv) + 'p' : '';
     const sc = scoreFor(lv), m = metaFor(lv);
     const st = Math.max(sc || 0, (m && m.strength) || 0) || null;
     const bar = st ? `<div style="height:4px;width:${Math.min(st, 100)}%;background:${color};border-radius:2px;opacity:.7"></div>` : '';
@@ -6496,10 +6468,13 @@ function renderZones(bs) {
   const priceRow = px ? `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;margin:4px 0;border-top:1px dashed var(--border2,#2a2a2a);border-bottom:1px dashed var(--border2,#2a2a2a)">
       <span style="width:72px;color:var(--gold);font-weight:800">${px.toFixed(2)}</span>
       <span style="color:var(--gold);font-size:10px;letter-spacing:1.5px">◄ PRICE</span></div>` : '';
-  el.innerHTML =
-    (res.map(l => row(l, 'R')).join('') || '<div class="no-data">no resistance data</div>')
+  return (res.map(l => row(l, 'R')).join('') || '<div class="no-data">no resistance data</div>')
     + priceRow
     + (sup.map(l => row(l, 'S')).join('') || '<div class="no-data">no support data</div>');
+}
+function renderZones(bs) {
+  const el = document.getElementById('zone-ladder'); if (!el) return;
+  el.innerHTML = _srLadderHTML(bs.zones || {}, (bs.price_info || {}).bid, 0.01);
 }
 
 /* ── Price Chart + AI Zones overlay (07-03) — lightweight-charts, data จาก MT5 ── */

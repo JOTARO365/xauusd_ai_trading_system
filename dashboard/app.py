@@ -1458,6 +1458,16 @@ def api_cluster_map():
     return jsonify(_cached(f"cluster-map:{sym or 'gold'}", _c, ttl=20))
 
 
+@app.route("/api/sr-ladder")
+def api_sr_ladder():
+    """S/R ladder เต็ม (bounce/break% · grade · ยืน/ไส้เทียน) ต่อคู่ — เหมือน gold zone-ladder. 0 token."""
+    sym = (request.args.get("symbol", "") or "").strip()
+    def _c():
+        from agents.sr_pair import sr_ladder
+        return sr_ladder(symbol=sym or None)
+    return jsonify(_cached(f"sr-ladder:{sym or 'gold'}", _c, ttl=30))
+
+
 @app.route("/api/sr-book")
 def api_sr_book():
     """S/R dwell-zone ต่อทุกคู่ live/open (LEVELS book). display-only, 0 token."""
