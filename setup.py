@@ -109,6 +109,94 @@ def apply_shared(env, shared):
     return changed
 
 
+def _write_env_key(env, key, value):
+    """เพิ่ม/แทน KEY=value ใน .env (แทนบรรทัดเดิมถ้ามี, ไม่งั้น append). ไม่แตะบรรทัดอื่น."""
+    try:
+        with open(env, encoding="utf-8") as f:
+            lines = f.readlines()
+    except OSError:
+        lines = []
+    for i, ln in enumerate(lines):
+        s = ln.strip()
+        if s and not s.startswith("#") and s.split("=", 1)[0].strip() == key:
+            lines[i] = f"{key}={value}\n"
+            break
+    else:
+        if lines and not lines[-1].endswith("\n"):
+            lines[-1] += "\n"
+        lines.append(f"{key}={value}\n")
+    with open(env, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
+
+def ask_broker_symbols(env):
+    """interactive: list candidate BTC/น้ำมัน จาก MT5 → ให้เลือก → เขียน BROKER_SYM_* ลง .env.
+    ข้ามเงียบถ้า non-TTY (กัน hang) / MT5 ต่อไม่ได้ / key มีใน .env แล้ว. คืน list คีย์ที่เขียน."""
+    if not sys.stdin.isatty():
+        print(_WARN + "non-interactive — ข้ามถาม BTC/น้ำมัน (ตั้ง BROKER_SYM_WTIUSD/BTCUSD ใน .env เองได้)")
+        return []
+    try:
+        import MetaTrader5 as mt5
+        if not mt5.initialize():
+            print(_WARN + f"MT5 ต่อไม่ได้ ({mt5.last_error()}) — login MT5 ก่อน แล้วรัน setup ใหม่เพื่อเลือก symbol")
+            return []
+    except Exception:
+        print(_WARN + "MetaTrader5 import ไม่ได้ — ข้าม")
+        return []
+    names = [s.name for s in (mt5.symbols_get() or [])]
+    have = _env_keys(env)
+    probe_map = {}                                        # logical ที่ probe จับได้แล้ว (universe_probe.json) → ไม่ต้องถามซ้ำ
+    try:
+        import json as _json
+        pj = _json.load(open(os.path.join(_BASE, "data", "universe_probe.json"), encoding="utf-8"))
+        probe_map = pj.get("instruments", {})
+    except Exception:
+        pass
+    _MONTHS = tuple(f"-{m}" for m in ("JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+                                      "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"))
+    # accept=token ที่รับ · prefer=token ที่ดันขึ้น #1 (ตัวจริง) · exclude=ตัด noise (หุ้นน้ำมัน/brent/futures/crypto อื่น)
+    wanted = [
+        ("BTCUSD", dict(accept=("BTC", "BITCOIN"), prefer=("USD",),
+                        exclude=("ETH", "LTC", "XRP", "BCH", "ADA")), "Bitcoin (BTC)"),
+        ("WTIUSD", dict(accept=("WTI", "USOIL", "XTI", "OIL", "CRUDE"),
+                        prefer=("WTI", "USOIL", "XTI", "OILCASH", "CRUDE"),
+                        exclude=("BRENT", "UKOIL") + _MONTHS), "น้ำมัน (WTI/USOIL)"),
+    ]
+    written = []
+    for logical, spec, label in wanted:
+        key = f"BROKER_SYM_{logical}"
+        if key in have or (probe_map.get(logical) or {}).get("broker_symbol"):
+            print(_OK + f"{logical} mapped แล้ว (.env/probe) — ข้าม")
+            continue
+        acc, pref, exc = spec["accept"], spec["prefer"], spec["exclude"]
+        matched = {n for n in names if any(t in n.upper() for t in acc)
+                   and not any(x in n.upper() for x in exc)}
+        # rank: ตัวที่มี prefer token ก่อน (ตัวจริง เช่น BTCUSD#/OILCash#) แล้วสั้นสุด
+        cands = sorted(matched, key=lambda n: (not any(p in n.upper() for p in pref), len(n)))[:9]
+        if not cands:
+            print(_WARN + f"{label}: ไม่พบใน broker นี้ (อาจไม่มีคู่นี้) — ข้าม")
+            continue
+        print(f"\n  {label} — เลือก symbol ของ {logical}:")
+        for i, c in enumerate(cands, 1):
+            print(f"    {i}) {c}")
+        print("    0) ข้าม (ไม่เทรดคู่นี้)")
+        try:
+            ans = input("  พิมพ์เลข หรือชื่อ symbol เอง (Enter=ข้าม): ").strip()
+        except EOFError:
+            break
+        if not ans or ans == "0":
+            continue
+        chosen = cands[int(ans) - 1] if (ans.isdigit() and 1 <= int(ans) <= len(cands)) else ans
+        _write_env_key(env, key, chosen)
+        written.append(f"{key}={chosen}")
+        print(_OK + f"เขียน {key}={chosen} ลง .env")
+    try:
+        mt5.shutdown()
+    except Exception:
+        pass
+    return written
+
+
 def sync_env(env, example):
     """เพิ่มคีย์ใหม่จาก .env.example → .env (ไม่ทับค่าเดิม, append ท้ายเท่านั้น). idempotent.
     คืน (added_keys, secret_keys) — secret = คีย์ที่ค่า placeholder ยังต้องกรอกเอง."""
@@ -229,6 +317,9 @@ def main():
             print(_WARN + "probe ไม่สำเร็จ (MT5 ยัง login ไหม?) — multi-symbol (BTC/WTI) ยังไม่ทำงาน "
                   "(ทองยังเทรดได้ผ่าน SYMBOL). รันภายหลัง: python scripts/probe_universe.py")
             problems.append("broker-symbol-probe")
+    # BTC/น้ำมัน ชื่อต่างโบรกเกอร์เยอะ → ถามให้เลือกจาก symbol จริง แล้วเขียน BROKER_SYM_* ลง .env (interactive)
+    if os.path.exists(env):
+        ask_broker_symbols(env)
 
     # summary + next steps
     print("\n" + "=" * 60)
