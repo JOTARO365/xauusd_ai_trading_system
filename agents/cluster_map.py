@@ -67,15 +67,23 @@ def compute_cluster_map(high, low, close, lookback=LOOKBACK, min_touch=MIN_TOUCH
             "clusters": [enrich(c) for c in clusters][:14]}
 
 
-def from_mt5(count=600):
-    """ดึง H1 bars จาก MT5 → compute. คืน {ok:False} ถ้าไม่พร้อม."""
+def from_mt5(count=600, symbol=None):
+    """ดึง H1 bars จาก MT5 → compute dwell-zone S/R. symbol=None → ทอง (default). อื่น → map broker."""
     try:
         import MetaTrader5 as mt5
         from connectors.price_feed import get_ohlcv
-        rates = get_ohlcv(timeframe=mt5.TIMEFRAME_H1, count=count)
+        if symbol:
+            from connectors.pair_collector import _broker_map
+            broker = _broker_map().get(symbol, symbol)
+            rates = get_ohlcv(symbol=broker, timeframe=mt5.TIMEFRAME_H1, count=count)
+        else:
+            rates = get_ohlcv(timeframe=mt5.TIMEFRAME_H1, count=count)
         if rates is None or len(rates) < LOOKBACK + 20:
             return {"ok": False, "error": "ดึง bars ไม่ได้"}
-        return compute_cluster_map(rates["high"].astype(float), rates["low"].astype(float),
-                                   rates["close"].astype(float))
+        r = compute_cluster_map(rates["high"].astype(float), rates["low"].astype(float),
+                                rates["close"].astype(float))
+        if isinstance(r, dict):
+            r["symbol"] = symbol or "XAUUSD"
+        return r
     except Exception as e:
         return {"ok": False, "error": str(e)}

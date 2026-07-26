@@ -1895,12 +1895,12 @@
       <div class="section-title">Shadow Matrix — ทุกกลยุทธ์ × ทุกคู่ (กลยุทธ์ไหนกำไรใน regime ไหน)</div>
       <div style="font-size:11px;color:var(--muted);margin:-2px 0 8px">คอลัมน์ <b style="color:var(--green)">เทรดจริง</b> = สถานะ execution จริง · <b>engine</b>=ทองเทรดผ่าน engine เฉพาะ (switch ไม่คุม) · <b>MSE</b>=multi-symbol executor (WTI) · <b>paper</b>=เก็บสถิติ 0 order. คอลัมน์ <b>switch</b> คุมเฉพาะระบบ shadow/MSE ไม่กระทบ engine ทอง</div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
-        <select id="sm-f-algo" onchange="loadShadowMatrix(true)" class="filter-select" style="padding:3px 8px">
+        <select id="sm-f-algo" onchange="loadShadowMatrix(true)" class="filter-select" style="padding:3px 26px 3px 10px">
           <option value="">ทุกกลยุทธ์</option>
           <option value="regime_momentum">momentum (TREND)</option>
           <option value="mean_reversion">mean-reversion (RANGE)</option>
         </select>
-        <select id="sm-f-pair" onchange="loadShadowMatrix(true)" class="filter-select" style="padding:3px 8px">
+        <select id="sm-f-pair" onchange="loadShadowMatrix(true)" class="filter-select" style="padding:3px 26px 3px 10px">
           <option value="">ทุกคู่</option>
         </select>
         <span id="sm-meta" style="font-family:var(--mono);font-size:11px;color:var(--muted)">—</span>
@@ -2034,7 +2034,7 @@
       <div class="section-title" style="display:flex;align-items:center">
         <span>Price Chart &mdash; AI Zones Overlay</span>
         <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
-          <select id="chart-sym" onchange="setChartSym(this.value)" class="filter-select" style="padding:3px 8px;font-size:11px">
+          <select id="chart-sym" onchange="setChartSym(this.value)" class="filter-select" style="padding:3px 26px 3px 10px;font-size:11px">
             <option value="">XAUUSD · ทอง</option>
           </select>
           <button class="tf-btn active" data-tf="M15" onclick="setChartTf('M15')">M15</button>
@@ -2120,6 +2120,20 @@
       <div class="chart-card" style="padding:14px 18px">
         <div id="zone-ladder" style="font-family:var(--mono);font-size:12px">Loading…</div>
         <div id="fib-panel" style="font-family:var(--mono);margin-top:8px"></div>
+      </div>
+      <!-- S/R book ต่อทุกคู่ที่ live/open (dwell-zone) -->
+      <div class="chart-card" style="padding:12px 16px;margin-top:12px">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px">S/R BOOK — ทุกคู่ที่ live (dwell-zone H1)</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px">
+            <thead><tr style="color:var(--muted);text-align:left">
+              <th style="padding:4px 8px">คู่</th><th style="padding:4px 8px">ราคา</th>
+              <th style="padding:4px 8px">แนวรับ (touch)</th><th style="padding:4px 8px">แนวต้าน (touch)</th>
+              <th style="padding:4px 8px">mom</th>
+            </tr></thead>
+            <tbody id="sr-book-body"><tr><td colspan="5" style="color:var(--muted);padding:6px 8px">—</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -3623,7 +3637,7 @@ async function loadLivePrice() {
       setT('ai-sent-tweets', (bs.sent_tweets || 0) + ' โพสต์');
       setT('ai-sent-summary', bs.sent_summary || '—');
     }
-    loadClusterMap();   // Price-Cluster decision-support (throttled, server-cached)
+    loadClusterMap(); loadSrBook();   // Price-Cluster decision-support (throttled, server-cached)
     loadOwnerGate();    // Owner-gate advisory — เตือน mid-vol / manual short
     loadMacroQuant();   // Macro/News quant — ข่าว+เศรษฐกิจ → gold bias (throttled, server-cached)
     loadLiquidityProxy();   // Liquidity/order-flow proxy (throttled, server-cached)
@@ -4592,12 +4606,35 @@ async function loadTsmom() {
   } catch (_e) {}
 }
 
+let _srBookLast = 0;
+async function loadSrBook() {
+  if (Date.now() - _srBookLast < 28000) return;
+  _srBookLast = Date.now();
+  const body = document.getElementById('sr-book-body'); if (!body) return;
+  try {
+    const d = await (await fetch('/api/sr-book')).json();
+    if (!d.ok) return;
+    const mC = m => m === 'up' ? 'var(--green)' : (m === 'down' ? 'var(--red)' : 'var(--muted)');
+    body.innerHTML = (d.rows || []).map(r => {
+      const sup = r.support ? `${r.support.level} <span style="color:var(--muted);font-size:10px">${r.support.touches}t</span>` : '—';
+      const res = r.resistance ? `${r.resistance.level} <span style="color:var(--muted);font-size:10px">${r.resistance.touches}t</span>` : '—';
+      return `<tr style="text-align:left;border-top:1px solid #262a31">
+        <td style="padding:4px 8px;font-weight:700">${r.symbol}</td>
+        <td style="padding:4px 8px">${r.price ?? '—'}</td>
+        <td style="padding:4px 8px;color:var(--green)">${sup}</td>
+        <td style="padding:4px 8px;color:var(--red)">${res}</td>
+        <td style="padding:4px 8px;color:${mC(r.momentum)}">${r.momentum || '—'}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="5" style="color:var(--muted);padding:6px 8px">ยังไม่มีคู่ live (toggle LIVE ที่ Shadow Matrix)</td></tr>';
+  } catch (_e) {}
+}
+
 let _clusterLast = 0;
 async function loadClusterMap() {
   if (Date.now() - _clusterLast < 15000) return;   // throttle (server cache 20s)
   _clusterLast = Date.now();
   try {
-    const d = await (await fetch('/api/cluster-map')).json();
+    const d = await (await fetch('/api/cluster-map' + (_chartSym ? '?symbol=' + encodeURIComponent(_chartSym) : ''))).json();
     const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
     const hintEl = document.getElementById('cluster-hint');
     if (!d.ok) { if (hintEl) hintEl.textContent = d.error || '—'; return; }
@@ -4792,7 +4829,7 @@ async function loadShadowMatrix(force) {
         <td style="padding:4px 8px;color:${badgeColor[r.badge]};font-weight:600">${r.badge}</td>
         <td style="padding:4px 8px">${execPill(r.exec_mode)}</td>
         <td style="padding:4px 8px">
-          <select class="filter-select" style="padding:2px 6px;font-size:11px"
+          <select class="filter-select" style="padding:2px 24px 2px 9px;font-size:11px"
             onchange="setShadowSwitch('${r.algo_id}','${r.symbol}',this.value)">
             ${['SHADOW','LIVE','OFF'].map(s => `<option value="${s}"${r.state === s ? ' selected' : ''}>${s}</option>`).join('')}
           </select>
@@ -6404,9 +6441,9 @@ let _chart = null, _candleSeries = null, _zoneLines = [], _clusterLines = [], _c
 
 function setChartSym(s) {                       // เลือกคู่ (ว่าง=ทอง). non-gold → ซ่อน overlay AI zones (gold-specific)
   _chartSym = s || '';
-  if (_chartSym) { _zoneLines.forEach(l => { try { _candleSeries.removePriceLine(l); } catch(e){} }); _zoneLines = [];
-                   _clusterLines.forEach(l => { try { _candleSeries.removePriceLine(l); } catch(e){} }); _clusterLines = []; }
-  loadCandles(true);
+  if (_chartSym) { _zoneLines.forEach(l => { try { _candleSeries.removePriceLine(l); } catch(e){} }); _zoneLines = []; }  // ซ่อน AI-zone (gold-only)
+  _clusterLast = 0;                             // force reload cluster S/R ของคู่ใหม่
+  loadCandles(true); loadClusterMap();
 }
 async function populateChartSymbols() {
   const sel = document.getElementById('chart-sym'); if (!sel) return;
@@ -6472,8 +6509,7 @@ function setChartTf(tf) {
 
 // overlay ระบบใหม่: cluster S/R (dwell-zone) + Donchian levels ที่ algo ใช้ (จาก /api/cluster-map)
 function drawClusterLines(d) {
-  if (_chartSym) return;                        // overlay = gold-only
-  if (!_candleSeries || !d || !d.ok) return;
+  if (!_candleSeries || !d || !d.ok) return;   // cluster S/R = per-symbol (ทุกคู่)
   _clusterLines.forEach(l => { try { _candleSeries.removePriceLine(l); } catch (e) {} });
   _clusterLines = [];
   const add = (price, color, title, style) => { if (price != null) _clusterLines.push(_candleSeries.createPriceLine({

@@ -1451,10 +1451,32 @@ def api_algo_status():
 def api_cluster_map():
     """Price-Cluster decision-support (Monitor tab) — คำนวณสด dwell-zone S/R จาก MT5 H1.
     บอทคำนวณให้ owner ตัดสินใจ (กฎ fade อัตโนมัติไม่มี edge; วิจารณญาณ owner มี). display-only, 0 token."""
+    sym = (request.args.get("symbol", "") or "").strip()
     def _c():
         from agents.cluster_map import from_mt5
-        return from_mt5()
-    return jsonify(_cached("cluster-map", _c, ttl=20))
+        return from_mt5(symbol=sym or None)
+    return jsonify(_cached(f"cluster-map:{sym or 'gold'}", _c, ttl=20))
+
+
+@app.route("/api/sr-book")
+def api_sr_book():
+    """S/R dwell-zone ต่อทุกคู่ live/open (LEVELS book). display-only, 0 token."""
+    def _c():
+        from agents.cluster_map import from_mt5
+        from agents import algo_registry as _reg, shadow_switches as _sw
+        syms, seen = ["XAUUSD"], {"XAUUSD"}
+        for _a, s in _sw.combos_in(_sw.LIVE, _reg.combos(_reg.UNIVERSE)):
+            if s not in seen:
+                syms.append(s); seen.add(s)
+        rows = []
+        for s in syms:
+            r = from_mt5(symbol=None if s == "XAUUSD" else s)
+            if r and r.get("ok"):
+                rows.append({"symbol": s, "price": r.get("price"), "atr": r.get("atr"),
+                             "support": r.get("support"), "resistance": r.get("resistance"),
+                             "near": r.get("near"), "momentum": r.get("momentum")})
+        return {"ok": True, "rows": rows}
+    return jsonify(_cached("sr-book", _c, ttl=30))
 
 
 @app.route("/api/macro-quant")
@@ -1618,7 +1640,7 @@ def api_candles():
 @app.route("/api/live-symbols")
 def api_live_symbols():
     """คู่ที่ดูได้ในกราф: ทอง (engine) + combo ที่ toggle LIVE + คู่ที่มี open position. 0 token."""
-    out = [{"logical": "XAUUSD", "label": "XAUUSD · ทอง"}]
+    out = [{"logical": "XAUUSD", "label": "XAUUSD · LIVE"}]
     seen = {"XAUUSD"}
     try:
         from agents import algo_registry as _reg, shadow_switches as _sw
