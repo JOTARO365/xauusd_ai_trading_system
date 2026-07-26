@@ -1488,6 +1488,26 @@ def api_sr_level_stats():
     return jsonify(_cached(f"sr-stats:{sym}:{price}:{side}", _c, ttl=300))
 
 
+@app.route("/api/weekly-outlook")
+def api_weekly_outlook():
+    """แนวโน้มสัปดาห์ (LLM Opus, cache ต่อสัปดาห์). auto: สัปดาห์ใหม่ → สร้าง background (ไม่บล็อก). 0 token ตอนดู."""
+    import threading
+    from agents.weekly_outlook import get_cached, _iso_week, tick
+    c = get_cached()
+    if (not c) or c.get("week") != _iso_week():          # สัปดาห์ใหม่/ยังไม่มี → auto สร้าง background
+        threading.Thread(target=tick, daemon=True).start()
+    return jsonify(c or {"ok": False, "generating": True})
+
+
+@app.route("/api/weekly-outlook/refresh", methods=["POST"])
+def api_weekly_outlook_refresh():
+    """ปุ่ม refresh: บังคับสร้างใหม่ (Opus) background. คืนทันที."""
+    import threading
+    from agents.weekly_outlook import build
+    threading.Thread(target=lambda: build(force=True), daemon=True).start()
+    return jsonify({"ok": True, "generating": True})
+
+
 @app.route("/api/sr-book")
 def api_sr_book():
     """S/R dwell-zone ต่อทุกคู่ live/open (LEVELS book). display-only, 0 token."""

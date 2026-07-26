@@ -1660,6 +1660,20 @@
     </div>
   </section>
 
+  <!-- WEEKLY OUTLOOK (LLM Opus — แนวโน้มประจำสัปดาห์) -->
+  <section>
+    <div class="table-card" style="border-left:3px solid var(--gold)">
+      <div style="padding:12px 16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+          <h3 style="margin:0">📈 แนวโน้มประจำสัปดาห์ <span id="wo-week" style="font-size:11px;color:var(--muted);font-weight:400"></span></h3>
+          <button onclick="refreshWeeklyOutlook()" class="filter-select" style="cursor:pointer;padding:4px 12px;font-size:11px">↻ วิเคราะห์ใหม่ (AI)</button>
+        </div>
+        <div id="wo-body" style="font-size:13px;color:var(--dim);line-height:1.7">กำลังโหลด…</div>
+        <div id="wo-meta" style="font-size:10px;color:var(--muted);margin-top:8px"></div>
+      </div>
+    </div>
+  </section>
+
   <!-- WEEKEND GAP MONITOR (แสดงเฉพาะเสาร์อาทิตย์) -->
   <section id="gap-monitor-sec" style="display:none">
     <div class="table-card" style="border-left:3px solid var(--gold)">
@@ -3164,6 +3178,43 @@ async function populateSymbolFilter() {
   } catch (_e) {}
 }
 
+// ── Weekly Outlook (LLM Opus) ──
+function _mdToHtml(md) {
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return esc(md || '').split('\n').map(ln => {
+    ln = ln.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    if (/^###\s/.test(ln)) return `<div style="font-weight:700;margin:8px 0 2px">${ln.replace(/^###\s/, '')}</div>`;
+    if (/^##\s/.test(ln))  return `<div style="font-weight:700;color:var(--gold);margin:12px 0 4px;font-size:14px">${ln.replace(/^##\s/, '')}</div>`;
+    if (/^[-*]\s/.test(ln)) return `<div style="padding-left:14px">• ${ln.replace(/^[-*]\s/, '')}</div>`;
+    return ln.trim() ? `<div>${ln}</div>` : '<div style="height:6px"></div>';
+  }).join('');
+}
+let _woPoll = null;
+async function loadWeeklyOutlook() {
+  const body = document.getElementById('wo-body'); if (!body) return;
+  try {
+    const d = await (await fetch('/api/weekly-outlook')).json();
+    const wk = document.getElementById('wo-week'); if (wk) wk.textContent = d.week ? '· ' + d.week : '';
+    if (d.markdown) {
+      body.innerHTML = _mdToHtml(d.markdown);
+      const meta = document.getElementById('wo-meta');
+      if (meta) meta.textContent = `${d.stale ? '⚠ อาจเก่า · ' : ''}สร้าง ${d.generated || ''} · ${d.model || ''} · ${d.n_events || 0} events`;
+      if (_woPoll && !d.generating) { clearInterval(_woPoll); _woPoll = null; }
+    } else {
+      body.innerHTML = '<span style="color:var(--muted)">⏳ กำลังวิเคราะห์ด้วย AI (Opus)… รอ ~30 วิ</span>';
+      if (!_woPoll) _woPoll = setInterval(loadWeeklyOutlook, 8000);
+    }
+  } catch (_e) {}
+}
+async function refreshWeeklyOutlook() {
+  if (!(await uiConfirm('วิเคราะห์แนวโน้มสัปดาห์ใหม่ด้วย AI (Opus)? ใช้ token ~1 ครั้ง', { title: 'วิเคราะห์ใหม่', ok: 'วิเคราะห์' }))) return;
+  try {
+    await fetch('/api/weekly-outlook/refresh', { method: 'POST' });
+    document.getElementById('wo-body').innerHTML = '<span style="color:var(--muted)">⏳ กำลังวิเคราะห์…</span>';
+    if (!_woPoll) _woPoll = setInterval(loadWeeklyOutlook, 8000);
+  } catch (_e) { toast('refresh ไม่ได้', 'err'); }
+}
+
 // weekend-gap monitor: ทอง 24/7 vs ปิดศุกร์ → เดา gap จันทร์ + เตือนไม้ที่จะชน SL (แสดงเฉพาะ weekend)
 async function loadGapMonitor() {
   try {
@@ -3696,6 +3747,8 @@ document.getElementById('filter-symbol').addEventListener('change', onSymbolChan
 populateSymbolFilter();
 loadGapMonitor();
 setInterval(loadGapMonitor, 300000);             // ทุก 5 นาที (AV cache 1 ชม → เรียกจริงน้อย, กัน limit 25/วัน)
+loadWeeklyOutlook();
+setInterval(loadWeeklyOutlook, 600000);          // ทุก 10 นาที (cache ต่อสัปดาห์ → เรียก LLM แค่ auto/refresh)
 ['filter-source', 'filter-dir', 'filter-status', 'filter-result'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => histSymbol ? onSymbolChange() : renderTable(allTrades));
 });
