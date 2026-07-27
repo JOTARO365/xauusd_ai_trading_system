@@ -51,7 +51,10 @@ vote ว่าควรเข้า algo ไหน จาก algo ที่เ�
   *(ส่วนใหญ่มีแล้ว — real_edge by_regime + DB comment/account_login)*
 - **P1 — offline shrinkage (shadow)**: ✅ **DONE** (`agents/algo_selector.py` + `/api/algo-selector`, commit 0786e5a).
   empirical-Bayes beta-binomial shrink ต่อ (algo,symbol) → cell n เล็กถูกดึงเข้า global (verify: n=6/100% → 55.6%).
-  0 token, shadow-only. **P1.5 ค้าง**: cross-user (DB get_trades) + regime split (features/trend) + ESS + deflated-sig.
+  0 token, shadow-only.
+- **P1.5 — cross-user + ESS + regime**: ✅ **DONE** (commit 6176bc9). `_cells_from_db` รวมทุก account (attribute จาก comment)
+  + regime bucket (trend) + `_ess()` design-effect แก้ correlated-user (1 user 30 ไม้ → ESS ~2, ไม่ใช่ 30 อิสระ).
+  ⚠️ ค้าง: comment DB บาง (45/600 = attribute ได้น้อย จนกว่า trade ใหม่สะสม) · exp_R=avg pnl ยังไม่ R-normalize · deflated-sig gate ยังไม่ทำ.
 - **P2 — online selector (shadow)**: contextual Thompson sampling → log pick vs actual. ยังไม่คุม entry จริง.
 - **P3 — enable ทีละ segment**: selector คุมเฉพาะ combo ที่ผ่าน gauntlet · most-confident first · flag + kill switch.
 
