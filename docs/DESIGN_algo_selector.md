@@ -49,8 +49,9 @@ vote ว่าควรเข้า algo ไหน จาก algo ที่เ�
 ## 5. Milestones (validated-or-off)
 - **P0 — data**: ยืนยัน real_fills เก็บ (algo, regime, R, account_login) ครบ + aggregate cross-user ผ่าน DB.
   *(ส่วนใหญ่มีแล้ว — real_edge by_regime + DB comment/account_login)*
-- **P1 — offline stats (shadow)**: คำนวณ expectancy ต่อ (algo,regime) ข้าม user + **effective-N + deflated significance**.
-  แสดงใน Shadow Matrix (มี by_regime อยู่แล้ว). 0 order. = พิสูจน์ว่า "vote" มีสัญญาณจริงก่อน.
+- **P1 — offline shrinkage (shadow)**: ✅ **DONE** (`agents/algo_selector.py` + `/api/algo-selector`, commit 0786e5a).
+  empirical-Bayes beta-binomial shrink ต่อ (algo,symbol) → cell n เล็กถูกดึงเข้า global (verify: n=6/100% → 55.6%).
+  0 token, shadow-only. **P1.5 ค้าง**: cross-user (DB get_trades) + regime split (features/trend) + ESS + deflated-sig.
 - **P2 — online selector (shadow)**: contextual Thompson sampling → log pick vs actual. ยังไม่คุม entry จริง.
 - **P3 — enable ทีละ segment**: selector คุมเฉพาะ combo ที่ผ่าน gauntlet · most-confident first · flag + kill switch.
 
