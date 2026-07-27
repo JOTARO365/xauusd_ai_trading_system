@@ -14,6 +14,7 @@ if _BASE not in sys.path:
     sys.path.insert(0, _BASE)
 
 _MIN_CELLS_FOR_PRIOR = 2      # ต้องมี ≥2 cell ถึง fit prior; ไม่พอ → prior อ่อน (uniform)
+_RETIRED = {"decision_ai"}    # algo เลิกเทรด (AI pipeline เก่า) — ไม่นับใน selector (ตรงกับ real_edge)
 
 
 def _fit_beta_prior(cells):
@@ -80,7 +81,7 @@ def _cells_from_real_edge():
         out = []
         for r in real_edge.build().get("rows", []):
             n = r.get("n") or 0
-            if n <= 0:
+            if n <= 0 or r["algo_id"] in _RETIRED:
                 continue
             wr = r.get("wr")
             wins = round((wr or 0) / 100 * n) if wr is not None else 0
@@ -134,8 +135,8 @@ def _cells_from_db(by_regime=True):
     agg = {}          # key → {n, wins, pnl_sum, accounts:set}
     for r in rows:
         algo = _attribute(r)
-        if not algo:
-            continue                                     # MANUAL/ไม่รู้ที่มา = ข้าม
+        if not algo or algo in _RETIRED:
+            continue                                     # MANUAL/ไม่รู้ที่มา/decision_ai(retired) = ข้าม
         sym = _norm(str(r.get("symbol") or ""))
         reg = _regime_bucket(r.get("trend")) if by_regime else "ALL"
         key = (algo, sym, reg)
