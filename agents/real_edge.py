@@ -114,10 +114,20 @@ def _gold_real():
     return recs
 
 
+def _norm_sym(sym):
+    """broker → logical (GOLD#→XAUUSD) กัน real_fills ที่เผลอเขียน broker symbol โผล่เป็นคู่ซ้ำ."""
+    try:
+        from db.reader import _norm
+        return _norm(sym)
+    except Exception:
+        return sym
+
+
 def build():
-    """สรุป real edge ต่อ combo + segment. fail-soft."""
+    """สรุป real edge ต่อ combo + segment. fail-soft. normalize+merge symbol (GOLD#→XAUUSD กัน row ซ้ำ)."""
     rows = []
     if os.path.isdir(_FILLS):
+        buckets = {}                                          # (algo, logical) → [records] (merge broker+logical)
         for fn in sorted(os.listdir(_FILLS)):
             if not fn.endswith(".jsonl"):
                 continue
@@ -127,6 +137,8 @@ def build():
             algo, _, sym = fn[:-6].partition("__")
             if algo in _RETIRED:                             # ปลดระวาง (ไม่ใช้แล้ว) → ซ่อนจาก dashboard
                 continue
+            buckets.setdefault((algo, _norm_sym(sym)), []).extend(recs)
+        for (algo, sym), recs in buckets.items():
             st = _stats(recs)
             rows.append({"algo_id": algo, "symbol": sym, **st,
                          "by_regime": _segment(recs, lambda r: (r.get("features") or {}).get("regime")),
