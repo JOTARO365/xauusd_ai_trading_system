@@ -39,6 +39,12 @@ def _read_text(path, limit=4000):
 
 def _gather():
     """รวม data จริงที่ป้อน LLM (compact). ไม่เรียก LLM."""
+    try:                                                 # ensure MT5 (standalone/auto-tick ไม่มี init → gold data null)
+        from connectors.price_feed import connect_mt5, is_mt5_connected
+        if not is_mt5_connected():
+            connect_mt5()
+    except Exception:
+        pass
     ctx = {}
     # 1. ปฏิทินสัปดาห์นี้ (ForexFactory 7 วัน, high/med)
     try:
