@@ -185,21 +185,6 @@ def build():
                      "backtest_managed": bool(b.get("managed")) if b else False,
                      "real_n": rr.get("n", 0), "real_exp_R": rr.get("exp_R"),
                      "real_wr": rr.get("wr"), "real_regime": rr.get("by_regime", {}), **zero})
-    # mark คู่ที่โบรกปิดเทรด (trade_mode≠FULL เช่น FX บน XM) → dashboard เตือน ไม่ให้ toggle LIVE เปล่าๆ
-    try:
-        import MetaTrader5 as _mt5
-        from connectors.pair_collector import _broker_map as _bm
-        _bmap = _bm()
-        _tm = {}
-        for r in rows:
-            s = r["symbol"]
-            if s not in _tm:
-                _bi = _mt5.symbol_info(_bmap.get(s, s))
-                _tm[s] = None if _bi is None else (_bi.trade_mode == _mt5.SYMBOL_TRADE_MODE_FULL)  # None = MT5 ไม่พร้อม (ไม่ flag)
-            if _tm[s] is not None:
-                r["tradeable"] = _tm[s]                          # set เฉพาะเมื่อรู้จริง (กัน false-⛔ ตอน MT5 หลุด)
-    except Exception:
-        pass
     counts = {"ready": 0, "collecting": 0, "dying": 0}
     for r in rows:
         counts[r["badge"]] = counts.get(r["badge"], 0) + 1
