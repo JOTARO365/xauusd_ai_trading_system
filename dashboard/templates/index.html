@@ -5054,9 +5054,13 @@ function switchCell(r) {
     `<select class="filter-select" style="padding:2px 24px 2px 9px;font-size:11px" onchange="${onch}">
       ${opts.map(s => `<option value="${s}"${cur === s ? ' selected' : ''}>${s}</option>`).join('')}
      </select>`;
-  if (kind === 'combo')
+  if (kind === 'combo') {
+    const warn = r.tradeable === false
+      ? ' <span title="โบรกปิดเทรดคู่นี้ (trade_mode≠FULL) — LIVE วางออเดอร์ไม่ได้ (shadow/paper ยังเก็บ data ได้)" style="color:var(--red);font-size:11px">⛔</span>'
+      : '';
     return sel(['SHADOW','LIVE','OFF'], r.switch_state || r.state,
-               `setShadowSwitch('${r.algo_id}','${r.symbol}',this.value)`);
+               `setShadowSwitch('${r.algo_id}','${r.symbol}',this.value)`) + warn;
+  }
   if (kind === 'regime_gold')   // LIVE→REGIME_SHADOW_FILL=false · PAPER→true
     return sel(['LIVE','PAPER'], r.switch_state,
                `setGoldFlag('REGIME_SHADOW_FILL', this.value==='PAPER'?'true':'false', 'regime ทอง → '+this.value)`);

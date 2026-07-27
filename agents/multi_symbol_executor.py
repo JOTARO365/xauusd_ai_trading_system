@@ -98,6 +98,16 @@ def _meta(broker):
     return None, None
 
 
+def _tradeable(broker):
+    """โบรกเปิดให้เทรด symbol นี้ไหม (trade_mode=FULL). DISABLED/CLOSEONLY = วางไม่ได้ → ข้าม (กัน reject spam)."""
+    try:
+        import MetaTrader5 as mt5
+        i = mt5.symbol_info(broker)
+        return bool(i and i.trade_mode == mt5.SYMBOL_TRADE_MODE_FULL)
+    except Exception:
+        return False
+
+
 def _our_positions(broker):
     """open positions ของ engine นี้บน broker symbol (magic ระบบ). ทองอยู่คนละ symbol → ไม่ปน."""
     try:
@@ -474,9 +484,12 @@ def tick(force=False):
                 managed += _manage(broker, positions, bars, point, digits, cstate)
             room_total = (max_total <= 0) or (total_open + opened < max_total)   # global cap ยังมีที่ว่าง
             if len(positions) < max_pos and room_total:         # ผ่านทั้ง per-combo + รวมทุก symbol
-                op = _maybe_enter(algo_id, symbol, broker, bars, point,
-                                  sl_mult.get(symbol, 1.0), cstate, max_pos)
-                opened += op
+                if not _tradeable(broker):                       # โบรกปิดเทรดคู่นี้ (DISABLED เช่น FX บน XM) → ข้าม กัน reject
+                    logger.debug(f"[MSE] {ck}: trade_mode≠FULL (โบรกปิดเทรด) — ข้าม entry")
+                else:
+                    op = _maybe_enter(algo_id, symbol, broker, bars, point,
+                                      sl_mult.get(symbol, 1.0), cstate, max_pos)
+                    opened += op
             elif not room_total:
                 logger.debug(f"[MSE] {ck}: global cap {max_total} ถึงแล้ว (open={total_open + opened}) — ข้าม entry")
             ok += 1
