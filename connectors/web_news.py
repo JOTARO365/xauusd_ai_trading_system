@@ -96,12 +96,12 @@ def fetch_forexfactory_calendar(hours_ahead: int = 24,
     now    = datetime.now(timezone.utc)
     cutoff = now + timedelta(hours=hours_ahead)
 
-    # FF feed ไม่มี actual → เติมจาก: FMP (same-day ทุกประเทศ = หลัก) → AV (US backfill = สำรอง)
+    # mirror feed ไม่มี actual → เติมจาก: FF.com scrape (same-day ทุกสกุล = หลัก) → AV (US backfill = สำรอง)
     try:
-        from connectors.fmp_calendar import get_events as _fmp_events
-        _fmp = _fmp_events()
+        from connectors.ff_scrape import get_events as _ffc_events
+        _ffc = _ffc_events()
     except Exception:
-        _fmp = []
+        _ffc = []
     try:
         from connectors.macro_actuals import get_actuals
         _av_actuals = get_actuals()
@@ -140,13 +140,13 @@ def fetch_forexfactory_calendar(hours_ahead: int = 24,
         actual_src = "forexfactory" if actual else ""
         if not actual and event_dt <= now:
             title = ev.get("title", "")
-            # 1) FMP — same-day ทุกประเทศ (หลัก)
-            if _fmp:
+            # 1) FF.com scrape — same-day ทุกสกุล (หลัก; match currency+เวลาเป๊ะ = source เดียวกับ mirror)
+            if _ffc:
                 try:
-                    from connectors.fmp_calendar import actual_for as _fmp_actual
-                    hit = _fmp_actual(ev.get("country", ""), title, event_dt, _fmp)
+                    from connectors.ff_scrape import actual_for as _ffc_actual
+                    hit = _ffc_actual(ev.get("country", ""), title, event_dt, _ffc)
                     if hit:
-                        actual, actual_src = hit, "fmp"
+                        actual, actual_src = hit, "forexfactory"
                 except Exception:
                     pass
             # 2) AV — US backfill (สำรอง; guard lag ~1 เดือน กันเลขเดือนเก่า)

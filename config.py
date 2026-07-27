@@ -7,8 +7,7 @@ load_dotenv(override=True)
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 # ── Economic-calendar actuals (optional) ──────────────────────
-# FMP = actual same-day ทุกประเทศ (free 250/day) = primary · AV = US backfill (ตามหลัง ~1 เดือน) = fallback
-FMP_API_KEY          = os.getenv("FMP_API_KEY", "")
+# actual same-day scrape จาก ForexFactory.com (ไม่ต้อง key) = primary · AV = US backfill (ตามหลัง ~1 เดือน) = fallback
 ALPHAVANTAGE_API_KEY = os.getenv("ALPHAVANTAGE_API_KEY", "")
 
 # ── MT5 ──────────────────────────────────────────────────────
