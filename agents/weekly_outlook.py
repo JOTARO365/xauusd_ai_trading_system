@@ -66,7 +66,7 @@ def _gather():
     # 3. news sentiment ปัจจุบัน
     ni = _read_json(os.path.join(_BASE, "data", "news_impact.json"), {})
     ctx["news_sentiment"] = ni.get("aggregate", {})
-    ctx["recent_headlines"] = [h.get("title") for h in (ni.get("scored") or [])[:12] if h.get("title")]
+    ctx["recent_headlines"] = [h.get("title") for h in (ni.get("scored") or [])[:20] if h.get("title")]
     # 4. macro regime stance (ไฟล์ที่ analyst ใช้)
     ctx["macro_regime"] = _read_text(os.path.join(_BASE, "agents", "prompts", "macro_regime.md"), 3000)
     # 5. COT positioning
@@ -98,9 +98,9 @@ def _gather():
     # 11. worldmonitor (ภูมิรัฐศาสตร์/ความเสี่ยงโลก) → เฝ้าระวัง
     wm = _read_json(os.path.join(_BASE, "data", "worldmonitor.json"), {})
     ctx["world"] = {"attention": wm.get("attention"),
-                    "events": (wm.get("events") or [])[:6],
+                    "events": (wm.get("events") or [])[:12],
                     "headlines": [h.get("title") if isinstance(h, dict) else h
-                                  for h in (wm.get("headlines") or [])[:8]]}
+                                  for h in (wm.get("headlines") or [])[:16]]}
     # 12. event reliability + baseline
     es = _read_json(os.path.join(_BASE, "data", "event_stats.json"), {})
     ctx["event_baseline_abs_pct"] = es.get("baseline_avg_abs_pct")
@@ -174,44 +174,54 @@ def _ohlc_sum(arr, n=10):
         return None
 
 
-_PROMPT = """คุณคือนักวิเคราะห์ตลาดทองคำ (XAUUSD) มืออาชีพ เขียนภาษาไทย.
-วิเคราะห์ "แนวโน้มประจำสัปดาห์" จากข้อมูลจริงด้านล่าง — กระชับ ตรงประเด็น ใช้ได้จริงสำหรับเทรดเดอร์.
+_SYSTEM = """คุณคือนักวิเคราะห์ตลาดทองคำ (XAUUSD) อาวุโส ประสบการณ์ 15+ ปีในสาย macro + geopolitics เขียนภาษาไทย.
+ความเชี่ยวชาญ:
+- **Macro**: Fed/ดอกเบี้ย/real yield/DXY/เงินเฟ้อ — อ่าน backdrop มหภาคว่าหนุนหรือกดทอง
+- **ภูมิรัฐศาสตร์ (จุดแข็ง)**: สงคราม/ความขัดแย้ง (ตะวันออกกลาง, ยูเครน, ไต้หวัน), คว่ำบาตร, ธนาคารกลางสะสมทอง,
+  safe-haven flow, การเมืองสหรัฐ/เลือกตั้ง, น้ำมัน/พลังงาน — เชื่อมโยงผลต่อทองเชิงลึกเป็นเหตุเป็นผล ไม่ผิวเผิน
+- **เทคนิค**: แนวรับ/ต้าน โครงสร้างราคา ATR momentum
 
-สไตล์การเขียน (สำคัญ — เขียนให้เหมือนคนจริง ไม่ใช่ AI):
-- ตัดคำเกริ่น/น้ำ ("โดยรวมแล้ว", "อย่างไรก็ตาม" ที่ไม่จำเป็น, "ในภาพรวม") — เข้าประเด็นทันที
-- เจาะจงด้วยตัวเลขจริงเสมอ ห้ามพูดลอย ("ปัจจัยเชิงโครงสร้าง", "มีนัยสำคัญ") — บอกตัวเลข/ชื่อจริง
-- ประโยค active ประธานชัด · สลับสั้น-ยาว อย่าให้ทุกประโยคยาวเท่ากัน
-- ห้าม em-dash (—) ในเนื้อความ · ห้ามลงท้ายย่อหน้าด้วยวลีเท่ๆ แบบ pull-quote
-- ห้าม generalize ลอย ("ทุกครั้ง", "เสมอ", "ไม่เคย") · เชื่อผู้อ่าน บอกข้อเท็จจริงตรงๆ ไม่ต้องขยายความเกิน
+หน้าที่: เขียน "แนวโน้มประจำสัปดาห์" ที่เทรดเดอร์จริงใช้ได้ — เจาะลึก มีบริบท ครบถ้วน แต่ไม่น้ำ.
 
-ข้อมูล (JSON):
+สไตล์การเขียน (เหมือนคนจริง ไม่ใช่ AI):
+- ตัดคำเกริ่น/น้ำ ("โดยรวมแล้ว", "ในภาพรวม") เข้าประเด็นทันที
+- เจาะจงด้วยตัวเลข/ชื่อเหตุการณ์จริงเสมอ ห้ามพูดลอย ("ปัจจัยเชิงโครงสร้าง", "มีนัยสำคัญ")
+- active voice ประธานชัด · สลับสั้น-ยาว · ห้าม em-dash (—) · ห้ามลงท้ายด้วยวลี pull-quote
+- ห้าม generalize ลอย ("ทุกครั้ง/เสมอ") · เชื่อผู้อ่าน บอกตรงๆ
+- ส่วนข่าว/geopolitics เขียนให้ "ละเอียด มีเนื้อหา" — เล่าเหตุการณ์ + กลไกส่งผลต่อทอง + ตัวเลข ไม่ใช่แค่ bullet สั้น
+- ยึดเฉพาะข้อมูลจริงที่ผู้ใช้ให้ (calendar/scenarios/news/macro/COT/world) — ห้ามแต่งตัวเลข/เหตุการณ์เอง"""
+
+_PROMPT = """ข้อมูลจริงสำหรับวิเคราะห์ (JSON):
 {context}
 
-เขียนเป็น Markdown ตามหัวข้อนี้ (ห้ามเพิ่มหัวข้ออื่น):
+เขียนเป็น Markdown ตามหัวข้อนี้เป๊ะ (ห้ามเพิ่ม/สลับหัวข้อ):
 
-## 📅 สรุปสัปดาห์ที่แล้ว
-2-4 บรรทัด: เกิดอะไร ข่าว/ตัวเลขสำคัญ ราคาทองตอบสนองยังไง.
-**ใช้ราคาจาก gold_tech.last_week (open/close/high/low/pct_chg ของสัปดาห์ที่ปิดแล้ว) เท่านั้น — ห้ามใช้ this_week**
+## 📅 สรุปข่าว & ตลาดสัปดาห์ที่แล้ว
+เล่าให้ละเอียด (4-6 บรรทัด): ข่าว/ตัวเลข/เหตุการณ์ภูมิรัฐศาสตร์เด่นสัปดาห์ที่ปิดไป + ทองตอบสนองยังไง +
+กลไกที่ขับ (Fed/DXY/safe-haven). **ราคาใช้ gold_tech.last_week เท่านั้น (open/close/high/low/pct) ห้ามใช้ this_week**.
+อ้าง recent_headlines + world.headlines จริง
+
+## 🌍 ภูมิรัฐศาสตร์ & Safe-Haven
+เจาะลึกปัจจัยภูมิรัฐศาสตร์ที่มีผลต่อทองตอนนี้ (จาก world.events/headlines/attention): เหตุการณ์อะไร ระดับความตึงเครียด
+ทิศทาง (คลาย/ตึงขึ้น) และ**กลไกส่งผลต่อทอง** (safe-haven bid, ธนาคารกลางซื้อ, น้ำมัน→เงินเฟ้อ). 3-5 บรรทัด มีเนื้อหา
 
 ## 🎯 ทิศทาง & Bias สัปดาห์นี้
-ทิศทางหลักที่น่าจะเป็น (ขึ้น/ลง/sideways) + ระบุความมั่นใจ (สูง/กลาง/ต่ำ). อ้างอิงข้อมูลจริงที่ให้:
-- **DXY/ดอลลาร์** (drivers.DXY %chg, macro_strip.dxy) — ดอลลาร์แข็ง = กดทอง (inverse)
-- **real yield / 10y** (macro_strip.real_yield/y10, regime_state.real_rate_sign) — real yield ขึ้น = ลบต่อทอง
-- **Fed/CPI stance** (regime_state.fed_dir/cpi_yoy/fed_funds) · **COT** positioning · **news sentiment**
-- **regime/risk** (risk_regime.regime/vix) · **เงิน** (drivers.silver) ยืนยันโลหะ
-- **เทคนิคทอง** (gold_tech.this_week + daily high/low): ทองสัปดาห์นี้อยู่โซนไหน ใกล้แนวรับ/ต้านไหน (ใช้ this_week ไม่ใช่ last_week)
+ทิศทางหลัก (ขึ้น/ลง/sideways) + ความมั่นใจ (สูง/กลาง/ต่ำ). อ้าง:
+- **DXY** (drivers.DXY %chg, macro_strip.dxy) inverse ต่อทอง · **real yield/10y** (macro_strip, regime_state.real_rate_sign)
+- **Fed/CPI** (regime_state.fed_dir/cpi_yoy/fed_funds) · **COT** · **news sentiment** · **risk_regime.vix** · **เงิน** (drivers.silver)
+- **เทคนิค** (gold_tech.this_week + daily high/low): ทองอยู่โซนไหน ใกล้แนวรับ/ต้านไหน
 
 ## 🗓️ ปฏิทิน & Scenario สัปดาห์นี้
-ต่อ event สำคัญใน calendar: วันเวลา + ถ้าเลข hot→ทองไปทางไหน / cool→ทองไปทางไหน
-**ใช้ตัวเลขจาก event_scenarios ที่ให้มา** (magnitude% + n) เป็นหลัก อย่าเดาเอง. ถ้า event ไหนไม่มีใน scenarios บอกว่า "ไม่มีสถิติ"
+ต่อ event สำคัญใน calendar: วันเวลา + hot→ทองทางไหน / cool→ทองทางไหน.
+**ใช้ตัวเลข event_scenarios (magnitude% + n) เป็นหลัก ห้ามเดา** · event ไหนไม่มีสถิติ บอก "ไม่มีสถิติ"
 
 ## ⚠️ เฝ้าระวัง (Risk Factors)
-ปัจจัยที่ต้องระวังสัปดาห์นี้ — bullet สั้นๆ. ใช้ world.events/headlines (ภูมิรัฐศาสตร์) + risk_regime.vix + event ใหญ่ในปฏิทิน
+ปัจจัยเสี่ยงสัปดาห์นี้ — bullet + เหตุผลสั้น: geopolitics (world) + risk_regime.vix + event ใหญ่ในปฏิทิน
 
 ## 🔍 Macro ที่ต้องติดตาม
-ตัวชี้วัด/ธีม macro ที่ควรจับตาต่อเนื่อง (Fed path, real yield, DXY trend, CPI จาก regime_state) — bullet สั้นๆ
+ธีม macro ต่อเนื่อง (Fed path, real yield, DXY trend, CPI, ธนาคารกลางซื้อทอง) — bullet
 
-จบด้วยประโยคเดียว: **สรุป 1 บรรทัด** สำหรับสัปดาห์นี้.
+จบด้วย: **สรุป 1 บรรทัด** สำหรับสัปดาห์นี้.
 """
 
 
@@ -229,14 +239,14 @@ def build(force=False):
     _BUILDING["on"] = True
     try:
         from langchain_anthropic import ChatAnthropic
+        from langchain_core.messages import SystemMessage, HumanMessage
         import config as _cfg
         ctx = _gather()
-        # limit สูง (ยังไม่จำกัดจริง) — วัด token จริงก่อน ค่อยตั้ง limit (max_tokens env-override ได้)
-        _maxtok = int(os.getenv("WEEKLY_OUTLOOK_MAX_TOKENS") or 6000)   # วัดจริง out~2261 → 6000 = headroom พอ (cap ไม่ใช่ cost)
+        _maxtok = int(os.getenv("WEEKLY_OUTLOOK_MAX_TOKENS") or 6000)   # cap (ไม่ใช่ cost); +geopolitics section = ยาวขึ้น
         llm = ChatAnthropic(model=_MODEL, api_key=_cfg.ANTHROPIC_API_KEY,
                             max_tokens=_maxtok, timeout=120)   # ไม่ตั้ง temperature — Opus 4.8 deprecated
-        msg = _PROMPT.format(context=json.dumps(ctx, ensure_ascii=False)[:60000])   # กว้าง — Opus รับได้เยอะ
-        resp = llm.invoke(msg)
+        user_msg = _PROMPT.format(context=json.dumps(ctx, ensure_ascii=False)[:60000])   # กว้าง — Opus รับได้เยอะ
+        resp = llm.invoke([SystemMessage(content=_SYSTEM), HumanMessage(content=user_msg)])
         md = resp.content if isinstance(resp.content, str) else str(resp.content)
         usage = getattr(resp, "usage_metadata", None) or {}
         tin, tout = usage.get("input_tokens"), usage.get("output_tokens")
