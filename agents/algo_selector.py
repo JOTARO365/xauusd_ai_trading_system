@@ -101,28 +101,41 @@ def _regime_bucket(trend):
     return "NEUTRAL"
 
 
+def _attribute(r):
+    """attribute ไม้ → algo_id (logical backfill, ไม่แตะ DB).
+    ลำดับ: source=MANUAL → None (ไม้มือ ไม่ใช่ algo, ข้าม) · comment มี → _algo_of · source=SYSTEM ว่าง → decision_ai (AI pipeline เก่า, comment ไม่ถูกเก็บ)."""
+    from agents.trade_recorder import _algo_of
+    src = (str(r.get("source") or "")).upper()
+    if src == "MANUAL":
+        return None                                      # ไม้มือ = ไม่ใช่ algo (ห้ามปนเป็น decision_ai)
+    cm = r.get("comment")
+    if cm:
+        return _algo_of(cm)
+    if src == "SYSTEM":
+        return "decision_ai"                             # SYSTEM + comment ว่าง = AI pipeline เก่า
+    return None                                          # ไม่รู้ที่มา → ข้าม (ปลอดภัย)
+
+
 def _cells_from_db(by_regime=True):
-    """cross-user cells จาก DB (ทุก account). attribute algo จาก comment · regime จาก trend · +n_accounts (ESS).
-    เฉพาะ CLOSED + มี comment (attribute ได้). คืน [] ถ้า DB ไม่ต่อ."""
+    """cross-user cells จาก DB (ทุก account). attribute algo จาก source+comment (logical backfill) · regime จาก trend · +n_accounts (ESS).
+    เฉพาะ CLOSED · MANUAL ถูกกันออก (ไม้มือ ไม่ใช่ algo). คืน [] ถ้า DB ไม่ต่อ."""
     try:
         import config  # noqa
         from db.connection import get_client
-        from agents.trade_recorder import _algo_of
         try:
             from db.reader import _norm
         except Exception:
             _norm = lambda s: s
         rows = (get_client().table("trades")
-                .select("comment,account_login,symbol,pnl,trend,status")
+                .select("comment,source,account_login,symbol,pnl,trend,status")
                 .eq("status", "CLOSED").limit(2000).execute().data)
     except Exception:
         return []
     agg = {}          # key → {n, wins, pnl_sum, accounts:set}
     for r in rows:
-        cm = r.get("comment")
-        if not cm:
-            continue                                     # ไม่มี comment = attribute algo ไม่ได้ (ข้าม)
-        algo = _algo_of(cm)
+        algo = _attribute(r)
+        if not algo:
+            continue                                     # MANUAL/ไม่รู้ที่มา = ข้าม
         sym = _norm(str(r.get("symbol") or ""))
         reg = _regime_bucket(r.get("trend")) if by_regime else "ALL"
         key = (algo, sym, reg)
