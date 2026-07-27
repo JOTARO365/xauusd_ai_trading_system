@@ -6,6 +6,9 @@ load_dotenv(override=True)
 # ── Claude API ────────────────────────────────────────────────
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
+# ── AlphaVantage (economic actuals for calendar — optional, free 25/day) ──
+ALPHAVANTAGE_API_KEY = os.getenv("ALPHAVANTAGE_API_KEY", "")
+
 # ── MT5 ──────────────────────────────────────────────────────
 MT5_LOGIN    = int(os.getenv("MT5_LOGIN") or 0)          # ว่าง/ไม่มี → 0 (กัน ValueError ตอนยังไม่กรอก; MT5 จะต่อไม่ได้จนกว่ากรอก)
 MT5_PASSWORD = os.getenv("MT5_PASSWORD", "")

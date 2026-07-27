@@ -96,6 +96,12 @@ def fetch_forexfactory_calendar(hours_ahead: int = 24,
     now    = datetime.now(timezone.utc)
     cutoff = now + timedelta(hours=hours_ahead)
 
+    try:                                                     # US actuals จาก AlphaVantage (feed FF ไม่มี actual) — cache รายวัน, 0 token
+        from connectors.macro_actuals import get_actuals
+        _av_actuals = get_actuals()
+    except Exception:
+        _av_actuals = {}
+
     results: list[dict] = []
     for ev in events:
         country = ev.get("country", "").upper()
@@ -123,6 +129,17 @@ def fetch_forexfactory_calendar(hours_ahead: int = 24,
         if not us_all and not (now <= event_dt <= cutoff):
             continue
 
+        # actual: feed FF ไม่มี → เติมจาก AV เฉพาะ US event ที่ประกาศแล้ว (event_dt ≤ now) + match indicator
+        actual = ev.get("actual", "") or ""
+        actual_src = "forexfactory" if actual else ""
+        if not actual and country == "USD" and event_dt <= now and _av_actuals:
+            try:
+                from connectors.macro_actuals import actual_for
+                hit = actual_for(ev.get("title", ""), _av_actuals)
+                if hit:
+                    actual, actual_src = hit[0], "alphavantage"
+            except Exception:
+                pass
         results.append({
             "source":        "forexfactory",
             "title":         ev.get("title", ""),
@@ -132,7 +149,8 @@ def fetch_forexfactory_calendar(hours_ahead: int = 24,
             "timestamp_iso": event_dt.isoformat(),
             "forecast":      ev.get("forecast", "") or "—",
             "previous":      ev.get("previous", "") or "—",
-            "actual":        ev.get("actual",   "") or "pending",
+            "actual":        actual or "pending",
+            "actual_source": actual_src,                     # 'alphavantage' = ตัวเลขจริง US · '' = ยังไม่ประกาศ/ไม่มีข้อมูล
         })
 
     logger.info(f"ForexFactory: {len(results)} high-impact events ใน {hours_ahead}h")

@@ -6211,7 +6211,7 @@ function buildScenarioDetail(key, ev) {
   const numbers = '<div style="display:flex;gap:6px">' +
       cell('ครั้งก่อน', ev.previous) +
       cell('คาดการณ์', ev.forecast, 'var(--gold)') +
-      cell('ประกาศจริง', ev.actual, act != null ? 'var(--text)' : 'var(--muted)') +
+      cell(ev.actual_source === 'alphavantage' ? 'ประกาศจริง (AV)' : 'ประกาศจริง', ev.actual, act != null ? 'var(--text)' : 'var(--muted)') +
     '</div>' + banner;
 
   const panels = '<div style="display:flex;gap:12px;margin-top:10px">' +
