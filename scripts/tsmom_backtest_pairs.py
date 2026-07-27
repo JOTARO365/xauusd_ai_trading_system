@@ -17,7 +17,7 @@ sys.path.insert(0, _BASE)
 
 _OUT = os.path.join(_BASE, "docs", "reports", "shadow_backtest.json")
 # คู่ที่ backtest = tsmom screen เดิม + คู่ที่เทรด live (WTI/BTC/GBP) ให้ครบ universe
-PAIRS = ["XAUUSD", "XAGUSD", "EURUSD", "AUDUSD", "USDCHF", "USDJPY", "GBPUSD", "WTIUSD", "BTCUSD"]
+PAIRS = ["XAUUSD", "XAGUSD", "XAUEUR", "XAUJPY", "EURUSD", "AUDUSD", "USDCHF", "USDJPY", "GBPUSD", "WTIUSD", "BTCUSD"]
 
 
 def main():
