@@ -59,7 +59,11 @@ vote ว่าควรเข้า algo ไหน จาก algo ที่เ�
   ต่อ (symbol, regime) สุ่ม MC 3000 draws จาก posterior Beta(a0+w_eff, b0+loss_eff) แต่ละ algo → **P(algo ดีสุด)** = vote
   แบบ probability-matching (ไม่ใช่ majority ดิบ) · `trust=total_ESS≥30` · dashboard: recommendation cards + shrunk-cells table.
   ⚠️ ยังไม่คุม entry จริง (P3) · ยังไม่ log pick-vs-actual แยก (recs อยู่ใน /api/algo-selector, เทียบกับ "เทรดจริง" ใน Shadow Matrix ได้).
-- **P3 — enable ทีละ segment**: selector คุมเฉพาะ combo ที่ผ่าน gauntlet · most-confident first · flag + kill switch.
+- **P3-D — validation gate (shadow)**: ✅ **DONE** (`_gate`). ยาม winner's curse: cell `eligible` เมื่อผ่านครบ
+  (1) ESS≥min (env `ALGO_SEL_MIN_ESS`=30) (2) WR shrunk significant >50% (z-test บน ESS) (3) FDR Benjamini-Hochberg
+  ข้ามทุก cell (multiple-testing haircut) (4) shrunk_exp_R>0. dashboard: badge 🔓/🔒 + reason ต่อ recommendation/cell.
+  **live DB ตอนนี้ตกหมด (ESS<30) = ถูกต้อง** (research คาดไว้). ⚠️ approx: z-test บน WR (ไม่ใช่ full DSR/PBO ที่ต้อง per-trade R sd) · PBO/purged-CV = ต่อยอด.
+- **P3b — enable ทีละ segment**: selector คุม order เฉพาะ combo ที่ `eligible` · most-confident first · flag + kill switch. **ยังไม่ทำ** (รอ data พอ + eligible จริง). `eligible ≠ auto-trade`.
 
 ## 6. Validation gates (ต้องผ่านก่อน enable — §6 skill)
 - min-N ต่อ (algo,regime) หลัง effective-N correction (≥100 scalp / ≥20 swing)

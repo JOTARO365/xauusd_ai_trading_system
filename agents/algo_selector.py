@@ -174,6 +174,54 @@ def _recommendations(res, draws=3000):
     return sorted(recs, key=lambda r: -r["total_ess"])
 
 
+def _gate(res, alpha=0.05):
+    """P3 ชั้น D — validation gate ยาม winner's curse (shadow, ไม่คุม order).
+    cell 'eligible' เมื่อผ่านครบ: (1) ESS≥min (2) WR shrunk significant >50% (z-test บน ESS)
+    (3) FDR Benjamini-Hochberg ข้ามทุก cell (multiple-testing haircut) (4) shrunk_exp_R>0.
+    ตอน data บาง = ตกเกือบหมด = ถูกต้อง (research: 'คาดว่าตอนนี้ตกเกือบหมด')."""
+    import os as _os
+    from math import sqrt, erf
+    min_ess = float(_os.getenv("ALGO_SEL_MIN_ESS") or 30)
+    cells = res.get("cells", [])
+    ncdf = lambda z: 0.5 * (1.0 + erf(z / sqrt(2.0)))
+    tests = []
+    for c in cells:
+        ne = c.get("ess", 0)
+        p = c.get("shrunk_wr", 0) / 100.0
+        se = sqrt(0.25 / ne) if ne > 0 else 0.0          # SE ภายใต้ null p=0.5
+        z = (p - 0.5) / se if se > 0 else 0.0
+        pval = 1.0 - ncdf(z)                              # one-sided: edge > 50%
+        c["edge_z"] = round(z, 2)
+        c["edge_p"] = round(pval, 4)
+        tests.append((c, pval))
+    # Benjamini-Hochberg FDR: หา i ใหญ่สุดที่ p(i) <= (i/m)*alpha → reject prefix
+    m = len(tests)
+    ranked = sorted(tests, key=lambda t: t[1])
+    fdr_ok = set()
+    for i, (c, pv) in enumerate(ranked, 1):
+        if pv <= (i / m) * alpha:
+            fdr_ok = {id(t[0]) for t in ranked[:i]}
+    for c in cells:
+        reasons = []
+        if c.get("ess", 0) < min_ess:
+            reasons.append(f"ESS<{int(min_ess)}")
+        if id(c) not in fdr_ok:
+            reasons.append("ไม่ผ่าน FDR (noise/multiple-testing)")
+        if (c.get("shrunk_exp_R") or 0) <= 0:
+            reasons.append("exp_R≤0")
+        c["eligible"] = not reasons
+        c["gate_reason"] = "✅ ผ่าน gate" if not reasons else " · ".join(reasons)
+    # map เข้า recommendations: rec eligible ถ้า cell ของ algo ที่แนะนำผ่าน
+    cell_by = {(c["algo"], c["symbol"], c.get("regime", "ALL")): c for c in cells}
+    for r in res.get("recommendations", []):
+        c = cell_by.get((r["recommend"], r["symbol"], r["regime"]))
+        r["eligible"] = bool(c and c.get("eligible"))
+        r["gate_reason"] = c.get("gate_reason") if c else "no cell"
+    res["gate"] = {"min_ess": min_ess, "alpha": alpha, "n_tests": m,
+                   "n_eligible": sum(1 for c in cells if c.get("eligible"))}
+    return res
+
+
 def build(source="db", by_regime=True):
     """P1.5 shadow output: shrunk edge cross-user + ESS + regime. source='db'(cross-user) / 'local'(real_fills). DISPLAY-ONLY."""
     from datetime import datetime, timezone
@@ -184,11 +232,13 @@ def build(source="db", by_regime=True):
         used = "local(real_fills)"
     res = shrink(cells)
     res["recommendations"] = _recommendations(res)       # P2: Thompson pick ต่อ (symbol, regime)
+    _gate(res)                                            # P3-D: validation gate (winner's-curse haircut, shadow)
     res["ok"] = True
     res["source"] = used
     res["generated"] = datetime.now(timezone.utc).isoformat()[:16] + "Z"
-    res["note"] = ("P2: contextual Thompson sampling (P(algo ดีสุด) ต่อ regime) บน posterior P1.5 · "
-                   "cross-user DB + ESS + regime split · exp_R=avg pnl (ยังไม่ R-normalize) · shadow-only ไม่แตะ entry")
+    res["note"] = ("P3-D: validation gate (min-ESS + WR-significance + FDR Benjamini-Hochberg) ยาม winner's curse · "
+                   "P2 Thompson vote · P1.5 cross-user DB+ESS+regime · exp_R=avg pnl (ยังไม่ R-normalize) · "
+                   "shadow-only ไม่แตะ entry (eligible ≠ auto-trade; order-control=P3b)")
     return res
 
 

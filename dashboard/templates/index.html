@@ -1997,8 +1997,9 @@
             <th style="padding:4px 8px">กลยุทธ์</th><th style="padding:4px 8px">คู่</th><th style="padding:4px 8px">regime</th>
             <th style="padding:4px 8px">n</th><th style="padding:4px 8px">ESS</th><th style="padding:4px 8px">WR ดิบ</th>
             <th style="padding:4px 8px">WR shrunk</th><th style="padding:4px 8px">pull</th><th style="padding:4px 8px">exp_R shrunk</th>
+            <th style="padding:4px 8px">edge p</th><th style="padding:4px 8px">gate</th>
           </tr></thead>
-          <tbody id="as-body"><tr><td colspan="9" style="color:var(--muted);padding:6px 8px">—</td></tr></tbody>
+          <tbody id="as-body"><tr><td colspan="11" style="color:var(--muted);padding:6px 8px">—</td></tr></tbody>
         </table>
       </div>
       <div style="color:var(--muted);font-size:10px;margin-top:5px">DESIGN_algo_selector.md · shadow-only 0 token · exp_R=avg pnl (ยังไม่ R-normalize) · ยังไม่คุม entry จริง (P3 = enable ทีละ segment หลังผ่าน gauntlet)</div>
@@ -5175,17 +5176,22 @@ async function loadAlgoSelector() {
     const body = document.getElementById('as-body'), meta = document.getElementById('as-meta'), recs = document.getElementById('as-recs');
     if (!body || !d.ok) return;
     const rC = v => v == null ? 'var(--muted)' : (v > 0 ? 'var(--green)' : (v < 0 ? 'var(--red)' : 'var(--text)'));
-    const pri = d.prior || {};
-    if (meta) meta.textContent = `${d.generated} · source=${d.source} · global WR ${pri.global_wr ?? '—'}% · ρ=${pri.rho ?? '—'} · ${(d.cells || []).length} cell`;
+    const pri = d.prior || {}, g = d.gate || {};
+    if (meta) meta.textContent = `${d.generated} · source=${d.source} · global WR ${pri.global_wr ?? '—'}% · ρ=${pri.rho ?? '—'} · ${(d.cells || []).length} cell · gate: ${g.n_eligible ?? 0}/${g.n_tests ?? 0} ผ่าน (min ESS ${g.min_ess ?? '—'}, FDR α${g.alpha ?? '—'})`;
     // P2 recommendation cards ต่อ (symbol, regime)
     if (recs) recs.innerHTML = (d.recommendations || []).map(r => {
       const bars = Object.entries(r.p_best).sort((a, b) => b[1] - a[1]).map(([a, p]) =>
         `<div style="display:flex;justify-content:space-between;font-size:11px;${a === r.recommend ? 'font-weight:700;color:var(--green)' : 'color:var(--muted)'}">
            <span>${a}</span><span>${(p * 100).toFixed(0)}%</span></div>`).join('');
       const trust = r.trust ? '<span style="color:var(--green)">✓ พอเชื่อ</span>' : '<span style="color:var(--amber,#e0a030)">✗ ESS ต่ำ</span>';
-      return `<div style="border:1px solid #262a31;border-radius:8px;padding:8px 12px;min-width:180px;background:var(--card,#161a20)">
+      const gate = r.eligible
+        ? '<span style="color:var(--green)">🔓 ผ่าน gate — พร้อม enable (P3b)</span>'
+        : `<span style="color:var(--muted)">🔒 ${r.gate_reason || 'ไม่ผ่าน gate'}</span>`;
+      const border = r.eligible ? 'var(--green)' : '#262a31';
+      return `<div style="border:1px solid ${border};border-radius:8px;padding:8px 12px;min-width:180px;background:var(--card,#161a20)">
         <div style="font-weight:700;font-size:12px">${r.symbol} · ${r.regime}</div>
-        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">ESS ${r.total_ess} · ${r.n_algos} algo · ${trust}</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:2px">ESS ${r.total_ess} · ${r.n_algos} algo · ${trust}</div>
+        <div style="font-size:10px;margin-bottom:4px">${gate}</div>
         ${bars}</div>`;
     }).join('') || '<div style="color:var(--muted);font-size:11px">ยังไม่มี cell (รอไม้ที่มี comment สะสมใน DB)</div>';
     // P1.5 shrunk cells table
@@ -5200,8 +5206,10 @@ async function loadAlgoSelector() {
         <td style="padding:4px 8px;font-weight:700">${c.shrunk_wr}</td>
         <td style="padding:4px 8px;color:var(--muted);font-size:11px">${pull > 0 ? '+' : ''}${pull}</td>
         <td style="padding:4px 8px;color:${rC(c.shrunk_exp_R)}">${c.shrunk_exp_R > 0 ? '+' : ''}${c.shrunk_exp_R}</td>
+        <td style="padding:4px 8px;color:var(--muted);font-size:11px">${c.edge_p ?? '—'}</td>
+        <td style="padding:4px 8px;font-size:11px;color:${c.eligible ? 'var(--green)' : 'var(--muted)'}">${c.eligible ? '🔓 ผ่าน' : '🔒 ' + (c.gate_reason || '')}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="9" style="color:var(--muted);padding:6px 8px">ยังไม่มี cell</td></tr>';
+    }).join('') || '<tr><td colspan="11" style="color:var(--muted);padding:6px 8px">ยังไม่มี cell</td></tr>';
   } catch (_e) {}
 }
 
