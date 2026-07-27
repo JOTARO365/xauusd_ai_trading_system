@@ -55,7 +55,10 @@ vote ว่าควรเข้า algo ไหน จาก algo ที่เ�
 - **P1.5 — cross-user + ESS + regime**: ✅ **DONE** (commit 6176bc9). `_cells_from_db` รวมทุก account (attribute จาก comment)
   + regime bucket (trend) + `_ess()` design-effect แก้ correlated-user (1 user 30 ไม้ → ESS ~2, ไม่ใช่ 30 อิสระ).
   ⚠️ ค้าง: comment DB บาง (45/600 = attribute ได้น้อย จนกว่า trade ใหม่สะสม) · exp_R=avg pnl ยังไม่ R-normalize · deflated-sig gate ยังไม่ทำ.
-- **P2 — online selector (shadow)**: contextual Thompson sampling → log pick vs actual. ยังไม่คุม entry จริง.
+- **P2 — online selector (shadow)**: ✅ **DONE** (`_recommendations` + dashboard card). contextual Thompson sampling:
+  ต่อ (symbol, regime) สุ่ม MC 3000 draws จาก posterior Beta(a0+w_eff, b0+loss_eff) แต่ละ algo → **P(algo ดีสุด)** = vote
+  แบบ probability-matching (ไม่ใช่ majority ดิบ) · `trust=total_ESS≥30` · dashboard: recommendation cards + shrunk-cells table.
+  ⚠️ ยังไม่คุม entry จริง (P3) · ยังไม่ log pick-vs-actual แยก (recs อยู่ใน /api/algo-selector, เทียบกับ "เทรดจริง" ใน Shadow Matrix ได้).
 - **P3 — enable ทีละ segment**: selector คุมเฉพาะ combo ที่ผ่าน gauntlet · most-confident first · flag + kill switch.
 
 ## 6. Validation gates (ต้องผ่านก่อน enable — §6 skill)

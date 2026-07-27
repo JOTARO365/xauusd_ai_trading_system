@@ -1490,7 +1490,7 @@ def api_sr_level_stats():
 
 @app.route("/api/algo-selector")
 def api_algo_selector():
-    """P1 shadow: shrunk edge ต่อ (algo,symbol) — empirical-Bayes แก้ n เล็ก (winner's curse). display-only, 0 token."""
+    """P1.5/P2 shadow: shrunk edge cross-user (empirical-Bayes+ESS) + Thompson vote P(algo ดีสุด|regime). display-only, 0 token."""
     from agents.algo_selector import build
     return jsonify(_cached("algo-selector", build, ttl=60))
 

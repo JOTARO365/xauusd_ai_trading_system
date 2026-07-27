@@ -141,6 +141,39 @@ def _cells_from_db(by_regime=True):
     return out
 
 
+def _recommendations(res, draws=3000):
+    """P2: contextual Thompson sampling — ต่อ (symbol, regime) สุ่มจาก posterior แต่ละ algo → P(algo ดีสุด).
+    = "vote แบบ probability-matching" (ไม่ใช่ majority ดิบ). posterior = Beta(a0+w_eff, b0+loss_eff) จาก P1.5.
+    low-ESS → posterior กว้าง → ยังมีโอกาสถูกเลือก (explore). แนะนำ = argmax P(best)."""
+    try:
+        import numpy as np
+        import collections
+    except Exception:
+        return []
+    pri = res.get("prior") or {}
+    a0, b0 = pri.get("a0", 1.0), pri.get("b0", 1.0)
+    groups = {}
+    for c in res.get("cells", []):
+        ne, n, w = c.get("ess", c["n"]), c["n"], c["wins"]
+        w_eff = w * (ne / n) if n else 0.0
+        alpha = a0 + w_eff
+        beta = b0 + max(0.0, ne - w_eff)
+        groups.setdefault((c["symbol"], c.get("regime", "ALL")), []).append(
+            {"algo": c["algo"], "alpha": alpha, "beta": beta, "ess": ne})
+    recs = []
+    for (sym, reg), post in groups.items():
+        samp = {p["algo"]: np.random.beta(p["alpha"], p["beta"], draws) for p in post}
+        algos = list(samp)
+        mat = np.vstack([samp[a] for a in algos])
+        win = collections.Counter(mat.argmax(axis=0).tolist())
+        pbest = {algos[i]: round(win.get(i, 0) / draws, 3) for i in range(len(algos))}
+        best = max(pbest, key=pbest.get)
+        recs.append({"symbol": sym, "regime": reg, "recommend": best, "p_best": pbest,
+                     "n_algos": len(post), "total_ess": round(sum(p["ess"] for p in post), 1),
+                     "trust": sum(p["ess"] for p in post) >= 30})   # total ESS ต่ำ = อย่าเพิ่งเชื่อคำแนะนำ
+    return sorted(recs, key=lambda r: -r["total_ess"])
+
+
 def build(source="db", by_regime=True):
     """P1.5 shadow output: shrunk edge cross-user + ESS + regime. source='db'(cross-user) / 'local'(real_fills). DISPLAY-ONLY."""
     from datetime import datetime, timezone
@@ -150,11 +183,12 @@ def build(source="db", by_regime=True):
         cells = _cells_from_real_edge()
         used = "local(real_fills)"
     res = shrink(cells)
+    res["recommendations"] = _recommendations(res)       # P2: Thompson pick ต่อ (symbol, regime)
     res["ok"] = True
     res["source"] = used
     res["generated"] = datetime.now(timezone.utc).isoformat()[:16] + "Z"
-    res["note"] = ("P1.5: cross-user DB + ESS (correlated-user correction) + regime split · shrinkage แก้ n เล็ก · "
-                   "exp_R=avg pnl (ยังไม่ R-normalize=P2) · shadow-only ไม่แตะ entry")
+    res["note"] = ("P2: contextual Thompson sampling (P(algo ดีสุด) ต่อ regime) บน posterior P1.5 · "
+                   "cross-user DB + ESS + regime split · exp_R=avg pnl (ยังไม่ R-normalize) · shadow-only ไม่แตะ entry")
     return res
 
 
