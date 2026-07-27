@@ -136,8 +136,12 @@ def fetch_forexfactory_calendar(hours_ahead: int = 24,
             try:
                 from connectors.macro_actuals import actual_for
                 hit = actual_for(ev.get("title", ""), _av_actuals)
+                # guard lag: ใช้ค่าเฉพาะเมื่อ AV reference month ใกล้พอกับวันประกาศ (AV อัปเดตช้า 1 เดือน
+                # → ถ้า gap > ~75 วัน แปลว่า AV ยังไม่มีเดือนของ event นี้ → ปล่อย pending กันแสดงเลขเดือนเก่า)
                 if hit:
-                    actual, actual_src = hit[0], "alphavantage"
+                    ref = datetime.strptime(hit[1], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                    if 0 <= (event_dt - ref).days <= 75:
+                        actual, actual_src = hit[0], "alphavantage"
             except Exception:
                 pass
         results.append({

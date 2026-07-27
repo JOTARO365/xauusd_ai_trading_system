@@ -27,7 +27,7 @@ _AV_URL = "https://www.alphavantage.co/query?function={fn}&interval={iv}&apikey=
 # (ตัด REAL_GDP: annualize จาก level ไม่ตรง FF = แสดงเลขผิด → ปล่อย pending ดีกว่า)
 _SERIES = {
     "CPI": "monthly", "UNEMPLOYMENT": "monthly", "FEDERAL_FUNDS_RATE": "monthly",
-    "RETAIL_SALES": "monthly", "NONFARM_PAYROLL": "monthly",
+    "RETAIL_SALES": "monthly", "NONFARM_PAYROLL": "monthly", "DURABLES": "monthly",
 }
 
 
@@ -77,6 +77,9 @@ def _derive(series):
     if len(nf) >= 2:
         chg = nf[0][1] - nf[1][1]                            # การเปลี่ยนแปลง (พันคน)
         out["nfp"] = (f"{chg:+,.0f}K", nf[0][0])
+    du = series.get("DURABLES") or []
+    if len(du) >= 2:
+        out["durables_mom"] = (f"{_pct(du[0][1], du[1][1]):+.1f}%", du[0][0])
     return out
 
 
@@ -90,6 +93,7 @@ _MATCH = [
     ("adp", None),                                          # ADP = private payrolls คนละรายงานกับ BLS NFP
     ("non-farm", "nfp"), ("nonfarm", "nfp"), ("nfp", "nfp"),
     ("core retail", None), ("retail sales", "retail_mom"),
+    ("core durable", None), ("durable goods", "durables_mom"),   # AV DURABLES = headline (core=ex-transport ไม่มี → pending)
 ]
 
 
