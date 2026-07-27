@@ -606,7 +606,8 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
 
     # Daily trade cap — safety net จุดเดียวคุมทุก market entry รวม path ที่ข้าม gates
     # (zone-break re-entry เรียก open_order ตรง) — gate ใน _run_gates ตัดก่อนถึงนี่อยู่แล้ว
-    _capped, _cap_reason = daily_trade_cap_reached()
+    # per-symbol: cap ของคู่นี้เท่านั้น (ทองเต็ม ไม่ block MSE · MSE เต็ม ไม่ block ทอง)
+    _capped, _cap_reason = daily_trade_cap_reached(symbol)
     if _capped:
         logger.warning(f"[TRADE_CAP] {_cap_reason} — block {direction}")
         return {"success": False, "error": _cap_reason}
@@ -848,13 +849,14 @@ def get_mt5_history(days: int = 60) -> list:
     return results
 
 
-def count_trades_opened_today() -> int:
-    """นับไม้ SYSTEM ที่ 'เปิดจริง' วันนี้จาก MT5 entry deals (market + pending ที่ fill แล้ว).
-    ใช้เป็นฐานของ MAX_TRADES_PER_DAY (เบรกกันวันพายุ — replay: ไม้ #7+ ของวัน = −411).
-    ขอบวันใช้ local midnight (convention เดียวกับ get_mt5_history/daily-loss ในระบบ) —
-    deal.time เป็น server-time epoch อาจ drift 2-5 ชม.ที่ขอบวัน: ยอมรับได้สำหรับ storm cap
-    (ไม่ใช่ accounting เป๊ะ). fail → คืน 0 = ไม่ block (fail-open: cap เป็น insurance ไม่ใช่ SL)"""
+def count_trades_opened_today(symbol: str | None = None) -> int:
+    """นับไม้ SYSTEM ที่ 'เปิดจริง' วันนี้จาก MT5 entry deals (market + pending ที่ fill แล้ว) — **ต่อ symbol**.
+    default = SYMBOL (ทอง) → caller เดิมไม่กระทบ; MSE ส่ง broker symbol → storm-cap ต่อคู่แยกกัน.
+    ใช้ใน MAX_TRADES_PER_DAY (เบรกกันวันพายุ — replay: ไม้ #7+ ของวัน = −411).
+    ขอบวันใช้ local midnight (convention เดียวกับ get_mt5_history/daily-loss) — deal.time server-time
+    อาจ drift 2-5 ชม.ที่ขอบวัน: ยอมรับได้สำหรับ storm cap. fail → 0 = ไม่ block (fail-open)"""
     from datetime import datetime
+    sym = symbol or SYMBOL
     try:
         midnight = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         deals = mt5.history_deals_get(midnight, datetime.now())
@@ -862,21 +864,23 @@ def count_trades_opened_today() -> int:
             return 0
         return sum(
             1 for d in deals
-            if d.symbol == SYMBOL and d.entry == 0 and d.magic == SYSTEM_MAGIC
+            if d.symbol == sym and d.entry == 0 and d.magic == SYSTEM_MAGIC
         )
     except Exception as e:
         logger.debug(f"count_trades_opened_today failed (fail-open): {e}")
         return 0
 
 
-def daily_trade_cap_reached() -> tuple[bool, str]:
-    """(reached, reason) — True เมื่อไม้ที่เปิดวันนี้ ≥ MAX_TRADES_PER_DAY (0 = ปิดใช้งาน)"""
+def daily_trade_cap_reached(symbol: str | None = None) -> tuple[bool, str]:
+    """(reached, reason) — True เมื่อไม้ **ของ symbol นี้** ที่เปิดวันนี้ ≥ MAX_TRADES_PER_DAY (0 = ปิด).
+    per-symbol: ทองเต็ม cap ไม่ block MSE · MSE เต็ม cap ไม่ block ทอง (แต่ละคู่มี storm-brake ของตัวเอง)."""
     cap = int(getattr(_cfg, "MAX_TRADES_PER_DAY", 0) or 0)
     if cap <= 0:
         return False, ""
-    n = count_trades_opened_today()
+    sym = symbol or SYMBOL
+    n = count_trades_opened_today(sym)
     if n >= cap:
-        return True, f"Daily trade cap: เปิดแล้ว {n}/{cap} ออเดอร์วันนี้ — หยุดเปิดเพิ่ม (ป้องกัน over-trade)"
+        return True, f"Daily trade cap [{sym}]: เปิดแล้ว {n}/{cap} ออเดอร์วันนี้ — หยุดเปิดเพิ่ม (ป้องกัน over-trade)"
     return False, ""
 
 
