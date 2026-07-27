@@ -1488,6 +1488,13 @@ def api_sr_level_stats():
     return jsonify(_cached(f"sr-stats:{sym}:{price}:{side}", _c, ttl=300))
 
 
+@app.route("/api/algo-selector")
+def api_algo_selector():
+    """P1 shadow: shrunk edge ต่อ (algo,symbol) — empirical-Bayes แก้ n เล็ก (winner's curse). display-only, 0 token."""
+    from agents.algo_selector import build
+    return jsonify(_cached("algo-selector", build, ttl=60))
+
+
 @app.route("/api/weekly-outlook")
 def api_weekly_outlook():
     """แนวโน้มสัปดาห์ (LLM Opus, cache ต่อสัปดาห์). auto: สัปดาห์ใหม่ → สร้าง background (ไม่บล็อก). 0 token ตอนดู."""
