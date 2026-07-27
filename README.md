@@ -21,6 +21,12 @@ ships a Flask dashboard on port 5050.
 
 ## Recent additions (2026-07)
 
+- **ML Algo-Selector (shadow)** (`agents/algo_selector.py`, dashboard *Algo Selector* card) — meta-layer that answers *"which algo should we trust in this regime?"* from cross-user performance: empirical-Bayes shrinkage (kills small-n winner's curse) + **effective-sample-size** correction (correlated users ≠ independent trades) + regime split + **Thompson-sampling vote** (P(algo best)) + a **validation gate** (min-ESS · significance · Benjamini-Hochberg FDR haircut). Display-only, 0 token, never touches entry. See `docs/DESIGN_algo_selector.md`.
+- **Weekly Outlook (LLM)** — an Opus-analyzed weekly direction/geopolitics/scenario briefing using *all* system data (calendar, macro regime, drivers, COT, gold technicals), cached per ISO-week (~$0.35/wk) with a manual refresh button.
+- **Multi-symbol executor — all pairs live-capable** — the executor now trades **any** non-gold pair whose switch is LIVE (WTI, BTC, EURUSD#, USDJPY#, …). Order-slot counting, `count_protected_slots`, force-BE and the **daily-trade cap are per-symbol** (gold hitting its cap no longer blocks non-gold). Entry dedup only marks a signal-bar *handled on success* (a transient open-failure no longer blocks that bar forever) with a retry cooldown (`MSE_ENTRY_RETRY_COOLDOWN`). `scripts/clear_mse_stale.py` clears any legacy false-block. Broker symbols are resolved per-broker via `BROKER_SYM_*` in `.env` (probe now prefers `trade_mode=FULL` so it never maps a feed-only/disabled symbol).
+- **Clear entry logging** — every real order prints `🟢 เข้าไม้จริง | <symbol> | algo=<algo> | <dir> <lot> @ <price> | SL/TP | ticket` (one central log covering gold + all engines), so the terminal always shows which pair and which algo entered.
+- **Weekend Gap Monitor & S/R Level Explainer** — dashboard panels: 24/7 gold spot (Binance XAUT/PAXG) vs Friday close to anticipate the Monday gap, and per-level touch/bounce statistics.
+- **`setup.py` runs broker-specific scripts on fresh pull** — after syncing `.env` and probing the broker symbol map, it regenerates the per-broker backtest (`shadow_backtest_managed.py` + `tsmom_backtest_pairs.py`) so a fresh clone's Shadow Matrix / algo-selector match *its* broker (skip with `SKIP_BACKTEST=1`).
 - **Unified Live Control** — every strategy×pair (gold included) is turned on/off from **one** switch (LIVE / SHADOW / OFF) in the dashboard **Shadow Matrix**; the gold engines now read the same switch. See [Live Control](#live-control--turning-strategies-onoff-shadow-matrix).
 - **TSMOM-D1 as a full registry algo** (`agents/algo_registry.py` `TSMOMDailyAlgo`) — daily time-series-momentum on every pair (ensemble vote L=63/126/252, 3×ATR disaster stop, **exit-on-flip**), with its own paper-resolver and live close-on-flip in the multi-symbol executor. Per-pair backtest committed to `docs/reports/shadow_backtest.json`.
 - **Per-algo real edge via order comment** (`agents/trade_recorder.py`) — captures the comment when a trade *opens* (survives the broker stripping `deal.comment` on SL/TP close), attributes each closed trade to its algo, and computes real edge **per strategy** (not lumped) — with a one-shot `backfill` from MT5 order history.
@@ -225,7 +231,9 @@ python setup.py
 
 Idempotent + safe to re-run. Does everything a fresh checkout needs: Python-version check →
 `pip install -r requirements.txt` → **sync `.env`** → create runtime dirs → MT5 connectivity
-check (informational). It never starts the bot.
+check → **broker symbol map** (probe) → **regenerate the per-broker backtest** so the dashboard's
+Shadow Matrix / algo-selector match *your* broker (set `SKIP_BACKTEST=1` to skip; needs MT5 logged
+in, ~2–3 min, read-only). It never starts the bot.
 
 > **`.env` sync behaviour** (two passes):
 > 1. **`.env.example` → add-only.** Missing `.env` is created from it; an existing `.env` gets
@@ -255,9 +263,11 @@ Then open `.env` and fill in the required secrets (see [Environment Variables](#
 > (XM: `GOLD#` / `OILCash#` / `BTCUSD#`; others: `XAUUSD` / `USOIL` / `BTCUSD`). Gold uses
 > `SYMBOL`; every other pair is `BROKER_SYM_<LOGICAL>` (e.g. `BROKER_SYM_WTIUSD=USOIL`) — the
 > single source `_broker_map()` reads. `python setup.py` (with MT5 logged in) **auto-detects and
-> fills these into `.env`** for your broker (ranking the real BTC/oil CFD above look-alike stocks,
-> Brent, and futures); anything it can't match, you set by hand. `data/universe_probe.json` is a
-> per-broker detection cache (gitignored) — `.env` is what actually drives symbol resolution.
+> fills these into `.env`** for your broker, **preferring symbols the broker lets you trade**
+> (`trade_mode=FULL`) so it maps `EURUSD#` rather than a feed-only/disabled `EURUSD`, and ranking the
+> real BTC/oil CFD above look-alike stocks, Brent, and futures; anything it can't match, you set by
+> hand. `data/universe_probe.json` is a per-broker detection cache (gitignored) — `.env` is what
+> actually drives symbol resolution.
 
 ### 4. Set up the database (Supabase)
 
@@ -607,7 +617,15 @@ This registers At-LogOn / Interactive scheduled tasks for the bot + dashboard th
 
 Live execution on non-gold instruments via `agents/multi_symbol_executor.py`. **Default OFF** —
 two independent gates must both be on before a single real order is placed. Gold's engine and
-`MAX_OPEN_TRADES` are unaffected.
+`MAX_OPEN_TRADES` are unaffected. Any pair whose switch is `LIVE` can trade (WTI, BTC, EURUSD#,
+USDJPY#, …); the broker symbol is resolved per-broker from `BROKER_SYM_*` in `.env`.
+
+**Isolation from gold (verified):** order-slot counting, `count_protected_slots`, force-BE and the
+**daily-trade cap are all per-symbol** — gold filling its slots or hitting its daily cap does **not**
+block a non-gold entry, and vice-versa. Auto-SL protection (`ensure_sl_protection`), stop-loss at
+entry, breakeven and trailing run for **every** pair (gold uses its pip-scaled managers; the executor
+uses self-contained R/ATR management). *Strategy-specific exits stay per-algo by design* — tsmom holds
+full-size and exits on daily flip (no TP), matching exactly what its backtest validated.
 
 | Key | Default | Description |
 |---|---|---|
@@ -616,6 +634,17 @@ two independent gates must both be on before a single real order is placed. Gold
 | `MSE_MAX_POSITIONS` | `1` | Max stacked positions **per combo** (adds one per new signal-bar, not all at once). Uses its own slot cap — does **not** touch gold's `MAX_OPEN_TRADES`. |
 | `MSE_MAX_TOTAL` | `0` | Global cap across **all** MSE symbols (guards exposure when several are live). `0` = no global cap (per-symbol only). |
 | `MSE_SL_MIN_ATR` / `MSE_SL_MAX_ATR` | `0.5` / `4.0` | Clamp the SL into `[min, max] × ATR` (safety against a broken/spiking ATR). Normal SLs (~1×ATR) are untouched; only pathological values are clamped. `0` disables that side. |
+| `MSE_ENTRY_RETRY_COOLDOWN` | `300` | After an open **fails** (margin/spread/disabled), wait this many seconds before retrying the same signal-bar — instead of marking it handled forever. Prevents both retry-spam and permanent false-blocks. |
+
+> **Stale dedup after fixing a symbol:** entry dedup is now recorded *only on a successful open*. If a
+> combo was blocked by an older build (it "handled" a bar whose open actually failed while the symbol
+> was disabled), run `python scripts/clear_mse_stale.py` **while the bot is stopped** to clear the
+> false-block (it keeps combos that genuinely opened), then restart.
+
+> WTI's edge is validated **in-sample** (period-stable across four eras, deflated-Sharpe pass,
+> structural rationale) but **not yet forward-tested live** — and the other pairs' tsmom edge is
+> **not yet significant** (t≈1). Run everything on a **demo** account first to collect forward OOS
+> before risking real capital.
 
 > WTI's edge is validated **in-sample** (period-stable across four eras, deflated-Sharpe pass,
 > structural rationale) but **not yet forward-tested live** — run it on a **demo** account first to

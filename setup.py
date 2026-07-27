@@ -4,7 +4,8 @@ Run once after `git pull`:   python setup.py
 Does everything a fresh checkout needs, then prints how to start the bot + dashboard.
 Does NOT start the live bot (that is your controlled action — real money).
 
-Steps: Python check → pip install -r requirements.txt → sync .env → create runtime dirs → verify MT5.
+Steps: Python check → pip install -r requirements.txt → sync .env → runtime dirs → verify MT5
+       → broker symbol map (probe, prefer trade_mode=FULL) → regen backtest ต่อโบรก (SKIP_BACKTEST ข้ามได้).
 .env handling:
   (1) sync_env  — เพิ่มคีย์ใหม่จาก .env.example (ไม่ทับค่าเดิม) → fresh pull ได้คีย์ครบ
   (2) apply_shared — เขียนทับ config ที่ทีมใช้ร่วม (.env.shared) เฉพาะค่าที่ต่าง · **secret ไม่แตะ**
@@ -171,14 +172,21 @@ def ask_broker_symbols(env):
         acc, pref, exc = spec["accept"], spec["prefer"], spec["exclude"]
         matched = {n for n in names if any(t in n.upper() for t in acc)
                    and not any(x in n.upper() for x in exc)}
-        # rank: ตัวที่มี prefer token ก่อน (ตัวจริง เช่น BTCUSD#/OILCash#) แล้วสั้นสุด
-        cands = sorted(matched, key=lambda n: (not any(p in n.upper() for p in pref), len(n)))[:9]
+
+        def _full(n):                                    # broker เปิดเทรด symbol นี้ไหม (FULL) — ดันตัว tradeable ขึ้นก่อน
+            try:
+                inf = mt5.symbol_info(n)
+                return bool(inf and inf.trade_mode == mt5.SYMBOL_TRADE_MODE_FULL)
+            except Exception:
+                return False
+        # rank: tradeable(FULL) ก่อน → prefer token → สั้นสุด (กันเลือกตัว feed-only ที่โบรกปิดเทรด)
+        cands = sorted(matched, key=lambda n: (not _full(n), not any(p in n.upper() for p in pref), len(n)))[:9]
         if not cands:
             print(_WARN + f"{label}: ไม่พบใน broker นี้ (อาจไม่มีคู่นี้) — ข้าม")
             continue
         print(f"\n  {label} — เลือก symbol ของ {logical}:")
         for i, c in enumerate(cands, 1):
-            print(f"    {i}) {c}")
+            print(f"    {i}) {c}" + ("  [เทรดได้]" if _full(c) else "  [ปิดเทรด/feed-only]"))
         print("    0) ข้าม (ไม่เทรดคู่นี้)")
         try:
             ans = input("  พิมพ์เลข หรือชื่อ symbol เอง (Enter=ข้าม): ").strip()
@@ -320,6 +328,30 @@ def main():
     # BTC/น้ำมัน ชื่อต่างโบรกเกอร์เยอะ → ถามให้เลือกจาก symbol จริง แล้วเขียน BROKER_SYM_* ลง .env (interactive)
     if os.path.exists(env):
         ask_broker_symbols(env)
+
+    # 7. broker-specific backtest — regen shadow_backtest.json ต่อ symbol ของโบรกนี้
+    #    (committed = ของ owner; โบรกอื่น symbol/ประวัติต่าง → dashboard Shadow Matrix/algo-selector จะตรงเมื่อ regen)
+    step(7, "Backtest per broker (Shadow Matrix / algo-selector)")
+    if os.environ.get("SKIP_BACKTEST"):
+        print(_WARN + "SKIP_BACKTEST set — ข้าม (รันเอง: python scripts/shadow_backtest_managed.py && "
+              "python scripts/tsmom_backtest_pairs.py)")
+    else:
+        connected = False
+        try:
+            import MetaTrader5 as mt5
+            connected = bool(mt5.initialize())
+            if connected:
+                mt5.shutdown()
+        except Exception:
+            connected = False
+        if connected:
+            print("     regen backtest ต่อโบรกนี้ (~2-3 นาที · read-only 0 order)…")
+            for scr in ("shadow_backtest_managed.py", "tsmom_backtest_pairs.py"):
+                rc = subprocess.call([sys.executable, os.path.join("scripts", scr)])
+                print((_OK if rc == 0 else _WARN) + f"{scr} " + ("เสร็จ" if rc == 0 else f"exit {rc}"))
+        else:
+            print(_WARN + "MT5 ยังไม่ต่อ — ข้าม (dashboard ใช้ backtest ของ owner ไปก่อน). ภายหลัง: "
+                  "python scripts/shadow_backtest_managed.py && python scripts/tsmom_backtest_pairs.py")
 
     # summary + next steps
     print("\n" + "=" * 60)

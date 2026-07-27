@@ -37,15 +37,26 @@ TARGETS = {
 _USD_METAL = {"XAUUSD", "XAGUSD"}                              # กรอง cross ออกจาก metal-USD
 
 
+def _is_full(name):
+    """True ถ้า broker เปิดให้เทรด symbol นี้ (trade_mode=FULL). feed-only/ปิดเทรด = False.
+    กัน probe เลือกคู่ที่ 'ดูตรง' แต่โบรกปิดเทรด (เช่น EURUSD disabled vs EURUSD# tradeable)."""
+    try:
+        info = mt5.symbol_info(name)
+        return bool(info and info.trade_mode == mt5.SYMBOL_TRADE_MODE_FULL)
+    except Exception:
+        return False
+
+
 def _match(target_tokens, names):
-    """หา broker symbol ที่ชื่อมี token ครบทุกกลุ่ม (แต่ละกลุ่ม = OR). เลือกชื่อสั้นสุด (ตรงสุด)."""
+    """หา broker symbol ที่ชื่อมี token ครบทุกกลุ่ม (แต่ละกลุ่ม = OR).
+    จัดอันดับ: **tradeable (FULL) ก่อน** → ชื่อสั้นสุด (ตรงสุด). FULL preference = broker truth
+    กันเลือก feed-only symbol ที่โบรกปิดเทรด (# suffix ต่างโบรก — ให้ broker บอกเองว่าอันไหนเทรดได้)."""
     cands = []
     for nm in names:
         up = nm.upper()
         if all(any(tok in up for tok in grp) for grp in target_tokens):
             cands.append(nm)
-    # ยกเว้น cross ที่ token ปน (เช่น XAUUSD ไม่ควรจับ XAUEUR) → เลือกที่ base ตรง
-    return sorted(cands, key=lambda x: (len(x), x))[:3]
+    return sorted(cands, key=lambda x: (not _is_full(x), len(x), x))[:3]
 
 
 def _pip_value(sym, price, point):
@@ -83,12 +94,12 @@ def main():
         # BTC/น้ำมัน: token กำกวม (BTCJPY/ETHBTC · MotorOil/Brent/futures) → ตัด noise + ดันตัวจริงขึ้น #1
         elif tgt == "BTCUSD":
             cands = [c for c in cands if not any(x in c.upper() for x in ("ETH", "LTC", "XRP", "BCH", "ADA"))]
-            cands = sorted(cands, key=lambda n: (not ("USD" in n.upper()), len(n)))
+            cands = sorted(cands, key=lambda n: (not _is_full(n), not ("USD" in n.upper()), len(n)))
         elif tgt == "WTIUSD":
             _M = tuple("-" + m for m in ("JAN", "FEB", "MAR", "APR", "MAY", "JUN",
                                          "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"))
             cands = [c for c in cands if not any(x in c.upper() for x in ("BRENT", "UKOIL") + _M)]
-            cands = sorted(cands, key=lambda n: (not any(p in n.upper()
+            cands = sorted(cands, key=lambda n: (not _is_full(n), not any(p in n.upper()
                            for p in ("WTI", "USOIL", "XTI", "OILCASH", "CRUDE")), len(n)))
         if not cands:
             out["unmatched"].append(tgt)
