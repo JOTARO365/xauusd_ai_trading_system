@@ -65,5 +65,35 @@ vote ว่าควรเข้า algo ไหน จาก algo ที่เ�
 - ไม่ pool ข้าม regime (Simpson) · ไม่ raw-count vote (correlated) · ไม่ greedy (winner's curse)
 - ไม่แตะ money management / _run_gates / DecisionMaker path เดิม
 
-## 8. Research findings (เติมจาก workflow)
-> _TBD — จะ merge สรุป + อ้างอิงจาก research workflow (bandit/expert-advice/meta-labeling/crowd-agg/winners-curse)_
+## 8. Research findings (workflow wf_28b93722-222 · 4/6 agents + synth)
+
+**Verdict (ทั้ง 3 หัวข้อชี้ทิศเดียว):** idea ทำได้จริง มีทฤษฎีรองรับ **แต่คุณค่าคือ "ชั้นกรอง/ลด variance กัน overfit"
+ไม่ใช่เครื่องปั่น alpha** — เพดานอยู่ที่ edge ของ primary algo. งาน wisdom-of-crowds ชี้ improvement ระดับ
+**หลักหน่วย %** (ไม่ใช่หลายเท่า) และหดอีกเมื่อ trader correlated. **ยังไม่ควรเปิด live ตอนนี้** เพราะ n ต่อเซลล์
+น้อยเกิน (ตรง memory: 97% กำไรจากไม้เดียว n=6) → ต้องสะสมไม้ **อิสระ** (หลังปรับ ESS) อีกมากก่อน fit.
+
+**Pipeline 4 ชั้น (คนละชั้น ไม่ใช่ทางเลือกแข่งกัน):**
+- **A. Meta-labeling** (López de Prado, AFML Ch.3) — algo=primary (ให้ side) → meta-model ทำนาย P(algo กำไร | regime,features) = take/skip. *primary ต้องมี edge ก่อน ไม่งั้นแค่ลดจำนวนไม้*
+- **B. Hierarchical Bayes / empirical-Bayes shrinkage** (beta-binomial, user=random effect) — **ทำก่อนสุด, 0 token, compute-in-code**. shrink edge ต่อ (algo×symbol×regime) เข้า prior ตาม n (James-Stein ลด MSE เมื่อ n น้อย) = "wisdom-of-crowds ที่ถูกทางสถิติ"
+- **C. Discounted/Change-detection Thompson Sampling** — arm=algo, prior=posterior จาก B (per regime). **"vote" ที่ถูก = probability-matching (posterior-weighted) + bagging seeds/folds — ไม่ใช่ majority/mean ดิบ** (ผิด ESS + selection bias)
+- **D. GATE (ยาม winner's curse)** — เซลล์ผ่านเมื่อ **DSR>0.95 AND haircut BHY/FDR (N=#cells) AND PBO ต่ำ** ประเมินด้วย **Purged CV + embargo/CPCV**. คาดว่าตอนนี้ตกเกือบหมด = ถูกต้อง
+
+**กับดักเพิ่มจาก research (นอกจาก §3):**
+- **ESS collapse**: ปรับ `ESS ≈ N/(1+(N−1)·ρ̄)` ก่อนคำนวณ CI · de-dup เป็น "signal event" ไม่ใช่ "fill"
+- **Sanity haircut 25–60%** จาก in-sample edge ก่อน sizing (McLean & Pontiff 2016: anomaly ตก ~26% OOS, ~58% หลังตีพิมพ์)
+- **calibration**: isotonic (n พอ) / Platt (n น้อย) — เฝ้า reliability + Brier
+- **herding/copy-trading**: ρ̄ จริง → อย่าเชื่อ "จำนวนคน" · **normalize เป็น R-multiple ไม่ใช่บาท** (ต่าง broker/lot)
+- **label**: features ณ เวลาเข้าไม้เท่านั้น · ใช้ `trades.json` ไม่ใช่ MT5 magic (broker reset)
+
+**ลำดับคุ้มค่า/ความเสี่ยง:** (1) hierarchical shrinkage ก่อน (0 token) → (2) meta-labeling → (3) DSR+PBO guard บังคับ.
+ใช้ซ้ำได้: `scripts/multiple_testing_demo.py`, skill `quant-systematic-trading`, pattern SHADOW=ON.
+
+**อ้างอิงหลัก:**
+- López de Prado (2018) *AFML Ch.3 Meta-Labeling* · QuantConnect "Not a Silver Bullet" · Hudson&Thames toy example
+- Niculescu-Mizil & Caruana (ICML 2005) *Predicting Good Probabilities* (isotonic vs Platt)
+- Albert&Hu *Bayesian Hierarchical Ch.10* · D.Robinson *empirical-Bayes beta-binomial* · Efron&Hastie *James-Stein (CASI Ch.7)*
+- Portfolio Optimizer *Effective Number of Bets* · Doering et al. (Mgmt Sci 2020) *Copy Trading*
+- arXiv 2305.10718 *Discounted TS* · 2009.02791 *Change-Detection TS*
+- Bailey & López de Prado (2014) *Deflated Sharpe* · Bailey et al. *PBO/CSCV* · Harvey&Liu (2015) *Haircut Sharpe* · Harvey,Liu,Zhu (2016) *t-stat→3.0* · McLean&Pontiff (2016)
+
+_(research: 4/6 agents สำเร็จ — bandit + expert-advice fail schema retry แต่ Thompson/bandit ครอบใน crowd-agg+synth)_
