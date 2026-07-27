@@ -409,14 +409,18 @@ def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max
     if not vo or not vo.get("bar_ts"):
         return 0
     if vo["bar_ts"] == combo_state.get("last_bar_ts"):
-        return 0                                                # เข้าไม้ของบาร์นี้ไปแล้ว (dedup ต่อ signal-bar)
+        return 0                                                # เข้าไม้บาร์นี้ **สำเร็จ**ไปแล้ว (dedup ต่อ signal-bar)
+    import time as _time
+    if _time.time() < float(combo_state.get("retry_after", 0)):
+        return 0                                                # เพิ่ง open fail → cooldown (กัน retry-spam ทุก tick) แต่ไม่บล็อกถาวร
     sl_pips_eff = float(vo["sl_pips"]) * sl_mult                 # edge = algo SL × mult (WTI 0.7)
     sl_pips_eff = _clamp_sl_atr(sl_pips_eff, bars, point)        # safety clamp (ไม่แตะ edge เคสปกติ)
     from connectors.mt5_connector import open_order
     res = open_order(vo["dir"], sl_pips_eff, float(vo["tp_pips"]),
                      comment=f"MSE-{algo_id}", symbol=broker, max_open_override=max_pos)
-    combo_state["last_bar_ts"] = vo["bar_ts"]                   # กันเข้าซ้ำบาร์เดิม แม้ open ล้มเหลว
     if res and res.get("success") and res.get("ticket"):
+        combo_state["last_bar_ts"] = vo["bar_ts"]              # dedup **เฉพาะเมื่อสำเร็จ** (fail → retry บาร์เดิมได้หลัง cooldown)
+        combo_state.pop("retry_after", None)
         combo_state.setdefault("tickets", {})[str(res["ticket"])] = {
             "sl_dist": sl_pips_eff * point, "dir": vo["dir"], "entry_bar_ts": vo["bar_ts"],
             "entry": float(res.get("price") or 0.0), "opened_ts": _now_iso(),
@@ -424,7 +428,9 @@ def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max
         logger.info(f"[MSE] LIVE entry {algo_id}:{symbol} {vo['dir']} @ {res.get('price')} "
                     f"SL={sl_pips_eff:.0f}p (×{sl_mult}) ticket={res['ticket']}")
         return 1
-    logger.warning(f"[MSE] entry {algo_id}:{symbol} ไม่สำเร็จ: {res.get('error') if res else 'no result'}")
+    combo_state["retry_after"] = _time.time() + _cfgf("MSE_ENTRY_RETRY_COOLDOWN", 300)   # fail → รอ 5 นาที ค่อย retry (ไม่ mark บาร์ handled)
+    logger.warning(f"[MSE] entry {algo_id}:{symbol} ไม่สำเร็จ: {res.get('error') if res else 'no result'} "
+                   f"— retry ใน {int(_cfgf('MSE_ENTRY_RETRY_COOLDOWN', 300))}s")
     return 0
 
 
