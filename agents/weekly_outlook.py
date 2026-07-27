@@ -86,8 +86,9 @@ def _gather():
     # 9. cross-asset drivers: DXY(UUP proxy) + silver — % เปลี่ยน 5 วัน (H1 ~120 บาร์) = ทิศทาง
     ctx["drivers"] = {"DXY": _ohlc_sum(_read_json(os.path.join(_BASE, "data", "drv_dxy_h1.json"), [])),
                       "silver": _ohlc_sum(_read_json(os.path.join(_BASE, "data", "drv_xag_h1.json"), []))}
-    # 10. เทคนิคทองเอง: ดึง MT5 สด (xau_*.json อาจ stale) — กรอบสัปดาห์ W1 + วัน D1 high/low/ATR/เทรนด์
-    ctx["gold_tech"] = {"weekly": _mt5_tf_sum("W1", 4), "daily": _mt5_tf_sum("D1", 10)}
+    # 10. เทคนิคทองเอง: ดึง MT5 สด (xau_*.json อาจ stale). แยก last_week (W1[-2] ปิดแล้ว = สรุปสัปดาห์ที่แล้ว)
+    #     vs this_week (W1[-1] = สัปดาห์นี้) + D1 10 วัน. **สำคัญ: last_week ≠ this_week (กัน LLM สรุปผิดสัปดาห์)**
+    ctx["gold_tech"] = {**_week_bars(), "daily": _mt5_tf_sum("D1", 10)}
     # 11. worldmonitor (ภูมิรัฐศาสตร์/ความเสี่ยงโลก) → เฝ้าระวัง
     wm = _read_json(os.path.join(_BASE, "data", "worldmonitor.json"), {})
     ctx["world"] = {"attention": wm.get("attention"),
@@ -100,6 +101,28 @@ def _gather():
     ic = _read_json(os.path.join(_BASE, "data", "impact_calibration.json"), {})
     ctx["news_reliability"] = {"status": ic.get("status"), "tiers": ic.get("tiers")}
     return ctx
+
+
+def _week_bars():
+    """W1 bars จาก MT5 → last_week (บาร์ปิดล่าสุด = สัปดาห์ที่แล้ว) + this_week (บาร์ปัจจุบัน).
+    pct_chg = (close−open)/open ต่อสัปดาห์. กัน LLM สรุปสัปดาห์ที่แล้วด้วยข้อมูลสัปดาห์นี้."""
+    try:
+        import MetaTrader5 as mt5
+        import config as _cfg
+        from connectors.price_feed import get_ohlcv
+        from datetime import datetime, timezone
+        r = get_ohlcv(_cfg.SYMBOL, mt5.TIMEFRAME_W1, 4)
+        if r is None or len(r) < 2:
+            return {}
+
+        def _bar(x):
+            o, h, l, c = float(x["open"]), float(x["high"]), float(x["low"]), float(x["close"])
+            return {"date": datetime.fromtimestamp(int(x["time"]), timezone.utc).strftime("%Y-%m-%d"),
+                    "open": round(o, 2), "high": round(h, 2), "low": round(l, 2), "close": round(c, 2),
+                    "pct_chg": round((c - o) / o * 100, 2) if o else None}
+        return {"last_week": _bar(r[-2]), "this_week": _bar(r[-1])}
+    except Exception:
+        return {}
 
 
 def _mt5_tf_sum(tf, n=10):
@@ -154,7 +177,8 @@ _PROMPT = """คุณคือนักวิเคราะห์ตลาด�
 เขียนเป็น Markdown ตามหัวข้อนี้ (ห้ามเพิ่มหัวข้ออื่น):
 
 ## 📅 สรุปสัปดาห์ที่แล้ว
-2-4 บรรทัด: เกิดอะไร ข่าว/ตัวเลขสำคัญ ราคาทองตอบสนองยังไง (จาก sentiment + headlines + macro_regime)
+2-4 บรรทัด: เกิดอะไร ข่าว/ตัวเลขสำคัญ ราคาทองตอบสนองยังไง.
+**ใช้ราคาจาก gold_tech.last_week (open/close/high/low/pct_chg ของสัปดาห์ที่ปิดแล้ว) เท่านั้น — ห้ามใช้ this_week**
 
 ## 🎯 ทิศทาง & Bias สัปดาห์นี้
 ทิศทางหลักที่น่าจะเป็น (ขึ้น/ลง/sideways) + ระบุความมั่นใจ (สูง/กลาง/ต่ำ). อ้างอิงข้อมูลจริงที่ให้:
@@ -162,7 +186,7 @@ _PROMPT = """คุณคือนักวิเคราะห์ตลาด�
 - **real yield / 10y** (macro_strip.real_yield/y10, regime_state.real_rate_sign) — real yield ขึ้น = ลบต่อทอง
 - **Fed/CPI stance** (regime_state.fed_dir/cpi_yoy/fed_funds) · **COT** positioning · **news sentiment**
 - **regime/risk** (risk_regime.regime/vix) · **เงิน** (drivers.silver) ยืนยันโลหะ
-- **เทคนิคทอง** (gold_tech.weekly/daily high/low/atr): ทองอยู่โซนไหน ใกล้แนวรับ/ต้านสัปดาห์ไหน
+- **เทคนิคทอง** (gold_tech.this_week + daily high/low): ทองสัปดาห์นี้อยู่โซนไหน ใกล้แนวรับ/ต้านไหน (ใช้ this_week ไม่ใช่ last_week)
 
 ## 🗓️ ปฏิทิน & Scenario สัปดาห์นี้
 ต่อ event สำคัญใน calendar: วันเวลา + ถ้าเลข hot→ทองไปทางไหน / cool→ทองไปทางไหน
