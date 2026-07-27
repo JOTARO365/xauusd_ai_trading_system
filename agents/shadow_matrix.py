@@ -195,18 +195,23 @@ def build():
         a = by_algo.setdefault(r["algo_id"], {"algo_id": r["algo_id"], "regime": _REGIME.get(r["algo_id"], "—"),
                                               "n": 0, "wins": 0, "sum_R": 0.0, "pairs_traded": 0,
                                               "pairs_pos": 0, "best": None, "worst": None})
-        a["n"] += r["n"]; a["sum_R"] += (r["sum_R"] or 0.0)
-        if r["n"]:
+        # ใช้ real edge ต่อ combo ถ้ามีไม้จริง (LIVE) — ไม่งั้น shadow paper (SHADOW) → รวมเห็นภาพจริงครบ
+        use_real = (r.get("real_n") or 0) > 0
+        n = r["real_n"] if use_real else r["n"]
+        expR = r["real_exp_R"] if use_real else r["exp_R"]
+        sumR = (r["real_exp_R"] * r["real_n"]) if use_real else (r["sum_R"] or 0.0)
+        wins = round((r.get("real_wr") or 0) / 100 * r["real_n"]) if use_real else (r["by_result"].get("TP", 0) if r["by_result"] else 0)
+        a["n"] += n; a["sum_R"] += (sumR or 0.0)
+        if n:
             a["pairs_traded"] += 1
-            if r["exp_R"] is not None and r["exp_R"] > 0:
+            if expR is not None and expR > 0:
                 a["pairs_pos"] += 1
-            if r["by_result"]:
-                a["wins"] += r["by_result"].get("TP", 0)
-            if r["exp_R"] is not None:
-                if a["best"] is None or r["exp_R"] > a["best"][1]:
-                    a["best"] = [r["symbol"], r["exp_R"]]
-                if a["worst"] is None or r["exp_R"] < a["worst"][1]:
-                    a["worst"] = [r["symbol"], r["exp_R"]]
+            a["wins"] += wins
+            if expR is not None:
+                if a["best"] is None or expR > a["best"][1]:
+                    a["best"] = [r["symbol"], expR]
+                if a["worst"] is None or expR < a["worst"][1]:
+                    a["worst"] = [r["symbol"], expR]
     for a in by_algo.values():
         a["sum_R"] = round(a["sum_R"], 1)
         a["exp_R"] = round(a["sum_R"] / a["n"], 3) if a["n"] else None
