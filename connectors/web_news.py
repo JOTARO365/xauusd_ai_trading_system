@@ -4,6 +4,7 @@ Web news connector — ForexFactory calendar + Investing.com gold headlines
 """
 
 import json
+import os
 import re
 import time as _time
 import urllib.request
@@ -26,6 +27,30 @@ _ff_cache: tuple[float, list] = (0.0, [])   # (timestamp, data)
 
 _INV_CACHE_TTL = 900   # วินาที — refresh ทุก 15 นาที
 _inv_cache: tuple[float, list] = (0.0, [])
+
+
+_FF_DISK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "ff_calendar_raw.json")
+_FF_DISK_MAX_AGE = 4 * 86400          # disk cache ใช้ได้ ~4 วัน (filter อนาคตตัด past ออกอยู่แล้ว → ยังได้ event ที่เหลือของสัปดาห์)
+
+
+def _save_ff_disk(events):
+    try:
+        os.makedirs(os.path.dirname(_FF_DISK), exist_ok=True)
+        with open(_FF_DISK, "w", encoding="utf-8") as f:
+            json.dump({"ts": _time.time(), "events": events}, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def _load_ff_disk():
+    try:
+        with open(_FF_DISK, encoding="utf-8") as f:
+            d = json.load(f)
+        if _time.time() - d.get("ts", 0) < _FF_DISK_MAX_AGE:
+            return d.get("events") or []
+    except Exception:
+        pass
+    return []
 
 
 def fetch_forexfactory_calendar(hours_ahead: int = 24,
@@ -53,14 +78,20 @@ def fetch_forexfactory_calendar(hours_ahead: int = 24,
             with urllib.request.urlopen(req, timeout=10) as res:
                 events = json.loads(res.read().decode("utf-8"))
             _ff_cache = (now_ts, events)
+            _save_ff_disk(events)                         # persist → กู้ได้ตอน 429/restart
             logger.debug("ForexFactory: fetch สำเร็จ — อัปเดต cache")
         except Exception as e:
             logger.warning(f"ForexFactory calendar fetch failed: {e}")
             if cached_events:
-                logger.info(f"ForexFactory: ใช้ cache เดิม ({len(cached_events)} events) เนื่องจาก fetch ล้มเหลว")
+                logger.info(f"ForexFactory: ใช้ cache memory ({len(cached_events)} events)")
                 events = cached_events
-            else:
-                return []
+            else:                                         # ไม่มี memory cache (429/restart) → disk cache
+                events = _load_ff_disk()
+                if events:
+                    logger.info(f"ForexFactory: ใช้ disk cache ({len(events)} events)")
+                    _ff_cache = (now_ts, events)
+                else:
+                    return []
 
     now    = datetime.now(timezone.utc)
     cutoff = now + timedelta(hours=hours_ahead)

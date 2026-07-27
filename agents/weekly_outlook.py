@@ -43,11 +43,14 @@ def _gather():
     # 1. ปฏิทินสัปดาห์นี้ (ForexFactory 7 วัน, high/med)
     try:
         from connectors.web_news import fetch_forexfactory_calendar
-        evs = fetch_forexfactory_calendar(hours_ahead=168, include_all_us=True) or []
-        ctx["calendar"] = [{"title": e.get("title"), "country": e.get("country"),
-                            "date": e.get("date"), "impact": e.get("impact"),
+        # High/Medium เท่านั้น (ตัวขยับทอง; ไม่เอา US Low รก). web_news มี memory+disk cache กัน 429 แล้ว
+        evs = fetch_forexfactory_calendar(hours_ahead=168, include_all_us=False) or []
+        ctx["calendar"] = [{"title": e.get("title"), "currency": e.get("currency"),
+                            "when": e.get("timestamp_iso"), "impact": e.get("impact"),
                             "forecast": e.get("forecast"), "previous": e.get("previous")}
                            for e in evs[:40]]
+        if not ctx["calendar"]:
+            logger.warning("[weekly] calendar ว่าง (ForexFactory ไม่ตอบ) — outlook จะใช้ cadence แทน")
     except Exception as e:
         ctx["calendar"] = []
         logger.debug(f"[weekly] calendar: {e}")
