@@ -34,6 +34,21 @@ def _safe_comment(text: str) -> str:
     return cleaned[:31]
 
 
+def _algo_label(comment: str) -> str:
+    """comment → algo อ่านง่ายสำหรับ log terminal (map เดียวกับ trade_recorder._algo_of).
+    MSE-<x>→x · ALGO-mom→regime_momentum · ALGO-TSMOM→tsmom_d1 · SWG-→swing · อื่น/ว่าง→decision_ai."""
+    c = (comment or "").strip()
+    if c.startswith("MSE-"):
+        return c[4:].strip() or "mse"
+    if c.startswith("ALGO-TSMOM"):
+        return "tsmom_d1"
+    if c.startswith("ALGO-mom"):
+        return "regime_momentum"
+    if c.startswith("SWG-"):
+        return "swing"
+    return "decision_ai"
+
+
 def _is_swing_comment(pos) -> bool:
     """True ถ้า position เป็นของ swing sleeve (comment ขึ้นต้น SWG-).
     scalp guards ที่ขยับ SL / ปิดไม้ ต้อง skip ไม้พวกนี้ — ไม่งั้นจะทำลาย structural SL ร่วม
@@ -585,7 +600,7 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         tick = mt5.symbol_info_tick(symbol)
         price = (tick.ask if direction.upper() == "BUY" else tick.bid) if tick else 0.0
         tag = "SHADOW" if shadow and not _cfg.DRY_RUN else "DRY_RUN"
-        logger.warning(f"[{tag}] would have opened {direction} @ {price:.2f} SL={sl_pips}p TP={tp_pips}p")
+        logger.info(f"[{tag}] paper | {symbol} | algo={_algo_label(comment)} | {direction} @ {price:.2f} SL={sl_pips}p TP={tp_pips}p (ไม่วางจริง)")
         return {"success": True, "ticket": 0, "direction": direction,
                 "lot": 0.0, "price": price, "sl": 0.0, "tp": 0.0, "dry_run": True, "shadow": bool(shadow)}
 
@@ -730,13 +745,14 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         logger.warning(f"Order retryable error (attempt {attempt+1}): {last_err}")
 
     if result is None:
-        logger.error(f"Order failed (all attempts): {last_err}")
+        logger.error(f"🔴 เข้าไม้ล้มเหลว | {symbol} | algo={_algo_label(comment)} | {direction} (ทุก attempt): {last_err}")
         return {"success": False, "error": last_err}
     if result.retcode != mt5.TRADE_RETCODE_DONE:
-        logger.error(f"Order failed: {last_err}")
+        logger.error(f"🔴 เข้าไม้ล้มเหลว | {symbol} | algo={_algo_label(comment)} | {direction}: {last_err}")
         return {"success": False, "error": result.comment, "retcode": result.retcode}
 
-    logger.info(f"Order opened: {direction} {lot} lots @ {price} SL={sl:.2f} TP={tp:.2f}")
+    logger.success(f"🟢 เข้าไม้จริง | {symbol} | algo={_algo_label(comment)} | {direction} {lot} lot "
+                   f"@ {price} | SL={sl:.2f} TP={tp:.2f} | ticket={result.order}")
 
     # ขยับ SL ฝั่งตรงข้ามทุก order มาหน้าทุนทันที (ไม่รอ 1000 pips)
     n = _force_breakeven_opposing(direction, symbol)
