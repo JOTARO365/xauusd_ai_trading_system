@@ -86,9 +86,8 @@ def _gather():
     # 9. cross-asset drivers: DXY(UUP proxy) + silver — % เปลี่ยน 5 วัน (H1 ~120 บาร์) = ทิศทาง
     ctx["drivers"] = {"DXY": _ohlc_sum(_read_json(os.path.join(_BASE, "data", "drv_dxy_h1.json"), [])),
                       "silver": _ohlc_sum(_read_json(os.path.join(_BASE, "data", "drv_xag_h1.json"), []))}
-    # 10. เทคนิคทองเอง: กรอบสัปดาห์ (W1) + วัน (D1) high/low/ATR/เทรนด์
-    ctx["gold_tech"] = {"weekly": _ohlc_sum(_read_json(os.path.join(_BASE, "data", "xau_w1.json"), []), n=4),
-                        "daily": _ohlc_sum(_read_json(os.path.join(_BASE, "data", "xau_d1.json"), []), n=10)}
+    # 10. เทคนิคทองเอง: ดึง MT5 สด (xau_*.json อาจ stale) — กรอบสัปดาห์ W1 + วัน D1 high/low/ATR/เทรนด์
+    ctx["gold_tech"] = {"weekly": _mt5_tf_sum("W1", 4), "daily": _mt5_tf_sum("D1", 10)}
     # 11. worldmonitor (ภูมิรัฐศาสตร์/ความเสี่ยงโลก) → เฝ้าระวัง
     wm = _read_json(os.path.join(_BASE, "data", "worldmonitor.json"), {})
     ctx["world"] = {"attention": wm.get("attention"),
@@ -101,6 +100,30 @@ def _gather():
     ic = _read_json(os.path.join(_BASE, "data", "impact_calibration.json"), {})
     ctx["news_reliability"] = {"status": ic.get("status"), "tiers": ic.get("tiers")}
     return ctx
+
+
+def _mt5_tf_sum(tf, n=10):
+    """สรุปกรอบทองจาก MT5 สด (แม่นกว่า xau_*.json ที่อาจ stale). tf='D1'/'W1'/'H4'. None ถ้าดึงไม่ได้."""
+    try:
+        import MetaTrader5 as mt5
+        import config as _cfg
+        from connectors.price_feed import get_ohlcv
+        tfmap = {"H1": mt5.TIMEFRAME_H1, "H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1, "W1": mt5.TIMEFRAME_W1}
+        r = get_ohlcv(_cfg.SYMBOL, tfmap.get(tf, mt5.TIMEFRAME_D1), n + 2)
+        if r is None or len(r) < 3:
+            return None
+        arr = [[int(x["time"]), float(x["open"]), float(x["high"]), float(x["low"]), float(x["close"]), 0] for x in r]
+        s = _ohlc_sum(arr, n)
+        if s:
+            s["last_bar"] = None
+            try:
+                from datetime import datetime, timezone
+                s["last_bar"] = datetime.fromtimestamp(int(r[-1]["time"]), timezone.utc).strftime("%Y-%m-%d")
+            except Exception:
+                pass
+        return s
+    except Exception:
+        return None
 
 
 def _ohlc_sum(arr, n=10):
