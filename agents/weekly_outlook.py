@@ -231,6 +231,11 @@ def get_cached():
     return _read_json(_CACHE)
 
 
+def is_building():
+    """กำลังสร้าง (Opus) อยู่ไหม — ให้ endpoint บอก frontend poll ต่อจนได้อันใหม่ (กันแสดง cache เก่าค้าง)."""
+    return _BUILDING["on"]
+
+
 def tick():
     """auto: สร้างครั้งแรกของสัปดาห์ใหม่ (เรียกจาก loop/dashboard). ไม่ force. fail-soft."""
     try:

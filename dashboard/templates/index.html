@@ -3196,7 +3196,8 @@ async function loadWeeklyOutlook() {
     const d = await (await fetch('/api/weekly-outlook')).json();
     const wk = document.getElementById('wo-week'); if (wk) wk.textContent = d.week ? '· ' + d.week : '';
     if (d.markdown) {
-      body.innerHTML = _mdToHtml(d.markdown);
+      const updating = d.generating ? '<div style="color:var(--gold);margin-bottom:8px">⏳ กำลังวิเคราะห์ใหม่… (แสดงอันเดิมชั่วคราว)</div>' : '';
+      body.innerHTML = updating + _mdToHtml(d.markdown);
       const meta = document.getElementById('wo-meta');
       if (meta) meta.textContent = `${d.stale ? '⚠ อาจเก่า · ' : ''}สร้าง ${d.generated || ''} · ${d.model || ''} · ${d.n_events || 0} events`
         + (d.tokens_in ? ` · token in ${d.tokens_in}/out ${d.tokens_out}` : '');

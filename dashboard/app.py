@@ -1492,10 +1492,12 @@ def api_sr_level_stats():
 def api_weekly_outlook():
     """แนวโน้มสัปดาห์ (LLM Opus, cache ต่อสัปดาห์). auto: สัปดาห์ใหม่ → สร้าง background (ไม่บล็อก). 0 token ตอนดู."""
     import threading
-    from agents.weekly_outlook import get_cached, _iso_week, tick
+    from agents.weekly_outlook import get_cached, _iso_week, tick, is_building
     c = get_cached()
     if (not c) or c.get("week") != _iso_week():          # สัปดาห์ใหม่/ยังไม่มี → auto สร้าง background
         threading.Thread(target=tick, daemon=True).start()
+    if is_building():                                    # กำลัง refresh/build → บอก generating (frontend poll ต่อจนได้อันใหม่)
+        return jsonify({**(c or {"ok": False}), "generating": True})
     return jsonify(c or {"ok": False, "generating": True})
 
 
