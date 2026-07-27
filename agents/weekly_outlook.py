@@ -168,15 +168,21 @@ def build(force=False):
         from langchain_anthropic import ChatAnthropic
         import config as _cfg
         ctx = _gather()
+        # limit สูง (ยังไม่จำกัดจริง) — วัด token จริงก่อน ค่อยตั้ง limit (max_tokens env-override ได้)
+        _maxtok = int(os.getenv("WEEKLY_OUTLOOK_MAX_TOKENS") or 6000)   # วัดจริง out~2261 → 6000 = headroom พอ (cap ไม่ใช่ cost)
         llm = ChatAnthropic(model=_MODEL, api_key=_cfg.ANTHROPIC_API_KEY,
-                            max_tokens=2200, timeout=90)   # ไม่ตั้ง temperature — Opus 4.8 deprecated param นี้
-        msg = _PROMPT.format(context=json.dumps(ctx, ensure_ascii=False)[:24000])   # Opus รับได้เยอะ; กันข้อมูลท้ายหาย
+                            max_tokens=_maxtok, timeout=120)   # ไม่ตั้ง temperature — Opus 4.8 deprecated
+        msg = _PROMPT.format(context=json.dumps(ctx, ensure_ascii=False)[:60000])   # กว้าง — Opus รับได้เยอะ
         resp = llm.invoke(msg)
         md = resp.content if isinstance(resp.content, str) else str(resp.content)
+        usage = getattr(resp, "usage_metadata", None) or {}
+        tin, tout = usage.get("input_tokens"), usage.get("output_tokens")
         from datetime import datetime, timezone
         out = {"ok": True, "week": wk, "markdown": md,
                "generated": datetime.now(timezone.utc).isoformat()[:16] + "Z",
-               "model": _MODEL, "n_events": len(ctx.get("calendar", []))}
+               "model": _MODEL, "n_events": len(ctx.get("calendar", [])),
+               "tokens_in": tin, "tokens_out": tout, "ctx_chars": len(json.dumps(ctx, ensure_ascii=False))}
+        logger.info(f"[weekly] tokens: in={tin} out={tout} (max={_maxtok}) ctx={out['ctx_chars']}ch")
         try:
             os.makedirs(os.path.dirname(_CACHE), exist_ok=True)
             with open(_CACHE, "w", encoding="utf-8") as f:

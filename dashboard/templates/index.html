@@ -3198,7 +3198,8 @@ async function loadWeeklyOutlook() {
     if (d.markdown) {
       body.innerHTML = _mdToHtml(d.markdown);
       const meta = document.getElementById('wo-meta');
-      if (meta) meta.textContent = `${d.stale ? '⚠ อาจเก่า · ' : ''}สร้าง ${d.generated || ''} · ${d.model || ''} · ${d.n_events || 0} events`;
+      if (meta) meta.textContent = `${d.stale ? '⚠ อาจเก่า · ' : ''}สร้าง ${d.generated || ''} · ${d.model || ''} · ${d.n_events || 0} events`
+        + (d.tokens_in ? ` · token in ${d.tokens_in}/out ${d.tokens_out}` : '');
       if (_woPoll && !d.generating) { clearInterval(_woPoll); _woPoll = null; }
     } else {
       body.innerHTML = '<span style="color:var(--muted)">⏳ กำลังวิเคราะห์ด้วย AI (Opus)… รอ ~30 วิ</span>';
