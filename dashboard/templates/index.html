@@ -144,6 +144,17 @@
     }
     .flash-up { animation: flash-green 0.6s ease-out; }
     .flash-down { animation: flash-red 0.6s ease-out; }
+    /* Weekly Outlook loading — theme gold */
+    @keyframes wo-spin { to { transform: rotate(360deg); } }
+    @keyframes wo-shimmer { 0% { background-position: -450px 0; } 100% { background-position: 450px 0; } }
+    @keyframes wo-fade { 0%,100% { opacity: .45; } 50% { opacity: 1; } }
+    .wo-ring { width: 40px; height: 40px; border-radius: 50%; border: 3px solid var(--gold-dim);
+      border-top-color: var(--gold); animation: wo-spin .9s linear infinite; margin: 0 auto;
+      box-shadow: 0 0 14px var(--gold-glow); }
+    .wo-skel { height: 11px; border-radius: 6px; margin: 9px 0;
+      background: linear-gradient(90deg, var(--gold-dim) 25%, var(--gold-glow) 50%, var(--gold-dim) 75%);
+      background-size: 900px 100%; animation: wo-shimmer 1.5s infinite linear; }
+    .wo-status { color: var(--gold); font-weight: 600; animation: wo-fade 1.6s ease-in-out infinite; }
 
     /* Live price ticker in header */
     .ticker {
@@ -3189,21 +3200,37 @@ function _mdToHtml(md) {
     return ln.trim() ? `<div>${ln}</div>` : '<div style="height:6px"></div>';
   }).join('');
 }
+function _woLoading() {
+  return `<div style="padding:22px 0">
+    <div class="wo-ring"></div>
+    <div class="wo-status" style="text-align:center;margin-top:16px;font-size:14px">🔮 AI กำลังวิเคราะห์แนวโน้มสัปดาห์…</div>
+    <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:6px">สังเคราะห์ ปฏิทิน · DXY · Fed · COT · เทคนิคทอง · ข่าว (~30 วิ)</div>
+    <div style="max-width:640px;margin:22px auto 0">
+      <div class="wo-skel" style="width:42%"></div>
+      <div class="wo-skel"></div>
+      <div class="wo-skel" style="width:88%"></div>
+      <div class="wo-skel" style="width:64%"></div>
+      <div class="wo-skel" style="width:94%"></div>
+    </div>
+  </div>`;
+}
 let _woPoll = null;
 async function loadWeeklyOutlook() {
   const body = document.getElementById('wo-body'); if (!body) return;
   try {
     const d = await (await fetch('/api/weekly-outlook')).json();
     const wk = document.getElementById('wo-week'); if (wk) wk.textContent = d.week ? '· ' + d.week : '';
-    if (d.markdown) {
-      const updating = d.generating ? '<div style="color:var(--gold);margin-bottom:8px">⏳ กำลังวิเคราะห์ใหม่… (แสดงอันเดิมชั่วคราว)</div>' : '';
-      body.innerHTML = updating + _mdToHtml(d.markdown);
+    if (d.generating) {                              // กำลังวิเคราะห์ → loading สวย (ไม่โชว์ cache เก่า)
+      body.innerHTML = _woLoading();
+      if (!_woPoll) _woPoll = setInterval(loadWeeklyOutlook, 8000);
+    } else if (d.markdown) {                          // เสร็จ → บทวิเคราะห์
+      body.innerHTML = _mdToHtml(d.markdown);
       const meta = document.getElementById('wo-meta');
       if (meta) meta.textContent = `${d.stale ? '⚠ อาจเก่า · ' : ''}สร้าง ${d.generated || ''} · ${d.model || ''} · ${d.n_events || 0} events`
         + (d.tokens_in ? ` · token in ${d.tokens_in}/out ${d.tokens_out}` : '');
-      if (_woPoll && !d.generating) { clearInterval(_woPoll); _woPoll = null; }
-    } else {
-      body.innerHTML = '<span style="color:var(--muted)">⏳ กำลังวิเคราะห์ด้วย AI (Opus)… รอ ~30 วิ</span>';
+      if (_woPoll) { clearInterval(_woPoll); _woPoll = null; }
+    } else {                                          // ยังไม่มี cache → loading
+      body.innerHTML = _woLoading();
       if (!_woPoll) _woPoll = setInterval(loadWeeklyOutlook, 8000);
     }
   } catch (_e) {}
@@ -3212,7 +3239,7 @@ async function refreshWeeklyOutlook() {
   if (!(await uiConfirm('วิเคราะห์แนวโน้มสัปดาห์ใหม่ด้วย AI (Opus)? ใช้ token ~1 ครั้ง', { title: 'วิเคราะห์ใหม่', ok: 'วิเคราะห์' }))) return;
   try {
     await fetch('/api/weekly-outlook/refresh', { method: 'POST' });
-    document.getElementById('wo-body').innerHTML = '<span style="color:var(--muted)">⏳ กำลังวิเคราะห์…</span>';
+    document.getElementById('wo-body').innerHTML = _woLoading();   // loading สวยทันที (ไม่โชว์ cache เก่า)
     if (!_woPoll) _woPoll = setInterval(loadWeeklyOutlook, 8000);
   } catch (_e) { toast('refresh ไม่ได้', 'err'); }
 }
