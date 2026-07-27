@@ -96,7 +96,13 @@ def fetch_forexfactory_calendar(hours_ahead: int = 24,
     now    = datetime.now(timezone.utc)
     cutoff = now + timedelta(hours=hours_ahead)
 
-    try:                                                     # US actuals จาก AlphaVantage (feed FF ไม่มี actual) — cache รายวัน, 0 token
+    # FF feed ไม่มี actual → เติมจาก: FMP (same-day ทุกประเทศ = หลัก) → AV (US backfill = สำรอง)
+    try:
+        from connectors.fmp_calendar import get_events as _fmp_events
+        _fmp = _fmp_events()
+    except Exception:
+        _fmp = []
+    try:
         from connectors.macro_actuals import get_actuals
         _av_actuals = get_actuals()
     except Exception:
@@ -129,21 +135,31 @@ def fetch_forexfactory_calendar(hours_ahead: int = 24,
         if not us_all and not (now <= event_dt <= cutoff):
             continue
 
-        # actual: feed FF ไม่มี → เติมจาก AV เฉพาะ US event ที่ประกาศแล้ว (event_dt ≤ now) + match indicator
+        # actual: feed FF ไม่มี → เติมเฉพาะ event ที่ประกาศแล้ว (event_dt ≤ now)
         actual = ev.get("actual", "") or ""
         actual_src = "forexfactory" if actual else ""
-        if not actual and country == "USD" and event_dt <= now and _av_actuals:
-            try:
-                from connectors.macro_actuals import actual_for
-                hit = actual_for(ev.get("title", ""), _av_actuals)
-                # guard lag: ใช้ค่าเฉพาะเมื่อ AV reference month ใกล้พอกับวันประกาศ (AV อัปเดตช้า 1 เดือน
-                # → ถ้า gap > ~75 วัน แปลว่า AV ยังไม่มีเดือนของ event นี้ → ปล่อย pending กันแสดงเลขเดือนเก่า)
-                if hit:
-                    ref = datetime.strptime(hit[1], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                    if 0 <= (event_dt - ref).days <= 75:
-                        actual, actual_src = hit[0], "alphavantage"
-            except Exception:
-                pass
+        if not actual and event_dt <= now:
+            title = ev.get("title", "")
+            # 1) FMP — same-day ทุกประเทศ (หลัก)
+            if _fmp:
+                try:
+                    from connectors.fmp_calendar import actual_for as _fmp_actual
+                    hit = _fmp_actual(ev.get("country", ""), title, event_dt, _fmp)
+                    if hit:
+                        actual, actual_src = hit, "fmp"
+                except Exception:
+                    pass
+            # 2) AV — US backfill (สำรอง; guard lag ~1 เดือน กันเลขเดือนเก่า)
+            if not actual and country == "USD" and _av_actuals:
+                try:
+                    from connectors.macro_actuals import actual_for
+                    hit = actual_for(title, _av_actuals)
+                    if hit:
+                        ref = datetime.strptime(hit[1], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                        if 0 <= (event_dt - ref).days <= 75:
+                            actual, actual_src = hit[0], "alphavantage"
+                except Exception:
+                    pass
         results.append({
             "source":        "forexfactory",
             "title":         ev.get("title", ""),
