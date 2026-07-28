@@ -1245,6 +1245,19 @@
 </head>
 <body>
 
+<!-- inline SVG icon sprite (Lucide) — reference ด้วย class ic + use href=#i-NAME · stroke=currentColor สืบสีจาก parent -->
+<style>.ic{width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block;margin-right:3px}</style>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-trending" viewBox="0 0 24 24"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></symbol>
+  <symbol id="i-news" viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8V6Z"/></symbol>
+  <symbol id="i-award" viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><path d="m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526"/></symbol>
+  <symbol id="i-money" viewBox="0 0 24 24"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></symbol>
+  <symbol id="i-bitcoin" viewBox="0 0 24 24"><path d="M11.767 19.089c4.924.868 6.14-6.025 1.216-6.894m-1.216 6.894L5.86 18.047m5.908 1.042-.347 1.97m1.564-8.864c4.924.869 6.14-6.025 1.215-6.893m-1.215 6.893-3.94-.694m5.155-6.199L8.29 4.26m5.908 1.042.348-1.97M7.48 20.364l3.126-17.727"/></symbol>
+  <symbol id="i-swords" viewBox="0 0 24 24"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" x2="19" y1="19" y2="13"/><line x1="16" x2="20" y1="16" y2="20"/><line x1="19" x2="21" y1="21" y2="19"/><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/><line x1="5" x2="9" y1="14" y2="18"/><line x1="7" x2="4" y1="17" y2="20"/><line x1="3" x2="5" y1="19" y2="21"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></symbol>
+</defs></svg>
+
 <header>
   <div class="header-left">
     <div class="brand">
@@ -1675,7 +1688,7 @@
   <section>
     <div class="table-card" style="border-left:3px solid var(--gold)">
       <div class="table-toolbar" style="justify-content:space-between;gap:16px">
-        <h3>📈 แนวโน้มประจำสัปดาห์ <span id="wo-week" style="opacity:.7"></span></h3>
+        <h3><svg class="ic"><use href="#i-trending"/></svg>แนวโน้มประจำสัปดาห์ <span id="wo-week" style="opacity:.7"></span></h3>
         <button onclick="refreshWeeklyOutlook()" class="filter-select" style="cursor:pointer;padding:5px 14px;font-size:11px;flex-shrink:0">↻ วิเคราะห์ใหม่ (AI)</button>
       </div>
       <div style="padding:14px 16px">
@@ -1689,7 +1702,7 @@
   <section id="gap-monitor-sec" style="display:none">
     <div class="table-card" style="border-left:3px solid var(--gold)">
       <div style="padding:12px 16px">
-        <h3 style="margin:0 0 8px">⛳ Weekend Gap Monitor <span style="font-size:11px;color:var(--muted);font-weight:400">— ทอง 24/7 vs ปิดศุกร์ → เดา gap จันทร์</span></h3>
+        <h3 style="margin:0 0 8px"><svg class="ic"><use href="#i-flag"/></svg>Weekend Gap Monitor <span style="font-size:11px;color:var(--muted);font-weight:400">— ทอง 24/7 vs ปิดศุกร์ → เดา gap จันทร์</span></h3>
         <div id="gap-monitor-body" style="font-size:13px;color:var(--dim)">กำลังโหลด…</div>
       </div>
     </div>
@@ -1828,19 +1841,19 @@
           <span><span style="color:#8ab4f8">●</span> central bank</span>
           <span><span style="color:var(--green)">▲</span>/<span style="color:var(--red)">▼</span> hub move</span>
           <span><span style="color:var(--red)">◉</span> live event</span>
-          <span>📅 econ</span>
+          <span><svg class="ic"><use href="#i-calendar"/></svg>econ</span>
         </div>
       </div>
       <div style="margin-top:8px;border:1px solid var(--border);border-radius:6px;overflow:hidden">
         <div class="section-title" style="font-size:11px;padding:7px 10px;margin:0;border-bottom:1px solid var(--border);background:var(--card,#111)">📰 ข่าว + ความรุนแรง · <span style="color:var(--muted);text-transform:none;letter-spacing:0">กด tab = กรองข่าว + จุดบนแผนที่</span></div>
         <div id="wm-news-tabs" style="display:flex;gap:4px;flex-wrap:wrap;padding:6px 9px;border-bottom:1px solid var(--border);background:var(--bg,var(--bg2))">
           <button class="ntab active" onclick="switchNewsTab('all',this)">ทั้งหมด</button>
-          <button class="ntab" onclick="switchNewsTab('gold',this)">🥇 ทองคำ</button>
-          <button class="ntab" onclick="switchNewsTab('stocks',this)">📈 ตลาดหุ้น</button>
-          <button class="ntab" onclick="switchNewsTab('fx',this)">💱 ค่าเงิน</button>
-          <button class="ntab" onclick="switchNewsTab('crypto',this)">₿ คริปโต</button>
-          <button class="ntab" onclick="switchNewsTab('war',this)">⚔ สงคราม</button>
-          <button class="ntab" onclick="switchNewsTab('sched',this)">📅 ในตาราง</button>
+          <button class="ntab" onclick="switchNewsTab('gold',this)"><svg class="ic"><use href="#i-award"/></svg>ทองคำ</button>
+          <button class="ntab" onclick="switchNewsTab('stocks',this)"><svg class="ic"><use href="#i-trending"/></svg>ตลาดหุ้น</button>
+          <button class="ntab" onclick="switchNewsTab('fx',this)"><svg class="ic"><use href="#i-money"/></svg>ค่าเงิน</button>
+          <button class="ntab" onclick="switchNewsTab('crypto',this)"><svg class="ic"><use href="#i-bitcoin"/></svg>คริปโต</button>
+          <button class="ntab" onclick="switchNewsTab('war',this)"><svg class="ic"><use href="#i-swords"/></svg>สงคราม</button>
+          <button class="ntab" onclick="switchNewsTab('sched',this)"><svg class="ic"><use href="#i-calendar"/></svg>ในตาราง</button>
         </div>
         <div id="wm-news" style="max-height:240px;overflow-y:auto">
           <div style="padding:10px;color:var(--muted);font-size:11px;font-family:var(--mono)">— รอ GDELT pull —</div>
@@ -6390,9 +6403,9 @@ function renderFeed() {
   }).join('');
 
   el.innerHTML =
-    '<div class="feed-group-title">📅 ECONOMIC CALENDAR — This Week</div>' +
+    '<div class="feed-group-title"><svg class="ic"><use href="#i-calendar"/></svg>ECONOMIC CALENDAR — This Week</div>' +
     (calRows || '<div style="color:var(--muted);font-size:11px;padding:6px">ไม่มี event สัปดาห์นี้</div>') +
-    '<div class="feed-group-title" style="margin-top:14px">📰 ข่าวทองล่าสุด</div>' +
+    '<div class="feed-group-title" style="margin-top:14px"><svg class="ic"><use href="#i-news"/></svg>ข่าวทองล่าสุด</div>' +
     (newsRows || '<div style="color:var(--muted);font-size:11px;padding:6px">ยังไม่มีข่าวที่ให้คะแนน — รอรอบข่าวถัดไป</div>');
 
   _tickCountdowns();
