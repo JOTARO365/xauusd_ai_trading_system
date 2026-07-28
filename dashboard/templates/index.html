@@ -51,6 +51,10 @@
       --muted2:    #4b5563;
       --muted3:    #262626;
       --grid:      rgba(255,255,255,0.04);   /* chart gridlines — theme-aware */
+      --hover:     rgba(255,255,255,0.05);   /* generic row/tab hover */
+      --card:      var(--surface2);          /* alias: var(--card,fallback) เดิม fallback ดำ — ผูก token ให้ adapt */
+      /* world-map (terminal green) — theme-aware */
+      --map-ocean: #020a08;  --map-land: #0a2018;  --map-land-stroke: #0f5040;  --map-grid: #0a2a20;
 
       --mono:      'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
       --display:   'Space Grotesk', 'Inter', -apple-system, system-ui, sans-serif;
@@ -74,7 +78,8 @@
       --red:       #dc2626;   --red-2: #b91c1c;     --red-dim: rgba(220,38,38,0.10);
       --amber:     #d97706;   --violet: #7c3aed;
       --text:      #1a1815;   --text-dim: #4b4842;  --muted: #6b6862;  --muted2: #9a968e;  --muted3: #e2ddd5;
-      --grid:      rgba(0,0,0,0.07);
+      --grid:      rgba(0,0,0,0.07);  --hover: rgba(0,0,0,0.05);
+      --map-ocean: #eaf0ed;  --map-land: #d3ddd6;  --map-land-stroke: #a8b8ad;  --map-grid: #d5ded8;
     }
 
     html, body {
@@ -268,7 +273,7 @@
       padding: 4px 9px; cursor: pointer; white-space: nowrap; transition: all .12s;
     }
     .jbtn:hover { color: var(--gold, var(--amber)); border-color: var(--gold, var(--amber)); }
-    .wm-newsrow:hover { background: var(--surface-hover, #1a1a1a); }
+    .wm-newsrow:hover { background: var(--surface2); }
     .ntab {
       font-family: var(--mono, monospace); font-size: 10px; color: var(--muted);
       background: transparent; border: 1px solid var(--border); border-radius: 4px;
@@ -686,7 +691,7 @@
       transition: background 0.12s;
     }
     tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: rgba(255,255,255,0.02); }
+    tbody tr:hover { background: var(--hover); }
     tbody tr.row-win  { background: rgba(74,222,128,0.04); }
     tbody tr.row-loss { background: rgba(239,68,68,0.04); }
     tbody tr.row-win:hover  { background: rgba(74,222,128,0.07); }
@@ -816,7 +821,7 @@
       font-family: var(--mono);
       white-space: nowrap;
     }
-    .tab-btn:hover  { color: var(--text); background: rgba(255,255,255,0.02); }
+    .tab-btn:hover  { color: var(--text); background: var(--hover); }
     .tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
     .tab-content    { display: none; }
     .tab-content.active { display: block; animation: fadeIn 0.18s ease-out; }
@@ -826,7 +831,7 @@
     .feed-item { border-bottom: 1px solid var(--border2, var(--border)); }
     .feed-row  { display: flex; align-items: center; gap: 8px; padding: 8px 6px; }
     .feed-row.clickable { cursor: pointer; }
-    .feed-row.clickable:hover { background: rgba(255,255,255,0.03); }
+    .feed-row.clickable:hover { background: var(--hover); }
     .feed-caret { margin-left: auto; color: var(--muted); transition: transform .3s ease; flex-shrink: 0; }
     .feed-item.open .feed-caret { transform: rotate(180deg); }
     .feed-detail { max-height: 0; overflow: hidden; transition: max-height .35s ease; }
@@ -1300,6 +1305,7 @@ window.toggleTheme = function(){
   if (light) { document.documentElement.removeAttribute('data-theme'); try { localStorage.setItem('theme','dark'); } catch(e){} }
   else { document.documentElement.setAttribute('data-theme','light'); try { localStorage.setItem('theme','light'); } catch(e){} }
   _setThemeIcon(); applyChartTheme();
+  try { if (typeof window._wmReset === 'function') window._wmReset(); } catch(e){}   // re-render world map ด้วยสี theme ใหม่
 };
 document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
 </script>
@@ -1316,8 +1322,8 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       <option value="all">ทุกคู่ (รวม WTI/BTC)</option>
     </select>
     <button id="theme-toggle" onclick="toggleTheme()" title="สลับ light/dark" aria-label="toggle theme"
-            style="margin-left:10px;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);cursor:pointer;padding:4px 8px;line-height:1;font-size:15px">
-      <svg class="ic" style="margin:0"><use href="#i-moon"/></svg></button>
+            style="margin-left:10px;flex:none;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);cursor:pointer;padding:0;font-size:15px">
+      <svg class="ic" style="margin:0;vertical-align:middle"><use href="#i-moon"/></svg></button>
   </div>
   <div class="header-right">
     <div class="ticker" id="live-ticker">
@@ -1882,7 +1888,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
         <span><span class="wm-dot ok"></span>Global Context — ศูนย์เทรดทอง + geopolitical risk (safe-haven driver)</span>
         <span id="wm-attention" style="text-transform:none;letter-spacing:0;font-family:var(--mono);font-size:11px;color:var(--muted)"><span class="wm-dot idle"></span>GDELT — โหลด...</span>
       </div>
-      <div style="position:relative;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:#020a08">
+      <div style="position:relative;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--map-ocean)">
         <div id="wm-map" style="width:100%;line-height:0"></div>
         <div style="position:absolute;bottom:7px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:11px;font-size:9px;color:var(--text-dim,#888);font-family:var(--mono);letter-spacing:.3px;padding:5px 14px;background:rgba(2,10,8,0.72);border:1px solid var(--border);border-radius:4px;pointer-events:none">
           <span><span style="color:#ffd700">●</span> gold mine</span>
@@ -1894,7 +1900,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
         </div>
       </div>
       <div style="margin-top:8px;border:1px solid var(--border);border-radius:6px;overflow:hidden">
-        <div class="section-title" style="font-size:11px;padding:7px 10px;margin:0;border-bottom:1px solid var(--border);background:var(--card,#111)">📰 ข่าว + ความรุนแรง · <span style="color:var(--muted);text-transform:none;letter-spacing:0">กด tab = กรองข่าว + จุดบนแผนที่</span></div>
+        <div class="section-title" style="font-size:11px;padding:7px 10px;margin:0;border-bottom:1px solid var(--border);background:var(--surface2)">📰 ข่าว + ความรุนแรง · <span style="color:var(--muted);text-transform:none;letter-spacing:0">กด tab = กรองข่าว + จุดบนแผนที่</span></div>
         <div id="wm-news-tabs" style="display:flex;gap:4px;flex-wrap:wrap;padding:6px 9px;border-bottom:1px solid var(--border);background:var(--bg,var(--bg2))">
           <button class="ntab active" onclick="switchNewsTab('all',this)">ทั้งหมด</button>
           <button class="ntab" onclick="switchNewsTab('gold',this)"><svg class="ic"><use href="#i-award"/></svg>ทองคำ</button>
@@ -4498,6 +4504,7 @@ const WM_H = Math.round((WM_LAT_TOP - WM_LAT_BOT) * WM_S);   // ~394 (สัด�
 const wmX = lng => (lng + 180) * WM_S;
 const wmY = lat => (WM_LAT_TOP - lat) * WM_S;
 let _wmMapInit = false, _wmLand = null, _wmLayers = null, _wmMoves = {}, _wmGdelt = [], _wmCtx = {};
+window._wmReset = function(){ try { _wmMapInit = false; initWmMap(); } catch(e){} };   // re-render map (theme toggle) — closure ถึง _wmMapInit (scoped)
 let _wmNews = [], _newsTab = 'all';   // ข่าว unified + tab filter ปัจจุบัน (คุมทั้งตาราง+จุดบนแผนที่)
 
 const _wmEsc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -4528,11 +4535,11 @@ function _wmGraticule() {
   let g = '';
   for (let lng = -180; lng <= 180; lng += 30) {
     const x = wmX(lng).toFixed(1);
-    g += `<line x1="${x}" y1="0" x2="${x}" y2="${WM_H}" stroke="#0a2a20" stroke-width="0.4"/>`;
+    g += `<line x1="${x}" y1="0" x2="${x}" y2="${WM_H}" stroke="${cssVar('--map-grid')}" stroke-width="0.4"/>`;
   }
   for (let lat = -30; lat <= 60; lat += 30) {
     const y = wmY(lat).toFixed(1);
-    g += `<line x1="0" y1="${y}" x2="${WM_W}" y2="${y}" stroke="#0a2a20" stroke-width="0.4"/>`;
+    g += `<line x1="0" y1="${y}" x2="${WM_W}" y2="${y}" stroke="${cssVar('--map-grid')}" stroke-width="0.4"/>`;
   }
   return g;
 }
@@ -4561,10 +4568,10 @@ function _mk(lat, lng, r, fill, opt) {
   } else if (opt.glow) {
     s += `<circle cx="${xs}" cy="${ys}" r="${(r*2.3).toFixed(1)}" fill="${fill}" opacity="0.16"/>`;
   }
-  s += `<circle cx="${xs}" cy="${ys}" r="${rs}" fill="${fill}" stroke="#020a08" stroke-width="${opt.ring === false ? 0 : 0.7}">`
+  s += `<circle cx="${xs}" cy="${ys}" r="${rs}" fill="${fill}" stroke="${cssVar('--map-ocean')}" stroke-width="${opt.ring === false ? 0 : 0.7}">`
     + `<title>${_wmEsc(opt.title || '')}</title></circle>`;
   if (opt.label) s += `<text x="${(x + r + 2.3).toFixed(1)}" y="${(y + 3).toFixed(1)}" fill="${opt.labelCol || fill}" `
-    + `font-size="8.5" font-family="var(--mono),monospace" opacity="0.92" style="text-shadow:0 0 3px #020a08">${_wmEsc(opt.label)}</text>`;
+    + `font-size="8.5" font-family="var(--mono),monospace" opacity="0.92" style="text-shadow:0 0 3px ${cssVar('--map-ocean')}">${_wmEsc(opt.label)}</text>`;
   return s;
 }
 
@@ -4619,9 +4626,9 @@ async function initWmMap() {
   try { _wmLayers = await (await fetch('/api/map-layers')).json(); } catch (_e) { _wmLayers = {}; }
   el.innerHTML =
     `<svg viewBox="0 0 ${WM_W} ${WM_H}" width="100%" preserveAspectRatio="xMidYMid meet" style="display:block">`
-    + `<rect x="0" y="0" width="${WM_W}" height="${WM_H}" fill="#020a08"/>`   // WM ocean: near-black green
+    + `<rect x="0" y="0" width="${WM_W}" height="${WM_H}" fill="${cssVar('--map-ocean')}"/>`   // WM ocean: near-black green
     + _wmGraticule()
-    + `<path d="${_wmLandPath(_wmLand || [])}" fill="#0a2018" stroke="#0f5040" stroke-width="0.5" stroke-linejoin="round"/>`
+    + `<path d="${_wmLandPath(_wmLand || [])}" fill="${cssVar('--map-land')}" stroke="${cssVar('--map-land-stroke')}" stroke-width="0.5" stroke-linejoin="round"/>`
     + `<g id="wm-dots"></g></svg>`;
   renderAllLayers();          // static layers ทันที (mines/waterways/cb/hubs)
   loadWorldMonitor();         // แล้ว merge GDELT live + pair-moves
