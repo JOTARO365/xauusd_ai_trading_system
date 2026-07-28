@@ -122,6 +122,30 @@ def _total_mse_positions():
         return 0
 
 
+def _protected_mse_positions():
+    """นับไม้ MSE (non-gold) ที่ SL พ้นทุนแล้ว (BE±buffer = protected, ไม่เสี่ยงขาดทุน).
+    ใช้ขยาย global cap: ไม้ protected ไม่นับกิน slot (trailing แล้วปลอดภัย) — pattern เดียวกับ count_protected_slots ทอง."""
+    try:
+        import MetaTrader5 as mt5
+        import config as _cfg
+        from connectors.mt5_connector import SYSTEM_MAGIC, SYMBOL as GOLD
+        buf = float(getattr(_cfg, "BE_BUFFER_PIPS", 200))
+        n = 0
+        for p in (mt5.positions_get() or []):
+            if p.magic != SYSTEM_MAGIC or p.symbol == GOLD or p.sl == 0:
+                continue
+            info = mt5.symbol_info(p.symbol)
+            if not info or not info.point:
+                continue
+            pt = info.point
+            is_buy = p.type == mt5.ORDER_TYPE_BUY
+            if (is_buy and p.sl >= p.price_open + buf * pt) or (not is_buy and p.sl <= p.price_open - buf * pt):
+                n += 1
+        return n
+    except Exception:
+        return 0
+
+
 def _simple_atr(high, low, close, period=14):
     """ATR(14) Wilder inline (เหมือน shadow_resolve_managed — self-contained)."""
     n = len(close)
@@ -450,6 +474,8 @@ def tick(force=False):
     sl_mult = _sl_mult_map()
     max_pos = max(1, int(getattr(_cfg, "MSE_MAX_POSITIONS", 1)))   # stack ไม้/combo (min 1; 0 ไม่ได้แปลว่า "ปิด" — ปิดที่ MULTI_SYMBOL_LIVE=false หรือ toggle SHADOW)
     max_total = int(getattr(_cfg, "MSE_MAX_TOTAL", 0))            # เพดานรวมทุก symbol (0 = ไม่จำกัด)
+    if max_total > 0:
+        max_total += _protected_mse_positions()                  # ขยาย cap ตามไม้ protected (trailing แล้วปลอดภัย ไม่กิน slot) — pattern เดียวกับทอง
     total_open = _total_mse_positions() if max_total > 0 else 0    # snapshot ต้น cycle; +opened ระหว่างวนลูป
     state = _load_state()
     dirty = False
