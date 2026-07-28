@@ -54,7 +54,7 @@
       --hover:     rgba(255,255,255,0.05);   /* generic row/tab hover */
       --card:      var(--surface2);          /* alias: var(--card,fallback) เดิม fallback ดำ — ผูก token ให้ adapt */
       /* world-map (terminal green) — theme-aware */
-      --map-ocean: #020a08;  --map-land: #0a2018;  --map-land-stroke: #0f5040;  --map-grid: #0a2a20;
+      --map-ocean: #020a08;  --map-land: #0a2018;  --map-land-stroke: #0f5040;  --map-grid: #0a2a20;  --map-legend: rgba(2,10,8,0.72);
 
       --mono:      'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
       --display:   'Space Grotesk', 'Inter', -apple-system, system-ui, sans-serif;
@@ -79,7 +79,7 @@
       --amber:     #d97706;   --violet: #7c3aed;
       --text:      #1a1815;   --text-dim: #4b4842;  --muted: #6b6862;  --muted2: #9a968e;  --muted3: #e2ddd5;
       --grid:      rgba(0,0,0,0.07);  --hover: rgba(0,0,0,0.05);
-      --map-ocean: #eaf0ed;  --map-land: #d3ddd6;  --map-land-stroke: #a8b8ad;  --map-grid: #d5ded8;
+      --map-ocean: #eaf0ed;  --map-land: #d3ddd6;  --map-land-stroke: #a8b8ad;  --map-grid: #d5ded8;  --map-legend: rgba(255,255,255,0.85);
     }
 
     html, body {
@@ -1322,7 +1322,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       <option value="all">ทุกคู่ (รวม WTI/BTC)</option>
     </select>
     <button id="theme-toggle" onclick="toggleTheme()" title="สลับ light/dark" aria-label="toggle theme"
-            style="margin-left:10px;flex:none;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);cursor:pointer;padding:0;font-size:15px">
+            style="margin:0 10px;flex:none;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);cursor:pointer;padding:0;font-size:15px">
       <svg class="ic" style="margin:0;vertical-align:middle"><use href="#i-moon"/></svg></button>
   </div>
   <div class="header-right">
@@ -1890,7 +1890,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       </div>
       <div style="position:relative;border:1px solid var(--border);border-radius:4px;overflow:hidden;background:var(--map-ocean)">
         <div id="wm-map" style="width:100%;line-height:0"></div>
-        <div style="position:absolute;bottom:7px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:11px;font-size:9px;color:var(--text-dim,#888);font-family:var(--mono);letter-spacing:.3px;padding:5px 14px;background:rgba(2,10,8,0.72);border:1px solid var(--border);border-radius:4px;pointer-events:none">
+        <div style="position:absolute;bottom:7px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:11px;font-size:9px;color:var(--text-dim,#888);font-family:var(--mono);letter-spacing:.3px;padding:5px 14px;background:var(--map-legend);border:1px solid var(--border);border-radius:4px;pointer-events:none">
           <span><span style="color:#ffd700">●</span> gold mine</span>
           <span><span style="color:var(--amber)">◆</span> chokepoint</span>
           <span><span style="color:#8ab4f8">●</span> central bank</span>
