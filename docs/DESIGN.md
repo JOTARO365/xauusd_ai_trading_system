@@ -78,3 +78,9 @@ Style: **Data-Dense Dashboard** (financial terminal) · dark-first · WCAG AA ·
 2. รวมเฉดซ้ำ: red/green/gold ให้เหลือชุดเดียว
 3. ย้าย ad-hoc gray (`#2a2a2a` ฯลฯ) เข้า `--border`/`--surface` scale
 4. audit ตาราง: cell padding + hover + mono numeric ให้เหมือนกันทุกตาราง
+
+## 9. Light mode (2026-07-28)
+- toggle ปุ่ม header (sun/moon SVG) → `data-theme="light"` บน `<html>` · persist localStorage · early-apply ใน `<head>` กัน flash
+- `:root[data-theme="light"]` override ทุก token (bg/surface/text/border + gold/green/red ปรับ contrast บนพื้นขาว) + `--grid`
+- chart re-theme: `regChart()` registry + `applyChartTheme()` อ่าน cssVar → applyOptions ตอน toggle (chart lib ใช้ hex ไม่ใช่ var)
+- ค้าง (minor): world-map viz + news-header bar ยัง dark (data-viz convention) — refine ได้ถ้าต้องการ

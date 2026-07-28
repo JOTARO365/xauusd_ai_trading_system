@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>XAU/USD · Gold Desk</title>
+  <script>/* apply theme ก่อน paint กัน flash */try{if(localStorage.getItem('theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -49,10 +50,31 @@
       --muted:     #9ca3af;
       --muted2:    #4b5563;
       --muted3:    #262626;
+      --grid:      rgba(255,255,255,0.04);   /* chart gridlines — theme-aware */
 
       --mono:      'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
       --display:   'Space Grotesk', 'Inter', -apple-system, system-ui, sans-serif;
       --sans:      'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+
+    /* ── LIGHT MODE — override tokens เมื่อ data-theme=light (toggle) ── */
+    :root[data-theme="light"] {
+      --bg:        #f7f6f3;
+      --bg2:       #efece7;
+      --surface:   #ffffff;
+      --surface2:  #f4f1ec;
+      --surface3:  #ebe7e0;
+      --border:    #ddd8d0;
+      --border2:   #d0cabf;
+      --border3:   #c2bbae;
+      --gold:      #b8860b;   --gold-2: #a67c1a;
+      --gold-dim:  rgba(184,134,11,0.14);  --gold-glow: rgba(184,134,11,0.28);
+      --cyan:      #2563eb;   --cyan-dim: rgba(37,99,235,0.10);
+      --green:     #16a34a;   --green-2: #15803d;   --green-dim: rgba(22,163,74,0.12);
+      --red:       #dc2626;   --red-2: #b91c1c;     --red-dim: rgba(220,38,38,0.10);
+      --amber:     #d97706;   --violet: #7c3aed;
+      --text:      #1a1815;   --text-dim: #4b4842;  --muted: #6b6862;  --muted2: #9a968e;  --muted3: #e2ddd5;
+      --grid:      rgba(0,0,0,0.07);
     }
 
     html, body {
@@ -82,7 +104,7 @@
 
     /* ─── HEADER ─────────────────────────────────────── */
     header {
-      background: linear-gradient(180deg, #0c0f15 0%, #0a0d12 100%);
+      background: linear-gradient(180deg, var(--bg2) 0%, var(--surface) 100%);
       border-bottom: 1px solid var(--border);
       padding: 0 24px;
       height: 54px;
@@ -1256,7 +1278,31 @@
   <symbol id="i-bitcoin" viewBox="0 0 24 24"><path d="M11.767 19.089c4.924.868 6.14-6.025 1.216-6.894m-1.216 6.894L5.86 18.047m5.908 1.042-.347 1.97m1.564-8.864c4.924.869 6.14-6.025 1.215-6.893m-1.215 6.893-3.94-.694m5.155-6.199L8.29 4.26m5.908 1.042.348-1.97M7.48 20.364l3.126-17.727"/></symbol>
   <symbol id="i-swords" viewBox="0 0 24 24"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" x2="19" y1="19" y2="13"/><line x1="16" x2="20" y1="16" y2="20"/><line x1="19" x2="21" y1="21" y2="19"/><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/><line x1="5" x2="9" y1="14" y2="18"/><line x1="7" x2="4" y1="17" y2="20"/><line x1="3" x2="5" y1="19" y2="21"/></symbol>
   <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
 </defs></svg>
+
+<script>/* ── theme (light/dark) — token override + chart re-theme ── */
+window.cssVar = function(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); };
+window.regChart = function(c){ (window._charts = window._charts || []).push(c); return c; };   // chart lib ใช้ hex ไม่ใช่ var → ต้อง re-apply ตอน toggle
+window.applyChartTheme = function(){
+  var tc = cssVar('--muted') || '#9ca3af', gc = cssVar('--grid') || 'rgba(255,255,255,0.04)';
+  (window._charts || []).forEach(function(c){ try { if (c && c.applyOptions) c.applyOptions({
+    layout: { textColor: tc }, grid: { vertLines: { color: gc }, horzLines: { color: gc } } }); } catch(e){} });
+};
+window._setThemeIcon = function(){
+  var b = document.getElementById('theme-toggle'); if (!b) return;
+  var light = document.documentElement.getAttribute('data-theme') === 'light';
+  var u = b.querySelector('use'); if (u) u.setAttribute('href', light ? '#i-sun' : '#i-moon');
+};
+window.toggleTheme = function(){
+  var light = document.documentElement.getAttribute('data-theme') === 'light';
+  if (light) { document.documentElement.removeAttribute('data-theme'); try { localStorage.setItem('theme','dark'); } catch(e){} }
+  else { document.documentElement.setAttribute('data-theme','light'); try { localStorage.setItem('theme','light'); } catch(e){} }
+  _setThemeIcon(); applyChartTheme();
+};
+document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
+</script>
 
 <header>
   <div class="header-left">
@@ -1269,6 +1315,9 @@
       <option value="xauusd">ทอง (XAUUSD)</option>
       <option value="all">ทุกคู่ (รวม WTI/BTC)</option>
     </select>
+    <button id="theme-toggle" onclick="toggleTheme()" title="สลับ light/dark" aria-label="toggle theme"
+            style="margin-left:10px;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);cursor:pointer;padding:4px 8px;line-height:1;font-size:15px">
+      <svg class="ic" style="margin:0"><use href="#i-moon"/></svg></button>
   </div>
   <div class="header-right">
     <div class="ticker" id="live-ticker">
@@ -3366,12 +3415,12 @@ function confBar(pct) {
    CHARTS
    ════════════════════════════════════════════════════════════ */
 function initCharts() {
-  const gridColor = 'rgba(255,255,255,0.04)';
-  const tickColor = '#4b5563';
+  const gridColor = cssVar('--grid') || 'rgba(255,255,255,0.04)';
+  const tickColor = cssVar('--muted') || '#4b5563';
 
   // Equity curve — TradingView Lightweight Charts (financial-grade time series)
   const _eqEl = document.getElementById('equityChart');
-  equityChart = LightweightCharts.createChart(_eqEl, {
+  equityChart = regChart(LightweightCharts.createChart(_eqEl, {
     height: 120,
     layout: { background: { type: 'solid', color: 'transparent' }, textColor: tickColor,
               fontFamily: 'JetBrains Mono', fontSize: 10 },
@@ -3387,7 +3436,7 @@ function initCharts() {
       horzLine: { color: 'rgba(74,222,128,0.45)', labelBackgroundColor: '#4ade80' },
     },
     handleScroll: false, handleScale: false,
-  });
+  }));
   equitySeries = equityChart.addAreaSeries({
     lineColor: '#4ade80', lineWidth: 2,
     topColor: 'rgba(74,222,128,0.20)', bottomColor: 'rgba(74,222,128,0.0)',
@@ -6810,13 +6859,13 @@ function initChart() {
   if (_chart || !window.LightweightCharts) return;
   const el = document.getElementById('price-chart');
   if (!el) return;
-  _chart = LightweightCharts.createChart(el, {
+  _chart = regChart(LightweightCharts.createChart(el, {
     height: 380,
-    layout: { background: { color: 'transparent' }, textColor: '#9ca3af', fontFamily: 'JetBrains Mono, monospace' },
-    grid: { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
-    timeScale: { timeVisible: true, secondsVisible: false, borderColor: '#262320' },
-    rightPriceScale: { borderColor: '#262320' },
-  });
+    layout: { background: { color: 'transparent' }, textColor: cssVar('--muted') || '#9ca3af', fontFamily: 'JetBrains Mono, monospace' },
+    grid: { vertLines: { color: cssVar('--grid') || 'rgba(255,255,255,0.04)' }, horzLines: { color: cssVar('--grid') || 'rgba(255,255,255,0.04)' } },
+    timeScale: { timeVisible: true, secondsVisible: false, borderColor: cssVar('--border') || '#262320' },
+    rightPriceScale: { borderColor: cssVar('--border') || '#262320' },
+  }));
   _candleSeries = _chart.addCandlestickSeries({
     upColor: '#22c55e', downColor: '#ef4444',
     wickUpColor: '#22c55e', wickDownColor: '#ef4444', borderVisible: false,
@@ -7457,7 +7506,7 @@ async function _spLoadBias(title) {
   } catch (_e) {}
 }
 const _SP_CHART_OPTS = {
-  layout: { background: { color: 'transparent' }, textColor: '#888', fontSize: 10 },
+  layout: { background: { color: 'transparent' }, textColor: (window.cssVar ? cssVar('--muted') : '#888') || '#888', fontSize: 10 },
   grid: { vertLines: { color: '#1a1a1a' }, horzLines: { color: '#1a1a1a' } },
   timeScale: { timeVisible: true, borderColor: '#262320' }, rightPriceScale: { borderColor: '#262320' }
 };
@@ -7484,7 +7533,7 @@ async function openSpeechModal(el) {
   try {
     const cEl = document.getElementById('sp-chart');
     if (!_spChart && window.LightweightCharts && cEl) {
-      _spChart = LightweightCharts.createChart(cEl, { ..._SP_CHART_OPTS, width: cEl.clientWidth, height: 220 });
+      _spChart = regChart(LightweightCharts.createChart(cEl, { ..._SP_CHART_OPTS, width: cEl.clientWidth, height: 220 }));
       _spSeries = _spChart.addCandlestickSeries(_SP_CANDLE_OPTS);
     }
     if (_spChart && cEl) _spChart.applyOptions({ width: cEl.clientWidth });
@@ -7495,7 +7544,7 @@ async function openSpeechModal(el) {
   try {
     const pEl = document.getElementById('sp-prev-chart'), note = document.getElementById('sp-prev-note');
     if (!_spPrevChart && window.LightweightCharts && pEl) {
-      _spPrevChart = LightweightCharts.createChart(pEl, { ..._SP_CHART_OPTS, width: pEl.clientWidth, height: 200 });
+      _spPrevChart = regChart(LightweightCharts.createChart(pEl, { ..._SP_CHART_OPTS, width: pEl.clientWidth, height: 200 }));
       _spPrevSeries = _spPrevChart.addCandlestickSeries(_SP_CANDLE_OPTS);
     }
     const ph = await (await fetch('/api/speech-history?title=' + encodeURIComponent(d.spTitle || ''))).json();
