@@ -78,21 +78,35 @@ def nearest_levels(bars_by_tf, price, atr=0.0, left=2, right=2):
     }
 
 
+_WICK_CACHE = {}                                          # (symbol,tf) -> (expiry_ts, (high,low))
+_WICK_TTL = {"H4": 300, "D1": 900, "W1": 3600}            # ดึงไส้ซ้ำได้ที่ความถี่นี้ (ไส้เปลี่ยนเมื่อแท่งใหม่ปิดเท่านั้น)
+
+
 def last_closed_wick(symbol, tf="D1"):
     """(high, low) ของแท่ง TF **ปิดล่าสุด** (index -2; -1 = แท่งกำลังก่อตัว) ต่อ symbol. None ถ้าดึงไม่ได้.
-    tf ∈ {H4,D1,W1}. ใช้วาง SL ปลายไส้ (structural_sl). broker symbol เช่น OILCash#, GOLD#."""
+    tf ∈ {H4,D1,W1}. ใช้วาง SL ปลายไส้ (structural_sl). broker symbol เช่น OILCash#, GOLD#.
+
+    ⚡ perf: single-attempt copy_rates (**ไม่ใช้ get_ohlcv ที่มี sleep-retry 1.5s×2 = block 3s/call**) + cache TTL
+    → ไม่ block main loop; ดึงไม่ได้ → None → structural fallback SL เดิม (ไม่หน่วง cycle)."""
+    import time as _t
+    key = (symbol, tf)
+    c = _WICK_CACHE.get(key)
+    now = _t.time()
+    if c and now < c[0]:
+        return c[1]
     try:
         import MetaTrader5 as mt5
-        from connectors.price_feed import get_ohlcv
         tfmap = {"H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1, "W1": mt5.TIMEFRAME_W1}
         mt5_tf = tfmap.get(tf)
         if mt5_tf is None:
             return None
-        r = get_ohlcv(symbol=symbol, timeframe=mt5_tf, count=5)
+        r = mt5.copy_rates_from_pos(symbol, mt5_tf, 0, 5)   # single attempt, no sleep-retry
         if r is None or len(r) < 2:
             return None
         i = len(r) - 2                                     # แท่งปิดล่าสุด
-        return (float(r["high"][i]), float(r["low"][i]))
+        res = (float(r["high"][i]), float(r["low"][i]))
+        _WICK_CACHE[key] = (now + _WICK_TTL.get(tf, 600), res)
+        return res
     except Exception:
         return None
 
