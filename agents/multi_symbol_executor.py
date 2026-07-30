@@ -194,8 +194,8 @@ def _clamp_sl_atr(sl_pips, bars, point):
 
 
 def _apply_structural_sl(direction, entry, bars, point, broker, base_sl_pips, base_tp_pips, algo_id, symbol):
-    """flag STRUCTURAL_SL_LIVE: วาง SL พิงแนว D1/W1 + buffer แทน fixed. คง RR เดิม (TP recompute).
-    default OFF → คืน (base_sl, base_tp). fail-soft: error ใดๆ → base. คืน (sl_pips, tp_pips)."""
+    """flag STRUCTURAL_SL_MSE: วาง SL ที่ปลายไส้ D1 ปิดล่าสุด เสมอ (ไม่ clamp). คง RR (TP recompute).
+    default OFF → base เดิม. fail-soft. คืน (sl_pips, tp_pips, force_min_lot)."""
     import config as _cfg
     from agents import structural_sl
     high, low, close, _t = bars
@@ -206,8 +206,8 @@ def _apply_structural_sl(direction, entry, bars, point, broker, base_sl_pips, ba
         enabled=getattr(_cfg, "STRUCTURAL_SL_MSE", False))
     if meta is not None:
         logger.info(f"[MSE] structural SL {algo_id}:{symbol} {meta['base_pips']}p → {meta['struct_pips']}p "
-                    f"(พิง {meta['tf']} @ {meta['level']} + buffer)")
-    return sl_pips, tp_pips
+                    f"(ปลายไส้ D1 @ {meta['sl_price']}) → min lot")
+    return sl_pips, tp_pips, (meta is not None and meta.get("force_min_lot", False))
 
 
 def _send_sltp(broker, ticket, new_sl, tp, digits):
@@ -457,10 +457,11 @@ def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max
     sl_pips_eff = float(vo["sl_pips"]) * sl_mult                 # edge = algo SL × mult (WTI 0.7)
     sl_pips_eff = _clamp_sl_atr(sl_pips_eff, bars, point)        # safety clamp (ไม่แตะ edge เคสปกติ)
     tp_pips_eff = float(vo["tp_pips"])
-    sl_pips_eff, tp_pips_eff = _apply_structural_sl(
+    sl_pips_eff, tp_pips_eff, _force_min = _apply_structural_sl(
         vo["dir"], float(vo["entry"]), bars, point, broker, sl_pips_eff, tp_pips_eff, algo_id, symbol)
+    _lot = _cfgf("MIN_LOT", 0.01) if _force_min else None   # structural = min lot เสมอ (SL กว้าง, ยอม risk%)
     from connectors.mt5_connector import open_order
-    res = open_order(vo["dir"], sl_pips_eff, tp_pips_eff,
+    res = open_order(vo["dir"], sl_pips_eff, tp_pips_eff, lot=_lot,
                      comment=f"MSE-{algo_id}", symbol=broker, max_open_override=max_pos)
     if res and res.get("success") and res.get("ticket"):
         combo_state["last_bar_ts"] = vo["bar_ts"]              # dedup **เฉพาะเมื่อสำเร็จ** (fail → retry บาร์เดิมได้หลัง cooldown)

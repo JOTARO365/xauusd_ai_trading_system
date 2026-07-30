@@ -1,7 +1,8 @@
 """scripts/structural_sl_backtest.py — พิสูจน์ structural SL ก่อนเปิด live.
 
-เทียบ SL แบบ fixed/ATR (live เดิม) vs structural (พิงแนว D1/W1 + buffer) บน signal momentum ชุด**เดียวกัน**
-(no look-ahead: signal ใช้ข้อมูล ≤ i, HTF pivot ใช้บาร์ day+ ที่ time ≤ signal, forward-sim จาก i+1).
+เทียบ SL แบบ fixed/ATR (live เดิม) vs structural (**ปลายไส้แท่ง D1 ปิดล่าสุด** + buffer, ไม่ clamp) บน signal
+momentum ชุด**เดียวกัน** (no look-ahead: signal ใช้ข้อมูล ≤ i, ไส้ D1 ใช้แท่ง D1 ที่ปิดก่อน time ของ signal,
+forward-sim จาก i+1).
 
 วัด: SL-hit%, TP-hit%, exp_R, และ "rescued" = ไม้ที่ fixed โดน SL แต่ structural ได้ TP (= แก้ตรงอาการ
 "เข้าถูกทางแต่โดน SL ก่อน"). ตรงข้าม "worsened" = fixed TP แต่ structural SL (structural กว้างไปโดนสวน).
@@ -22,23 +23,23 @@ sys.path.insert(0, _BASE)
 sys.path.insert(0, os.path.join(_BASE, "scripts"))
 
 import regime_lib as R
-from agents import htf_levels as H, structural_sl as S
+from agents import structural_sl as S
 
 H1_COUNT = 60000            # ~10 ปี H1 (MT5 ให้เท่าที่มี)
+H4_COUNT = 20000
 D1_COUNT = 3000
-W1_COUNT = 800
 MAX_HOLD = 240             # forward-sim สูงสุด (H1 บาร์) ~10 วันเทรด
 BUFFER_ATR = float(os.getenv("BT_BUFFER_ATR") or 0.3)   # sensitivity: BT_BUFFER_ATR=0.2 python ...
-MIN_ATR, MAX_ATR = 0.5, 4.0
-TFS = ("D1", "W1")
+PICK = os.getenv("BT_PICK", "farthest")                 # ตรง config default; BT_PICK=nearest เทียบได้
+TFS = ("H4", "D1")
 
 
 def _pull(symbol):
     import MetaTrader5 as mt5
     from connectors.price_feed import get_ohlcv
     out = {}
-    for tf, mtf, cnt in [("H1", mt5.TIMEFRAME_H1, H1_COUNT), ("D1", mt5.TIMEFRAME_D1, D1_COUNT),
-                         ("W1", mt5.TIMEFRAME_W1, W1_COUNT)]:
+    for tf, mtf, cnt in [("H1", mt5.TIMEFRAME_H1, H1_COUNT), ("H4", mt5.TIMEFRAME_H4, H4_COUNT),
+                         ("D1", mt5.TIMEFRAME_D1, D1_COUNT)]:
         r = get_ohlcv(symbol=symbol, timeframe=mtf, count=cnt)
         if r is None or len(r) < 50:
             out[tf] = None
@@ -50,17 +51,17 @@ def _pull(symbol):
     return out
 
 
-def _htf_bars_upto(d1, w1, t):
-    """ตัดบาร์ D1/W1 ให้เหลือ time ≤ t (no look-ahead)."""
-    res = {}
-    for tf, bars in (("D1", d1), ("W1", w1)):
-        if not bars:
-            continue
-        hi, lo, cl, tm = bars
-        k = int(np.searchsorted(tm, t, side="right"))     # จำนวนบาร์ที่ time ≤ t
-        if k >= 10:
-            res[tf] = (hi[:k], lo[:k], cl[:k], tm[:k])
-    return res
+def _last_closed_wick(bars, t):
+    """(high, low) ของแท่ง TF ที่ปิดก่อน time t (no look-ahead). None ถ้าไม่พอ.
+    MT5 bar time = เปิดแท่ง → แท่งกำลังก่อตัว index k-1, ปิดล่าสุด = k-2."""
+    if not bars:
+        return None
+    hi, lo, _cl, tm = bars
+    k = int(np.searchsorted(tm, t, side="right"))
+    j = k - 2
+    if j < 0:
+        return None
+    return (float(hi[j]), float(lo[j]))
 
 
 def _sim(direction, entry, sl_pips, tp_pips, point, fh, fl, start):
@@ -113,12 +114,19 @@ def backtest(symbol, sl_mult=1.0):
         atr_px = float(atr[i])
         if base_sl <= 0 or atr_px <= 0:
             continue
-        # structural (point-in-time HTF)
-        levels = H.nearest_levels(_htf_bars_upto(data["D1"], data["W1"], int(times[i])), entry, atr=atr_px)
-        s_sl, reason, meta = S.adjust_sl_pips(direction, entry, atr_px, point, levels, base_sl,
-                                              BUFFER_ATR, MIN_ATR, MAX_ATR)
-        used = (reason == "structural")
-        s_tp = base_tp if not used else (base_tp / base_sl) * s_sl   # คง RR
+        # structural (ปลายไส้ H4/D1 ปิดล่าสุด, point-in-time, no clamp)
+        wicks = {}
+        for tf in TFS:
+            w = _last_closed_wick(data.get(tf), int(times[i]))
+            if w:
+                wicks[tf] = w
+        r = S.wick_sl(direction, entry, atr_px, point, wicks, BUFFER_ATR, mode=PICK) if wicks else None
+        used = r is not None
+        s_sl = r["sl_pips"] if used else base_sl
+        if used and os.getenv("BT_RR_PRESERVE") == "1":
+            s_tp = (base_tp / base_sl) * s_sl                        # (เทียบเฉยๆ) คง RR — TP ขยายตาม SL = แย่กว่า
+        else:
+            s_tp = base_tp                                            # live: คง TP เดิม (เปลี่ยน SL อย่างเดียว)
 
         rf, hf = _sim(direction, entry, base_sl, base_tp, point, high, low, i + 1)
         rs, hs = _sim(direction, entry, s_sl, s_tp, point, high, low, i + 1)
@@ -184,7 +192,7 @@ def main():
             symbols.append((br, smult.get(sym, 1.0)))
         if GOLD not in seen:
             symbols.append((GOLD, 1.0))
-    print(f"Structural SL backtest — buffer={BUFFER_ATR}ATR clamp[{MIN_ATR},{MAX_ATR}]ATR tfs={TFS} hold≤{MAX_HOLD}H1\n")
+    print(f"Structural SL backtest — SL=ปลายไส้ {'+'.join(TFS)} ปิดล่าสุด pick={PICK} +buffer={BUFFER_ATR}ATR hold≤{MAX_HOLD}H1\n")
     for sym, mult in symbols:
         print(_fmt(backtest(sym, mult)))
         print()

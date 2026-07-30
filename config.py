@@ -255,18 +255,18 @@ MSE_MAX_TOTAL         = int(os.getenv("MSE_MAX_TOTAL") or 0)
 # MSE_SL_MIN_ATR / MSE_SL_MAX_ATR = clamp SL ของ MSE เป็น multiple ของ ATR (กัน ATR เพี้ยน→SL บ้าๆ; ไม่แตะ edge เคสปกติ). 0 = ปิด clamp ฝั่งนั้น
 MSE_SL_MIN_ATR        = float(os.getenv("MSE_SL_MIN_ATR") or 0.5)
 MSE_SL_MAX_ATR        = float(os.getenv("MSE_SL_MAX_ATR") or 4.0)
-# Structural SL = วาง SL พิงแนว D1/W1 S/R + ATR buffer แทน fixed/ATR (แก้ "เข้าถูกทางแต่โดน SL ก่อน").
-# แยก flag ต่อ path: backtest พบ **ทอง +0.03~0.04R robust ทุก buffer** แต่ **WTI/MSE momentum แย่ลง −0.02~0.035R**
-# (SL กว้างทำลาย edge tight-SL×0.7). → เปิดเฉพาะ GOLD; MSE ปล่อย OFF. default OFF ทั้งคู่
+# Structural SL = วาง SL ที่ "ปลายไส้แท่ง D1 ปิดล่าสุด" เสมอ (BUY→D1.low−buf, SELL→D1.high+buf), ไม่ clamp
+# ไม่ fallback (user directive 07-30). ทุนน้อย → lot=min เสมอ + ข้าม risk-cap. แก้ "เข้าถูกทางแต่โดน SL ก่อน".
 STRUCTURAL_SL_GOLD    = os.getenv("STRUCTURAL_SL_GOLD", "false").lower() == "true"   # gold ALGO-mom (regime_executor/tick)
-STRUCTURAL_SL_MSE     = os.getenv("STRUCTURAL_SL_MSE", "false").lower() == "true"    # MSE momentum — backtest = แย่ลง อย่าเปิด
-# STRUCTURAL_SL_BUFFER_ATR = ระยะเผื่อพ้นแนว (× ATR) กัน wick สะอาดชน SL
+STRUCTURAL_SL_MSE     = os.getenv("STRUCTURAL_SL_MSE", "false").lower() == "true"    # MSE (momentum + tsmom คู่ MSE)
+# STRUCTURAL_SL_BUFFER_ATR = ระยะเผื่อพ้นไส้ (× ATR) กัน wick สะอาดชน SL
 STRUCTURAL_SL_BUFFER_ATR = float(os.getenv("STRUCTURAL_SL_BUFFER_ATR") or 0.3)
-# STRUCTURAL_SL_MIN_ATR / MAX_ATR = ช่วงที่ SL โครงสร้างต้องอยู่ (× ATR); นอกช่วง → fallback SL เดิม (opt-in ต่อไม้)
+# STRUCTURAL_SL_TFS = timeframe ไส้ที่พิจารณา (D1 หรือ H4). STRUCTURAL_SL_PICK = nearest(SL แคบ RR ดี)/farthest(กัน noise มากสุด)
+STRUCTURAL_SL_TFS     = os.getenv("STRUCTURAL_SL_TFS", "H4,D1")
+STRUCTURAL_SL_PICK    = os.getenv("STRUCTURAL_SL_PICK", "farthest")
+# MIN/MAX_ATR = legacy (โหมด pivot+clamp เดิม; กฎ wick ปัจจุบันไม่ใช้ clamp) — คงไว้กัน env drift
 STRUCTURAL_SL_MIN_ATR = float(os.getenv("STRUCTURAL_SL_MIN_ATR") or 0.5)
 STRUCTURAL_SL_MAX_ATR = float(os.getenv("STRUCTURAL_SL_MAX_ATR") or 4.0)
-# STRUCTURAL_SL_TFS = timeframe ที่ดึงแนว pivot (day ขึ้นไป). คั่นด้วย comma
-STRUCTURAL_SL_TFS     = os.getenv("STRUCTURAL_SL_TFS", "D1,W1")
 # WEEKEND_RUN = รัน loop ต่อวันหยุด (เก็บ edge BTC crypto 24/7). AI ยังรัน (sentiment) แต่ loop ห่างขึ้น (ลด token). default OFF
 WEEKEND_RUN           = os.getenv("WEEKEND_RUN", "false").lower() == "true"
 # WEEKEND_INTERVAL_SECS = interval ต่ำสุดของ loop วันหยุด (ห่างกว่าปกติ = ลด token; default 1800 = 30 นาที)
@@ -406,7 +406,7 @@ def reload_config():
     global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT, REGIME_SHADOW
     global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING, REGIME_SR_ENTRY, REGIME_PENDING_FADE, REGIME_SR_EXIT
     global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK, ALGO_MAX_SAME_DIR, ALGO_ENTRY_HOURS, MULTI_SYMBOL_LIVE, ALGO_SL_MULT, MSE_MAX_POSITIONS, MSE_MAX_TOTAL, MSE_SL_MIN_ATR, MSE_SL_MAX_ATR, WEEKEND_RUN, WEEKEND_INTERVAL_SECS, AUTO_SL_PCT_OTHER
-    global STRUCTURAL_SL_GOLD, STRUCTURAL_SL_MSE, STRUCTURAL_SL_BUFFER_ATR, STRUCTURAL_SL_MIN_ATR, STRUCTURAL_SL_MAX_ATR, STRUCTURAL_SL_TFS
+    global STRUCTURAL_SL_GOLD, STRUCTURAL_SL_MSE, STRUCTURAL_SL_BUFFER_ATR, STRUCTURAL_SL_MIN_ATR, STRUCTURAL_SL_MAX_ATR, STRUCTURAL_SL_TFS, STRUCTURAL_SL_PICK
     global ALGO_SIZE_STANDDOWN, ALGO_MAX_TRADE_RISK_PCT
     global TSMOM_LIVE, TSMOM_SHADOW, TSMOM_COEXIST, TSMOM_LONG_ONLY, TSMOM_MIN_ADX, TSMOM_MIN_VOLPCT, TSMOM_LOOKBACKS, TSMOM_SL_ATR, TSMOM_SL_PIPS, TSMOM_SL_CAP_FALLBACK
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
@@ -434,12 +434,13 @@ def reload_config():
     WEEKEND_RUN              = os.getenv("WEEKEND_RUN", "false").lower() == "true"             # รัน loop วันหยุด (เก็บ BTC)
     WEEKEND_INTERVAL_SECS   = int(os.getenv("WEEKEND_INTERVAL_SECS") or 1800)                 # loop ห่างวันหยุด (ลด token)
     AUTO_SL_PCT_OTHER       = float(os.getenv("AUTO_SL_PCT_OTHER") or 0.01)                    # auto-SL คู่ non-gold = %ราคา
-    STRUCTURAL_SL_GOLD       = os.getenv("STRUCTURAL_SL_GOLD", "false").lower() == "true"       # SL พิงแนว D1/W1 — gold (backtest +0.03R)
-    STRUCTURAL_SL_MSE        = os.getenv("STRUCTURAL_SL_MSE", "false").lower() == "true"        # SL พิงแนว — MSE (backtest แย่ลง อย่าเปิด)
-    STRUCTURAL_SL_BUFFER_ATR = float(os.getenv("STRUCTURAL_SL_BUFFER_ATR") or 0.3)              # เผื่อพ้นแนว × ATR
-    STRUCTURAL_SL_MIN_ATR    = float(os.getenv("STRUCTURAL_SL_MIN_ATR") or 0.5)                 # SL โครงสร้าง ≥ n×ATR ไม่งั้น fallback
-    STRUCTURAL_SL_MAX_ATR    = float(os.getenv("STRUCTURAL_SL_MAX_ATR") or 4.0)                 # SL โครงสร้าง ≤ n×ATR ไม่งั้น fallback
-    STRUCTURAL_SL_TFS        = os.getenv("STRUCTURAL_SL_TFS", "D1,W1")                          # timeframe pivot (day+)
+    STRUCTURAL_SL_GOLD       = os.getenv("STRUCTURAL_SL_GOLD", "false").lower() == "true"       # SL ปลายไส้ D1/H4 — gold
+    STRUCTURAL_SL_MSE        = os.getenv("STRUCTURAL_SL_MSE", "false").lower() == "true"        # SL ปลายไส้ D1/H4 — MSE
+    STRUCTURAL_SL_BUFFER_ATR = float(os.getenv("STRUCTURAL_SL_BUFFER_ATR") or 0.3)              # เผื่อพ้นไส้ × ATR
+    STRUCTURAL_SL_TFS        = os.getenv("STRUCTURAL_SL_TFS", "H4,D1")                          # timeframe ไส้ (D1/H4)
+    STRUCTURAL_SL_PICK       = os.getenv("STRUCTURAL_SL_PICK", "farthest")                       # nearest/farthest
+    STRUCTURAL_SL_MIN_ATR    = float(os.getenv("STRUCTURAL_SL_MIN_ATR") or 0.5)                 # legacy (ไม่ใช้)
+    STRUCTURAL_SL_MAX_ATR    = float(os.getenv("STRUCTURAL_SL_MAX_ATR") or 4.0)                 # legacy (ไม่ใช้)
     ALGO_SIZE_STANDDOWN      = os.getenv("ALGO_SIZE_STANDDOWN", "true").lower() == "true"    # small-acct guard
     ALGO_MAX_TRADE_RISK_PCT  = float(os.getenv("ALGO_MAX_TRADE_RISK_PCT") or 0.02)           # เพดาน risk/ไม้
     TSMOM_LIVE               = os.getenv("TSMOM_LIVE", "false").lower() == "true"            # TSMOM directional engine

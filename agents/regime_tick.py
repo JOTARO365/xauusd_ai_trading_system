@@ -92,16 +92,18 @@ def _tick() -> None:
         # same-direction guard: กัน 2 engine (TSMOM/intraday) เข้าซ้อนทิศเดียวกัน (ALGO_MAX_SAME_DIR=1 → ห้ามดับเบิลทางเดียว; ฝั่งตรงข้ามยังเข้าได้)
         if sum(1 for p in _algo if _pdir(p) == d) >= getattr(config, "ALGO_MAX_SAME_DIR", 1):
             return
-        from agents.algo_sizing import standdown_for_size         # small-acct guard: min-lot เสี่ยงเกินเพดาน = ข้าม
-        _skip, _si = standdown_for_size(_cache["sl_pips"])
-        if _skip:
-            _last_traded_hour = hour                              # ถือว่าจัดการชั่วโมงนี้แล้ว (กัน log ซ้ำทุก tick)
-            logger.info(f"[REGIME-TICK] SIZE-STANDDOWN {d}: min-lot มีความเสี่ยง {_si.get('risk_pct',0)*100:.1f}% "
-                        f"> เพดาน {_si.get('ceiling',0)*100:.0f}% (SL {_cache['sl_pips']}p เงินทุนไม่เพียงพอ) → ข้าม")
-            from agents.algo_state import write_state
-            write_state("SIZE-STANDDOWN", regime="TREND", via="tick",
-                        detail=f"min-lot มีความเสี่ยง {_si.get('risk_pct',0)*100:.1f}% > เพดาน (SL {_cache['sl_pips']}p เงินทุนไม่เพียงพอ)")
-            return
+        _structural_on = getattr(config, "STRUCTURAL_SL_GOLD", False)   # structural = SL ปลายไส้ D1 + min lot เสมอ → ข้าม standdown
+        if not _structural_on:
+            from agents.algo_sizing import standdown_for_size         # small-acct guard: min-lot เสี่ยงเกินเพดาน = ข้าม
+            _skip, _si = standdown_for_size(_cache["sl_pips"])
+            if _skip:
+                _last_traded_hour = hour                              # ถือว่าจัดการชั่วโมงนี้แล้ว (กัน log ซ้ำทุก tick)
+                logger.info(f"[REGIME-TICK] SIZE-STANDDOWN {d}: min-lot มีความเสี่ยง {_si.get('risk_pct',0)*100:.1f}% "
+                            f"> เพดาน {_si.get('ceiling',0)*100:.0f}% (SL {_cache['sl_pips']}p เงินทุนไม่เพียงพอ) → ข้าม")
+                from agents.algo_state import write_state
+                write_state("SIZE-STANDDOWN", regime="TREND", via="tick",
+                            detail=f"min-lot มีความเสี่ยง {_si.get('risk_pct',0)*100:.1f}% > เพดาน (SL {_cache['sl_pips']}p เงินทุนไม่เพียงพอ)")
+                return
         from agents import shadow_switches as _sw                 # unify: dashboard switch = single control
         _st = _sw.gold_state("regime_momentum")
         if _st == _sw.OFF:
@@ -113,9 +115,10 @@ def _tick() -> None:
         _entry_px = tick.ask if d == "BUY" else tick.bid
         _tp_pips = sr_tp_pips(d, _entry_px, _cache["sl_pips"], _cache["tp_pips"])
         from agents.regime_executor import _structural_sl_gold
-        _sl_pips, _tp_pips = _structural_sl_gold(d, _entry_px, _cache.get("atr"),
-                                                 _cache["sl_pips"], _tp_pips)
-        res = open_order(d, _sl_pips, _tp_pips, comment="ALGO-mom", lot=algo_lot(_sl_pips),
+        _sl_pips, _tp_pips, _force_min = _structural_sl_gold(d, _entry_px, _cache.get("atr"),
+                                                             _cache["sl_pips"], _tp_pips)
+        _lot = float(getattr(config, "MIN_LOT", 0.01)) if _force_min else algo_lot(_sl_pips)  # structural = min lot เสมอ
+        res = open_order(d, _sl_pips, _tp_pips, comment="ALGO-mom", lot=_lot,
                          shadow=(_st == _sw.SHADOW))               # SHADOW → paper-fill
         from agents.regime_executor import _log
         _log({"ts_hour": hour, "via": "tick", "regime": "TREND",

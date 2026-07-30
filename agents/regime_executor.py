@@ -32,7 +32,8 @@ def _log(rec):
 
 
 def _structural_sl_gold(direction, entry, atr, base_sl_pips, base_tp_pips):
-    """flag STRUCTURAL_SL_LIVE: วาง SL ทองพิงแนว D1/W1 (เหมือน MSE). default OFF → base. fail-soft."""
+    """flag STRUCTURAL_SL_GOLD: วาง SL ทองที่ปลายไส้ D1 ปิดล่าสุด เสมอ. default OFF → base. fail-soft.
+    คืน (sl_pips, tp_pips, force_min_lot)."""
     try:
         from connectors.mt5_connector import SYMBOL
         import MetaTrader5 as mt5
@@ -45,11 +46,11 @@ def _structural_sl_gold(direction, entry, atr, base_sl_pips, base_tp_pips):
             enabled=getattr(_cfg, "STRUCTURAL_SL_GOLD", False))
         if meta is not None:
             logger.info(f"[ALGO] structural SL {meta['base_pips']}p → {meta['struct_pips']}p "
-                        f"(พิง {meta['tf']} @ {meta['level']} + buffer)")
-        return sl_pips, tp_pips
+                        f"(ปลายไส้ D1 @ {meta['sl_price']}) → min lot")
+        return sl_pips, tp_pips, (meta is not None and meta.get("force_min_lot", False))
     except Exception as e:
         logger.debug(f"[ALGO] structural SL skip ({e})")
-        return base_sl_pips, base_tp_pips
+        return base_sl_pips, base_tp_pips, False
 
 
 def _hb(state, detail="", regime=None):
@@ -105,12 +106,14 @@ def run_regime_executor():
             return None
     except Exception:
         pass
-    from agents.algo_sizing import standdown_for_size          # small-acct guard: min-lot เสี่ยงเกินเพดาน = ข้าม
-    _skip, _si = standdown_for_size(sig["sl_pips"])
-    if _skip:
-        _hb("SIZE-STANDDOWN", f"regime=TREND {sig.get('dir')} · min-lot มีความเสี่ยง {_si.get('risk_pct',0)*100:.1f}% "
-            f"> เพดาน {_si.get('ceiling',0)*100:.0f}% (เงินทุนไม่เพียงพอ SL {sig.get('sl_pips')}p) → ข้าม", regime="TREND")
-        return None
+    _structural_on = getattr(_cfg, "STRUCTURAL_SL_GOLD", False)   # structural = SL ปลายไส้ D1 + min lot เสมอ → ข้าม standdown (ยอม risk%)
+    if not _structural_on:
+        from agents.algo_sizing import standdown_for_size          # small-acct guard: min-lot เสี่ยงเกินเพดาน = ข้าม
+        _skip, _si = standdown_for_size(sig["sl_pips"])
+        if _skip:
+            _hb("SIZE-STANDDOWN", f"regime=TREND {sig.get('dir')} · min-lot มีความเสี่ยง {_si.get('risk_pct',0)*100:.1f}% "
+                f"> เพดาน {_si.get('ceiling',0)*100:.0f}% (เงินทุนไม่เพียงพอ SL {sig.get('sl_pips')}p) → ข้าม", regime="TREND")
+            return None
     from agents.algo_gate import entry_hour_ok
     if not entry_hour_ok():                                   # session gate (ALGO_ENTRY_HOURS · ว่าง=ทุกชม default)
         _hb("SESSION-GATE", "นอกช่วง ALGO_ENTRY_HOURS → งดเข้า", regime="TREND")
@@ -125,10 +128,11 @@ def run_regime_executor():
     from agents.algo_exit import sr_tp_pips                  # P-D: TP ตามแนว S/R (flag OFF → RR2 เดิม)
     from agents.algo_sizing import algo_lot                  # P-E: lot risk-based (flag OFF → fixed เดิม)
     tp_pips = sr_tp_pips(sig["dir"], rec["close"], sig["sl_pips"], sig["tp_pips"])
-    sl_pips, tp_pips = _structural_sl_gold(sig["dir"], rec.get("close"), rec.get("atr"),
-                                           sig["sl_pips"], tp_pips)
+    sl_pips, tp_pips, _force_min = _structural_sl_gold(sig["dir"], rec.get("close"), rec.get("atr"),
+                                                       sig["sl_pips"], tp_pips)
+    _lot = float(getattr(_cfg, "MIN_LOT", 0.01)) if _force_min else algo_lot(sl_pips)  # structural = min lot เสมอ
     res = open_order(sig["dir"], sl_pips, tp_pips, comment="ALGO-mom",
-                     lot=algo_lot(sl_pips),                 # risk-based lot ตาม SL จริง (structural อาจปรับ) · DRY_RUN/cap/clamp ในตัว
+                     lot=_lot,                              # DRY_RUN/cap/clamp ในตัว
                      shadow=(st == _sw.SHADOW))              # SHADOW → paper-fill
     out = {"ts": datetime.now(timezone.utc).isoformat(), "bar_ts": rec["bar_ts"],
            "regime": rec["regime"], "close": rec["close"], "signal": sig, "order": res}

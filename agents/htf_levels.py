@@ -78,6 +78,25 @@ def nearest_levels(bars_by_tf, price, atr=0.0, left=2, right=2):
     }
 
 
+def last_closed_wick(symbol, tf="D1"):
+    """(high, low) ของแท่ง TF **ปิดล่าสุด** (index -2; -1 = แท่งกำลังก่อตัว) ต่อ symbol. None ถ้าดึงไม่ได้.
+    tf ∈ {H4,D1,W1}. ใช้วาง SL ปลายไส้ (structural_sl). broker symbol เช่น OILCash#, GOLD#."""
+    try:
+        import MetaTrader5 as mt5
+        from connectors.price_feed import get_ohlcv
+        tfmap = {"H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1, "W1": mt5.TIMEFRAME_W1}
+        mt5_tf = tfmap.get(tf)
+        if mt5_tf is None:
+            return None
+        r = get_ohlcv(symbol=symbol, timeframe=mt5_tf, count=5)
+        if r is None or len(r) < 2:
+            return None
+        i = len(r) - 2                                     # แท่งปิดล่าสุด
+        return (float(r["high"][i]), float(r["low"][i]))
+    except Exception:
+        return None
+
+
 _TF_COUNT = {"D1": 400, "W1": 260, "H4": 500}                   # W1 260 ≈ 5 ปี
 
 
