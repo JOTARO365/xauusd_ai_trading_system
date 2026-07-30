@@ -261,6 +261,8 @@ STRUCTURAL_SL_GOLD    = os.getenv("STRUCTURAL_SL_GOLD", "false").lower() == "tru
 STRUCTURAL_SL_MSE     = os.getenv("STRUCTURAL_SL_MSE", "false").lower() == "true"    # MSE (momentum + tsmom คู่ MSE)
 # STRUCTURAL_SL_BUFFER_ATR = ระยะเผื่อพ้นไส้ (× ATR) กัน wick สะอาดชน SL
 STRUCTURAL_SL_BUFFER_ATR = float(os.getenv("STRUCTURAL_SL_BUFFER_ATR") or 0.3)
+# ALGO_ENTRY_MIN_GAP_ATR = กัน stack เกาะจุดเดิม: skip เข้าใหม่ถ้ามีไม้ algo ทิศเดียวกันเปิดอยู่ภายใน n×ATR. 0 = ปิด guard
+ALGO_ENTRY_MIN_GAP_ATR = float(os.getenv("ALGO_ENTRY_MIN_GAP_ATR") or 1.0)
 # STRUCTURAL_SL_TFS = timeframe ไส้ที่พิจารณา (D1 หรือ H4). STRUCTURAL_SL_PICK = nearest(SL แคบ RR ดี)/farthest(กัน noise มากสุด)
 STRUCTURAL_SL_TFS     = os.getenv("STRUCTURAL_SL_TFS", "H4,D1")
 STRUCTURAL_SL_PICK    = os.getenv("STRUCTURAL_SL_PICK", "farthest")
@@ -406,7 +408,7 @@ def reload_config():
     global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT, REGIME_SHADOW
     global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING, REGIME_SR_ENTRY, REGIME_PENDING_FADE, REGIME_SR_EXIT
     global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK, ALGO_MAX_SAME_DIR, ALGO_ENTRY_HOURS, MULTI_SYMBOL_LIVE, ALGO_SL_MULT, MSE_MAX_POSITIONS, MSE_MAX_TOTAL, MSE_SL_MIN_ATR, MSE_SL_MAX_ATR, WEEKEND_RUN, WEEKEND_INTERVAL_SECS, AUTO_SL_PCT_OTHER
-    global STRUCTURAL_SL_GOLD, STRUCTURAL_SL_MSE, STRUCTURAL_SL_BUFFER_ATR, STRUCTURAL_SL_MIN_ATR, STRUCTURAL_SL_MAX_ATR, STRUCTURAL_SL_TFS, STRUCTURAL_SL_PICK
+    global STRUCTURAL_SL_GOLD, STRUCTURAL_SL_MSE, STRUCTURAL_SL_BUFFER_ATR, STRUCTURAL_SL_MIN_ATR, STRUCTURAL_SL_MAX_ATR, STRUCTURAL_SL_TFS, STRUCTURAL_SL_PICK, ALGO_ENTRY_MIN_GAP_ATR
     global ALGO_SIZE_STANDDOWN, ALGO_MAX_TRADE_RISK_PCT
     global TSMOM_LIVE, TSMOM_SHADOW, TSMOM_COEXIST, TSMOM_LONG_ONLY, TSMOM_MIN_ADX, TSMOM_MIN_VOLPCT, TSMOM_LOOKBACKS, TSMOM_SL_ATR, TSMOM_SL_PIPS, TSMOM_SL_CAP_FALLBACK
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
@@ -437,6 +439,7 @@ def reload_config():
     STRUCTURAL_SL_GOLD       = os.getenv("STRUCTURAL_SL_GOLD", "false").lower() == "true"       # SL ปลายไส้ D1/H4 — gold
     STRUCTURAL_SL_MSE        = os.getenv("STRUCTURAL_SL_MSE", "false").lower() == "true"        # SL ปลายไส้ D1/H4 — MSE
     STRUCTURAL_SL_BUFFER_ATR = float(os.getenv("STRUCTURAL_SL_BUFFER_ATR") or 0.3)              # เผื่อพ้นไส้ × ATR
+    ALGO_ENTRY_MIN_GAP_ATR   = float(os.getenv("ALGO_ENTRY_MIN_GAP_ATR") or 1.0)                # กัน stack เกาะจุดเดิม (0=ปิด)
     STRUCTURAL_SL_TFS        = os.getenv("STRUCTURAL_SL_TFS", "H4,D1")                          # timeframe ไส้ (D1/H4)
     STRUCTURAL_SL_PICK       = os.getenv("STRUCTURAL_SL_PICK", "farthest")                       # nearest/farthest
     STRUCTURAL_SL_MIN_ATR    = float(os.getenv("STRUCTURAL_SL_MIN_ATR") or 0.5)                 # legacy (ไม่ใช้)

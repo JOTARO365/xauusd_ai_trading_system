@@ -109,6 +109,12 @@ def _tick() -> None:
         if _st == _sw.OFF:
             _last_traded_hour = hour                              # ถือว่าจัดการชั่วโมงนี้แล้ว (กัน log ซ้ำ)
             return
+        _entry_px_chk = tick.ask if d == "BUY" else tick.bid
+        from agents.regime_executor import _too_close_algo
+        if _too_close_algo(d, _entry_px_chk, _cache.get("atr")):  # กัน stack เกาะจุดเดิม (≤ n×ATR)
+            _last_traded_hour = hour
+            logger.info(f"[REGIME-TICK] PROXIMITY-SKIP {d}: มีไม้ ALGO ทิศเดียวใกล้ → งดเข้าจุดเดิม")
+            return
         _last_traded_hour = hour
         from agents.algo_exit import sr_tp_pips                    # P-D: TP ตามแนว S/R (flag OFF → RR2 เดิม)
         from agents.algo_sizing import algo_lot                    # P-E: lot risk-based (flag OFF → fixed เดิม)

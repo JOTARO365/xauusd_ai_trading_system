@@ -441,8 +441,9 @@ def _reconcile_closed(algo_id, symbol, positions, combo_state):
 
 
 # ── entry: signal เดียวกับ shadow → open_order จริง ───────────────────────
-def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max_pos=1):
+def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max_pos=1, positions=None):
     """ถ้ายังไม่ครบ max_pos + มี signal ใหม่ (bar_ts ยังไม่เคยเข้า) → open_order จริง. คืน 1 ถ้าเปิด."""
+    import config as _cfg
     algo = _reg.get(algo_id)
     if algo is None:
         return 0
@@ -451,6 +452,18 @@ def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max
         return 0
     if vo["bar_ts"] == combo_state.get("last_bar_ts"):
         return 0                                                # เข้าไม้บาร์นี้ **สำเร็จ**ไปแล้ว (dedup ต่อ signal-bar)
+    # price-proximity guard: มีไม้ทิศเดียวกันเปิดใกล้ (≤ n×ATR) → skip กัน stack เกาะจุดเดิม
+    _gap = float(getattr(_cfg, "ALGO_ENTRY_MIN_GAP_ATR", 0) or 0)
+    if _gap > 0 and positions:
+        import MetaTrader5 as _mt5
+        _dir_t = _mt5.ORDER_TYPE_BUY if vo["dir"] == "BUY" else _mt5.ORDER_TYPE_SELL
+        _same = [p.price_open for p in positions if p.type == _dir_t]
+        _atr_l = _simple_atr(*bars[:3])
+        _atr = _atr_l[-1] if _atr_l else 0.0
+        from agents import structural_sl as _ssl
+        if _ssl.near_existing(float(vo["entry"]), _atr, _same, _gap):
+            logger.debug(f"[MSE] {algo_id}:{symbol} {vo['dir']} skip — มีไม้ทิศเดียวใกล้ ≤{_gap}×ATR (กัน stack จุดเดิม)")
+            return 0
     import time as _time
     if _time.time() < float(combo_state.get("retry_after", 0)):
         return 0                                                # เพิ่ง open fail → cooldown (กัน retry-spam ทุก tick) แต่ไม่บล็อกถาวร
@@ -528,7 +541,7 @@ def tick(force=False):
             room_total = (max_total <= 0) or (total_open + opened < max_total)   # global cap ยังมีที่ว่าง
             if len(positions) < max_pos and room_total:         # ผ่านทั้ง per-combo + รวมทุก symbol
                 op = _maybe_enter(algo_id, symbol, broker, bars, point,
-                                  sl_mult.get(symbol, 1.0), cstate, max_pos)   # LIVE = วางจริง (โบรก reject เองถ้าปิดคู่)
+                                  sl_mult.get(symbol, 1.0), cstate, max_pos, positions)   # LIVE = วางจริง (โบรก reject เองถ้าปิดคู่)
                 opened += op
             elif not room_total:
                 logger.debug(f"[MSE] {ck}: global cap {max_total} ถึงแล้ว (open={total_open + opened}) — ข้าม entry")

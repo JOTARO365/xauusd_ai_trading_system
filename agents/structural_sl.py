@@ -11,6 +11,15 @@ CORE INVARIANT: level = ไส้แท่งจริง (closed bar) ไม่
 """
 
 
+def near_existing(entry, atr, same_dir_prices, gap_atr):
+    """True = มีไม้ทิศเดียวกันเปิดอยู่ภายใน gap_atr·ATR ของ entry → ควร skip (กัน stack เกาะจุดเดิม).
+    gap_atr≤0 หรือ atr≤0 → False (ปิด guard). same_dir_prices = ราคาเปิดของไม้ทิศเดียวกัน."""
+    if gap_atr <= 0 or atr <= 0 or not same_dir_prices:
+        return False
+    gap = float(gap_atr) * float(atr)
+    return any(abs(float(entry) - float(p)) <= gap for p in same_dir_prices)
+
+
 def wick_sl(direction, entry, atr, point, wicks, buffer_atr=0.3, mode="nearest"):
     """เลือก SL จากปลายไส้หลาย TF. คืน {sl_pips, sl_price, tf} หรือ None (ทุก TF ผิดข้าง/data ไม่พอ).
     wicks = {"H4": (high, low), "D1": (high, low), ...}. buffer = buffer_atr·ATR."""

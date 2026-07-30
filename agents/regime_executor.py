@@ -31,6 +31,29 @@ def _log(rec):
         pass
 
 
+def _too_close_algo(direction, entry, atr):
+    """True = มีไม้ ALGO ทิศเดียวกันเปิดอยู่ภายใน ALGO_ENTRY_MIN_GAP_ATR·ATR ของ entry → กัน stack เกาะจุดเดิม.
+    ใช้ทั้ง regime_executor + regime_tick. fail-soft → False (ไม่บล็อกถ้าเช็คไม่ได้)."""
+    try:
+        gap = float(getattr(_cfg, "ALGO_ENTRY_MIN_GAP_ATR", 0) or 0)
+        if gap <= 0 or not entry or not atr:
+            return False
+        from connectors.mt5_connector import get_open_positions
+        import MetaTrader5 as mt5
+        want = mt5.ORDER_TYPE_BUY if direction == "BUY" else mt5.ORDER_TYPE_SELL
+        same = []
+        for p in (get_open_positions() or []):
+            cm = (p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or ""
+            tp = p.get("type") if isinstance(p, dict) else getattr(p, "type", None)
+            px = p.get("price_open") if isinstance(p, dict) else getattr(p, "price_open", None)
+            if str(cm).startswith("ALGO") and tp == want and px:
+                same.append(px)
+        from agents import structural_sl
+        return structural_sl.near_existing(float(entry), float(atr), same, gap)
+    except Exception:
+        return False
+
+
 def _structural_sl_gold(direction, entry, atr, base_sl_pips, base_tp_pips):
     """flag STRUCTURAL_SL_GOLD: วาง SL ทองที่ปลายไส้ D1 ปิดล่าสุด เสมอ. default OFF → base. fail-soft.
     คืน (sl_pips, tp_pips, force_min_lot)."""
@@ -114,6 +137,9 @@ def run_regime_executor():
             _hb("SIZE-STANDDOWN", f"regime=TREND {sig.get('dir')} · min-lot มีความเสี่ยง {_si.get('risk_pct',0)*100:.1f}% "
                 f"> เพดาน {_si.get('ceiling',0)*100:.0f}% (เงินทุนไม่เพียงพอ SL {sig.get('sl_pips')}p) → ข้าม", regime="TREND")
             return None
+    if _too_close_algo(sig["dir"], rec.get("close"), rec.get("atr")):   # กัน stack เกาะจุดเดิม (≤ n×ATR)
+        _hb("PROXIMITY-SKIP", f"{sig.get('dir')} · มีไม้ ALGO ทิศเดียวใกล้ ≤{getattr(_cfg,'ALGO_ENTRY_MIN_GAP_ATR',0)}×ATR → งดเข้าจุดเดิม", regime="TREND")
+        return None
     from agents.algo_gate import entry_hour_ok
     if not entry_hour_ok():                                   # session gate (ALGO_ENTRY_HOURS · ว่าง=ทุกชม default)
         _hb("SESSION-GATE", "นอกช่วง ALGO_ENTRY_HOURS → งดเข้า", regime="TREND")
