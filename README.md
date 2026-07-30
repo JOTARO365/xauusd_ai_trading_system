@@ -637,6 +637,21 @@ full-size and exits on daily flip (no TP), matching exactly what its backtest va
 | `MSE_SL_MIN_ATR` / `MSE_SL_MAX_ATR` | `0.5` / `4.0` | Clamp the SL into `[min, max] × ATR` (safety against a broken/spiking ATR). Normal SLs (~1×ATR) are untouched; only pathological values are clamped. `0` disables that side. |
 | `MSE_ENTRY_RETRY_COOLDOWN` | `300` | After an open **fails** (margin/spread/disabled), wait this many seconds before retrying the same signal-bar — instead of marking it handled forever. Prevents both retry-spam and permanent false-blocks. |
 
+**Structural SL — SL at the D1/H4 candle wick** (algo momentum: gold `regime_executor`/`regime_tick` + all MSE combos):
+
+| Key | Default | Description |
+|---|---|---|
+| `STRUCTURAL_SL_GOLD` / `STRUCTURAL_SL_MSE` | `false` / `false` | Enable the wick-SL rule for the gold ALGO-mom path / the MSE path. When ON, the SL is placed just beyond the last-closed D1 or H4 wick — *always*, no clamp/fallback — and the lot drops to the minimum (`standdown`/risk-cap bypassed) so a wide structural stop still fits a small account. |
+| `STRUCTURAL_SL_TFS` | `H4,D1` | Which candle wicks to consider. |
+| `STRUCTURAL_SL_PICK` | `farthest` | `farthest` = the wick furthest from entry (usually D1, most noise-proof — best in backtest); `nearest` = closest wick (usually H4, tighter SL). |
+| `STRUCTURAL_SL_BUFFER_ATR` | `0.3` | Extra room beyond the wick, `× ATR`, so a clean wick doesn't clip the SL. |
+| `ALGO_ENTRY_MIN_GAP_ATR` | `1.0` | Price-proximity guard: skip a new algo entry when a **same-direction** position is already open within `N × ATR` — stops consecutive momentum bars pyramiding onto one spot. `0` disables. |
+
+> **Backtest** (`scripts/structural_sl_backtest.py`, no look-ahead, 60k H1, keep-TP, `pick=farthest`): every pair's
+> stop-out rate drops ~65-73% → ~26-30% and no trade flips win→loss; exp_R improves on GOLD/USDJPY/EURUSD, ~flat on
+> BTC/WTI. Profile is high-win-rate / low-RR (wide SL, original TP), so losers are large in absolute terms — min-lot
+> caps the money risk. `STRUCTURAL_SL_*` changes are code paths, so they need a **restart** (not just `reload_config`).
+
 > **Stale dedup after fixing a symbol:** entry dedup is now recorded *only on a successful open*. If a
 > combo was blocked by an older build (it "handled" a bar whose open actually failed while the symbol
 > was disabled), run `python scripts/clear_mse_stale.py` **while the bot is stopped** to clear the
