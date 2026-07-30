@@ -68,16 +68,19 @@ def _save_state(state):
 
 # ── MT5 helpers (fail-soft) ───────────────────────────────────────────────
 def _bars(broker, tf="H1", count=None):
-    """(high, low, close, times) ตาม timeframe ของ algo (H1 = regime/mean_rev · D1 = tsmom). หรือ None."""
+    """(high, low, close, times) ตาม timeframe ของ algo (H1 = regime/mean_rev · D1 = tsmom). หรือ None.
+
+    ⚡ perf: single-attempt copy_rates_from_pos (**ไม่ใช้ get_ohlcv ที่มี sleep-retry 1.5s×2**) —
+    เครื่อง/โบรกอื่นที่ symbol map ไม่ตรง → copy_rates ว่าง → block 3s×2/combo/cycle. fail-fast → None → ข้าม combo."""
     try:
         import MetaTrader5 as mt5
-        from connectors.price_feed import get_ohlcv
         tfmap = {"H1": mt5.TIMEFRAME_H1, "H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1}
         mt5_tf = tfmap.get(tf, mt5.TIMEFRAME_H1)
         if count is None:
             count = 400 if tf == "D1" else _BARS_COUNT       # D1 ~400 บาร์พอ L=252 + buffer
         min_bars = 282 if tf == "D1" else _MIN_BARS          # tsmom ต้อง ≥ max(LOOKBACK 252)+30
-        rates = get_ohlcv(symbol=broker, timeframe=mt5_tf, count=count)
+        mt5.symbol_select(broker, True)                       # ensure subscribed (ครั้งแรก) — ไม่ sleep
+        rates = mt5.copy_rates_from_pos(broker, mt5_tf, 0, count)   # single attempt, no sleep-retry
         if rates is None or len(rates) < min_bars:
             return None
         return (rates["high"].astype(float), rates["low"].astype(float),
