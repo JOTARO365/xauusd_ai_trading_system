@@ -43,7 +43,7 @@ def _refresh_levels(hour: int) -> None:
     from agents.algo_state import write_state
     if lv:
         _cache.update(hour=hour, armed=True, buy=lv["buy_level"], sell=lv["sell_level"],
-                      sl_pips=lv["sl_pips"], tp_pips=lv["tp_pips"])
+                      sl_pips=lv["sl_pips"], tp_pips=lv["tp_pips"], atr=float(atr_v[i]))
         write_state("ARMED", regime="TREND", via="tick",
                     detail=f"เฝ้าการทะลุแนว BUY>{lv['buy_level']:.1f} / SELL<{lv['sell_level']:.1f}")
     else:
@@ -112,7 +112,10 @@ def _tick() -> None:
         from agents.algo_sizing import algo_lot                    # P-E: lot risk-based (flag OFF → fixed เดิม)
         _entry_px = tick.ask if d == "BUY" else tick.bid
         _tp_pips = sr_tp_pips(d, _entry_px, _cache["sl_pips"], _cache["tp_pips"])
-        res = open_order(d, _cache["sl_pips"], _tp_pips, comment="ALGO-mom", lot=algo_lot(_cache["sl_pips"]),
+        from agents.regime_executor import _structural_sl_gold
+        _sl_pips, _tp_pips = _structural_sl_gold(d, _entry_px, _cache.get("atr"),
+                                                 _cache["sl_pips"], _tp_pips)
+        res = open_order(d, _sl_pips, _tp_pips, comment="ALGO-mom", lot=algo_lot(_sl_pips),
                          shadow=(_st == _sw.SHADOW))               # SHADOW → paper-fill
         from agents.regime_executor import _log
         _log({"ts_hour": hour, "via": "tick", "regime": "TREND",

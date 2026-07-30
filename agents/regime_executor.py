@@ -31,6 +31,27 @@ def _log(rec):
         pass
 
 
+def _structural_sl_gold(direction, entry, atr, base_sl_pips, base_tp_pips):
+    """flag STRUCTURAL_SL_LIVE: วาง SL ทองพิงแนว D1/W1 (เหมือน MSE). default OFF → base. fail-soft."""
+    try:
+        from connectors.mt5_connector import SYMBOL
+        import MetaTrader5 as mt5
+        from agents import structural_sl
+        info = mt5.symbol_info(SYMBOL)
+        point = float(info.point) if info and info.point else 0.0
+        sl_pips, tp_pips, meta = structural_sl.live_adjust(
+            direction, float(entry or 0), float(atr or 0), point, SYMBOL,
+            float(base_sl_pips), float(base_tp_pips), _cfg,
+            enabled=getattr(_cfg, "STRUCTURAL_SL_GOLD", False))
+        if meta is not None:
+            logger.info(f"[ALGO] structural SL {meta['base_pips']}p → {meta['struct_pips']}p "
+                        f"(พิง {meta['tf']} @ {meta['level']} + buffer)")
+        return sl_pips, tp_pips
+    except Exception as e:
+        logger.debug(f"[ALGO] structural SL skip ({e})")
+        return base_sl_pips, base_tp_pips
+
+
 def _hb(state, detail="", regime=None):
     """Heartbeat: log ว่า algo executor ยังหายใจ + ตัดสินใจอะไร (DEBUG, 0 token, 0 order) + เขียน algo_state
     ให้ terminal/dashboard อ่าน. แยก 'ยืนดูถูกต้อง' vs 'พังเงียบ'. grep '[ALGO]' ใน system.log."""
@@ -104,8 +125,10 @@ def run_regime_executor():
     from agents.algo_exit import sr_tp_pips                  # P-D: TP ตามแนว S/R (flag OFF → RR2 เดิม)
     from agents.algo_sizing import algo_lot                  # P-E: lot risk-based (flag OFF → fixed เดิม)
     tp_pips = sr_tp_pips(sig["dir"], rec["close"], sig["sl_pips"], sig["tp_pips"])
-    res = open_order(sig["dir"], sig["sl_pips"], tp_pips, comment="ALGO-mom",
-                     lot=algo_lot(sig["sl_pips"]),          # DRY_RUN/cap/lot-clamp ในตัว
+    sl_pips, tp_pips = _structural_sl_gold(sig["dir"], rec.get("close"), rec.get("atr"),
+                                           sig["sl_pips"], tp_pips)
+    res = open_order(sig["dir"], sl_pips, tp_pips, comment="ALGO-mom",
+                     lot=algo_lot(sl_pips),                 # risk-based lot ตาม SL จริง (structural อาจปรับ) · DRY_RUN/cap/clamp ในตัว
                      shadow=(st == _sw.SHADOW))              # SHADOW → paper-fill
     out = {"ts": datetime.now(timezone.utc).isoformat(), "bar_ts": rec["bar_ts"],
            "regime": rec["regime"], "close": rec["close"], "signal": sig, "order": res}
