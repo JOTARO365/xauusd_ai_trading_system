@@ -70,6 +70,11 @@ def _write_json(path, obj):
 def collect_once():
     """pull OHLC (4 TF) + spread snapshot ต่อ symbol → เขียนไฟล์. คืน dict สรุป (n symbols ok)."""
     mt5 = _mt5()
+    try:                                    # ล็อกร่วมกับ dashboard/connector (MT5 1 connection, ไม่ thread-safe)
+        from connectors.mt5_connector import _mt5_lock as _LK
+    except Exception:
+        import threading as _th
+        _LK = _th.RLock()
     os.makedirs(_PAIRDIR, exist_ok=True)
     bmap = _broker_map()
     if not bmap:
@@ -80,20 +85,21 @@ def collect_once():
     spreads = []
     for logical, sym in bmap.items():
         try:
-            mt5.symbol_select(sym, True)
-            info = mt5.symbol_info(sym)
-            tick = mt5.symbol_info_tick(sym)
-            if info and tick and info.point:
-                sp = round((tick.ask - tick.bid) / info.point)
-                spreads.append({"ts": now, "sym": logical, "broker": sym,
-                                "spread_pts": sp, "bid": tick.bid, "ask": tick.ask})
-            for tf, cnt in _TF_BARS.items():
-                rates = mt5.copy_rates_from_pos(sym, tfmap[tf], 0, cnt)
-                if rates is None or len(rates) == 0:
-                    continue
-                arr = [[int(r["time"]), float(r["open"]), float(r["high"]),
-                        float(r["low"]), float(r["close"]), int(r["tick_volume"])] for r in rates]
-                _write_json(os.path.join(_PAIRDIR, f"{logical.lower()}_{tf}.json"), arr)
+            with _LK:                       # per-symbol → request threads แทรกได้ระหว่าง symbol
+                mt5.symbol_select(sym, True)
+                info = mt5.symbol_info(sym)
+                tick = mt5.symbol_info_tick(sym)
+                if info and tick and info.point:
+                    sp = round((tick.ask - tick.bid) / info.point)
+                    spreads.append({"ts": now, "sym": logical, "broker": sym,
+                                    "spread_pts": sp, "bid": tick.bid, "ask": tick.ask})
+                for tf, cnt in _TF_BARS.items():
+                    rates = mt5.copy_rates_from_pos(sym, tfmap[tf], 0, cnt)
+                    if rates is None or len(rates) == 0:
+                        continue
+                    arr = [[int(r["time"]), float(r["open"]), float(r["high"]),
+                            float(r["low"]), float(r["close"]), int(r["tick_volume"])] for r in rates]
+                    _write_json(os.path.join(_PAIRDIR, f"{logical.lower()}_{tf}.json"), arr)
             ok += 1
         except Exception:
             continue

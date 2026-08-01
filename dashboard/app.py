@@ -50,7 +50,12 @@ import threading as _threading
 _data_cache: dict = {}       # key -> (timestamp, payload)
 _cache_refreshing: set = set()  # keys currently being refreshed in background
 _cache_lock = _threading.Lock()   # guard check-then-add ของ refresh (4 waitress threads)
-_MT5_LOCK = _threading.RLock()    # MetaTrader5 ไม่ thread-safe (1 connection) — serialize ทุก mt5.* ใน dashboard
+# MetaTrader5 ไม่ thread-safe (1 connection) — reuse lock เดียวกับ mt5_connector เพื่อ serialize
+# ทั้ง dashboard request threads + pair-collector + connector-wrapped calls ในโปรเซสนี้ให้ตรงกัน
+try:
+    from connectors.mt5_connector import _mt5_lock as _MT5_LOCK
+except Exception:
+    _MT5_LOCK = _threading.RLock()
 _DATA_CACHE_TTL = 20         # seconds
 _CACHE_MAX = 600             # กัน dict โตไม่จำกัด (key มี user-arg เช่น sr-stats:{sym}:{price})
 
@@ -381,28 +386,29 @@ def get_mt5_account(data_to_sync: dict | None = None) -> dict:
     if not _MT5_AVAILABLE:
         return {}
     try:
-        already_init = mt5.terminal_info() is not None
-        if not already_init:
-            if not mt5.initialize():
+        with _MT5_LOCK:                        # serialize MT5 (RLock: _sync_from_mt5 nested = same thread OK)
+            already_init = mt5.terminal_info() is not None
+            if not already_init:
+                if not mt5.initialize():
+                    return {}
+                if not mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
+                    return {}
+            info = mt5.account_info()
+            if info is None:
                 return {}
-            if not mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
-                return {}
-        info = mt5.account_info()
-        if info is None:
-            return {}
-        result = {
-            "balance":     info.balance,
-            "equity":      info.equity,
-            "margin":      info.margin,
-            "free_margin": info.margin_free,
-            "profit":      info.profit,
-            "currency":    info.currency,
-        }
-        if data_to_sync is not None:
-            _sync_from_mt5(data_to_sync)
-        if not already_init:
-            mt5.shutdown()
-        return result
+            result = {
+                "balance":     info.balance,
+                "equity":      info.equity,
+                "margin":      info.margin,
+                "free_margin": info.margin_free,
+                "profit":      info.profit,
+                "currency":    info.currency,
+            }
+            if data_to_sync is not None:
+                _sync_from_mt5(data_to_sync)
+            if not already_init:
+                mt5.shutdown()
+            return result
     except Exception:
         return {}
 
@@ -419,19 +425,20 @@ def _get_actual_mt5_login() -> int | None:
         return MT5_LOGIN or None
     result = MT5_LOGIN or None
     try:
-        already_init = mt5.terminal_info() is not None
-        if not already_init:
-            if not mt5.initialize():
-                _login_cache.update({"login": result, "fetched_at": now})
-                return result
-            if not mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
+        with _MT5_LOCK:
+            already_init = mt5.terminal_info() is not None
+            if not already_init:
+                if not mt5.initialize():
+                    _login_cache.update({"login": result, "fetched_at": now})
+                    return result
+                if not mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
+                    mt5.shutdown()
+                    _login_cache.update({"login": result, "fetched_at": now})
+                    return result
+            info = mt5.account_info()
+            if not already_init:
                 mt5.shutdown()
-                _login_cache.update({"login": result, "fetched_at": now})
-                return result
-        info = mt5.account_info()
-        if not already_init:
-            mt5.shutdown()
-        result = int(info.login) if info else (MT5_LOGIN or None)
+            result = int(info.login) if info else (MT5_LOGIN or None)
     except Exception:
         pass
     _login_cache.update({"login": result, "fetched_at": now})
@@ -612,8 +619,10 @@ def api_set_config():
             new_lines.append(f"{key}={val}\n")
 
     try:
-        with open(ENV_FILE, "w", encoding="utf-8") as f:
+        _tmp = ENV_FILE + ".tmp"                    # atomic write — กัน crash กลางคันทำ .env ขาด (bot reload_config อ่าน)
+        with open(_tmp, "w", encoding="utf-8") as f:
             f.writelines(new_lines)
+        os.replace(_tmp, ENV_FILE)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1209,11 +1218,12 @@ def _ensure_mt5() -> bool:
     if not _MT5_AVAILABLE:
         return False
     try:
-        if mt5.terminal_info() is not None:
-            return True
-        if not mt5.initialize():
-            return False
-        return bool(mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER))
+        with _MT5_LOCK:
+            if mt5.terminal_info() is not None:
+                return True
+            if not mt5.initialize():
+                return False
+            return bool(mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER))
     except Exception:
         return False
 
@@ -1527,7 +1537,7 @@ def api_weekly_outlook():
     import threading
     from agents.weekly_outlook import get_cached, _iso_week, tick, is_building
     c = get_cached()
-    if (not c) or c.get("week") != _iso_week():          # สัปดาห์ใหม่/ยังไม่มี → auto สร้าง background
+    if ((not c) or c.get("week") != _iso_week()) and not is_building():   # สัปดาห์ใหม่ + ยังไม่ build → auto background
         threading.Thread(target=tick, daemon=True).start()
     if is_building():                                    # กำลัง refresh/build → บอก generating (frontend poll ต่อจนได้อันใหม่)
         return jsonify({**(c or {"ok": False}), "generating": True})
@@ -1711,7 +1721,8 @@ def api_candles():
     def _fetch():
         if not _MT5_AVAILABLE or not _ensure_mt5():
             return {"ok": False, "error": "MT5 not connected (dashboard process)", "symbol": sym_arg or SYMBOL, "candles": []}
-        rates = mt5.copy_rates_from_pos(broker, _TF_MAP[tf], 0, count)
+        with _MT5_LOCK:
+            rates = mt5.copy_rates_from_pos(broker, _TF_MAP[tf], 0, count)
         if rates is None or len(rates) == 0:
             return {"ok": False, "symbol": sym_arg or SYMBOL, "broker": broker,
                     "error": f"no bars for '{broker}' — {mt5.last_error()}",

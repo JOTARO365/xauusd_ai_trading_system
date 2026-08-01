@@ -225,6 +225,8 @@ _PROMPT = """ข้อมูลจริงสำหรับวิเครา�
 """
 
 
+import threading as _threading
+_BUILD_LOCK = _threading.Lock()                          # atomic check-and-set (กัน Opus รันซ้อน = เงินจริง)
 _BUILDING = {"on": False}                                # กัน Opus รันซ้อน (poll หลายรอบ)
 
 
@@ -234,9 +236,10 @@ def build(force=False):
     cached = _read_json(_CACHE)
     if not force and cached and cached.get("week") == wk and cached.get("markdown"):
         return cached
-    if _BUILDING["on"]:                                  # กำลังสร้างอยู่ (thread อื่น) → คืน cache/generating
-        return {**(cached or {"ok": False}), "generating": True}
-    _BUILDING["on"] = True
+    with _BUILD_LOCK:                                    # check-then-set ต้อง atomic (2 thread ยิง Opus พร้อมกันไม่ได้)
+        if _BUILDING["on"]:                              # กำลังสร้างอยู่ (thread อื่น) → คืน cache/generating
+            return {**(cached or {"ok": False}), "generating": True}
+        _BUILDING["on"] = True
     try:
         from langchain_anthropic import ChatAnthropic
         from langchain_core.messages import SystemMessage, HumanMessage
