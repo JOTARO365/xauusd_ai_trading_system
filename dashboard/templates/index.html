@@ -3833,6 +3833,7 @@ function goSection(id) {
    FETCH DATA
    ════════════════════════════════════════════════════════════ */
 async function fetchData() {
+  if (document.hidden) return;          // แท็บ background → ไม่ยิง (กัน hammer + ชน MT5)
   let data = null;
   try {
     const res = await fetch('/api/data?system=' + activeSystem);
@@ -3884,6 +3885,7 @@ function _flashCell(el, isUp) {
 }
 
 async function loadLivePrice() {
+  if (document.hidden) return;          // แท็บ background → ข้าม cascade ~16 endpoint (กัน hammer ทุก 5s)
   try {
     const res  = await fetch('/api/monitor?system=' + activeSystem);
     const data = await res.json();

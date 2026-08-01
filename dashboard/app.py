@@ -49,7 +49,10 @@ import time as _time_mod
 import threading as _threading
 _data_cache: dict = {}       # key -> (timestamp, payload)
 _cache_refreshing: set = set()  # keys currently being refreshed in background
+_cache_lock = _threading.Lock()   # guard check-then-add ของ refresh (4 waitress threads)
+_MT5_LOCK = _threading.RLock()    # MetaTrader5 ไม่ thread-safe (1 connection) — serialize ทุก mt5.* ใน dashboard
 _DATA_CACHE_TTL = 20         # seconds
+_CACHE_MAX = 600             # กัน dict โตไม่จำกัด (key มี user-arg เช่น sr-stats:{sym}:{price})
 
 def _cached(key: str, fn, ttl: int = _DATA_CACHE_TTL):
     """Stale-while-revalidate cache.
@@ -70,13 +73,17 @@ def _cached(key: str, fn, ttl: int = _DATA_CACHE_TTL):
         if now - ts < ttl:
             return val
         # stale → kick off a single background refresh, serve stale meanwhile
-        if key not in _cache_refreshing:
-            _cache_refreshing.add(key)
+        start_refresh = False
+        with _cache_lock:                       # atomic check-then-add (กัน 2 thread refresh key เดียวกัน)
+            if key not in _cache_refreshing:
+                _cache_refreshing.add(key)
+                start_refresh = True
+        if start_refresh:
             def _refresh():
                 try:
                     _data_cache[key] = (_time_mod.time(), fn())
-                except Exception:
-                    pass
+                except Exception as _e:
+                    print(f"[cache] refresh {key} failed: {_e}")   # ไม่กลืนเงียบ (serve-stale-forever)
                 finally:
                     _cache_refreshing.discard(key)
             _threading.Thread(target=_refresh, daemon=True).start()
@@ -84,6 +91,11 @@ def _cached(key: str, fn, ttl: int = _DATA_CACHE_TTL):
     # cold: compute synchronously
     val = fn()
     _data_cache[key] = (_time_mod.time(), val)
+    if len(_data_cache) > _CACHE_MAX:           # bound: ทิ้ง entry เก่าสุด
+        try:
+            _data_cache.pop(min(_data_cache, key=lambda k: _data_cache[k][0]), None)
+        except Exception:
+            pass
     return val
 _SYSTEM_LOGS = {
     "xauusd": os.path.join(_BASE, "../logs/trades.json"),
@@ -655,9 +667,9 @@ def api_data():
     # account = บัญชี MT5 เดียวกันทุก system → "all"/"xauusd" คืน account (กันโชว์ MT5 disconnect หลอก);
     # "all" ไม่ sync per-symbol (data_to_sync=None) — sync ทำที่ system=xauusd อยู่แล้ว
     if system == "xauusd":
-        account = _cached(f"mt5acct:{system}", lambda: get_mt5_account(data_to_sync=data), ttl=30)
+        account = _cached(f"mt5acct:{system}", lambda: get_mt5_account(data_to_sync=data), ttl=90)
     elif system == "all":
-        account = _cached("mt5acct:all", lambda: get_mt5_account(data_to_sync=None), ttl=30)
+        account = _cached("mt5acct:all", lambda: get_mt5_account(data_to_sync=None), ttl=90)
     else:
         account = {}
     trades  = data.get("trades", [])
@@ -749,37 +761,43 @@ def api_monitor():
     except Exception:
         pass
 
-    # ── MT5 pending orders ────────────────────────────────────────
-    pending: list[dict] = []
-    if _MT5_AVAILABLE:
+    # ── MT5 pending orders (cached ttl=10 + MT5 lock — กันยิงทุก 5s/ชน bot) ──
+    def _fetch_pending() -> list[dict]:
+        out: list[dict] = []
+        if not _MT5_AVAILABLE:
+            return out
         try:
-            already_init = mt5.terminal_info() is not None
-            if not already_init:
-                mt5.initialize()
-                mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER)
-            orders = mt5.orders_get(symbol=SYMBOL) or []
-            _type_map = {2: "BUY_LIMIT", 3: "SELL_LIMIT", 4: "BUY_STOP", 5: "SELL_STOP"}
-            for o in orders:
-                comment = o.comment or ""
-                if comment.startswith("SL-RE"):   tag = "SL-RE"
-                elif comment.startswith("RNG-"):   tag = "RNG"
-                elif comment.startswith("WK-"):    tag = "WK"
-                else:                              tag = "AP"
-                pending.append({
-                    "ticket":  o.ticket,
-                    "type":    _type_map.get(o.type, str(o.type)),
-                    "price":   o.price_open,
-                    "sl":      o.sl   if o.sl   != 0 else None,
-                    "tp":      o.tp   if o.tp   != 0 else None,
-                    "comment": comment,
-                    "tag":     tag,
-                    "expiry":  (datetime.fromtimestamp(o.time_expiration).isoformat()
-                                if o.time_expiration else None),
-                })
-            if not already_init:
-                mt5.shutdown()
+            with _MT5_LOCK:
+                already_init = mt5.terminal_info() is not None
+                if not already_init:
+                    mt5.initialize()
+                    mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER)
+                orders = mt5.orders_get(symbol=SYMBOL) or []
+                _type_map = {2: "BUY_LIMIT", 3: "SELL_LIMIT", 4: "BUY_STOP", 5: "SELL_STOP"}
+                for o in orders:
+                    comment = o.comment or ""
+                    if comment.startswith("SL-RE"):   tag = "SL-RE"
+                    elif comment.startswith("RNG-"):   tag = "RNG"
+                    elif comment.startswith("WK-"):    tag = "WK"
+                    else:                              tag = "AP"
+                    out.append({
+                        "ticket":  o.ticket,
+                        "type":    _type_map.get(o.type, str(o.type)),
+                        "price":   o.price_open,
+                        "sl":      o.sl   if o.sl   != 0 else None,
+                        "tp":      o.tp   if o.tp   != 0 else None,
+                        "comment": comment,
+                        "tag":     tag,
+                        "expiry":  (datetime.fromtimestamp(o.time_expiration).isoformat()
+                                    if o.time_expiration else None),
+                    })
+                if not already_init:
+                    mt5.shutdown()
         except Exception:
             pass
+        return out
+
+    pending: list[dict] = _cached("monitor-pending", _fetch_pending, ttl=10)
 
     grouped: dict[str, list] = {}
     for p in pending:
@@ -989,36 +1007,61 @@ def api_tsmom():
            "signal": None, "votes": [], "d1_close": None, "atr_d1": None, "sl_pips": None,
            "position": None, "state": None, "capital_warn": None, "vb_years": vb_years,
            "vs_bh": _cached(f"tsmom-vs-bh:{vb_years}", lambda: _tsmom_vs_bh(_vy), ttl=3600)}
-    # ── signal ensemble จาก D1 bars — pull MT5 สด (fallback xau_d1.json ถ้า MT5 ไม่พร้อม) ──
-    try:
-        import numpy as np
-        d = None
-        if _MT5_AVAILABLE and _ensure_mt5():
-            r = mt5.copy_rates_from_pos(SYMBOL, mt5.TIMEFRAME_D1, 0, 300)
-            if r is not None and len(r) > 60:
-                d = np.array([[int(x['time']), float(x['open']), float(x['high']),
-                               float(x['low']), float(x['close'])] for x in r], dtype=float)
-        if d is None:                                   # MT5 ไม่พร้อม → ไฟล์ (อาจ stale)
-            with open(os.path.join(_BASE, "..", "data", "xau_d1.json")) as _f:
-                d = np.array(json.load(_f), dtype=float)
-        close, high, low = d[:, 4], d[:, 2], d[:, 3]
-        Ls = [int(x) for x in str(getattr(_cfg, "TSMOM_LOOKBACKS", "63,126,252")).split(",")]
-        ci = -2; votes_sum = 0
-        for L in Ls:
-            if len(close) > L - ci + 1:
-                s = int(np.sign(close[ci] - close[ci - L]))
-                votes_sum += s
-                out["votes"].append({"L": L, "sign": s})
-        out["signal"] = "BUY" if votes_sum > 0 else ("SELL" if votes_sum < 0 else "FLAT")
-        out["d1_close"] = round(float(close[ci]), 2)
-        # ATR(D1,22) แท่งปิด
-        tr = np.maximum(high[1:] - low[1:], np.maximum(abs(high[1:] - close[:-1]), abs(low[1:] - close[:-1])))
-        atr = float(np.mean(tr[-23:-1]))
-        out["atr_d1"] = round(atr, 2)
-        fixed = float(getattr(_cfg, "TSMOM_SL_PIPS", 0) or 0)   # respect fixed-SL override
-        out["sl_pips"] = int(fixed) if fixed > 0 else int(round(float(getattr(_cfg, "TSMOM_SL_ATR", 3.0)) * atr / 0.01))
-    except Exception:
-        pass
+    # ── MT5-derived signal ensemble + position — cached ttl=15 + MT5 lock ──
+    #    (เดิม pull D1×300 + positions_get ทุก 5s ไม่ cache → ชน bot; cache ตัด load)
+    def _tsmom_live() -> dict:
+        res = {"signal": None, "votes": [], "d1_close": None, "atr_d1": None,
+               "sl_pips": None, "position": None}
+        try:
+            import numpy as np
+            d = None
+            with _MT5_LOCK:
+                if _MT5_AVAILABLE and _ensure_mt5():
+                    r = mt5.copy_rates_from_pos(SYMBOL, mt5.TIMEFRAME_D1, 0, 300)
+                    if r is not None and len(r) > 60:
+                        d = np.array([[int(x['time']), float(x['open']), float(x['high']),
+                                       float(x['low']), float(x['close'])] for x in r], dtype=float)
+            if d is None:                                   # MT5 ไม่พร้อม → ไฟล์ (อาจ stale)
+                with open(os.path.join(_BASE, "..", "data", "xau_d1.json")) as _f:
+                    d = np.array(json.load(_f), dtype=float)
+            close, high, low = d[:, 4], d[:, 2], d[:, 3]
+            Ls = [int(x) for x in str(getattr(_cfg, "TSMOM_LOOKBACKS", "63,126,252")).split(",")]
+            ci = -2; votes_sum = 0
+            for L in Ls:
+                if len(close) > L - ci + 1:
+                    s = int(np.sign(close[ci] - close[ci - L]))
+                    votes_sum += s
+                    res["votes"].append({"L": L, "sign": s})
+            res["signal"] = "BUY" if votes_sum > 0 else ("SELL" if votes_sum < 0 else "FLAT")
+            res["d1_close"] = round(float(close[ci]), 2)
+            tr = np.maximum(high[1:] - low[1:], np.maximum(abs(high[1:] - close[:-1]), abs(low[1:] - close[:-1])))
+            atr = float(np.mean(tr[-23:-1]))
+            res["atr_d1"] = round(atr, 2)
+            fixed = float(getattr(_cfg, "TSMOM_SL_PIPS", 0) or 0)
+            res["sl_pips"] = int(fixed) if fixed > 0 else int(round(float(getattr(_cfg, "TSMOM_SL_ATR", 3.0)) * atr / 0.01))
+        except Exception:
+            pass
+        # ── position ALGO-TSMOM จาก MT5 ──
+        if _MT5_AVAILABLE:
+            try:
+                with _MT5_LOCK:
+                    already = mt5.terminal_info() is not None
+                    if not already:
+                        mt5.initialize(); mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER)
+                    for p in (mt5.positions_get(symbol=SYMBOL) or []):
+                        if str(p.comment or "").startswith("ALGO-TSMOM"):
+                            res["position"] = {"ticket": p.ticket, "direction": "BUY" if p.type == 0 else "SELL",
+                                               "lot": p.volume, "entry": p.price_open, "sl": p.sl or None,
+                                               "profit": round(p.profit, 2),
+                                               "days": round((datetime.now().timestamp() - p.time) / 86400, 1)}
+                            break
+                    if not already:
+                        mt5.shutdown()
+            except Exception:
+                pass
+        return res
+
+    out.update(_cached(f"tsmom-live:{SYMBOL}", _tsmom_live, ttl=15))
     # ── capital warning (คล้าย margin call — เตือนถ้าทุนไม่พอ, ไม่บล็อก) ──
     try:
         if out["sl_pips"]:
@@ -1030,23 +1073,6 @@ def api_tsmom():
                                        "equity": round(wi["equity"]), "needed": round(wi["needed_equity"])}
     except Exception:
         pass
-    # ── position ALGO-TSMOM จาก MT5 ──
-    if _MT5_AVAILABLE:
-        try:
-            already = mt5.terminal_info() is not None
-            if not already:
-                mt5.initialize(); mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER)
-            for p in (mt5.positions_get(symbol=SYMBOL) or []):
-                if str(p.comment or "").startswith("ALGO-TSMOM"):
-                    out["position"] = {"ticket": p.ticket, "direction": "BUY" if p.type == 0 else "SELL",
-                                       "lot": p.volume, "entry": p.price_open, "sl": p.sl or None,
-                                       "profit": round(p.profit, 2),
-                                       "days": round((datetime.now().timestamp() - p.time) / 86400, 1)}
-                    break
-            if not already:
-                mt5.shutdown()
-        except Exception:
-            pass
     # ── state ล่าสุด (algo_state.json ถ้าเป็น TSMOM-*) ──
     try:
         with open(os.path.join(_BASE, "..", "data", "algo_state.json"), encoding="utf-8") as _f:
