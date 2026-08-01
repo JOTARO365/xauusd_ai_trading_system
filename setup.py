@@ -336,10 +336,6 @@ def main():
         print(_WARN + "SKIP_BACKTEST set — ข้าม (รันเอง: python scripts/shadow_backtest_managed.py && "
               "python scripts/tsmom_backtest_pairs.py)")
     else:
-        # offline SMC candidate backtest (data/xau_*.json — ไม่ต้อง MT5, เหมือนกันทุกโบรก) → data/smc_backtest.json
-        rc = subprocess.call([sys.executable, os.path.join("scripts", "smc_backtest.py")])
-        print((_OK if rc == 0 else _WARN) + "smc_backtest.py " +
-              ("→ data/smc_backtest.json (SMC panel)" if rc == 0 else f"exit {rc}"))
         connected = False
         try:
             import MetaTrader5 as mt5
@@ -353,9 +349,18 @@ def main():
             for scr in ("shadow_backtest_managed.py", "tsmom_backtest_pairs.py"):
                 rc = subprocess.call([sys.executable, os.path.join("scripts", scr)])
                 print((_OK if rc == 0 else _WARN) + f"{scr} " + ("เสร็จ" if rc == 0 else f"exit {rc}"))
+            # SMC candidate backtest — ทุกคู่ผ่าน MT5 (matrix_backtest ต่อ (algo,symbol) → Shadow Matrix)
+            rc = subprocess.call([sys.executable, os.path.join("scripts", "smc_backtest.py"), "--all"])
+            print((_OK if rc == 0 else _WARN) + "smc_backtest.py --all " +
+                  ("→ data/smc_backtest.json (ทุกคู่)" if rc == 0 else f"exit {rc}"))
         else:
-            print(_WARN + "MT5 ยังไม่ต่อ — ข้าม (dashboard ใช้ backtest ของ owner ไปก่อน). ภายหลัง: "
-                  "python scripts/shadow_backtest_managed.py && python scripts/tsmom_backtest_pairs.py")
+            # MT5 ไม่ต่อ → SMC XAU offline อย่างเดียว (committed xau data), คู่อื่นใช้ของ owner ไปก่อน
+            rc = subprocess.call([sys.executable, os.path.join("scripts", "smc_backtest.py")])
+            print((_OK if rc == 0 else _WARN) + "smc_backtest.py (XAU offline) " +
+                  ("→ data/smc_backtest.json" if rc == 0 else f"exit {rc}"))
+            print(_WARN + "MT5 ยังไม่ต่อ — backtest คู่อื่น (Shadow Matrix) ใช้ของ owner ไปก่อน. ภายหลัง: "
+                  "python scripts/shadow_backtest_managed.py && python scripts/tsmom_backtest_pairs.py && "
+                  "python scripts/smc_backtest.py --all")
 
     # summary + next steps
     print("\n" + "=" * 60)

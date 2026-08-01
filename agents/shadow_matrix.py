@@ -70,9 +70,9 @@ def _load_backtest():
         pass
     try:
         smc = json.load(open(os.path.join(_BASE, "data", "smc_backtest.json"), encoding="utf-8"))
-        for aid, m in (smc.get("matrix_backtest") or {}).items():
+        for m in (smc.get("matrix_backtest") or []):        # list of {algo_id,symbol,exp_R,n,wr}
             if m.get("n"):
-                out[(aid, m.get("symbol", "XAUUSD"))] = {
+                out[(m["algo_id"], m.get("symbol", "XAUUSD"))] = {
                     "exp_R": m.get("exp_R"), "n": m.get("n"), "wr": m.get("wr"),
                     "managed": m.get("managed", False)}
     except Exception:

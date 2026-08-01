@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-01T13:34:47+00:00",
+  "generated": "2026-08-01T13:40:25+00:00",
   "instrument": "XAUUSD H1",
   "bars": 70000,
   "cost_pips": 30.0,
@@ -25,16 +25,16 @@
     },
     {
       "name": "A1 momentum + FVG filter (k=6)",
-      "n": 1341,
+      "n": 1345,
       "wr": 0.339,
-      "exp_R": -0.0305,
-      "sharpe_t": -0.79,
-      "psr0": 0.218,
-      "sum_R": -40.9,
+      "exp_R": -0.0291,
+      "sharpe_t": -0.75,
+      "psr0": 0.228,
+      "sum_R": -39.1,
       "note": "variant of A0",
       "reasons": {
-        "TP": 454,
-        "SL": 885,
+        "TP": 456,
+        "SL": 887,
         "SL_TP_ambig": 2
       }
     },
@@ -71,33 +71,17 @@
       }
     },
     {
-      "name": "B3 sweep-rev target=opp-level",
-      "n": 4439,
-      "wr": 0.617,
-      "exp_R": -0.1197,
-      "sharpe_t": -13.27,
-      "psr0": 0.0,
-      "sum_R": -531.4,
-      "note": "variant of B1",
-      "reasons": {
-        "SL": 920,
-        "TP": 3253,
-        "SL_TP_ambig": 264,
-        "TIME": 2
-      }
-    },
-    {
       "name": "C1 FVG-fill fade rr1.0",
-      "n": 8164,
+      "n": 8208,
       "wr": 0.478,
-      "exp_R": -0.1261,
-      "sharpe_t": -11.39,
+      "exp_R": -0.1266,
+      "sharpe_t": -11.46,
       "psr0": 0.0,
-      "sum_R": -1029.7,
+      "sum_R": -1038.9,
       "note": "NEW algo",
       "reasons": {
-        "TP": 3903,
-        "SL": 3928,
+        "TP": 3922,
+        "SL": 3953,
         "SL_TP_ambig": 332,
         "TIME": 1
       }
@@ -112,9 +96,9 @@
         "wr": 0.311
       },
       "A1": {
-        "n": 782,
-        "exp_R": -0.0689,
-        "wr": 0.33
+        "n": 786,
+        "exp_R": -0.0663,
+        "wr": 0.331
       }
     },
     "out_sample": {
@@ -135,20 +119,182 @@
     "regime_momentum_fvg",
     "sweep_reversal"
   ],
-  "matrix_backtest": {
-    "regime_momentum_fvg": {
-      "exp_R": -0.0305,
-      "n": 1341,
-      "wr": 33.9,
+  "matrix_backtest": [
+    {
+      "algo_id": "regime_momentum_fvg",
       "symbol": "XAUUSD",
+      "exp_R": 0.0476,
+      "n": 544,
+      "wr": 35.8,
       "managed": false
     },
-    "sweep_reversal": {
-      "exp_R": -0.0419,
-      "n": 4439,
-      "wr": 41.1,
+    {
+      "algo_id": "sweep_reversal",
       "symbol": "XAUUSD",
+      "exp_R": -0.0638,
+      "n": 1120,
+      "wr": 39.0,
+      "managed": false
+    },
+    {
+      "algo_id": "regime_momentum_fvg",
+      "symbol": "XAGUSD",
+      "exp_R": -0.1638,
+      "n": 455,
+      "wr": 34.7,
+      "managed": false
+    },
+    {
+      "algo_id": "sweep_reversal",
+      "symbol": "XAGUSD",
+      "exp_R": -0.3824,
+      "n": 1300,
+      "wr": 36.8,
+      "managed": false
+    },
+    {
+      "algo_id": "regime_momentum_fvg",
+      "symbol": "XAUEUR",
+      "exp_R": 0.0405,
+      "n": 518,
+      "wr": 36.9,
+      "managed": false
+    },
+    {
+      "algo_id": "sweep_reversal",
+      "symbol": "XAUEUR",
+      "exp_R": -0.1756,
+      "n": 1213,
+      "wr": 36.9,
+      "managed": false
+    },
+    {
+      "algo_id": "regime_momentum_fvg",
+      "symbol": "XAUJPY",
+      "exp_R": 0.1702,
+      "n": 138,
+      "wr": 39.9,
+      "managed": false
+    },
+    {
+      "algo_id": "sweep_reversal",
+      "symbol": "XAUJPY",
+      "exp_R": 0.0077,
+      "n": 282,
+      "wr": 41.5,
+      "managed": false
+    },
+    {
+      "algo_id": "regime_momentum_fvg",
+      "symbol": "AUDUSD",
+      "exp_R": -0.3095,
+      "n": 397,
+      "wr": 28.0,
+      "managed": false
+    },
+    {
+      "algo_id": "sweep_reversal",
+      "symbol": "AUDUSD",
+      "exp_R": -0.1367,
+      "n": 1268,
+      "wr": 42.5,
+      "managed": false
+    },
+    {
+      "algo_id": "regime_momentum_fvg",
+      "symbol": "EURUSD",
+      "exp_R": -0.2331,
+      "n": 415,
+      "wr": 29.2,
+      "managed": false
+    },
+    {
+      "algo_id": "sweep_reversal",
+      "symbol": "EURUSD",
+      "exp_R": -0.2029,
+      "n": 1182,
+      "wr": 37.6,
+      "managed": false
+    },
+    {
+      "algo_id": "regime_momentum_fvg",
+      "symbol": "GBPUSD",
+      "exp_R": -0.0948,
+      "n": 463,
+      "wr": 34.6,
+      "managed": false
+    },
+    {
+      "algo_id": "sweep_reversal",
+      "symbol": "GBPUSD",
+      "exp_R": -0.2262,
+      "n": 1205,
+      "wr": 38.2,
+      "managed": false
+    },
+    {
+      "algo_id": "regime_momentum_fvg",
+      "symbol": "USDCHF",
+      "exp_R": -0.2814,
+      "n": 377,
+      "wr": 29.2,
+      "managed": false
+    },
+    {
+      "algo_id": "sweep_reversal",
+      "symbol": "USDCHF",
+      "exp_R": -0.219,
+      "n": 1342,
+      "wr": 39.9,
+      "managed": false
+    },
+    {
+      "algo_id": "regime_momentum_fvg",
+      "symbol": "USDJPY",
+      "exp_R": -0.0682,
+      "n": 463,
+      "wr": 33.7,
+      "managed": false
+    },
+    {
+      "algo_id": "sweep_reversal",
+      "symbol": "USDJPY",
+      "exp_R": -0.1889,
+      "n": 1188,
+      "wr": 37.1,
+      "managed": false
+    },
+    {
+      "algo_id": "regime_momentum_fvg",
+      "symbol": "BTCUSD",
+      "exp_R": -0.0771,
+      "n": 355,
+      "wr": 31.8,
+      "managed": false
+    },
+    {
+      "algo_id": "sweep_reversal",
+      "symbol": "BTCUSD",
+      "exp_R": 0.0136,
+      "n": 1102,
+      "wr": 42.3,
+      "managed": false
+    },
+    {
+      "algo_id": "regime_momentum_fvg",
+      "symbol": "WTIUSD",
+      "exp_R": -0.1334,
+      "n": 529,
+      "wr": 31.4,
+      "managed": false
+    },
+    {
+      "algo_id": "sweep_reversal",
+      "symbol": "WTIUSD",
+      "exp_R": -0.0273,
+      "n": 1142,
+      "wr": 42.5,
       "managed": false
     }
-  }
+  ]
 }

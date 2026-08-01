@@ -406,8 +406,11 @@ Below it, a **backtest table** of the SMC candidate algos (`data/smc_backtest.js
 does *not* survive out-of-sample (window bias), and sweep-fade is a high-WR/low-RR trap. The two
 candidates (`regime_momentum_fvg`, `sweep_reversal`) are therefore registered **shadow-only**
 (`agents/algo_registry.py`) to collect forward OOS — enable paper logging with `SHADOW_ENGINE=true`;
-they never place an order (no LIVE switch). `setup.py` regenerates `data/smc_backtest.json` (offline,
-step 7; skip with `SKIP_BACKTEST=1`). See `docs/research/smc-quant-paper.md` for the full study.
+they never place an order (no LIVE switch). Each pair's in-sample exp_R also shows on its
+**Shadow Matrix** row — run `python scripts/smc_backtest.py --all` to backtest the two candidates
+across **every pair** via MT5 (per-broker; XAU alone works offline). `setup.py` step 7 does this
+automatically (`--all` when MT5 is connected, XAU-offline otherwise; skip with `SKIP_BACKTEST=1`).
+See `docs/research/smc-quant-paper.md` for the full study.
 
 ### Calendar & Gold-News feed (Live tab)
 
