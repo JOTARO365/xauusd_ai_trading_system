@@ -2257,6 +2257,58 @@ def _pair_collector_loop():
         _t.sleep(getattr(pc, "INTERVAL", 60))
 
 
+@app.route("/api/smc-monitor")
+def api_smc_monitor():
+    """SMC context monitor: unfilled FVG (H1/H4) + liquidity map (PD/PW H-L + round #) + sweep flag.
+    compute-in-code, 0 token, DISPLAY-ONLY (ไม่ป้อน entry/gate — คง CORE INVARIANT). cached 60s + MT5 lock."""
+    def _build():
+        import agents.smc_monitor as SM
+
+        def _bars(tf, n):
+            with _MT5_LOCK:
+                if not (_MT5_AVAILABLE and _ensure_mt5()):
+                    return None
+                r = mt5.copy_rates_from_pos(SYMBOL, tf, 0, n)
+            if r is None or len(r) < 5:
+                return None
+            return {"o": [float(x['open']) for x in r], "h": [float(x['high']) for x in r],
+                    "l": [float(x['low']) for x in r], "c": [float(x['close']) for x in r],
+                    "t": [int(x['time']) for x in r]}
+
+        h1 = _bars(mt5.TIMEFRAME_H1, 600)
+        if not h1:
+            return {"ok": False, "error": "MT5 bars ไม่พร้อม"}
+        h4 = _bars(mt5.TIMEFRAME_H4, 300)
+        d1 = _bars(mt5.TIMEFRAME_D1, 5)
+        w1 = _bars(mt5.TIMEFRAME_W1, 3)
+        price = h1["c"][-1]                                  # แท่งปัจจุบัน (forming) = ราคาล่าสุด
+        _has = lambda b: b and len(b["c"]) >= 2
+        pdh = d1["h"][-2] if _has(d1) else None              # prior-day = แท่ง D1 ก่อนหน้า (ปิดแล้ว)
+        pdl = d1["l"][-2] if _has(d1) else None
+        pwh = w1["h"][-2] if _has(w1) else None
+        pwl = w1["l"][-2] if _has(w1) else None
+        regime = None
+        try:                                                # regime H1 (แท่งปิด index -2)
+            import sys as _sys
+            _sp = os.path.join(_BASE, "..", "scripts")
+            if _sp not in _sys.path:
+                _sys.path.insert(0, _sp)
+            import numpy as _np, regime_lib as _R
+            _c = _np.array(h1["c"]); _h = _np.array(h1["h"]); _l = _np.array(h1["l"])
+            _er = _R.efficiency_ratio(_c, _R.ER_WIN); _adx = _R.adx(_h, _l, _c, _R.ADX_WIN)
+            _vp = _R.vol_percentile(_c, _R.VOL_WIN, _R.VOL_LOOKBACK)
+            regime = _R.detect_regime(_er[-2], _adx[-2], _vp[-2])
+        except Exception:
+            pass
+        for bb in (h1, h4):                                  # FVG/sweep ใช้แท่งปิด → ตัดแท่งกำลังก่อ
+            if bb:
+                for k in ("o", "h", "l", "c", "t"):
+                    bb[k] = bb[k][:-1]
+        return SM.build(price, h1, h4, pdh=pdh, pdl=pdl, pwh=pwh, pwl=pwl, regime=regime)
+
+    return jsonify(_cached("smc-monitor", _build, ttl=60))
+
+
 # ── Local-only plugins (gitignored: dashboard/local_*.py) — optional add-ons ──
 # ไฟล์ local_*.py ที่มี register(app) จะถูกโหลดตอน start (เช่น admin account manager).
 # committed footprint = loader ทั่วไปนี้เท่านั้น; ตัว plugin ไม่ถูก push จนกว่าจะอนุญาต.

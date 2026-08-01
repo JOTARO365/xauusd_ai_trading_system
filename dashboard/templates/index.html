@@ -1944,6 +1944,28 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       </div>
     </section>
 
+    <section id="smc-section" style="margin-bottom:10px">
+      <div class="section-title"><span class="wm-dot ok"></span>SMC Monitor — FVG / liquidity map / sweep (บริบทเฝ้าดู · refresh 60s · display-only, 0 token, ไม่ป้อน entry)</div>
+      <div style="padding:9px 14px;border:1px solid var(--border);border-left:3px solid var(--cyan,var(--cyan));border-radius:8px;font-family:var(--mono);font-size:12px;overflow-x:auto">
+        <div id="smc-head" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px">
+          <span>ราคา <b id="smc-price">—</b></span>
+          <span>regime <b id="smc-regime" style="color:var(--muted)">—</b></span>
+        </div>
+        <div id="smc-sweep" style="display:none;padding:6px 10px;margin-bottom:8px;border-radius:6px;background:rgba(245,158,11,0.12);color:var(--amber,var(--amber))"></div>
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+          <div style="flex:1;min-width:240px">
+            <div style="color:var(--muted);font-size:10px;margin-bottom:3px">UNFILLED FVG (imbalance ยังไม่เติม)</div>
+            <div id="smc-fvg" style="font-size:11px">—</div>
+          </div>
+          <div style="flex:1;min-width:240px">
+            <div style="color:var(--muted);font-size:10px;margin-bottom:3px">LIQUIDITY MAP (PD/PW H-L + round #)</div>
+            <div id="smc-liq" style="font-size:11px">—</div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:6px">SMC = บริบท/เฝ้าดู ไม่ป้อน entry (backtest: ไม่มี edge หลัง cost) · sweep→มัก continuation อย่า fade · FVG = imbalance 3 แท่งที่ราคายังไม่กลับมาเติม</div>
+      </div>
+    </section>
+
     <section id="ai-sentiment-section" style="margin-bottom:10px">
       <div class="section-title">AI Sentiment (SELECTION) — LLM อ่านข่าว/ตัวเลข · algo ตัดสิน entry ด้วยตนเอง</div>
       <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:9px 14px;border:1px solid var(--border);border-left:3px solid var(--cyan,var(--cyan));border-radius:8px;font-family:var(--mono);font-size:12px">
@@ -3916,6 +3938,7 @@ async function loadLivePrice() {
     loadWorldMonitor(); // GDELT geopolitical signals — globe live dots + attention/headline
     loadPairContext();  // gold-complex cross-pair context (breadth / USD-leg / gold-silver ratio)
     loadEcosystem();    // ecosystem monitor (co-move vs gold + sentiment) — live MT5, display-only
+    loadSmc();          // SMC monitor (FVG / liquidity map / sweep) — compute-in-code, display-only
 
     // Live ticker
     const bidEl  = document.getElementById('px-bid');
@@ -4817,6 +4840,31 @@ async function loadEcosystem() {
         <td style="padding:4px 8px">${rsiCell}</td>
       </tr>`;
     }).join('');
+  } catch (_e) {}
+}
+
+async function loadSmc() {
+  if (document.hidden) return;
+  try {
+    const d = await (await fetch('/api/smc-monitor')).json();
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.innerHTML = v; };
+    if (!d.ok) { set('smc-fvg', '<span style="color:var(--muted)">' + (d.error || '—') + '</span>'); return; }
+    set('smc-price', d.price != null ? d.price.toLocaleString() : '—');
+    const rc = {TREND:'var(--green)', RANGE:'var(--amber)', 'RISK-OFF':'var(--red)'}[d.regime] || 'var(--muted)';
+    set('smc-regime', '<span style="color:' + rc + '">' + (d.regime || '—') + '</span>');
+    const sw = document.getElementById('smc-sweep');
+    if (sw) {
+      if (d.sweep) { sw.style.display = ''; sw.innerHTML = '⚠ SWEEP ' + d.sweep.level + ' @' + d.sweep.price + ' — ' + d.sweep.note; }
+      else { sw.style.display = 'none'; }
+    }
+    set('smc-fvg', (d.fvg && d.fvg.length) ? d.fvg.map(f => {
+      const col = f.dir === 'bull' ? 'var(--green)' : 'var(--red)';
+      return `<div><span style="color:${col}">${f.tf} ${f.dir}</span> ${f.bot}–${f.top} <span style="color:var(--muted)">(${f.size_pips}p, ${f.age_bars} แท่งก่อน)</span></div>`;
+    }).join('') : '<span style="color:var(--muted)">— ไม่มี unfilled FVG —</span>');
+    set('smc-liq', (d.liquidity && d.liquidity.length) ? d.liquidity.slice(0, 8).map(x => {
+      const col = x.side === 'above' ? 'var(--red)' : 'var(--green)';
+      return `<div>${x.name} <b>${x.level.toLocaleString()}</b> <span style="color:${col}">${x.side === 'above' ? '↑' : '↓'}${x.dist_pips}p</span></div>`;
+    }).join('') : '<span style="color:var(--muted)">—</span>');
   } catch (_e) {}
 }
 
@@ -7468,6 +7516,7 @@ function _bootstrap() {
   setInterval(_tickCountdowns, 1000);   // live countdowns in the combined feed
   setInterval(fetchData, 10000);
   setInterval(loadEcosystem, 30000);    // ecosystem monitor refresh ทุก 30 วิ (server cache 30s)
+  setInterval(loadSmc, 60000);          // SMC monitor refresh ทุก 60 วิ (server cache 60s)
   setInterval(fetchCalendar, 1800000);
   setInterval(loadEventStats, 3600000);
   setInterval(loadEventScenario, 3600000);
