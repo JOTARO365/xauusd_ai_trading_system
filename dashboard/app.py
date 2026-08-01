@@ -1241,7 +1241,8 @@ def _filling_modes_for(symbol: str) -> list:
     """Return list of ORDER_FILLING_* constants in preference order for symbol.
     Preference: IOC (bit 1 of bitmask) → FOK (bit 0) → RETURN (fallback).
     §3.1 frozen contract: bit0=FOK, bit1=IOC."""
-    info = mt5.symbol_info(symbol)
+    with _MT5_LOCK:
+        info = mt5.symbol_info(symbol)
     bm   = int(getattr(info, "filling_mode", 0) or 0) if info is not None else 0
     _FOK    = getattr(mt5, "ORDER_FILLING_FOK",    0)  # MT5 constant = 0
     _IOC    = getattr(mt5, "ORDER_FILLING_IOC",    1)  # MT5 constant = 1
@@ -1265,40 +1266,41 @@ def api_close_position():
     if not _ensure_mt5():
         return jsonify({"ok": False, "error": "MT5 not connected"}), 503
 
-    pos_list = mt5.positions_get(ticket=ticket)
-    if not pos_list:
-        return jsonify({"ok": False, "error": f"ไม่พบ position #{ticket}"}), 404
-    pos  = pos_list[0]
-    tick = mt5.symbol_info_tick(pos.symbol)
-    if tick is None:
-        return jsonify({"ok": False, "error": "ไม่สามารถดึงราคาได้"}), 503
+    with _MT5_LOCK:                                     # read+order_send atomic (serialize กับ collector/bot-proc)
+        pos_list = mt5.positions_get(ticket=ticket)
+        if not pos_list:
+            return jsonify({"ok": False, "error": f"ไม่พบ position #{ticket}"}), 404
+        pos  = pos_list[0]
+        tick = mt5.symbol_info_tick(pos.symbol)
+        if tick is None:
+            return jsonify({"ok": False, "error": "ไม่สามารถดึงราคาได้"}), 503
 
-    is_buy = pos.type == 0
-    modes  = _filling_modes_for(pos.symbol)
-    last_err = "no filling mode available"
-    for mode in modes:
-        result = mt5.order_send({
-            "action":       mt5.TRADE_ACTION_DEAL,
-            "symbol":       pos.symbol,
-            "volume":       pos.volume,
-            "type":         mt5.ORDER_TYPE_SELL if is_buy else mt5.ORDER_TYPE_BUY,
-            "position":     pos.ticket,
-            "price":        tick.bid if is_buy else tick.ask,
-            "deviation":    20,
-            "comment":      "DASHBOARD_CLOSE",
-            "type_filling": mode,
-        })
-        if result is None:
-            last_err = str(mt5.last_error())
-            continue
-        if result.retcode == mt5.TRADE_RETCODE_DONE:
-            return jsonify({"ok": True, "ticket": ticket, "closed_pnl": round(pos.profit, 2)})
-        if result.retcode == 10030:   # TRADE_RETCODE_INVALID_FILL → try next mode
-            last_err = f"retcode=10030 filling_mode={mode} rejected, trying next"
-            continue
-        # Other error — do not retry
-        last_err = f"retcode={result.retcode} {result.comment}"
-        return jsonify({"ok": False, "error": last_err}), 500
+        is_buy = pos.type == 0
+        modes  = _filling_modes_for(pos.symbol)
+        last_err = "no filling mode available"
+        for mode in modes:
+            result = mt5.order_send({
+                "action":       mt5.TRADE_ACTION_DEAL,
+                "symbol":       pos.symbol,
+                "volume":       pos.volume,
+                "type":         mt5.ORDER_TYPE_SELL if is_buy else mt5.ORDER_TYPE_BUY,
+                "position":     pos.ticket,
+                "price":        tick.bid if is_buy else tick.ask,
+                "deviation":    20,
+                "comment":      "DASHBOARD_CLOSE",
+                "type_filling": mode,
+            })
+            if result is None:
+                last_err = str(mt5.last_error())
+                continue
+            if result.retcode == mt5.TRADE_RETCODE_DONE:
+                return jsonify({"ok": True, "ticket": ticket, "closed_pnl": round(pos.profit, 2)})
+            if result.retcode == 10030:   # TRADE_RETCODE_INVALID_FILL → try next mode
+                last_err = f"retcode=10030 filling_mode={mode} rejected, trying next"
+                continue
+            # Other error — do not retry
+            last_err = f"retcode={result.retcode} {result.comment}"
+            return jsonify({"ok": False, "error": last_err}), 500
     return jsonify({"ok": False, "error": last_err}), 500
 
 
@@ -1311,10 +1313,11 @@ def api_cancel_pending_order():
     if not _ensure_mt5():
         return jsonify({"ok": False, "error": "MT5 not connected"}), 503
 
-    result = mt5.order_send({"action": mt5.TRADE_ACTION_REMOVE, "order": ticket})
-    if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
-        err = mt5.last_error() if result is None else f"retcode={result.retcode} {result.comment}"
-        return jsonify({"ok": False, "error": str(err)}), 500
+    with _MT5_LOCK:
+        result = mt5.order_send({"action": mt5.TRADE_ACTION_REMOVE, "order": ticket})
+        if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+            err = mt5.last_error() if result is None else f"retcode={result.retcode} {result.comment}"
+            return jsonify({"ok": False, "error": str(err)}), 500
     return jsonify({"ok": True, "ticket": ticket})
 
 
@@ -1332,20 +1335,21 @@ def api_modify_position():
     if not _ensure_mt5():
         return jsonify({"ok": False, "error": "MT5 not connected"}), 503
 
-    pos_list = mt5.positions_get(ticket=ticket)
-    if not pos_list:
-        return jsonify({"ok": False, "error": f"ไม่พบ position #{ticket}"}), 404
-    pos = pos_list[0]
-    result = mt5.order_send({
-        "action":   mt5.TRADE_ACTION_SLTP,
-        "symbol":   pos.symbol,
-        "position": pos.ticket,
-        "sl":       sl,
-        "tp":       tp,
-    })
-    if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
-        err = mt5.last_error() if result is None else f"retcode={result.retcode} {result.comment}"
-        return jsonify({"ok": False, "error": str(err)}), 500
+    with _MT5_LOCK:
+        pos_list = mt5.positions_get(ticket=ticket)
+        if not pos_list:
+            return jsonify({"ok": False, "error": f"ไม่พบ position #{ticket}"}), 404
+        pos = pos_list[0]
+        result = mt5.order_send({
+            "action":   mt5.TRADE_ACTION_SLTP,
+            "symbol":   pos.symbol,
+            "position": pos.ticket,
+            "sl":       sl,
+            "tp":       tp,
+        })
+        if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+            err = mt5.last_error() if result is None else f"retcode={result.retcode} {result.comment}"
+            return jsonify({"ok": False, "error": str(err)}), 500
     return jsonify({"ok": True, "ticket": ticket, "sl": sl, "tp": tp})
 
 
@@ -1376,7 +1380,8 @@ def api_ride_stats():
         if not _MT5_AVAILABLE or not _ensure_mt5():
             return {"ok": False, "error": "MT5 not connected"}
         from collections import defaultdict
-        deals = mt5.history_deals_get(datetime.now() - timedelta(days=90), datetime.now()) or []
+        with _MT5_LOCK:
+            deals = mt5.history_deals_get(datetime.now() - timedelta(days=90), datetime.now()) or []
         # จัดกลุ่มทุก deal ตาม position_id แล้วค่อยตัดสินว่าเป็นไม้ระบบจาก magic ของ "ขาเข้า"
         # (ขาปิดที่ broker ยิง SL/TP เองมัก magic=0 → กรอง magic ทีละ deal จะทิ้งขาปิด → ไม้ค้าง n_open)
         pos = defaultdict(lambda: {"in": None, "pnl": 0.0, "closed": False, "sys": False})
@@ -1750,7 +1755,9 @@ def api_live_symbols():
             from connectors.mt5_connector import SYSTEM_MAGIC
             from connectors.pair_collector import _broker_map
             inv = {v: k for k, v in _broker_map().items()}
-            for p in (mt5.positions_get() or []):
+            with _MT5_LOCK:
+                _positions = mt5.positions_get() or []
+            for p in _positions:
                 if p.magic == SYSTEM_MAGIC and p.symbol != SYMBOL:
                     lg = inv.get(p.symbol, p.symbol)
                     if lg not in seen:
@@ -1899,7 +1906,8 @@ def api_speech_history():
         out["speech_ts"] = prev
         if _MT5_AVAILABLE and _ensure_mt5():
             frm = datetime.utcfromtimestamp(prev - 12 * 3600)
-            rates = mt5.copy_rates_from(SYMBOL, _TF_MAP["H1"], frm, 36)
+            with _MT5_LOCK:
+                rates = mt5.copy_rates_from(SYMBOL, _TF_MAP["H1"], frm, 36)
             if rates is not None and len(rates):
                 out["candles"] = [{"time": int(r["time"]), "open": float(r["open"]), "high": float(r["high"]),
                                    "low": float(r["low"]), "close": float(r["close"])} for r in rates]
