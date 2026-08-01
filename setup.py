@@ -336,6 +336,10 @@ def main():
         print(_WARN + "SKIP_BACKTEST set — ข้าม (รันเอง: python scripts/shadow_backtest_managed.py && "
               "python scripts/tsmom_backtest_pairs.py)")
     else:
+        # offline SMC candidate backtest (data/xau_*.json — ไม่ต้อง MT5, เหมือนกันทุกโบรก) → data/smc_backtest.json
+        rc = subprocess.call([sys.executable, os.path.join("scripts", "smc_backtest.py")])
+        print((_OK if rc == 0 else _WARN) + "smc_backtest.py " +
+              ("→ data/smc_backtest.json (SMC panel)" if rc == 0 else f"exit {rc}"))
         connected = False
         try:
             import MetaTrader5 as mt5

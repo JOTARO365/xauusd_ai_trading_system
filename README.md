@@ -27,7 +27,7 @@ ships a Flask dashboard on port 5050.
 - **Multi-symbol executor — all pairs live-capable** — the executor now trades **any** non-gold pair whose switch is LIVE (WTI, BTC, EURUSD#, USDJPY#, …). Order-slot counting, `count_protected_slots`, force-BE and the **daily-trade cap are per-symbol** (gold hitting its cap no longer blocks non-gold). Entry dedup only marks a signal-bar *handled on success* (a transient open-failure no longer blocks that bar forever) with a retry cooldown (`MSE_ENTRY_RETRY_COOLDOWN`). `scripts/clear_mse_stale.py` clears any legacy false-block. Broker symbols are resolved per-broker via `BROKER_SYM_*` in `.env` (probe now prefers `trade_mode=FULL` so it never maps a feed-only/disabled symbol).
 - **Clear entry logging** — every real order prints `🟢 เข้าไม้จริง | <symbol> | algo=<algo> | <dir> <lot> @ <price> | SL/TP | ticket` (one central log covering gold + all engines), so the terminal always shows which pair and which algo entered.
 - **Weekend Gap Monitor & S/R Level Explainer** — dashboard panels: 24/7 gold spot (Binance XAUT/PAXG) vs Friday close to anticipate the Monday gap, and per-level touch/bounce statistics.
-- **`setup.py` runs broker-specific scripts on fresh pull** — after syncing `.env` and probing the broker symbol map, it regenerates the per-broker backtest (`shadow_backtest_managed.py` + `tsmom_backtest_pairs.py`) so a fresh clone's Shadow Matrix / algo-selector match *its* broker (skip with `SKIP_BACKTEST=1`).
+- **`setup.py` runs broker-specific scripts on fresh pull** — after syncing `.env` and probing the broker symbol map, it regenerates the per-broker backtest (`shadow_backtest_managed.py` + `tsmom_backtest_pairs.py`) so a fresh clone's Shadow Matrix / algo-selector match *its* broker (skip with `SKIP_BACKTEST=1`). The same step also runs the offline SMC candidate backtest (`smc_backtest.py` → `data/smc_backtest.json`) for the SMC Monitor panel.
 - **Unified Live Control** — every strategy×pair (gold included) is turned on/off from **one** switch (LIVE / SHADOW / OFF) in the dashboard **Shadow Matrix**; the gold engines now read the same switch. See [Live Control](#live-control--turning-strategies-onoff-shadow-matrix).
 - **TSMOM-D1 as a full registry algo** (`agents/algo_registry.py` `TSMOMDailyAlgo`) — daily time-series-momentum on every pair (ensemble vote L=63/126/252, 3×ATR disaster stop, **exit-on-flip**), with its own paper-resolver and live close-on-flip in the multi-symbol executor. Per-pair backtest committed to `docs/reports/shadow_backtest.json`.
 - **Per-algo real edge via order comment** (`agents/trade_recorder.py`) — captures the comment when a trade *opens* (survives the broker stripping `deal.comment` on SL/TP close), attributes each closed trade to its algo, and computes real edge **per strategy** (not lumped) — with a one-shot `backfill` from MT5 order history.
@@ -342,7 +342,7 @@ Open your browser at `http://localhost:5050`. Five tabs:
 | Tab | Description |
 |---|---|
 | **Dashboard** | Portfolio equity curve (index-based x-axis), performance statistics, system-vs-manual split, trade history |
-| **Live** | Real-time bot status, algo/regime state + signal, TSMOM-D1 engine, the **gold-complex map + unified news feed** (GDELT + gold news with severity dots), Gold-Complex context (breadth / USD-leg / gold-silver ratio), the **Ecosystem Monitor** (cross-asset co-movement vs gold + sentiment, 30 s refresh), the **S/R-zone analysis terminal** (below), cluster S/R, macro/liquidity panels, economic calendar |
+| **Live** | Real-time bot status, algo/regime state + signal, TSMOM-D1 engine, the **gold-complex map + unified news feed** (GDELT + gold news with severity dots), Gold-Complex context (breadth / USD-leg / gold-silver ratio), the **Ecosystem Monitor** (cross-asset co-movement vs gold + sentiment, 30 s refresh), the **SMC Monitor** (FVG / liquidity map / sweep + candidate-algo backtest, display-only), the **S/R-zone analysis terminal** (below), cluster S/R, macro/liquidity panels, economic calendar |
 | **Analytics** | Performance breakdown, confidence calibration, CFTC COT positioning |
 | **Costs** | AI token spend, daily burn vs target, per-agent cost |
 | **Settings** | Live config editing — saves and auto-restarts via PM2 |
@@ -387,6 +387,27 @@ Correlation uses returns (not price levels) aligned by timestamp to avoid spurio
 every panel here it is **context for analysis only — it never feeds an entry or gate** (SELECTION vs
 EXECUTION invariant). Optionally snapshot the driver history to `data/drv_*.json` for offline work
 with `python scripts/export_drivers.py`.
+
+### SMC Monitor (Live tab) — FVG / liquidity map / sweep, 0 LLM cost
+
+A **display-only** panel (`agents/smc_monitor.py` → `/api/smc-monitor`, refresh 60 s, MT5 read-only,
+compute-in-code) surfacing Smart-Money-Concepts **as context, never an entry/gate** (CORE INVARIANT):
+
+- **Unfilled FVG** (H1/H4) — 3-candle imbalances price hasn't returned to fill (the one SMC primitive
+  that is cleanly backtestable).
+- **Liquidity map** — prior-day / prior-week H-L + round numbers ($10/$50) with distance in pips
+  (Osler's real "orders cluster at round numbers" kernel — not arbitrary swing pivots).
+- **Sweep flag** — price pierced a prior-day level then closed back inside, tagged *"sweep → usually
+  continuation, don't fade"* (the backtest below confirms fading a sweep loses).
+
+Below it, a **backtest table** of the SMC candidate algos (`data/smc_backtest.json`, generated by
+`python scripts/smc_backtest.py` — XAU H1, causal + cost-adjusted, with an in-sample-vs-OOS split).
+**Honest result: none has a directional edge after cost** — the FVG-momentum filter's in-sample gain
+does *not* survive out-of-sample (window bias), and sweep-fade is a high-WR/low-RR trap. The two
+candidates (`regime_momentum_fvg`, `sweep_reversal`) are therefore registered **shadow-only**
+(`agents/algo_registry.py`) to collect forward OOS — enable paper logging with `SHADOW_ENGINE=true`;
+they never place an order (no LIVE switch). `setup.py` regenerates `data/smc_backtest.json` (offline,
+step 7; skip with `SKIP_BACKTEST=1`). See `docs/research/smc-quant-paper.md` for the full study.
 
 ### Calendar & Gold-News feed (Live tab)
 

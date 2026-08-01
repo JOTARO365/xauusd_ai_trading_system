@@ -1962,6 +1962,11 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
             <div id="smc-liq" style="font-size:11px">—</div>
           </div>
         </div>
+        <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
+          <div style="color:var(--muted);font-size:10px;margin-bottom:3px">BACKTEST candidate algos (causal + cost · <span id="smcbt-meta">—</span>) — shadow 2 ตัวเก็บ forward เทียบ</div>
+          <div id="smcbt" style="font-size:11px;overflow-x:auto">—</div>
+          <div id="smcbt-oos" style="font-size:10px;color:var(--amber,var(--amber));margin-top:4px"></div>
+        </div>
         <div style="font-size:10px;color:var(--muted);margin-top:6px">SMC = บริบท/เฝ้าดู ไม่ป้อน entry (backtest: ไม่มี edge หลัง cost) · sweep→มัก continuation อย่า fade · FVG = imbalance 3 แท่งที่ราคายังไม่กลับมาเติม</div>
       </div>
     </section>
@@ -3939,6 +3944,7 @@ async function loadLivePrice() {
     loadPairContext();  // gold-complex cross-pair context (breadth / USD-leg / gold-silver ratio)
     loadEcosystem();    // ecosystem monitor (co-move vs gold + sentiment) — live MT5, display-only
     loadSmc();          // SMC monitor (FVG / liquidity map / sweep) — compute-in-code, display-only
+    loadSmcBacktest();  // SMC candidate backtest results (data/smc_backtest.json) — display-only
 
     // Live ticker
     const bidEl  = document.getElementById('px-bid');
@@ -4865,6 +4871,23 @@ async function loadSmc() {
       const col = x.side === 'above' ? 'var(--red)' : 'var(--green)';
       return `<div>${x.name} <b>${x.level.toLocaleString()}</b> <span style="color:${col}">${x.side === 'above' ? '↑' : '↓'}${x.dist_pips}p</span></div>`;
     }).join('') : '<span style="color:var(--muted)">—</span>');
+  } catch (_e) {}
+}
+
+async function loadSmcBacktest() {
+  try {
+    const d = await (await fetch('/api/smc-backtest')).json();
+    const bt = document.getElementById('smcbt');
+    if (!bt) return;
+    if (!d.ok || !d.candidates) { bt.innerHTML = '<span style="color:var(--muted)">— ยังไม่มี (รัน scripts/smc_backtest.py) —</span>'; return; }
+    const meta = document.getElementById('smcbt-meta'); if (meta) meta.textContent = `${d.instrument} · ${d.bars} bars · cost ${d.cost_pips}p`;
+    const rows = d.candidates.map(c => {
+      const col = c.exp_R > 0 ? 'var(--green)' : 'var(--red)';
+      return `<tr style="border-top:1px solid var(--border)"><td style="padding:2px 8px">${c.name}</td><td style="padding:2px 8px">${c.n}</td><td style="padding:2px 8px">${c.wr}</td><td style="padding:2px 8px;color:${col}">${c.exp_R}</td><td style="padding:2px 8px">${c.psr0}</td></tr>`;
+    }).join('');
+    bt.innerHTML = `<table style="border-collapse:collapse;min-width:440px;text-align:left"><thead><tr style="color:var(--muted)"><th style="padding:2px 8px">candidate</th><th style="padding:2px 8px">n</th><th style="padding:2px 8px">WR</th><th style="padding:2px 8px">exp_R</th><th style="padding:2px 8px">PSR0</th></tr></thead><tbody>${rows}</tbody></table>`;
+    const o = d.oos, oe = document.getElementById('smcbt-oos');
+    if (o && oe) oe.innerHTML = `⚠ OOS split — IS: A0 ${o.in_sample.A0.exp_R} / A1 ${o.in_sample.A1.exp_R} · OOS: A0 ${o.out_sample.A0.exp_R} / A1 ${o.out_sample.A1.exp_R} → ${d.verdict}`;
   } catch (_e) {}
 }
 
@@ -7517,6 +7540,7 @@ function _bootstrap() {
   setInterval(fetchData, 10000);
   setInterval(loadEcosystem, 30000);    // ecosystem monitor refresh ทุก 30 วิ (server cache 30s)
   setInterval(loadSmc, 60000);          // SMC monitor refresh ทุก 60 วิ (server cache 60s)
+  setInterval(loadSmcBacktest, 300000); // SMC backtest table refresh ทุก 5 นาที (static file)
   setInterval(fetchCalendar, 1800000);
   setInterval(loadEventStats, 3600000);
   setInterval(loadEventScenario, 3600000);

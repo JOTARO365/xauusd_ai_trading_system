@@ -58,13 +58,26 @@ def _read(path):
 
 def _load_backtest():
     """{(algo_id, symbol): row} from the committed backtest json, if present.
-    Rows without algo_id default to regime_momentum (backward-compat with pre-MR files)."""
+    Rows without algo_id default to regime_momentum (backward-compat with pre-MR files).
+    Also merges SMC candidate in-sample backtest (data/smc_backtest.json) for the shadow
+    algos regime_momentum_fvg / sweep_reversal (XAU only) so their matrix row shows a ref exp_R."""
+    out = {}
     try:
         rows = json.load(open(_BACKTEST, encoding="utf-8"))
-        return {(r.get("algo_id", "regime_momentum"), r["logical"]): r
-                for r in rows if r.get("ok") and r.get("n")}
+        out = {(r.get("algo_id", "regime_momentum"), r["logical"]): r
+               for r in rows if r.get("ok") and r.get("n")}
     except Exception:
-        return {}
+        pass
+    try:
+        smc = json.load(open(os.path.join(_BASE, "data", "smc_backtest.json"), encoding="utf-8"))
+        for aid, m in (smc.get("matrix_backtest") or {}).items():
+            if m.get("n"):
+                out[(aid, m.get("symbol", "XAUUSD"))] = {
+                    "exp_R": m.get("exp_R"), "n": m.get("n"), "wr": m.get("wr"),
+                    "managed": m.get("managed", False)}
+    except Exception:
+        pass
+    return out
 
 
 def _span_days(recs):

@@ -1,0 +1,154 @@
+{
+  "generated": "2026-08-01T13:34:47+00:00",
+  "instrument": "XAUUSD H1",
+  "bars": 70000,
+  "cost_pips": 30.0,
+  "range": [
+    1414123200,
+    1784329200
+  ],
+  "candidates": [
+    {
+      "name": "A0 momentum (baseline TREND)",
+      "n": 1575,
+      "wr": 0.331,
+      "exp_R": -0.0542,
+      "sharpe_t": -1.52,
+      "psr0": 0.067,
+      "sum_R": -85.4,
+      "note": "",
+      "reasons": {
+        "SL": 1050,
+        "TP": 521,
+        "SL_TP_ambig": 4
+      }
+    },
+    {
+      "name": "A1 momentum + FVG filter (k=6)",
+      "n": 1341,
+      "wr": 0.339,
+      "exp_R": -0.0305,
+      "sharpe_t": -0.79,
+      "psr0": 0.218,
+      "sum_R": -40.9,
+      "note": "variant of A0",
+      "reasons": {
+        "TP": 454,
+        "SL": 885,
+        "SL_TP_ambig": 2
+      }
+    },
+    {
+      "name": "B1 sweep-rev PDH/PDL rr1.5",
+      "n": 4439,
+      "wr": 0.411,
+      "exp_R": -0.0419,
+      "sharpe_t": -2.27,
+      "psr0": 0.012,
+      "sum_R": -186.1,
+      "note": "NEW algo",
+      "reasons": {
+        "SL": 2501,
+        "TP": 1815,
+        "SL_TP_ambig": 109,
+        "TIME": 14
+      }
+    },
+    {
+      "name": "B2 sweep-rev rr1.0",
+      "n": 4439,
+      "wr": 0.503,
+      "exp_R": -0.0621,
+      "sharpe_t": -4.13,
+      "psr0": 0.0,
+      "sum_R": -275.6,
+      "note": "variant of B1",
+      "reasons": {
+        "SL": 2054,
+        "TP": 2230,
+        "SL_TP_ambig": 150,
+        "TIME": 5
+      }
+    },
+    {
+      "name": "B3 sweep-rev target=opp-level",
+      "n": 4439,
+      "wr": 0.617,
+      "exp_R": -0.1197,
+      "sharpe_t": -13.27,
+      "psr0": 0.0,
+      "sum_R": -531.4,
+      "note": "variant of B1",
+      "reasons": {
+        "SL": 920,
+        "TP": 3253,
+        "SL_TP_ambig": 264,
+        "TIME": 2
+      }
+    },
+    {
+      "name": "C1 FVG-fill fade rr1.0",
+      "n": 8164,
+      "wr": 0.478,
+      "exp_R": -0.1261,
+      "sharpe_t": -11.39,
+      "psr0": 0.0,
+      "sum_R": -1029.7,
+      "note": "NEW algo",
+      "reasons": {
+        "TP": 3903,
+        "SL": 3928,
+        "SL_TP_ambig": 332,
+        "TIME": 1
+      }
+    }
+  ],
+  "oos": {
+    "cut_ts": 1672128000,
+    "in_sample": {
+      "A0": {
+        "n": 931,
+        "exp_R": -0.1242,
+        "wr": 0.311
+      },
+      "A1": {
+        "n": 782,
+        "exp_R": -0.0689,
+        "wr": 0.33
+      }
+    },
+    "out_sample": {
+      "A0": {
+        "n": 644,
+        "exp_R": 0.0469,
+        "wr": 0.359
+      },
+      "A1": {
+        "n": 559,
+        "exp_R": 0.0233,
+        "wr": 0.351
+      }
+    }
+  },
+  "verdict": "ไม่มี candidate ให้ edge หลัง cost; FVG filter ไม่รอด OOS (window bias); sweep-fade = high-WR/low-RR trap",
+  "shadow_algos": [
+    "regime_momentum_fvg",
+    "sweep_reversal"
+  ],
+  "matrix_backtest": {
+    "regime_momentum_fvg": {
+      "exp_R": -0.0305,
+      "n": 1341,
+      "wr": 33.9,
+      "symbol": "XAUUSD",
+      "managed": false
+    },
+    "sweep_reversal": {
+      "exp_R": -0.0419,
+      "n": 4439,
+      "wr": 41.1,
+      "symbol": "XAUUSD",
+      "managed": false
+    }
+  }
+}

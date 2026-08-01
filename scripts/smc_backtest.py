@@ -129,11 +129,11 @@ def _pd_levels(t_h1, td1, hd1, ld1):
 # ═══════════════════════════════════════════════════════════════════════════════
 # CANDIDATE A — momentum baseline + FVG filter
 # ═══════════════════════════════════════════════════════════════════════════════
-def run_momentum(h, l, o, c, cost, fvg_filter=False, fvg_lookback=6):
+def run_momentum(h, l, o, c, cost, fvg_filter=False, fvg_lookback=6, lo=None, hi=None):
     er, adx, vp, atr = _regime_series(h, l, c)
     start = max(R.VOL_LOOKBACK, R.BRK_WIN, R.ER_WIN) + 2
     trades = []
-    for i in range(start, len(c) - 1):
+    for i in range(max(start, lo or 0), hi or (len(c) - 1)):
         if R.detect_regime(er[i], adx[i], vp[i]) != "TREND":
             continue
         hh = h[i - R.BRK_WIN:i].max()
@@ -266,6 +266,48 @@ def main():
             print(f"  {r['name']:<34} {r['reasons']}")
     print("\n⚠️ variants tried this run = 6 (log for multiple-testing; A1/B2/B3 are tweaks of A0/B1).")
     print("⚠️ cost = spread only, swap NOT modelled (multi-day holds worse). in-sample — needs OOS/CPCV before trust.")
+
+    # ── OOS split (FVG filter robustness) — momentum ± FVG, in-sample 70% vs OOS 30% ──
+    def _er(tr):
+        rs = [x for x, _ in tr]
+        return {"n": len(rs), "exp_R": round(sum(rs) / len(rs), 4) if rs else None,
+                "wr": round(sum(1 for x in rs if x > 0) / len(rs), 3) if rs else None}
+    cut = int(len(c) * 0.7)
+    oos = {
+        "cut_ts": int(t[cut]),
+        "in_sample":  {"A0": _er(run_momentum(h, l, o, c, cost, hi=cut)),
+                       "A1": _er(run_momentum(h, l, o, c, cost, fvg_filter=True, hi=cut))},
+        "out_sample": {"A0": _er(run_momentum(h, l, o, c, cost, lo=cut)),
+                       "A1": _er(run_momentum(h, l, o, c, cost, fvg_filter=True, lo=cut))},
+    }
+    print(f"\nOOS split (cut@{cut}): IS  A0 {oos['in_sample']['A0']['exp_R']} / A1 {oos['in_sample']['A1']['exp_R']}"
+          f"  |  OOS A0 {oos['out_sample']['A0']['exp_R']} / A1 {oos['out_sample']['A1']['exp_R']}")
+
+    # ── write data/smc_backtest.json (dashboard reads this — display-only, 0 token) ──
+    from datetime import datetime, timezone
+    payload = {
+        "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "instrument": f"XAUUSD {tf.upper()}", "bars": len(c), "cost_pips": cost,
+        "range": [int(t[0]), int(t[-1])],
+        "candidates": [{k: r.get(k) for k in ("name", "n", "wr", "exp_R", "sharpe_t", "psr0", "sum_R", "note", "reasons")}
+                       for r in results],
+        "oos": oos,
+        "verdict": "ไม่มี candidate ให้ edge หลัง cost; FVG filter ไม่รอด OOS (window bias); sweep-fade = high-WR/low-RR trap",
+        "shadow_algos": ["regime_momentum_fvg", "sweep_reversal"],
+        # map → Shadow Matrix (algo_id → in-sample backtest ref, XAU only): A1=momentum+FVG, B1=sweep-rev
+        "matrix_backtest": {
+            aid: {"exp_R": r["exp_R"], "n": r["n"],
+                  "wr": round(r["wr"] * 100, 1) if r.get("wr") is not None else None,
+                  "symbol": "XAUUSD", "managed": False}
+            for aid, r in (("regime_momentum_fvg", results[1]), ("sweep_reversal", results[2]))
+        },
+    }
+    try:
+        (_ROOT / "data" / "smc_backtest.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        print("\n✅ wrote data/smc_backtest.json")
+    except OSError as e:
+        print(f"\n⚠️ write smc_backtest.json failed: {e}")
 
 
 if __name__ == "__main__":

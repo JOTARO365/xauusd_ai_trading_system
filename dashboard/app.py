@@ -2328,6 +2328,18 @@ def api_smc_monitor():
     return jsonify(_cached("smc-monitor", _build, ttl=60))
 
 
+@app.route("/api/smc-backtest")
+def api_smc_backtest():
+    """SMC candidate backtest results (data/smc_backtest.json จาก scripts/smc_backtest.py). display-only, 0 token."""
+    def _c():
+        try:
+            with open(os.path.join(_BASE, "..", "data", "smc_backtest.json"), encoding="utf-8") as f:
+                return {"ok": True, **json.load(f)}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+    return jsonify(_cached("smc-backtest", _c, ttl=300))
+
+
 # ── Local-only plugins (gitignored: dashboard/local_*.py) — optional add-ons ──
 # ไฟล์ local_*.py ที่มี register(app) จะถูกโหลดตอน start (เช่น admin account manager).
 # committed footprint = loader ทั่วไปนี้เท่านั้น; ตัว plugin ไม่ถูก push จนกว่าจะอนุญาต.
