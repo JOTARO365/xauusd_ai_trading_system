@@ -119,7 +119,22 @@ def _attribute(r):
 
 def _cells_from_db(by_regime=True):
     """cross-user cells จาก DB (ทุก account). attribute algo จาก source+comment (logical backfill) · regime จาก trend · +n_accounts (ESS).
-    เฉพาะ CLOSED · MANUAL ถูกกันออก (ไม้มือ ไม่ใช่ algo). คืน [] ถ้า DB ไม่ต่อ."""
+    เฉพาะ CLOSED · MANUAL ถูกกันออก (ไม้มือ ไม่ใช่ algo). คืน [] ถ้า DB ไม่ต่อ.
+    proxy mode: proxy aggregate cross-user ให้แล้ว (ไม่ leak raw ต่อ account) → map เป็น shape เดิม."""
+    from db.connection import proxy_mode, proxy_get
+    if proxy_mode():
+        try:
+            data = proxy_get("cells", {"by_regime": 1 if by_regime else 0})
+            out = []
+            for c in data.get("cells", []):
+                n = c.get("n") or 0
+                out.append({"algo": c["algo"], "symbol": c["symbol"], "regime": c["regime"],
+                            "n": n, "wins": c.get("wins", 0),
+                            "n_accounts": c.get("n_accounts") or 1,
+                            "exp_R": round((c.get("pnl") or 0.0) / n, 2) if n else None})
+            return out
+        except Exception:
+            return []
     try:
         import config  # noqa
         from db.connection import get_client

@@ -26,3 +26,6 @@ data/weekly_outlook.json
 data/macro_actuals.json
 data/fmp_calendar.json
 data/ff_scrape.json
+
+# Local-only dashboard plugins (not pushed until approved) — e.g. admin account manager
+dashboard/local_*.py

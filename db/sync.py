@@ -132,8 +132,16 @@ def reconcile_open_trades(account_login: int | None = None, days: int = 365,
     dry_run=True → ไม่เขียน DB, แค่คืน actions ที่ "จะ" ทำ.
     """
     from collections import defaultdict
-    from db.connection import is_available, get_client
+    from db.connection import is_available, get_client, proxy_mode, proxy_get, proxy_post
     from config import SYMBOL
+
+    def _apply_update(tk: int, patch: dict):
+        """UPDATE 1 ticket — proxy (scope key) หรือ owner (eq account). raise ถ้าพลาด."""
+        if proxy_mode():
+            proxy_post("trades/update", {"ticket": tk, "fields": patch})
+        else:
+            (get_client().table("trades").update(patch)
+             .eq("ticket", tk).eq("account_login", login).execute())
 
     result = {"login": None, "db_open": 0, "still_open": 0, "reconciled": 0, "stale": 0,
               "backfilled": 0, "failed": 0, "dry_run": dry_run, "actions": []}
@@ -166,19 +174,20 @@ def reconcile_open_trades(account_login: int | None = None, days: int = 365,
 
     # ── DB rows ที่ยัง OPEN ของบัญชี + symbol นี้ ──────────────────
     try:
-        rows = (get_client().table("trades")
-                .select("ticket")
-                .eq("status", "OPEN").eq("account_login", login).eq("symbol", SYMBOL)
-                .execute().data) or []
+        if proxy_mode():
+            open_tks = proxy_get("trades/tickets", {"symbol": SYMBOL, "status": "OPEN"}).get("tickets", [])
+        else:
+            open_tks = [r["ticket"] for r in ((get_client().table("trades")
+                        .select("ticket")
+                        .eq("status", "OPEN").eq("account_login", login).eq("symbol", SYMBOL)
+                        .execute().data) or []) if r.get("ticket")]
     except Exception as e:
         logger.debug(f"reconcile_open_trades: query error: {e}")
         return result
-    result["db_open"] = len(rows)
+    result["db_open"] = len(open_tks)
 
-    for r in rows:
-        if not r.get("ticket"):
-            continue
-        tk = int(r["ticket"])
+    for _tk in open_tks:
+        tk = int(_tk)
         if tk in live:
             result["still_open"] += 1
             continue
@@ -192,8 +201,7 @@ def reconcile_open_trades(account_login: int | None = None, days: int = 365,
 
         if not dry_run:
             try:
-                (get_client().table("trades").update(patch)
-                 .eq("ticket", tk).eq("account_login", login).execute())
+                _apply_update(tk, patch)
             except Exception as e:
                 result["failed"] += 1
                 logger.debug(f"reconcile_open_trades: update ticket {tk} failed: {e}")
@@ -204,27 +212,31 @@ def reconcile_open_trades(account_login: int | None = None, days: int = 365,
     # ── backfill pnl/closed_at ให้ row ที่ CLOSED แต่ pnl=None (เช่น RECONCILED_STALE เก่า / close ที่ pnl ไม่ถูกบันทึก) ──
     # reuse hist (position_id → pnl,closed_at). ticket = order = position_id บนโบรกนี้. update เฉพาะ 2 ฟิลด์ ไม่ทับ context.
     try:
-        crows = (get_client().table("trades").select("ticket")
-                 .eq("status", "CLOSED").is_("pnl", "null")
-                 .eq("account_login", login).eq("symbol", SYMBOL).execute().data) or []
+        if proxy_mode():
+            crow_tks = proxy_get("trades/tickets",
+                                 {"symbol": SYMBOL, "status": "CLOSED", "flt": "pnl_null"}).get("tickets", [])
+        else:
+            crow_tks = [r["ticket"] for r in ((get_client().table("trades").select("ticket")
+                        .eq("status", "CLOSED").is_("pnl", "null")
+                        .eq("account_login", login).eq("symbol", SYMBOL).execute().data) or [])
+                        if r.get("ticket") is not None]
     except Exception as e:
-        crows = []
+        crow_tks = []
         logger.debug(f"reconcile_open_trades: closed-pnl-null query error: {e}")
-    for r in crows:
-        tk = r.get("ticket")
-        if tk is None or int(tk) not in hist:
+    for _tk in crow_tks:
+        if _tk is None or int(_tk) not in hist:
             continue
-        pnl, closed_at = hist[int(tk)]
+        tk = int(_tk)
+        pnl, closed_at = hist[tk]
         if not dry_run:
             try:
-                (get_client().table("trades").update({"pnl": pnl, "closed_at": closed_at})
-                 .eq("ticket", int(tk)).eq("account_login", login).execute())
+                _apply_update(tk, {"pnl": pnl, "closed_at": closed_at})
             except Exception as e:
                 result["failed"] += 1
                 logger.debug(f"reconcile_open_trades: pnl-backfill ticket {tk} failed: {e}")
                 continue
         result["backfilled"] += 1
-        result["actions"].append({"ticket": int(tk), "reason": "PNL_BACKFILL", "pnl": pnl})
+        result["actions"].append({"ticket": tk, "reason": "PNL_BACKFILL", "pnl": pnl})
 
     tag = "DRY-RUN" if dry_run else "applied"
     logger.info(f"reconcile_open_trades[{login}] ({tag}): db_open={result['db_open']} "
@@ -274,7 +286,7 @@ def backfill_metadata_from_logs(account_login: int | None = None,
     ดึงจาก trades.json → UPDATE เฉพาะ field ที่ขาด, scope account ปัจจุบัน + SYMBOL.
     ไม่ทับค่าที่มีอยู่ (อัปเดตเฉพาะ row ที่ trend ว่าง). dry_run=True → ไม่เขียน.
     """
-    from db.connection import is_available, get_client
+    from db.connection import is_available, get_client, proxy_mode, proxy_get, proxy_post
     from config import SYMBOL
 
     result = {"login": None, "db_missing": 0, "backfilled": 0, "no_log": 0,
@@ -296,27 +308,34 @@ def backfill_metadata_from_logs(account_login: int | None = None,
         return result
 
     try:
-        rows = (get_client().table("trades")
-                .select("ticket")
-                .is_("trend", "null").eq("account_login", login).eq("symbol", SYMBOL)
-                .execute().data) or []
+        if proxy_mode():
+            miss_tks = proxy_get("trades/tickets",
+                                 {"symbol": SYMBOL, "flt": "trend_null"}).get("tickets", [])
+        else:
+            miss_tks = [r["ticket"] for r in ((get_client().table("trades")
+                        .select("ticket")
+                        .is_("trend", "null").eq("account_login", login).eq("symbol", SYMBOL)
+                        .execute().data) or []) if r.get("ticket") is not None]
     except Exception as e:
         logger.debug(f"backfill_metadata: query error: {e}")
         return result
-    result["db_missing"] = len(rows)
+    result["db_missing"] = len(miss_tks)
 
-    for r in rows:
-        tk = r.get("ticket")
-        if tk is None:
+    for _tk in miss_tks:
+        if _tk is None:
             continue
-        meta = meta_map.get(int(tk))
+        tk = int(_tk)
+        meta = meta_map.get(tk)
         if not meta:
             result["no_log"] += 1
             continue
         if not dry_run:
             try:
-                (get_client().table("trades").update(meta)
-                 .eq("ticket", int(tk)).eq("account_login", login).execute())
+                if proxy_mode():
+                    proxy_post("trades/update", {"ticket": tk, "fields": meta})
+                else:
+                    (get_client().table("trades").update(meta)
+                     .eq("ticket", tk).eq("account_login", login).execute())
             except Exception as e:
                 result["failed"] += 1
                 logger.warning(f"backfill_metadata: update ticket {tk} failed: {e}")
@@ -330,10 +349,17 @@ def backfill_metadata_from_logs(account_login: int | None = None,
 
 
 def _get_existing_tickets(account_login: int) -> set[int]:
-    """ดึง tickets ที่มีใน DB สำหรับ account นี้แล้ว"""
+    """ดึง tickets ที่มีใน DB สำหรับ account นี้แล้ว (proxy หรือ owner)."""
+    from config import SYMBOL
+    from db.connection import proxy_mode, proxy_get, get_client
+    if proxy_mode():
+        try:
+            data = proxy_get("trades/tickets", {"symbol": SYMBOL})   # scope account จาก key
+            return {int(t) for t in data.get("tickets", []) if t is not None}
+        except Exception as e:
+            logger.debug(f"_get_existing_tickets proxy error: {e}")
+            return set()
     try:
-        from db.connection import get_client
-        from config import SYMBOL
         res = (
             get_client().table("trades")
             .select("ticket")

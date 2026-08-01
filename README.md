@@ -375,6 +375,10 @@ call (`agents/ecosystem_monitor.py` → `/api/ecosystem`):
 - Per asset: last **1 h** % move · **WITH / AGAINST** gold (co-move sign) · the *typical* rolling H1
   correlation · a **⚠ divergence** flag when the current move contradicts that typical correlation
   (e.g. usually inverse but co-moving now), plus a WITH/AGAINST count.
+- **RSI reversal column** (next to divergence): H1 **RSI(14)** per asset + gold, flagged **⚠ OB**
+  (≥ `ECO_RSI_OB`, default 70 → reversal-down risk) or **⚠ OS** (≤ `ECO_RSI_OS`, default 30 →
+  reversal-up risk). Computed from the same H1 closes already fetched — no extra MT5 call, 0 token.
+  A reversal count sits beside the WITH/AGAINST counts.
 - A **sentiment banner** synthesising the pattern into a regime read — 🛡️ *safe-haven* (gold ↑,
   stocks ↓, VIX ↑), 🟢 *risk-on beta* (gold ↑ with stocks ↑, VIX ↓), 💵 *USD-driven* (gold vs a
   falling dollar), or ⚪ *mixed*.
@@ -676,6 +680,7 @@ are backed by a replay over 489 real closed trades (see `scripts/diagnose_trades
 | `MIN_TECH_CONF` | `62` | Confidence floor for every entry (conf 50-59 band: WR 23.5%) |
 | `ASIAN_MIN_CONF` | `72` | Asian/quiet session (0-7 UTC): ALL entries need this conf |
 | `COUNTER_SPIKE_PIPS` | `500` | Block entries against a fresh spike ≥ this (0 = off) |
+| `ECO_RSI_OB` / `ECO_RSI_OS` | `70` / `30` | Ecosystem Monitor RSI(14) overbought/oversold reversal thresholds (dashboard display-only) |
 | `NEWS_FIRST` | `true` | Block entries against a clear news/macro bias |
 | `NEWS_BIAS_MIN_CONF` | `55` | Analyst conf needed to count as "clear news bias" |
 | `HTF_FADE_BLOCK` | `true` | No SELL at D1/W1 SUPPORT / no BUY at RESISTANCE |

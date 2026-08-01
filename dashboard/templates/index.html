@@ -1936,11 +1936,11 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
           <thead><tr style="color:var(--muted);text-align:left">
             <th style="padding:4px 8px">asset</th><th style="padding:4px 8px">ราคา</th>
             <th style="padding:4px 8px">1h%</th><th style="padding:4px 8px">vs ทอง</th>
-            <th style="padding:4px 8px">corr ปกติ</th><th style="padding:4px 8px"></th>
+            <th style="padding:4px 8px">corr ปกติ</th><th style="padding:4px 8px">diverge</th><th style="padding:4px 8px">RSI / กลับตัว</th>
           </tr></thead>
-          <tbody id="eco-rows"><tr><td colspan="6" style="padding:4px 8px;color:var(--muted)">— รอข้อมูล (MT5 ต้องเปิด) —</td></tr></tbody>
+          <tbody id="eco-rows"><tr><td colspan="7" style="padding:4px 8px;color:var(--muted)">— รอข้อมูล (MT5 ต้องเปิด) —</td></tr></tbody>
         </table>
-        <div style="font-size:10px;color:var(--muted);margin-top:4px">vs ทอง = ทิศทาง 1h เทียบทอง (ตาม=WITH, สวน=AGAINST) · corr ปกติ = correlation H1 100 แท่ง · ⚠ = ตอนนี้วิ่งผิดจาก corr ปกติ (divergence) · intermarket = บริบทวิเคราะห์ ไม่ป้อน entry/gate</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">vs ทอง = ทิศทาง 1h เทียบทอง (ตาม=WITH, สวน=AGAINST) · corr ปกติ = correlation H1 100 แท่ง · ⚠ diverge = ตอนนี้วิ่งผิดจาก corr ปกติ · RSI = RSI(14) H1; ⚠ OB (≥70) โอกาสกลับตัวลง / ⚠ OS (≤30) โอกาสกลับตัวขึ้น · intermarket = บริบทวิเคราะห์ ไม่ป้อน entry/gate</div>
       </div>
     </section>
 
@@ -4781,16 +4781,18 @@ async function loadEcosystem() {
     if (!tb) return;
     const set = (id, v) => { const e = document.getElementById(id); if (e) e.innerHTML = v; };
     if (!d.ok || !d.rows) {
-      tb.innerHTML = '<tr><td colspan="6" style="padding:4px 8px;color:var(--muted)">' + (d.error || '— ไม่มีข้อมูล —') + '</td></tr>';
+      tb.innerHTML = '<tr><td colspan="7" style="padding:4px 8px;color:var(--muted)">' + (d.error || '— ไม่มีข้อมูล —') + '</td></tr>';
       return;
     }
     const g = d.gold || {}, s = d.sentiment || {};
     (function(){var _e=document.getElementById('eco-emoji');if(_e)_e.style.background=({'🟢':'var(--green)','🟡':'var(--amber)','🔴':'var(--red)','⚪':'var(--muted)'}[s.emoji]||'var(--muted)');})(); set('eco-label', s.label || '—'); set('eco-detail', s.detail || '');
     if (g.move !== null && g.move !== undefined) {
       const gc = g.move > 0 ? 'var(--green)' : (g.move < 0 ? 'var(--red)' : 'var(--muted)');
-      set('eco-gold', `ทอง ${g.price ? g.price.toLocaleString() : ''} <span style="color:${gc}">${g.move >= 0 ? '+' : ''}${g.move}%/1h</span>`);
+      const grsi = (g.rsi === null || g.rsi === undefined) ? ''
+        : ` · RSI ${g.rsi}${g.rsi_flag ? ` <span style="color:var(--amber)">⚠ ${g.rsi_flag === 'OB' ? 'OB↓' : 'OS↑'}</span>` : ''}`;
+      set('eco-gold', `ทอง ${g.price ? g.price.toLocaleString() : ''} <span style="color:${gc}">${g.move >= 0 ? '+' : ''}${g.move}%/1h</span>${grsi}`);
     }
-    set('eco-counts', `วิ่งตามทอง (WITH): <b style="color:var(--text)">${d.n_with}</b> · สวนทาง (AGAINST): <b style="color:var(--amber,var(--amber))">${d.n_against}</b>`);
+    set('eco-counts', `วิ่งตามทอง (WITH): <b style="color:var(--text)">${d.n_with}</b> · สวนทาง (AGAINST): <b style="color:var(--amber,var(--amber))">${d.n_against}</b> · เตือนกลับตัว (RSI): <b style="color:var(--amber)">${d.n_reversal || 0}</b>`);
     const relBadge = r => r.rel === 'WITH' ? '<span style="color:var(--green)">▲ ตาม</span>'
       : (r.rel === 'AGAINST' ? '<span style="color:var(--red)">▼ สวน</span>' : '<span style="color:var(--muted)">– นิ่ง</span>');
     tb.innerHTML = d.rows.map(r => {
@@ -4799,13 +4801,18 @@ async function loadEcosystem() {
       const tc = (r.typ_corr === null || r.typ_corr === undefined) ? '<span style="color:var(--muted)">—</span>'
         : `<span style="color:${r.typ_corr > 0 ? 'var(--green)' : 'var(--red)'}">${r.typ_corr > 0 ? '+' : ''}${r.typ_corr.toFixed(2)}</span>`;
       const price = (r.price === null || r.price === undefined) ? '—' : r.price.toLocaleString();
-      return `<tr style="text-align:left;border-top:1px solid var(--border)${r.diverge ? ';background:rgba(245,158,11,0.08)' : ''}">
+      const rsiCell = (r.rsi === null || r.rsi === undefined) ? '<span style="color:var(--muted)">—</span>'
+        : (r.rsi_flag
+            ? `<span style="color:var(--amber);font-weight:700">${r.rsi} ⚠ ${r.rsi_flag === 'OB' ? 'OB กลับตัว↓' : 'OS กลับตัว↑'}</span>`
+            : `<span style="color:var(--text-dim,var(--muted))">${r.rsi}</span>`);
+      return `<tr style="text-align:left;border-top:1px solid var(--border)${(r.diverge || r.rsi_flag) ? ';background:rgba(245,158,11,0.08)' : ''}">
         <td style="padding:4px 8px;font-weight:700">${r.label}</td>
         <td style="padding:4px 8px">${price}</td>
         <td style="padding:4px 8px">${mv}</td>
         <td style="padding:4px 8px">${relBadge(r)}</td>
         <td style="padding:4px 8px">${tc}</td>
         <td style="padding:4px 8px">${r.diverge ? '<span style="color:var(--amber,var(--amber))">⚠ diverge</span>' : ''}</td>
+        <td style="padding:4px 8px">${rsiCell}</td>
       </tr>`;
     }).join('');
   } catch (_e) {}

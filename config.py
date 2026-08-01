@@ -121,6 +121,9 @@ SL_MIN_GAP_PIPS       = int(os.getenv("SL_MIN_GAP_PIPS") or 800)
 MIN_TECHNICAL_CONFIDENCE = int(os.getenv("MIN_TECH_CONF") or 62)      # floor ทุก entry (HTF zone ไม่ลดแล้ว)
 ASIAN_MIN_CONF           = float(os.getenv("ASIAN_MIN_CONF") or 72)   # Asian 0-7 UTC ทุก entry
 COUNTER_SPIKE_PIPS       = float(os.getenv("COUNTER_SPIKE_PIPS") or 500)  # ห้ามเข้าสวนสไปก์ ≥ นี้ (0=ปิด)
+# ── Ecosystem Monitor (dashboard, display-only, 0 token, ไม่ป้อน entry/gate) ──
+ECO_RSI_OB = float(os.getenv("ECO_RSI_OB") or 70)   # RSI(14) H1 ≥ นี้ = overbought → เตือนโอกาสกลับตัว
+ECO_RSI_OS = float(os.getenv("ECO_RSI_OS") or 30)   # RSI(14) H1 ≤ นี้ = oversold → เตือนโอกาสกลับตัว
 # ── NEWS_GATE (flag, default OFF) — News Impact score ปรับ "conf floor" เท่านั้น ──
 # ยังไม่ validate → เปิดด้วยความระวัง. ไม่แตะ money mgmt / HTF-direction / counter-spike.
 NEWS_GATE             = os.getenv("NEWS_GATE", "false").lower() == "true"
@@ -378,6 +381,9 @@ def reload_config():
     MIN_TECHNICAL_CONFIDENCE = int(os.getenv("MIN_TECH_CONF") or 62)
     ASIAN_MIN_CONF           = float(os.getenv("ASIAN_MIN_CONF") or 72)
     COUNTER_SPIKE_PIPS       = float(os.getenv("COUNTER_SPIKE_PIPS") or 500)
+    global ECO_RSI_OB, ECO_RSI_OS
+    ECO_RSI_OB               = float(os.getenv("ECO_RSI_OB") or 70)
+    ECO_RSI_OS               = float(os.getenv("ECO_RSI_OS") or 30)
     global NEWS_GATE, NEWS_GATE_OPPOSE, NEWS_OPPOSE_PENALTY, NEWS_AGREE_RELAX
     global NEWS_GATE_HARD_FLOOR, NEWS_GATE_MIN_N, NEWS_GATE_MAX_AGE_MIN
     NEWS_GATE             = os.getenv("NEWS_GATE", "false").lower() == "true"

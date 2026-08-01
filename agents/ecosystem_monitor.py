@@ -53,6 +53,43 @@ def _sign(x):
     return 1 if x > 0 else -1
 
 
+def _rsi(hclose, n=14):
+    """Wilder RSI(14) จาก H1 close series ของ asset นั้นเอง (dict {ts:close}).
+    reuse ข้อมูลที่ดึงมาแล้ว = 0 extra MT5 call. คืน None ถ้า bar ไม่พอ."""
+    if not hclose or len(hclose) < n + 1:
+        return None
+    closes = [hclose[t] for t in sorted(hclose)]
+    deltas = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
+    gains = [d if d > 0 else 0.0 for d in deltas]
+    losses = [-d if d < 0 else 0.0 for d in deltas]
+    avg_g = sum(gains[:n]) / n
+    avg_l = sum(losses[:n]) / n
+    for i in range(n, len(deltas)):            # Wilder smoothing
+        avg_g = (avg_g * (n - 1) + gains[i]) / n
+        avg_l = (avg_l * (n - 1) + losses[i]) / n
+    if avg_l == 0:
+        return 100.0
+    rs = avg_g / avg_l
+    return round(100 - 100 / (1 + rs), 1)
+
+
+def _rsi_flag(rsi):
+    """OB (overbought) / OS (oversold) / None — เตือนโอกาสกลับตัว. threshold จาก config (tunable)."""
+    if rsi is None:
+        return None
+    try:
+        import config as _cfg
+        ob = float(getattr(_cfg, "ECO_RSI_OB", 70))
+        os_ = float(getattr(_cfg, "ECO_RSI_OS", 30))
+    except Exception:
+        ob, os_ = 70.0, 30.0
+    if rsi >= ob:
+        return "OB"
+    if rsi <= os_:
+        return "OS"
+    return None
+
+
 def _sentiment(gold_mv, rows):
     """สังเคราะห์ว่าการวิ่งของทองรอบนี้เป็นแบบไหน (rule-based, 0 token)."""
     mv = {r["key"]: (r["move"] or 0.0) for r in rows}
@@ -101,13 +138,16 @@ def ecosystem():
         gclose = _closes_h1(mt5, gsym)
         gmove, gprice = _move_1h(mt5, gsym, gclose)
         gsign = _sign(gmove)
+        grsi = _rsi(gclose)
+        grsi_flag = _rsi_flag(grsi)
 
         rows, n_with, n_against = [], 0, 0
         for key, label, kws, role in _ECO:
             sym = _pick_symbol(allsyms, kws)
             if not sym:
                 rows.append({"key": key, "label": label, "symbol": None, "price": None,
-                             "move": None, "rel": "—", "typ_corr": None, "diverge": False})
+                             "move": None, "rel": "—", "typ_corr": None, "diverge": False,
+                             "rsi": None, "rsi_flag": None})
                 continue
             mt5.symbol_select(sym, True)
             hclose = _closes_h1(mt5, sym)
@@ -127,14 +167,18 @@ def ecosystem():
                     diverge = True                    # ปกติตาม แต่ตอนนี้สวน
                 elif typ < -0.3 and rel == "WITH":
                     diverge = True                    # ปกติสวน แต่ตอนนี้ตาม
+            rsi = _rsi(hclose)
             rows.append({"key": key, "label": label, "symbol": sym, "price": price,
-                         "move": move, "rel": rel, "typ_corr": typ, "diverge": diverge, "role": role})
+                         "move": move, "rel": rel, "typ_corr": typ, "diverge": diverge,
+                         "rsi": rsi, "rsi_flag": _rsi_flag(rsi), "role": role})
 
+        n_reversal = sum(1 for r in rows if r.get("rsi_flag"))
         return {"ok": True,
-                "gold": {"symbol": gsym, "price": gprice, "move": gmove},
+                "gold": {"symbol": gsym, "price": gprice, "move": gmove,
+                         "rsi": grsi, "rsi_flag": grsi_flag},
                 "sentiment": _sentiment(gmove, rows),
-                "n_with": n_with, "n_against": n_against, "window": "1h",
-                "rows": rows}
+                "n_with": n_with, "n_against": n_against, "n_reversal": n_reversal,
+                "window": "1h", "rows": rows}
     finally:
         if not already:
             mt5.shutdown()

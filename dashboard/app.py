@@ -1759,7 +1759,8 @@ def api_trades_symbol():
 
 def _gold_spot_24_7():
     """ทอง 24/7 (เสาร์อาทิตย์) จาก gold-token บน crypto exchange — ฟรี ไม่ต้อง key ไม่มี limit.
-    ลำดับ: Binance XAUTUSDT → PAXGUSDT → CoinGecko → AlphaVantage. คืน {price, source} หรือ None."""
+    PAXG เกาะ spot จริงใกล้กว่า XAUT (premium ต่ำกว่า) → เป็น primary.
+    ลำดับ: Binance PAXGUSDT → XAUTUSDT → CoinGecko(PAXG→XAUT) → AlphaVantage. คืน {price, source} หรือ None."""
     import os as _os
     import urllib.request as _u
 
@@ -1768,8 +1769,10 @@ def _gold_spot_24_7():
         return json.loads(_u.urlopen(req, timeout=10).read().decode())
 
     for src, url, pick in (
-        ("XAUT/Binance", "https://api.binance.com/api/v3/ticker/price?symbol=XAUTUSDT", lambda d: float(d["price"])),
         ("PAXG/Binance", "https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", lambda d: float(d["price"])),
+        ("XAUT/Binance", "https://api.binance.com/api/v3/ticker/price?symbol=XAUTUSDT", lambda d: float(d["price"])),
+        ("PAXG/CoinGecko", "https://api.coingecko.com/api/v3/simple/price?ids=pax-gold&vs_currencies=usd",
+         lambda d: float(d["pax-gold"]["usd"])),
         ("XAUT/CoinGecko", "https://api.coingecko.com/api/v3/simple/price?ids=tether-gold&vs_currencies=usd",
          lambda d: float(d["tether-gold"]["usd"])),
     ):
@@ -2226,6 +2229,28 @@ def _pair_collector_loop():
             except Exception:
                 pass
         _t.sleep(getattr(pc, "INTERVAL", 60))
+
+
+# ── Local-only plugins (gitignored: dashboard/local_*.py) — optional add-ons ──
+# ไฟล์ local_*.py ที่มี register(app) จะถูกโหลดตอน start (เช่น admin account manager).
+# committed footprint = loader ทั่วไปนี้เท่านั้น; ตัว plugin ไม่ถูก push จนกว่าจะอนุญาต.
+def _load_local_plugins():
+    import glob
+    import importlib.util
+    for _path in sorted(glob.glob(os.path.join(_BASE, "local_*.py"))):
+        try:
+            _spec = importlib.util.spec_from_file_location(
+                os.path.splitext(os.path.basename(_path))[0], _path)
+            _mod = importlib.util.module_from_spec(_spec)
+            _spec.loader.exec_module(_mod)
+            if hasattr(_mod, "register"):
+                _mod.register(app)
+                print(f"[local-plugin] loaded {os.path.basename(_path)}")
+        except Exception as _e:
+            print(f"[local-plugin] {os.path.basename(_path)} failed: {_e}")
+
+
+_load_local_plugins()
 
 
 if __name__ == "__main__":
