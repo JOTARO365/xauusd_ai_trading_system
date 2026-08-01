@@ -10,6 +10,8 @@ strategy is introduced here; a new non-XAUUSD algo is Batch D, only after shadow
 
 Frozen interfaces — docs/ARCHITECTURE_batchB.md §4.1/§4.2.
 """
+from datetime import datetime, timezone
+
 import numpy as np
 
 from agents.regime_shadow import compute_shadow_signal, _MIN_BARS
@@ -153,7 +155,117 @@ class TSMOMDailyAlgo(Algo):
         }
 
 
-ALGO_REGISTRY = {a.algo_id: a for a in (RegimeMomentumAlgo(), MeanReversionAlgo(), TSMOMDailyAlgo())}
+class MomentumFVGAlgo(Algo):
+    """SMC candidate (IMPROVED momentum) — momentum_breakout + FVG confluence filter.
+    เข้าเมื่อ momentum ให้สัญญาณ TREND *และ* มี Fair-Value-Gap (imbalance 3 แท่ง) หนุนทิศ
+    ภายใน FVG_LOOKBACK แท่งล่าสุด. FVG = gap-only (bars ไม่มี open): bull low[j]>high[j-2] / bear high[j]<low[j-2].
+
+    ⚠️ SHADOW-ONLY: backtest (scripts/smc_backtest.py) = in-sample ดีขึ้นแต่ไม่รอด OOS (window bias) →
+    ไม่มี edge พิสูจน์แล้ว. เปิด shadow เพื่อเก็บ forward-OOS เทียบ regime_momentum เฉยๆ. ไม่ live."""
+    algo_id = "regime_momentum_fvg"
+    version = 1
+    klass = "scalp"
+    eligible_pairs = UNIVERSE
+    FVG_LOOKBACK = 6
+
+    def evaluate(self, symbol, bars, ctx=None, point=None):
+        high, low, close, times = bars
+        rec = compute_shadow_signal(high, low, close, times, point=point)
+        if not rec:
+            return None
+        sig = rec.get("signal")
+        if not sig or sig.get("algo") != "momentum_breakout":
+            return None
+        n = len(close); i = n - 2
+        d = sig["dir"]; ok = False
+        for j in range(max(2, i - self.FVG_LOOKBACK), i + 1):     # FVG confluence หนุนทิศ
+            if d == "BUY" and low[j] > high[j - 2]:
+                ok = True; break
+            if d == "SELL" and high[j] < low[j - 2]:
+                ok = True; break
+        if not ok:
+            return None                                          # ไม่มี FVG หนุน → ข้าม (นี่คือ "filter")
+        return {
+            "algo_id": self.algo_id, "symbol": symbol, "dir": d,
+            "entry": rec["close"], "sl_pips": sig["sl_pips"], "tp_pips": sig["tp_pips"],
+            "regime": rec["regime"], "bar_ts": rec["bar_ts"], "klass": self.klass,
+        }
+
+
+class SweepReversalAlgo(Algo):
+    """SMC candidate (NEW algo) — liquidity-sweep reversal: fade การ sweep prior-day H/L
+    ที่ปิดกลับเข้าใน เฉพาะ regime NEUTRAL/RANGE (ไม่ fade TREND). SL เลยปลาย sweep + BUF×ATR, TP = RR×SL.
+    prior-day H/L คำนวณจากแท่ง H1 เอง (bucket UTC วันก่อนหน้า) — causal, ไม่ต้องพึ่ง D1.
+
+    ⚠️ SHADOW-ONLY: backtest = −EV (WR สูง/RR ต่ำ = กับดัก; fade สู้ cascade). เปิด shadow เก็บ forward
+    เพื่อยืนยัน/หักล้าง. ไม่ live."""
+    algo_id = "sweep_reversal"
+    version = 1
+    klass = "scalp"
+    eligible_pairs = UNIVERSE
+    BUF_ATR = 0.5
+    RR = 1.5
+
+    def _prior_day_hl(self, high, low, times, i):
+        """H/L ของวัน UTC ก่อนหน้าล่าสุด (ปิดแล้ว) จากแท่ง H1. คืน (pdh, pdl) หรือ (None,None)."""
+        di = datetime.fromtimestamp(int(times[i]), timezone.utc).date()
+        pdh = pdl = None; prev_date = None
+        for j in range(i - 1, max(-1, i - 300), -1):
+            dj = datetime.fromtimestamp(int(times[j]), timezone.utc).date()
+            if dj >= di:
+                continue
+            if prev_date is None:
+                prev_date = dj
+            if dj == prev_date:
+                pdh = high[j] if pdh is None else max(pdh, high[j])
+                pdl = low[j] if pdl is None else min(pdl, low[j])
+            else:
+                break                                            # ข้ามไปวันก่อนหน้านั้น → พอ
+        return pdh, pdl
+
+    def evaluate(self, symbol, bars, ctx=None, point=None):
+        high, low, close, times = bars
+        n = len(close)
+        if n < _MIN_BARS or not point:
+            return None
+        er = R.efficiency_ratio(close); adx_v = R.adx(high, low, close)
+        volpct = R.vol_percentile(close); atr_v = R.atr(high, low, close)
+        i = n - 2
+        reg = R.detect_regime(er[i], adx_v[i], volpct[i])
+        if reg not in ("NEUTRAL", "RANGE"):                      # ไม่ fade ใน TREND
+            return None
+        av = float(atr_v[i]) if atr_v[i] == atr_v[i] else 0.0
+        if av <= 0:
+            return None
+        pdh, pdl = self._prior_day_hl(high, low, times, i)
+        if pdh is None or pdl is None:
+            return None
+        d = swept = None
+        if high[i] > pdh and close[i] < pdh:
+            d, swept = "SELL", high[i]
+        elif low[i] < pdl and close[i] > pdl:
+            d, swept = "BUY", low[i]
+        if d is None:
+            return None
+        sign = 1 if d == "BUY" else -1
+        sl_pips = abs(float(close[i]) - (swept - sign * self.BUF_ATR * av)) / point
+        if sl_pips <= 0:
+            return None
+        try:
+            bar_ts = datetime.fromtimestamp(int(times[i]), timezone.utc).isoformat()
+        except Exception:
+            return None
+        return {
+            "algo_id": self.algo_id, "symbol": symbol, "dir": d,
+            "entry": float(close[i]), "sl_pips": sl_pips, "tp_pips": sl_pips * self.RR,
+            "regime": reg, "bar_ts": bar_ts, "klass": self.klass,
+        }
+
+
+ALGO_REGISTRY = {a.algo_id: a for a in (
+    RegimeMomentumAlgo(), MeanReversionAlgo(), TSMOMDailyAlgo(),
+    MomentumFVGAlgo(), SweepReversalAlgo(),
+)}
 
 
 def get(algo_id):
