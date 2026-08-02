@@ -114,23 +114,36 @@ def _gather():
 
 
 def _week_bars():
-    """W1 bars จาก MT5 → last_week (บาร์ปิดล่าสุด = สัปดาห์ที่แล้ว) + this_week (บาร์ปัจจุบัน).
-    pct_chg = (close−open)/open ต่อสัปดาห์. กัน LLM สรุปสัปดาห์ที่แล้วด้วยข้อมูลสัปดาห์นี้."""
+    """W1 bars จาก MT5 → last_week / this_week เลือกด้วย **วันที่จริง** (จันทร์ของสัปดาห์) เทียบสัปดาห์ปัจจุบัน
+    (local) ไม่ใช่ index — กันเคสแท่งสัปดาห์ใหม่ยังไม่ก่อ → last_week ชี้ผิดสัปดาห์ (เช่นเห็น 19 ก.ค.).
+    broker W1 เปิดวันอาทิตย์ → เลื่อนเป็นจันทร์ของสัปดาห์นั้น. label = ช่วง จ.–ศ. ให้ LLM อ้างวันถูก."""
     try:
         import MetaTrader5 as mt5
         import config as _cfg
         from connectors.price_feed import get_ohlcv
-        from datetime import datetime, timezone
-        r = get_ohlcv(_cfg.SYMBOL, mt5.TIMEFRAME_W1, 4)
+        from datetime import datetime, timezone, timedelta, date
+        r = get_ohlcv(_cfg.SYMBOL, mt5.TIMEFRAME_W1, 6)
         if r is None or len(r) < 2:
             return {}
+        today = datetime.now()                                       # local (ตรงกับ _iso_week)
+        cur_mon = (today - timedelta(days=today.weekday())).date()   # จันทร์สัปดาห์นี้
 
-        def _bar(x):
+        def _wk(x):
             o, h, l, c = float(x["open"]), float(x["high"]), float(x["low"]), float(x["close"])
-            return {"date": datetime.fromtimestamp(int(x["time"]), timezone.utc).strftime("%Y-%m-%d"),
+            bd = datetime.fromtimestamp(int(x["time"]), timezone.utc).date()
+            mon = bd + timedelta(days=(0 - bd.weekday()) % 7)        # อาทิตย์(เปิด)→จันทร์สัปดาห์นั้น
+            return {"week_of": f"{mon:%Y-%m-%d}(จ.)–{mon + timedelta(days=4):%Y-%m-%d}(ศ.)",
+                    "monday": mon.isoformat(),
                     "open": round(o, 2), "high": round(h, 2), "low": round(l, 2), "close": round(c, 2),
                     "pct_chg": round((c - o) / o * 100, 2) if o else None}
-        return {"last_week": _bar(r[-2]), "this_week": _bar(r[-1])}
+        bars = [_wk(x) for x in r]
+        by_mon = {date.fromisoformat(b["monday"]): b for b in bars}
+        this_wk = by_mon.get(cur_mon)
+        last_wk = by_mon.get(cur_mon - timedelta(days=7))
+        if last_wk is None:                                          # fallback: สัปดาห์ที่ปิดล่าสุดก่อนสัปดาห์นี้
+            prev = [b for b in bars if date.fromisoformat(b["monday"]) < cur_mon]
+            last_wk = prev[-1] if prev else None
+        return {k: v for k, v in {"last_week": last_wk, "this_week": this_wk}.items() if v}
     except Exception:
         return {}
 
@@ -204,7 +217,7 @@ _PROMPT = """ข้อมูลจริงสำหรับวิเครา�
 ## 📅 สรุปข่าว & ตลาดสัปดาห์ที่แล้ว
 เล่าให้ละเอียด (4-6 บรรทัด): ข่าว/ตัวเลข/เหตุการณ์ภูมิรัฐศาสตร์เด่นสัปดาห์ที่ปิดไป + ทองตอบสนองยังไง +
 กลไกที่ขับ (Fed/DXY/safe-haven). **ราคาใช้ gold_tech.last_week เท่านั้น (open/close/high/low/pct) ห้ามใช้ this_week**.
-อ้าง recent_headlines + world.headlines จริง
+**อ้างวันที่จาก gold_tech.last_week.week_of (ช่วง จ.–ศ.) เท่านั้น — ห้ามเดา/คำนวณวันเอง**. อ้าง recent_headlines + world.headlines จริง
 
 ## 🌍 ภูมิรัฐศาสตร์ & Safe-Haven
 เจาะลึกปัจจัยภูมิรัฐศาสตร์ที่มีผลต่อทองตอนนี้ (จาก world.events/headlines/attention): เหตุการณ์อะไร ระดับความตึงเครียด
