@@ -1802,11 +1802,33 @@ def api_trades_symbol():
 
 
 def _gold_spot_24_7():
-    """ทอง 24/7 (เสาร์อาทิตย์) จาก gold-token บน crypto exchange — ฟรี ไม่ต้อง key ไม่มี limit.
-    PAXG เกาะ spot จริงใกล้กว่า XAUT (premium ต่ำกว่า) → เป็น primary.
-    ลำดับ: Binance PAXGUSDT → XAUTUSDT → CoinGecko(PAXG→XAUT) → AlphaVantage. คืน {price, source} หรือ None."""
+    """ทอง 24/7 (เสาร์อาทิตย์). **primary = XM GOLD24-7# (MT5)** — ทองจริงบนโบรกเดียวกับที่เทรด,
+    ไม่มี USDT basis/depeg. fallback = gold-token crypto (PAXG→XAUT→CoinGecko) → AlphaVantage.
+    ตั้ง GOLD_SPOT_247_SYMBOL ใน .env เพื่อระบุชื่อ symbol ตรงๆ (ถ้า keyword หาไม่เจอ). คืน {price, source} หรือ None."""
     import os as _os
     import urllib.request as _u
+
+    # 0) XM native 24/7 gold — เทรดเสาร์อาทิตย์ = ราคาทองจริง (ดีกว่า token)
+    try:
+        if _MT5_AVAILABLE and _ensure_mt5():
+            with _MT5_LOCK:
+                fixed = _os.getenv("GOLD_SPOT_247_SYMBOL", "").strip()
+                cands = [fixed] if fixed else []
+                if not cands:
+                    allsyms = [s.name for s in (mt5.symbols_get() or [])]
+                    up = {n: n.upper() for n in allsyms}
+                    cands = sorted([n for n in allsyms if "GOLD" in up[n]
+                                    and any(k in up[n] for k in ("24-7", "24_7", "247", "GOLD24"))], key=len)
+                for n in cands:
+                    if not n:
+                        continue
+                    mt5.symbol_select(n, True)
+                    t = mt5.symbol_info_tick(n)
+                    px = float(t.bid or t.ask or getattr(t, "last", 0) or 0) if t else 0.0
+                    if px > 0:
+                        return {"price": px, "source": f"XM {n}"}
+    except Exception:
+        pass
 
     def _get(url):
         req = _u.Request(url, headers={"User-Agent": "Mozilla/5.0"})
