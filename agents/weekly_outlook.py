@@ -15,8 +15,12 @@ _MODEL = os.getenv("WEEKLY_OUTLOOK_MODEL", "claude-opus-4-8")   # env-override �
 
 
 def _iso_week(dt=None):
+    """ISO week ตาม **เวลาเครื่อง (local)** — ขอบสัปดาห์ = จันทร์ท้องถิ่น.
+    เดิมใช้ UTC → จันทร์เช้าไทย (UTC+7) ยังเป็นอาทิตย์ใน UTC → บทวิเคราะห์ roll สัปดาห์ช้า 7 ชม.
+    (bot รันเครื่อง user เดียว → local = โซนผู้ใช้). ตั้ง WEEKLY_OUTLOOK_UTC=true เพื่อกลับไปใช้ UTC."""
     from datetime import datetime, timezone
-    dt = dt or datetime.now(timezone.utc)
+    if dt is None:
+        dt = datetime.now(timezone.utc) if os.getenv("WEEKLY_OUTLOOK_UTC", "").lower() == "true" else datetime.now()
     y, w, _ = dt.isocalendar()
     return f"{y}-W{w:02d}"
 
