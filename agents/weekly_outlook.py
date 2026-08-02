@@ -193,7 +193,8 @@ _SYSTEM = """คุณคือนักวิเคราะห์ตลาด�
 - active voice ประธานชัด · สลับสั้น-ยาว · ห้าม em-dash (—) · ห้ามลงท้ายด้วยวลี pull-quote
 - ห้าม generalize ลอย ("ทุกครั้ง/เสมอ") · เชื่อผู้อ่าน บอกตรงๆ
 - ส่วนข่าว/geopolitics เขียนให้ "ละเอียด มีเนื้อหา" — เล่าเหตุการณ์ + กลไกส่งผลต่อทอง + ตัวเลข ไม่ใช่แค่ bullet สั้น
-- ยึดเฉพาะข้อมูลจริงที่ผู้ใช้ให้ (calendar/scenarios/news/macro/COT/world) — ห้ามแต่งตัวเลข/เหตุการณ์เอง"""
+- ยึดเฉพาะข้อมูลจริงที่ผู้ใช้ให้ (calendar/scenarios/news/macro/COT/world) — ห้ามแต่งตัวเลข/เหตุการณ์เอง
+- **ยึด "สัปดาห์ที่ต้องวิเคราะห์" (ช่วงจันทร์–อาทิตย์) ที่ระบุต้น prompt เสมอ** — วิเคราะห์เฉพาะสัปดาห์นั้น อ้าง event/ราคาให้ตรงช่วง ไม่ปนสัปดาห์อื่น"""
 
 _PROMPT = """ข้อมูลจริงสำหรับวิเคราะห์ (JSON):
 {context}
@@ -252,7 +253,12 @@ def build(force=False):
         _maxtok = int(os.getenv("WEEKLY_OUTLOOK_MAX_TOKENS") or 6000)   # cap (ไม่ใช่ cost); +geopolitics section = ยาวขึ้น
         llm = ChatAnthropic(model=_MODEL, api_key=_cfg.ANTHROPIC_API_KEY,
                             max_tokens=_maxtok, timeout=120)   # ไม่ตั้ง temperature — Opus 4.8 deprecated
-        user_msg = _PROMPT.format(context=json.dumps(ctx, ensure_ascii=False)[:60000])   # กว้าง — Opus รับได้เยอะ
+        from datetime import datetime as _dt, timedelta as _td
+        _now = _dt.now()                                   # local — ขอบสัปดาห์จันทร์ท้องถิ่น (ตรงกับ _iso_week)
+        _mon = _now - _td(days=_now.weekday()); _sun = _mon + _td(days=6)
+        _whdr = (f"สัปดาห์ที่ต้องวิเคราะห์: **{wk}** (จันทร์ {_mon:%Y-%m-%d} ถึง อาทิตย์ {_sun:%Y-%m-%d}). "
+                 f"เขียน 'แนวโน้มประจำสัปดาห์นี้' สำหรับช่วงวันนี้เท่านั้น — 'สัปดาห์ที่แล้ว' = จันทร์ก่อนหน้า.\n\n")
+        user_msg = _whdr + _PROMPT.format(context=json.dumps(ctx, ensure_ascii=False)[:60000])   # กว้าง — Opus รับได้เยอะ
         resp = llm.invoke([SystemMessage(content=_SYSTEM), HumanMessage(content=user_msg)])
         md = resp.content if isinstance(resp.content, str) else str(resp.content)
         usage = getattr(resp, "usage_metadata", None) or {}
