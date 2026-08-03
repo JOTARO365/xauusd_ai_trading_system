@@ -243,9 +243,9 @@ not a value dump):
 
 ## 🗓️ ปฏิทิน & Scenario สัปดาห์นี้
 For each key event in calendar: date/time + hot→gold direction / cool→gold direction. Base magnitudes on
-event_scenarios (magnitude% + n) — do not guess; if an event has no stats, say "ไม่มีสถิติ". Express the
-sample size in plain Thai words when it adds confidence (e.g. "อิงสถิติราว 180 ครั้งที่ผ่านมา"), never
-print a bare token like "n=180".
+event_scenarios (magnitude% + n) — do not guess; if an event has no stats, say "ไม่มีสถิติ". Convey the
+statistic's reliability from n as a Thai WORD, never the raw count or "n=": n≥100 → "ความน่าเชื่อถือสูง",
+30–100 → "ปานกลาง", <30 → "ต่ำ (ตัวอย่างน้อย)".
 
 ## ⚠️ เฝ้าระวัง (Risk Factors)
 This week's risks — bullets + short reason: geopolitics (world) + market risk mood + major calendar events.
