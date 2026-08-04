@@ -1789,6 +1789,31 @@ def api_volume_profile():
     return jsonify(_cached(f"volprofile:{broker}:{tf}:{count}", _fetch, ttl=60))
 
 
+@app.route("/api/options-oi")
+def api_options_oi():
+    """Gold options open-interest walls (GLD chain via CBOE → XAU price). proxy 'สัญญาถือ ณ ราคา'
+    ของจริง (options OI) สำหรับ S/R Book. spot ทองจาก MT5. display-only, 0 token (HTTP ไม่ใช่ LLM)."""
+    def _fetch():
+        spot = None
+        if _MT5_AVAILABLE and _ensure_mt5():
+            with _MT5_LOCK:
+                tick = mt5.symbol_info_tick(SYMBOL)
+            if tick and tick.bid:
+                spot = float(tick.bid)
+        if spot is None:                                   # fallback: ราคาล่าสุดจาก bot_status
+            try:
+                with open(os.path.join(_BASE, "../logs/bot_status.json"), encoding="utf-8") as f:
+                    bs = json.load(f)
+                spot = float((bs.get("price_info") or {}).get("bid") or 0) or None
+            except Exception:
+                spot = None
+        if not spot:
+            return {"ok": False, "error": "no gold spot (MT5/bot_status)"}
+        from agents.options_oi import build
+        return build(spot)
+    return jsonify(_cached("options-oi", _fetch, ttl=1800))
+
+
 @app.route("/api/live-symbols")
 def api_live_symbols():
     """คู่ที่ดูได้ในกราф: ทอง (engine) + combo ที่ toggle LIVE + คู่ที่มี open position. 0 token."""

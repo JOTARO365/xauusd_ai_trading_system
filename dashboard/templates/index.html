@@ -6685,6 +6685,7 @@ async function loadMonitor() {
     renderVerdict(bs);
     renderZones(bs);
     loadVolProfile('XAUUSD', '');       // volume profile ทอง (throttle server 60s; re-render เมื่อมา)
+    if (!window._optionsOi.XAUUSD) loadOptionsOi();   // options OI ทอง (server cache 30min; โหลดครั้งเดียว/รอบ tab)
     renderFib(bs);
     renderLiquidity(bs);
     renderVolume(bs);
@@ -6915,6 +6916,19 @@ function _srLadderHTML(z, px, pipDiv, sym) {     // ladder HTML ใช้ร่�
     const lbl = isPoc ? ' VPOC' : (inVa ? ' VA' : '');
     return ` <span title="volume-share ณ ราคานี้ = proxy สัญญาถือ/กิจกรรม (VPOC=หนาสุด · VA=โซน 70%)" style="color:${col};font-size:9px;font-weight:700">📊${pct}%${lbl}</span>`;
   };
+  // options OI wall (gold only — GLD = proxy ทอง): put-heavy=support(เขียว) call-heavy=resistance(แดง)
+  const oi = sym === 'XAUUSD' ? ((window._optionsOi || {}).XAUUSD || null) : null;
+  const oiTagFor = lv => {
+    if (!oi || !oi.ok) return '';
+    const tol = lv * 0.005;
+    const hit = (oi.strikes || []).filter(s => Math.abs(s.xau - lv) <= tol)
+      .sort((a, b) => Math.abs(a.xau - lv) - Math.abs(b.xau - lv))[0];
+    if (!hit || !hit.total_oi) return '';
+    const k = hit.total_oi >= 1000 ? (hit.total_oi / 1000).toFixed(0) + 'k' : hit.total_oi;
+    const col = hit.kind === 'support' ? 'var(--green)' : hit.kind === 'resistance' ? 'var(--red)' : 'var(--muted)';
+    const dom = hit.put_oi > hit.call_oi ? 'put' : 'call';
+    return ` <span title="options OI ที่ strike GLD ${hit.gld} (≈XAU ${hit.xau}) — call ${hit.call_oi} / put ${hit.put_oi} = ${hit.kind}" style="color:${col};font-size:9px;font-weight:700">OI ${k}<span style="opacity:.6">${dom}</span></span>`;
+  };
   const setups = z.setups || [];
   const srMeta = z.sr_meta || [];
   const htf = z.htf_zone || null;
@@ -6964,7 +6978,7 @@ function _srLadderHTML(z, px, pipDiv, sym) {     // ladder HTML ใช้ร่�
       <span style="width:72px;color:${color};font-weight:700">${lv.toFixed(2)}</span>
       <span style="width:52px;color:var(--muted);font-size:10px">${dist}</span>
       <span style="width:40px;color:var(--muted);font-size:10px">${st ? st + '%' : ''}</span>
-      <div style="flex:1">${bar}</div>${scoreTag}${confTag}${holdTag}${htfTag}${volTagFor(lv)}<span style="color:var(--muted);font-size:9px">▾</span></div>${whyLine}
+      <div style="flex:1">${bar}</div>${scoreTag}${confTag}${holdTag}${htfTag}${volTagFor(lv)}${oiTagFor(lv)}<span style="color:var(--muted);font-size:9px">▾</span></div>${whyLine}
       <div id="${rid}" style="display:none;padding:2px 0 8px 82px;font-size:10px;color:var(--dim);line-height:1.7"></div>`;
   };
   const res = (z.resistance || []).slice().sort((a, b) => b - a);
@@ -6978,8 +6992,8 @@ function _srLadderHTML(z, px, pipDiv, sym) {     // ladder HTML ใช้ร่�
 }
 function renderZones(bs) {
   const el = document.getElementById('zone-ladder'); if (!el) return;
-  window._lastBs = bs;                            // เก็บไว้ re-render เมื่อ volume profile มาถึง
-  el.innerHTML = _volProfileHeader('XAUUSD') + _srLadderHTML(bs.zones || {}, (bs.price_info || {}).bid, 0.01, 'XAUUSD');
+  window._lastBs = bs;                            // เก็บไว้ re-render เมื่อ volume profile / options OI มาถึง
+  el.innerHTML = _volProfileHeader('XAUUSD') + _optionsOiHeader() + _srLadderHTML(bs.zones || {}, (bs.price_info || {}).bid, 0.01, 'XAUUSD');
 }
 
 // ── Volume Profile (A): proxy "สัญญาถือ ณ ราคา" ต่อ S/R Book — VPOC/VA จาก MT5 tick_volume ──
@@ -7000,6 +7014,29 @@ async function loadVolProfile(key, apiSym) {
     window._volProfile[key] = d;
     if (key === 'XAUUSD' && !_srTab && window._lastBs) renderZones(window._lastBs);   // re-render (ไม่ fetch ซ้ำ)
     else if (key === _srTab) renderSrPairDetail(_srTab);
+  } catch (_e) {}
+}
+
+// ── Options OI walls (B): GLD options chain (CBOE) → XAU price. ทองเท่านั้น (GLD=proxy ทอง) ──
+window._optionsOi = window._optionsOi || {};
+function _optionsOiHeader() {
+  const oi = window._optionsOi.XAUUSD;
+  if (!oi || !oi.ok) return '';
+  const r = oi.top_resistance, s = oi.top_support;
+  const kfmt = v => v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v;
+  return `<div style="font-size:10px;color:var(--muted);margin-bottom:6px;border-bottom:1px dashed var(--border);padding-bottom:5px">
+    🎯 Options OI (GLD→XAU · ≤${oi.front_days}วัน · ${oi.asof})
+    · max-pain <b style="color:var(--gold)">${oi.max_pain_xau ? oi.max_pain_xau.toFixed(0) : '—'}</b>
+    ${r ? `· ต้าน <b style="color:var(--red)">${r.xau.toFixed(0)}</b> (call ${kfmt(r.call_oi)})` : ''}
+    ${s ? `· รับ <b style="color:var(--green)">${s.xau.toFixed(0)}</b> (put ${kfmt(s.put_oi)})` : ''}
+    <span style="opacity:.7">— OI จริงจาก GLD options (proxy ทอง · strike หยาบ)</span></div>`;
+}
+async function loadOptionsOi() {
+  try {
+    const d = await (await fetch('/api/options-oi')).json();
+    if (!d || !d.ok) return;
+    window._optionsOi.XAUUSD = d;
+    if (!_srTab && window._lastBs) renderZones(window._lastBs);      // re-render ทอง (ไม่ fetch ซ้ำ)
   } catch (_e) {}
 }
 
@@ -7636,6 +7673,7 @@ function _bootstrap() {
   setInterval(loadAlgoJournal, 15000);      // Trade score — algo journal — realtime
   setInterval(loadShadowMatrix, 30000); setInterval(loadShadowTsmom, 30000); setInterval(loadRealEdge, 30000); setInterval(loadAlgoSelector, 30000);     // Batch B — multi-pair shadow matrix
   setInterval(loadRegimeAnalytics, 60000);  // regime analytics + ALGO monitor (N-gauge) — compute live, refresh 60s
+  setInterval(loadOptionsOi, 1800000);      // options OI walls (GLD→XAU) — OI = daily figure, refresh 30min
   setInterval(() => { const t = document.getElementById('tab-backtest');   // Performance Breakdown — ค่าปัจจุบัน ระหว่างเปิด Analytics
     if (t && t.classList.contains('active')) loadBacktest(); }, 30000);
   loadDeskTicker();

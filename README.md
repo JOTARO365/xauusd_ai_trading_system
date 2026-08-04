@@ -361,6 +361,13 @@ via `bot_status.json` — these fields are **never sent to the LLM** (no token c
   `tick_volume` (`/api/volume-profile`, H1×500). Spot XAUUSD is OTC — it has **no market-wide open
   interest / order book**, so this activity-at-price is the closest free proxy for "how many
   contracts sit at a level"; it is *transacted activity*, not resting size. `agents/volume_profile.py`
+- **Options OI walls 🎯** (real open interest) — gold **options** open interest per strike, the
+  closest *real* "contracts held at a price". Pulled key-free from the **CBOE GLD** chain (delayed),
+  aggregated call/put OI over front expiries (≤60d), each GLD strike converted to an XAU-price
+  equivalent (`factor = XAU_spot / GLD_price`). Put-heavy strike below = **support** (green), call-heavy
+  above = **resistance** (red); the payout-minimising strike = **max-pain** magnet. `/api/options-oi`
+  (cache 30 min — OI is a daily figure), `agents/options_oi.py`. Caveat: GLD ≈ proxy for gold (not
+  COMEX GC), strikes are coarse ($1–$5 GLD ≈ $11–$54 XAU).
 - **Fair Value Gap (FVG)** — unfilled SMC 3-candle imbalances (entry / target zones)
 - **Liquidity pools** (BSL / SSL equal-high/low stop clusters) · **Volume wall** + buy/sell
   tick-flow imbalance (labelled *tick-volume*, not contract volume)
