@@ -1753,6 +1753,42 @@ def api_candles():
     return jsonify(_cached(f"candles:{broker}:{tf}:{count}", _fetch, ttl=10))
 
 
+@app.route("/api/volume-profile")
+def api_volume_profile():
+    """Volume-at-price (VPOC / value area) จาก MT5 tick_volume — proxy 'ความหนาแน่นสัญญา
+    ณ ราคา' สำหรับ S/R Book. spot ไม่มี OI จริง → ใช้ volume profile แทน. display-only, 0 token."""
+    tf = request.args.get("tf", "H1").upper()
+    sym_arg = (request.args.get("symbol", "") or "").strip()          # logical (ว่าง=ทอง)
+    if tf not in ("M15", "H1", "H4", "D1"):
+        tf = "H1"
+    try:
+        count = min(int(request.args.get("count", 500)), 1000)
+    except ValueError:
+        count = 500
+    broker = SYMBOL
+    if sym_arg:
+        try:
+            from connectors.pair_collector import _broker_map
+            broker = _broker_map().get(sym_arg, sym_arg)
+        except Exception:
+            broker = sym_arg
+
+    def _fetch():
+        if not _MT5_AVAILABLE or not _ensure_mt5():
+            return {"ok": False, "error": "MT5 not connected", "symbol": sym_arg or SYMBOL}
+        with _MT5_LOCK:
+            rates = mt5.copy_rates_from_pos(broker, _TF_MAP[tf], 0, count)
+        if rates is None or len(rates) == 0:
+            return {"ok": False, "symbol": sym_arg or SYMBOL, "broker": broker,
+                    "error": f"no bars for '{broker}' — {mt5.last_error()}"}
+        from agents.volume_profile import compute
+        out = compute(rates)
+        out["symbol"] = sym_arg or SYMBOL
+        out["tf"] = tf
+        return out
+    return jsonify(_cached(f"volprofile:{broker}:{tf}:{count}", _fetch, ttl=60))
+
+
 @app.route("/api/live-symbols")
 def api_live_symbols():
     """คู่ที่ดูได้ในกราф: ทอง (engine) + combo ที่ toggle LIVE + คู่ที่มี open position. 0 token."""

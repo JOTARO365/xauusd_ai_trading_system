@@ -5008,7 +5008,8 @@ async function renderSrPairDetail(sym) {          // ladder เหมือน�
   try {
     const d = await (await fetch('/api/sr-ladder?symbol=' + encodeURIComponent(sym))).json();
     if (!d.ok) { det.innerHTML = `<span style="color:var(--muted)">${d.error || 'ไม่มีข้อมูล'}</span>`; return; }
-    det.innerHTML = _srLadderHTML(d.zones || {}, d.price, d.point || 0.01, sym);
+    det.innerHTML = _volProfileHeader(sym) + _srLadderHTML(d.zones || {}, d.price, d.point || 0.01, sym);
+    if (!window._volProfile[sym]) loadVolProfile(sym, sym);   // ดึง VP คู่นี้ (re-render เมื่อมา)
   } catch (_e) { det.innerHTML = '<span style="color:var(--muted)">โหลดไม่ได้</span>'; }
 }
 
@@ -6683,6 +6684,7 @@ async function loadMonitor() {
 
     renderVerdict(bs);
     renderZones(bs);
+    loadVolProfile('XAUUSD', '');       // volume profile ทอง (throttle server 60s; re-render เมื่อมา)
     renderFib(bs);
     renderLiquidity(bs);
     renderVolume(bs);
@@ -6894,8 +6896,25 @@ async function toggleSrDetail(id, sym, lv, kind) {
   } catch (_e) { el.innerHTML = '<span style="color:var(--muted)">โหลดสถิติไม่ได้</span>'; }
 }
 
+function _volPctAt(vp, price) {                   // volume-share % ของ bin ที่ครอบ price (mirror volume_profile.pct_at)
+  if (!vp || !vp.ok || !vp.bins) return 0;
+  for (const b of vp.bins) if (b.lo <= price && price < b.hi) return b.pct;
+  const last = vp.bins[vp.bins.length - 1];
+  return (last && price >= last.hi) ? last.pct : 0;
+}
 function _srLadderHTML(z, px, pipDiv, sym) {     // ladder HTML ใช้ร่วม gold + ทุกคู่ (สไตล์เดียวกัน)
   z = z || {}; pipDiv = pipDiv || 0.01; sym = sym || 'XAUUSD';
+  const vp = (window._volProfile || {})[sym] || null;     // volume profile (VPOC/VA) — proxy "สัญญาถือ ณ ราคา"
+  const volTagFor = lv => {
+    if (!vp || !vp.ok) return '';
+    const pct = _volPctAt(vp, lv);
+    const isPoc = Math.abs(lv - vp.vpoc) <= (vp.bin_size || 1) / 2 + 1e-9;
+    const inVa = lv >= vp.va_low && lv <= vp.va_high;
+    if (!pct && !isPoc) return '';
+    const col = isPoc ? 'var(--gold)' : (inVa ? '#cf9835' : 'var(--muted)');
+    const lbl = isPoc ? ' VPOC' : (inVa ? ' VA' : '');
+    return ` <span title="volume-share ณ ราคานี้ = proxy สัญญาถือ/กิจกรรม (VPOC=หนาสุด · VA=โซน 70%)" style="color:${col};font-size:9px;font-weight:700">📊${pct}%${lbl}</span>`;
+  };
   const setups = z.setups || [];
   const srMeta = z.sr_meta || [];
   const htf = z.htf_zone || null;
@@ -6945,7 +6964,7 @@ function _srLadderHTML(z, px, pipDiv, sym) {     // ladder HTML ใช้ร่�
       <span style="width:72px;color:${color};font-weight:700">${lv.toFixed(2)}</span>
       <span style="width:52px;color:var(--muted);font-size:10px">${dist}</span>
       <span style="width:40px;color:var(--muted);font-size:10px">${st ? st + '%' : ''}</span>
-      <div style="flex:1">${bar}</div>${scoreTag}${confTag}${holdTag}${htfTag}<span style="color:var(--muted);font-size:9px">▾</span></div>${whyLine}
+      <div style="flex:1">${bar}</div>${scoreTag}${confTag}${holdTag}${htfTag}${volTagFor(lv)}<span style="color:var(--muted);font-size:9px">▾</span></div>${whyLine}
       <div id="${rid}" style="display:none;padding:2px 0 8px 82px;font-size:10px;color:var(--dim);line-height:1.7"></div>`;
   };
   const res = (z.resistance || []).slice().sort((a, b) => b - a);
@@ -6959,7 +6978,29 @@ function _srLadderHTML(z, px, pipDiv, sym) {     // ladder HTML ใช้ร่�
 }
 function renderZones(bs) {
   const el = document.getElementById('zone-ladder'); if (!el) return;
-  el.innerHTML = _srLadderHTML(bs.zones || {}, (bs.price_info || {}).bid, 0.01, 'XAUUSD');
+  window._lastBs = bs;                            // เก็บไว้ re-render เมื่อ volume profile มาถึง
+  el.innerHTML = _volProfileHeader('XAUUSD') + _srLadderHTML(bs.zones || {}, (bs.price_info || {}).bid, 0.01, 'XAUUSD');
+}
+
+// ── Volume Profile (A): proxy "สัญญาถือ ณ ราคา" ต่อ S/R Book — VPOC/VA จาก MT5 tick_volume ──
+window._volProfile = window._volProfile || {};
+function _volProfileHeader(sym) {
+  const vp = window._volProfile[sym];
+  if (!vp || !vp.ok) return '';
+  return `<div style="font-size:10px;color:var(--muted);margin-bottom:6px;border-bottom:1px dashed var(--border);padding-bottom:5px">
+    📊 Volume Profile (${vp.tf} ×${vp.n_bars} แท่ง) · VPOC <b style="color:var(--gold)">${vp.vpoc.toFixed(2)}</b>
+    · Value Area ${vp.va_low.toFixed(2)}–${vp.va_high.toFixed(2)}
+    <span style="opacity:.7">— %ข้างเส้น = สัดส่วนกิจกรรมที่ราคานั้น (proxy สัญญาถือ)</span></div>`;
+}
+async function loadVolProfile(key, apiSym) {
+  try {
+    const q = apiSym ? ('?symbol=' + encodeURIComponent(apiSym)) : '';
+    const d = await (await fetch('/api/volume-profile' + q)).json();
+    if (!d || !d.ok) return;
+    window._volProfile[key] = d;
+    if (key === 'XAUUSD' && !_srTab && window._lastBs) renderZones(window._lastBs);   // re-render (ไม่ fetch ซ้ำ)
+    else if (key === _srTab) renderSrPairDetail(_srTab);
+  } catch (_e) {}
 }
 
 /* ── Price Chart + AI Zones overlay (07-03) — lightweight-charts, data จาก MT5 ── */

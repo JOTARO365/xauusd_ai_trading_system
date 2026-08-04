@@ -356,6 +356,11 @@ via `bot_status.json` — these fields are **never sent to the LLM** (no token c
   score + grade (A/B/C)**, break-vs-bounce probability with test count, break-confirmation
   (held *ยืน* / wick *ไส้เทียน*), cross-TF + Fibonacci **confluence ⚡**, HTF-major-zone **★**,
   recency + average bounce ($)
+- **Volume Profile 📊** (VPOC / value area) — each ladder level shows the **volume-share % at that
+  price** (peaks flagged **VPOC** = heaviest, **VA** = 70% value area), computed in code from MT5
+  `tick_volume` (`/api/volume-profile`, H1×500). Spot XAUUSD is OTC — it has **no market-wide open
+  interest / order book**, so this activity-at-price is the closest free proxy for "how many
+  contracts sit at a level"; it is *transacted activity*, not resting size. `agents/volume_profile.py`
 - **Fair Value Gap (FVG)** — unfilled SMC 3-candle imbalances (entry / target zones)
 - **Liquidity pools** (BSL / SSL equal-high/low stop clusters) · **Volume wall** + buy/sell
   tick-flow imbalance (labelled *tick-volume*, not contract volume)
