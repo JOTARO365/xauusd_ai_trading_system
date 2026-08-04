@@ -5199,8 +5199,9 @@ async function loadShadowMatrix(force) {
     const rows = (d.rows || []).filter(r => (!selAlgo || r.algo_id === selAlgo) && (!selPair || r.symbol === selPair));
     body.innerHTML = rows.map(r => {
       const regime = r.algo_id === 'mean_reversion' ? 'RANGE' : (r.algo_id === 'regime_momentum' ? 'TREND' : '—');
+      const key = (r.algo_id + '__' + r.symbol).replace(/[^A-Za-z0-9_]/g, '');
       return `<tr style="text-align:left;border-top:1px solid var(--border)">
-        <td style="padding:4px 8px">${r.algo_id}${r.live ? ' <span style="color:var(--green);font-size:9px;font-weight:700">🟢LIVE</span>' : ''}</td>
+        <td style="padding:4px 8px;cursor:pointer" onclick="toggleShadowOrders('${r.algo_id}','${r.symbol}','${key}')" title="ดูไม้ราย order"><span id="ca-${key}" style="color:var(--muted);font-size:9px;display:inline-block;width:9px">▶</span> ${r.algo_id}${r.live ? ' <span style="color:var(--green);font-size:9px;font-weight:700">🟢LIVE</span>' : ''}</td>
         <td style="padding:4px 8px;font-weight:700">${r.symbol}</td>
         <td style="padding:4px 8px;color:var(--muted)">${regime}</td>
         <td style="padding:4px 8px">${r.n}</td>
@@ -5213,10 +5214,50 @@ async function loadShadowMatrix(force) {
         <td style="padding:4px 8px;color:${badgeColor[r.badge]};font-weight:600">${r.badge}</td>
         <td style="padding:4px 8px">${execPill(r.exec_mode)}</td>
         <td style="padding:4px 8px">${switchCell(r)}</td>
-      </tr>`;
+      </tr>
+      <tr id="det-${key}" style="display:none"><td colspan="13" style="padding:0 8px 8px 26px;background:var(--surface)"><div id="detbox-${key}" style="color:var(--muted);font-size:11px">…</div></td></tr>`;
     }).join('') || '<tr><td colspan="13" style="color:var(--muted);padding:4px 8px">ไม่มีข้อมูลตามตัวกรอง</td></tr>';
     refreshMasterToggle();
   } catch (_e) {}
+}
+
+// ── row dropdown: ไม้ราย order ของ combo (algo,symbol) จาก shadow journal ──
+async function toggleShadowOrders(algo, symbol, key) {
+  const det = document.getElementById('det-' + key), ca = document.getElementById('ca-' + key);
+  if (!det) return;
+  if (det.style.display !== 'none') { det.style.display = 'none'; if (ca) ca.textContent = '▶'; return; }
+  det.style.display = ''; if (ca) ca.textContent = '▼';
+  const box = document.getElementById('detbox-' + key);
+  if (box) box.textContent = 'กำลังโหลด…';
+  try {
+    const d = await (await fetch(`/api/shadow-orders?algo=${encodeURIComponent(algo)}&symbol=${encodeURIComponent(symbol)}`)).json();
+    if (!box) return;
+    if (!d.ok || !(d.orders || []).length) { box.textContent = 'ยังไม่มีไม้ (กำลังเก็บ)'; return; }
+    const rC = v => v == null ? 'var(--muted)' : (v > 0 ? 'var(--green)' : (v < 0 ? 'var(--red)' : 'var(--text)'));
+    const fx = v => v == null ? '—' : (v > 0 ? '+' : '') + Number(v).toFixed(2);
+    const px = v => v == null ? '—' : Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 });
+    const resCol = { TP: 'var(--green)', SL: 'var(--red)', TIMEOUT: 'var(--muted)', OPEN: 'var(--muted)' };
+    const dt = s => { if (!s) return '—'; const m = String(s).replace('T', ' ').match(/\d{4}-(\d\d-\d\d \d\d:\d\d)/); return m ? m[1] : s; };
+    const head = `<div style="margin:4px 0 6px;color:var(--text)">รวมปิดแล้ว <b style="color:${rC(d.sum_R)}">${fx(d.sum_R)}R</b> · n=${d.n}${d.n_open ? ` · เปิดอยู่ ${d.n_open}` : ''} <span style="color:var(--muted)">(ล่าสุดก่อน)</span></div>`;
+    const rowsHtml = d.orders.map(o => `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:2px 8px;white-space:nowrap">${dt(o.bar_ts)}</td>
+        <td style="padding:2px 8px;color:${o.dir === 'BUY' ? 'var(--green)' : 'var(--red)'};font-weight:700">${o.dir || '—'}</td>
+        <td style="padding:2px 8px;color:var(--muted)">${o.regime || '—'}</td>
+        <td style="padding:2px 8px">${px(o.entry)}</td>
+        <td style="padding:2px 8px;color:var(--muted)">${px(o.sl)}/${px(o.tp)}</td>
+        <td style="padding:2px 8px;color:${resCol[o.result] || 'var(--text)'};font-weight:600">${o.result}</td>
+        <td style="padding:2px 8px;color:${rC(o.realized_R)};font-weight:700">${o.result === 'OPEN' ? '—' : fx(o.realized_R)}</td>
+        <td style="padding:2px 8px;color:var(--muted)">${fx(o.mfe_R)}/${fx(o.mae_R)}</td>
+        <td style="padding:2px 8px;color:var(--muted)">${o.bars_held == null ? '—' : o.bars_held}</td>
+      </tr>`).join('');
+    box.innerHTML = head + `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:10px">
+      <thead><tr style="color:var(--muted);text-align:left">
+        <th style="padding:2px 8px;font-weight:600">เวลา (bar)</th><th style="padding:2px 8px;font-weight:600">ทิศ</th>
+        <th style="padding:2px 8px;font-weight:600">regime</th><th style="padding:2px 8px;font-weight:600">entry</th>
+        <th style="padding:2px 8px;font-weight:600">SL/TP</th><th style="padding:2px 8px;font-weight:600">ผล</th>
+        <th style="padding:2px 8px;font-weight:600">R</th><th style="padding:2px 8px;font-weight:600">MFE/MAE</th>
+        <th style="padding:2px 8px;font-weight:600">แท่ง</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
+  } catch (_e) { if (box) box.textContent = 'โหลดไม่สำเร็จ'; }
 }
 
 // ── switch cell: combo (MSE, shadow-switch) · regime_gold (LIVE/PAPER↔REGIME_SHADOW_FILL) · tsmom_gold (LIVE/OFF↔TSMOM_LIVE) ──

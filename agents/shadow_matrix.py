@@ -128,6 +128,30 @@ def _aggregate(recs, klass):
     return stat
 
 
+def orders(algo_id, symbol, limit=80):
+    """Per-order detail for one (algo,symbol) — drives the Shadow Matrix row dropdown.
+    Reads logs/shadow/<algo>__<sym>.jsonl, returns latest-first list of the individual
+    signals with their resolved P&L. Import-safe, 0 token (compute-in-code)."""
+    recs = [r for r in _read(os.path.join(_LOGDIR, f"{algo_id}__{symbol}.jsonl"))
+            if r.get("kind") == "signal"]
+    out = []
+    for r in recs:
+        o = r.get("outcome") or {}
+        out.append({
+            "bar_ts": r.get("bar_ts"), "regime": r.get("regime"), "dir": r.get("dir"),
+            "entry": r.get("entry"), "sl": r.get("sl"), "tp": r.get("tp"),
+            "result": o.get("result") or "OPEN", "realized_R": o.get("realized_R"),
+            "exit_price": o.get("exit_price"), "bars_held": o.get("bars_held"),
+            "mfe_R": o.get("mfe_R"), "mae_R": o.get("mae_R"),
+        })
+    out.sort(key=lambda x: x.get("bar_ts") or "", reverse=True)
+    closed = [x for x in out if x["result"] in ("TP", "SL", "TIMEOUT")]
+    sum_R = round(sum(x["realized_R"] or 0 for x in closed), 2)
+    return {"ok": True, "algo_id": algo_id, "symbol": symbol,
+            "n": len(closed), "n_open": len(out) - len(closed), "sum_R": sum_R,
+            "orders": out[:limit]}
+
+
 def build():
     """Full matrix dict for the dashboard. Import-safe, fail-soft."""
     import config as _cfg

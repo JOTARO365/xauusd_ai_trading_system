@@ -1421,6 +1421,21 @@ def api_shadow_matrix():
     return jsonify(_cached("shadow-matrix", _c, ttl=30))
 
 
+@app.route("/api/shadow-orders")
+def api_shadow_orders():
+    """ไม้ราย order ของ combo (algo,symbol) — driver ของ dropdown ในแถว Shadow Matrix.
+    อ่าน logs/shadow/<algo>__<sym>.jsonl. display-only, 0 token."""
+    algo = (request.args.get("algo") or "").strip()
+    symbol = (request.args.get("symbol") or "").strip()
+    if not algo or not symbol:
+        return jsonify({"ok": False, "error": "algo/symbol required"}), 400
+
+    def _c():
+        from agents.shadow_matrix import orders
+        return orders(algo, symbol)
+    return jsonify(_cached(f"shadow-orders:{algo}:{symbol}", _c, ttl=30))
+
+
 @app.route("/api/shadow-switch", methods=["POST"])
 def api_shadow_switch():
     """Toggle combo (algo,symbol) → SHADOW/LIVE/OFF (data/algo_switches.json). LIVE = executor วางออเดอร์จริง
