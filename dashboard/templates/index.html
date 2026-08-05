@@ -7404,9 +7404,13 @@ function _initNnlbModal() {
     if (modal) modal.style.display = 'flex';
   });
 
-  if (confirmBtn) confirmBtn.addEventListener('click', function () {
-    nnlbToggle.checked = true;
+  if (confirmBtn) confirmBtn.addEventListener('click', async function () {
     if (modal) modal.style.display = 'none';
+    // ด่าน 2: ย้ำความเสี่ยงอีกชั้นก่อนเปิด NNLB (bypass MM gates บนเงินจริง)
+    const ok = await uiConfirm(
+      'NNLB = bypass money-management gates บนเงินจริง. ผิดพลาด = เสียเงินจริง ไม่มีปุ่ม undo.\n\nHOLY SHIT ARE YOU FUCKING KIDDING ME BRO — แน่ใจจริงๆนะ?',
+      {title:'⚠️ ด่านสุดท้าย · NNLB', ok:'เอาวะ เปิดเลย', cancel:'ไม่เอา ยกเลิก', danger:true});
+    nnlbToggle.checked = !!ok;          // ผ่าน 2 ด่าน = เปิด (บันทึกจริงเมื่อกด Save Configuration)
   });
 
   if (cancelBtn) cancelBtn.addEventListener('click', function () {
