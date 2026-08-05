@@ -89,6 +89,26 @@ def _is_mse_magic(m):
     return _MSE_OFF_MIN <= (int(m) - SYSTEM_MAGIC) <= _MSE_OFF_MAX
 
 
+# ── cold-start gate ───────────────────────────────────────────────────────
+# เทรดเฉพาะ signal จากบาร์ที่ปิด**หลัง** engine เริ่ม cycle แรก. กัน stale-entry: ตอน start
+# marker ว่าง → signal ของบาร์ที่ปิดไปก่อนหน้าจะถูกเข้า market ที่ราคาไกลจากจุด setup.
+_ENGINE_START = None                             # epoch (UTC) ของ tick แรก
+_TF_SECONDS = {"H1": 3600, "H4": 14400, "D1": 86400}
+
+
+def _signal_stale(bar_ts_iso, algo):
+    """True ถ้าบาร์ของ signal ปิดก่อน engine เริ่ม (bar_ts + tf ≤ start) → stale ไม่ควรเข้า."""
+    if _ENGINE_START is None or not bar_ts_iso:
+        return False
+    try:
+        from datetime import datetime
+        bt = datetime.fromisoformat(bar_ts_iso).timestamp()      # bar_ts = เวลาเปิดบาร์ (UTC) → ปิดที่ +tf
+        tf = _TF_SECONDS.get(getattr(algo, "timeframe", "H1"), 3600)
+        return (bt + tf) <= _ENGINE_START
+    except Exception:
+        return False
+
+
 # ── MT5 helpers (fail-soft) ───────────────────────────────────────────────
 def _bars(broker, tf="H1", count=None):
     """(high, low, close, times) ตาม timeframe ของ algo (H1 = regime/mean_rev · D1 = tsmom). หรือ None.
@@ -476,6 +496,10 @@ def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max
         return 0
     if vo["bar_ts"] == combo_state.get("last_bar_ts"):
         return 0                                                # เข้าไม้บาร์นี้ **สำเร็จ**ไปแล้ว (dedup ต่อ signal-bar)
+    if _signal_stale(vo["bar_ts"], algo):                       # cold-start: บาร์ปิดก่อน engine เริ่ม = stale
+        combo_state["last_bar_ts"] = vo["bar_ts"]              # seed baseline → รอบาร์สดถัดไป (ไม่เข้าที่ราคาไกลจาก setup)
+        logger.debug(f"[MSE] {algo_id}:{symbol} skip cold-start stale signal (bar {vo['bar_ts']})")
+        return 0
     # price-proximity guard: มีไม้ทิศเดียวกันเปิดใกล้ (≤ n×ATR) → skip กัน stack เกาะจุดเดิม
     _gap = float(getattr(_cfg, "ALGO_ENTRY_MIN_GAP_ATR", 0) or 0)
     if _gap > 0 and positions:
@@ -523,6 +547,10 @@ def tick(force=False):
     import config as _cfg
     if not getattr(_cfg, "MULTI_SYMBOL_LIVE", False):    # master gate เสมอ (force ไม่ข้าม — กันรันมือแล้ววางออเดอร์จริง)
         return None
+    global _ENGINE_START
+    if _ENGINE_START is None:                            # cold-start: จำเวลาเริ่ม → ข้าม signal บาร์ที่ปิดก่อนหน้า
+        import time as _t
+        _ENGINE_START = _t.time()
     eligible = _reg.combos(_reg.UNIVERSE)
     live = _sw.combos_in(_sw.LIVE, eligible)
     if not live:

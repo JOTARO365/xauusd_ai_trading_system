@@ -20,6 +20,7 @@ from agents import shadow_switches as _sw          # unify: dashboard switch ค
 
 _LOG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs", "regime_live.jsonl")
 _last_bar = None                                    # dedup: 1 order / H1 bar ต่อ process run
+_ENGINE_START = None                                # cold-start gate: เข้าเฉพาะ signal บาร์ที่ปิดหลัง engine เริ่ม (กัน stale-entry)
 
 
 def _log(rec):
@@ -98,7 +99,10 @@ def run_regime_executor():
     if getattr(_cfg, "REGIME_LIVE_TICK", False) or getattr(_cfg, "REGIME_PENDING", False):
         _hb("HAND-OFF", "per-tick/pending ควบคุม entry แล้ว → per-cycle หยุดทำงาน")
         return None                                     # per-tick / pending จัดการ entry แล้ว → per-cycle ไม่เข้าซ้ำ
-    global _last_bar
+    global _last_bar, _ENGINE_START
+    if _ENGINE_START is None:                            # cold-start: จำเวลาที่ engine เริ่มคุม entry
+        import time as _t
+        _ENGINE_START = _t.time()
     bars = _bars_from_feed()
     if bars is None:
         _hb("NO-BARS", "ไม่สามารถดึง H1 bars ได้ (feed ไม่พร้อม)")
@@ -120,6 +124,14 @@ def run_regime_executor():
     if rec["bar_ts"] and rec["bar_ts"] == _last_bar:        # บาร์นี้เข้าไปแล้ว → ไม่ซ้ำ
         _hb("ARMED", f"regime=TREND {sig.get('dir')} · เข้าออเดอร์บาร์นี้แล้ว (รอบาร์ถัดไป)")
         return None
+    if _ENGINE_START and rec["bar_ts"]:                     # cold-start: บาร์ปิดก่อน engine เริ่ม = stale → seed + รอบาร์สด
+        try:
+            if datetime.fromisoformat(rec["bar_ts"]).timestamp() + 3600 <= _ENGINE_START:   # H1 = +3600
+                _last_bar = rec["bar_ts"]
+                _hb("COLD-START", f"regime=TREND {sig.get('dir')} · signal บาร์ปิดก่อน engine เริ่ม (stale) → รอบาร์สด")
+                return None
+        except Exception:
+            pass
     try:                                                    # stack guard: ถือครบ ALGO_MAX_STACK = ข้าม (dict-safe)
         from connectors.mt5_connector import get_open_positions
         _algo_open = sum(1 for p in (get_open_positions() or [])

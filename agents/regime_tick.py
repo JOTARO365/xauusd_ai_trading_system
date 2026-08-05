@@ -23,6 +23,7 @@ _stop = threading.Event()
 _thread: threading.Thread | None = None
 _cache = {"hour": None, "armed": False, "buy": None, "sell": None, "sl_pips": 0, "tp_pips": 0}
 _last_traded_hour = None            # dedup: เข้าได้ 1 ไม้ / H1 bar
+_started = False                     # cold-start gate: กันเข้าเมื่อราคาทะลุ level ไปแล้วก่อนบอทเริ่ม (stale break)
 
 
 def _refresh_levels(hour: int) -> None:
@@ -62,7 +63,7 @@ def _tick() -> None:
     from agents.regime_adaptive import is_enabled        # weekly auto-disable (decay kill switch)
     if not is_enabled("momentum_breakout"):
         return
-    global _last_traded_hour
+    global _last_traded_hour, _started
     try:
         import MetaTrader5 as mt5
         tick = mt5.symbol_info_tick(config.SYMBOL)
@@ -71,6 +72,13 @@ def _tick() -> None:
         hour = int(tick.time // 3600)                  # H1 block (broker time)
         if _cache["hour"] != hour:                     # ขึ้น bar ใหม่ → recompute levels (ครั้งเดียว/ชม.)
             _refresh_levels(hour)
+        if not _started:                               # cold-start: ราคาทะลุ level ที่ arm ไว้แล้วตั้งแต่ก่อนบอทเริ่ม
+            _started = True                            # = break เกิดก่อนเราดู (stale) → seed ชั่วโมงนี้ รอบาร์/level สดถัดไป
+            if _cache["armed"] and ((_cache.get("buy") and tick.ask > _cache["buy"])
+                                    or (_cache.get("sell") and tick.bid < _cache["sell"])):
+                _last_traded_hour = hour
+                logger.info("[REGIME-TICK] cold-start: ราคาทะลุ level ที่ arm ไว้ก่อนบอทเริ่ม (stale) → รอบาร์สด")
+                return
         if not _cache["armed"] or _last_traded_hour == hour:
             return
         if tick.ask > _cache["buy"]:
