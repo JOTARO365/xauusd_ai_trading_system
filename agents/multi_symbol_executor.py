@@ -66,6 +66,29 @@ def _save_state(state):
         pass
 
 
+# ── per-algo magic ────────────────────────────────────────────────────────
+# แต่ละ MSE algo ได้ magic = SYSTEM_MAGIC + offset → ถือไม้แยกบน symbol เดียวกันได้ (account hedging)
+# + จัดการ SL แยกต่อ algo. ทอง = SYSTEM_MAGIC (offset 0, gold path) ไม่ปน. offset 1..999 = ช่วง MSE.
+_ALGO_MAGIC = {"regime_momentum": 1, "mean_reversion": 2, "tsmom_d1": 3,
+               "regime_momentum_fvg": 4, "sweep_reversal": 5}
+_MSE_OFF_MIN, _MSE_OFF_MAX = 1, 9999          # ช่วง offset ที่นับเป็น MSE (ไม่รวม 0 = ทอง/base)
+
+
+def _magic_of(algo_id):
+    """magic ต่อ algo (SYSTEM_MAGIC + offset คงที่). algo นอก map → offset จากชื่อ (deterministic, กันชน base)."""
+    from connectors.mt5_connector import SYSTEM_MAGIC
+    off = _ALGO_MAGIC.get(algo_id)
+    if off is None:
+        off = 100 + (sum(algo_id.encode()) % 900)     # 100..999 คงที่ข้าม restart (ไม่ใช้ hash ที่ random)
+    return SYSTEM_MAGIC + off
+
+
+def _is_mse_magic(m):
+    """magic นี้อยู่ในช่วง MSE (per-algo) ไหม — ใช้นับ exposure รวมทุก algo."""
+    from connectors.mt5_connector import SYSTEM_MAGIC
+    return _MSE_OFF_MIN <= (int(m) - SYSTEM_MAGIC) <= _MSE_OFF_MAX
+
+
 # ── MT5 helpers (fail-soft) ───────────────────────────────────────────────
 def _bars(broker, tf="H1", count=None):
     """(high, low, close, times) ตาม timeframe ของ algo (H1 = regime/mean_rev · D1 = tsmom). หรือ None.
@@ -101,26 +124,25 @@ def _meta(broker):
     return None, None
 
 
-def _our_positions(broker):
-    """open positions ของ engine นี้บน broker symbol (magic ระบบ). ทองอยู่คนละ symbol → ไม่ปน."""
+def _our_positions(broker, magic):
+    """open positions ของ **algo นี้** บน broker symbol (magic ต่อ algo). algo/ทองอื่น = คนละ magic → ไม่ปน."""
     try:
         import MetaTrader5 as mt5
-        from connectors.mt5_connector import SYSTEM_MAGIC
         pos = mt5.positions_get(symbol=broker)
         if pos is None:
             return None                                      # fetch fail (terminal hiccup) — แยกจาก "ไม่มีไม้" กัน false-close
-        return [p for p in pos if p.magic == SYSTEM_MAGIC]
+        return [p for p in pos if p.magic == magic]
     except Exception:
         return None
 
 
 def _total_mse_positions():
-    """นับไม้ MSE รวมทุก symbol = magic ระบบ + symbol != ทอง (MSE เปิดเฉพาะ non-gold; ไม่พึ่ง comment ที่ broker อาจลบ)."""
+    """นับไม้ MSE รวมทุก algo/symbol = magic ในช่วง MSE (per-algo) + symbol != ทอง. คุม exposure รวม (MSE_MAX_TOTAL)."""
     try:
         import MetaTrader5 as mt5
-        from connectors.mt5_connector import SYSTEM_MAGIC, SYMBOL as GOLD
+        from connectors.mt5_connector import SYMBOL as GOLD
         pos = mt5.positions_get() or []
-        return sum(1 for p in pos if p.magic == SYSTEM_MAGIC and p.symbol != GOLD)
+        return sum(1 for p in pos if _is_mse_magic(p.magic) and p.symbol != GOLD)
     except Exception:
         return 0
 
@@ -131,11 +153,11 @@ def _protected_mse_positions():
     try:
         import MetaTrader5 as mt5
         import config as _cfg
-        from connectors.mt5_connector import SYSTEM_MAGIC, SYMBOL as GOLD
+        from connectors.mt5_connector import SYMBOL as GOLD
         buf = float(getattr(_cfg, "BE_BUFFER_PIPS", 200))
         n = 0
         for p in (mt5.positions_get() or []):
-            if p.magic != SYSTEM_MAGIC or p.symbol == GOLD or p.sl == 0:
+            if not _is_mse_magic(p.magic) or p.symbol == GOLD or p.sl == 0:
                 continue
             info = mt5.symbol_info(p.symbol)
             if not info or not info.point:
@@ -295,7 +317,6 @@ def _close_position(broker, p, digits):
     """ปิด position ด้วย market order ฝั่งตรงข้าม (TRADE_ACTION_DEAL). คืน ok. fail-soft."""
     try:
         import MetaTrader5 as mt5
-        from connectors.mt5_connector import SYSTEM_MAGIC
         tick = mt5.symbol_info_tick(broker)
         if not tick:
             return False
@@ -309,7 +330,7 @@ def _close_position(broker, p, digits):
                "volume": float(p.volume),
                "type": mt5.ORDER_TYPE_SELL if is_buy else mt5.ORDER_TYPE_BUY,
                "price": tick.bid if is_buy else tick.ask, "deviation": 30,
-               "magic": SYSTEM_MAGIC, "comment": "MSE-flip-exit",
+               "magic": int(p.magic), "comment": "MSE-flip-exit",
                "type_time": mt5.ORDER_TIME_GTC, "type_filling": filling}
         r = mt5.order_send(req)
         if r is None or r.retcode != mt5.TRADE_RETCODE_DONE:
@@ -444,7 +465,7 @@ def _reconcile_closed(algo_id, symbol, positions, combo_state):
 
 
 # ── entry: signal เดียวกับ shadow → open_order จริง ───────────────────────
-def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max_pos=1, positions=None):
+def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max_pos=1, positions=None, magic=None):
     """ถ้ายังไม่ครบ max_pos + มี signal ใหม่ (bar_ts ยังไม่เคยเข้า) → open_order จริง. คืน 1 ถ้าเปิด."""
     import config as _cfg
     algo = _reg.get(algo_id)
@@ -478,7 +499,8 @@ def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max
     _lot = _cfgf("MIN_LOT", 0.01) if _force_min else None   # structural = min lot เสมอ (SL กว้าง, ยอม risk%)
     from connectors.mt5_connector import open_order
     res = open_order(vo["dir"], sl_pips_eff, tp_pips_eff, lot=_lot,
-                     comment=f"MSE-{algo_id}", symbol=broker, max_open_override=max_pos)
+                     comment=f"MSE-{algo_id}", symbol=broker, max_open_override=max_pos,
+                     magic=magic if magic is not None else _magic_of(algo_id))
     if res and res.get("success") and res.get("ticket"):
         combo_state["last_bar_ts"] = vo["bar_ts"]              # dedup **เฉพาะเมื่อสำเร็จ** (fail → retry บาร์เดิมได้หลัง cooldown)
         combo_state.pop("retry_after", None)
@@ -532,7 +554,8 @@ def tick(force=False):
                 continue
             ck = f"{algo_id}:{symbol}"
             cstate = state.setdefault(ck, {})
-            positions = _our_positions(broker)
+            magic = _magic_of(algo_id)                       # magic ต่อ algo → ถือ/จัดการไม้แยกบน symbol เดียว
+            positions = _our_positions(broker, magic)
             if positions is None:                            # fetch fail → ข้าม combo รอบนี้ (ห้าม manage ด้วยข้อมูลพัง)
                 continue
             # ไม้ปิด → บันทึกโดย trade_recorder (universal, comment MSE-<algo>) แล้ว — MSE ไม่ record ซ้ำ
@@ -544,7 +567,7 @@ def tick(force=False):
             room_total = (max_total <= 0) or (total_open + opened < max_total)   # global cap ยังมีที่ว่าง
             if len(positions) < max_pos and room_total:         # ผ่านทั้ง per-combo + รวมทุก symbol
                 op = _maybe_enter(algo_id, symbol, broker, bars, point,
-                                  sl_mult.get(symbol, 1.0), cstate, max_pos, positions)   # LIVE = วางจริง (โบรก reject เองถ้าปิดคู่)
+                                  sl_mult.get(symbol, 1.0), cstate, max_pos, positions, magic)   # LIVE = วางจริง (โบรก reject เองถ้าปิดคู่)
                 opened += op
             elif not room_total:
                 logger.debug(f"[MSE] {ck}: global cap {max_total} ถึงแล้ว (open={total_open + opened}) — ข้าม entry")

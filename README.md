@@ -661,6 +661,14 @@ two independent gates must both be on before a single real order is placed. Gold
 `MAX_OPEN_TRADES` are unaffected. Any pair whose switch is `LIVE` can trade (WTI, BTC, EURUSD#,
 USDJPY#, …); the broker symbol is resolved per-broker from `BROKER_SYM_*` in `.env`.
 
+**Per-algo positions (magic-separated):** each MSE algo trades under its own magic number
+(`SYSTEM_MAGIC + offset`, e.g. `regime_momentum`→+1, `mean_reversion`→+2), so **different algos can
+hold independent, overlapping positions on the same symbol** and each manages only its own stops
+(no cross-management). Gold keeps the base `SYSTEM_MAGIC`. The `MSE_MAX_POSITIONS` slot cap now counts
+**per-algo** (not per-symbol); `MSE_MAX_TOTAL` still bounds total exposure across every MSE magic.
+Requires a **hedging** account (verified). Position attribution, the SYSTEM/MANUAL source label and the
+open-pair detector all treat the whole `SYSTEM_MAGIC … +9999` band as bot-owned.
+
 **Isolation from gold (verified):** order-slot counting, `count_protected_slots`, force-BE and the
 **daily-trade cap are all per-symbol** — gold filling its slots or hitting its daily cap does **not**
 block a non-gold entry, and vice-versa. Auto-SL protection (`ensure_sl_protection`), stop-loss at
@@ -672,7 +680,7 @@ full-size and exits on daily flip (no TP), matching exactly what its backtest va
 |---|---|---|
 | `MULTI_SYMBOL_LIVE` | `false` | **Master gate.** OFF = the executor never runs (0 real orders). Even when ON, only combos toggled to `LIVE` in the dashboard Shadow Matrix (`data/algo_switches.json`) trade; the rest stay paper/SHADOW. Reversible instantly. |
 | `ALGO_SL_MULT` | `WTIUSD:0.7` | Per-symbol SL multiplier, `"SYM:mult,..."`. WTI `0.7` is **data-derived** (winners' MAE p75 = 0.64R → tighter stop; edge +1.13→+2.39R). Other symbols default ×1.0. |
-| `MSE_MAX_POSITIONS` | `1` | Max stacked positions **per combo** (adds one per new signal-bar, not all at once). Uses its own slot cap — does **not** touch gold's `MAX_OPEN_TRADES`. |
+| `MSE_MAX_POSITIONS` | `1` | Max stacked positions **per combo** (adds one per new signal-bar, not all at once). Counted **per-algo magic**, so two algos on the same symbol don't share this budget. Uses its own slot cap — does **not** touch gold's `MAX_OPEN_TRADES`. |
 | `MSE_MAX_TOTAL` | `0` | Global cap across **all** MSE symbols (guards exposure when several are live). `0` = no global cap (per-symbol only). |
 | `MSE_SL_MIN_ATR` / `MSE_SL_MAX_ATR` | `0.5` / `4.0` | Clamp the SL into `[min, max] × ATR` (safety against a broken/spiking ATR). Normal SLs (~1×ATR) are untouched; only pathological values are clamped. `0` disables that side. |
 | `MSE_ENTRY_RETRY_COOLDOWN` | `300` | After an open **fails** (margin/spread/disabled), wait this many seconds before retrying the same signal-bar — instead of marking it handled forever. Prevents both retry-spam and permanent false-blocks. |

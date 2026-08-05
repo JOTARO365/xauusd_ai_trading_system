@@ -157,7 +157,7 @@ def backfill(days=365):
         outs = [d for d in dl if d.entry in (1, 2)]
         if entry is None or not outs:
             continue
-        if entry.magic != SYSTEM_MAGIC:                             # ไม้บอททุก symbol (ทอง + WTI/BTC)
+        if not (SYSTEM_MAGIC <= entry.magic <= SYSTEM_MAGIC + 9999):   # ทอง (base) + MSE per-algo (base+offset)                             # ไม้บอททุก symbol (ทอง + WTI/BTC)
             continue
         o = orders.get(entry.order)
         comment = (getattr(o, "comment", "") or entry.comment or "").strip()
@@ -202,7 +202,7 @@ def tick(force=False):
         reg = _load_reg()
         open_ids = set()
         for p in pos:
-            if p.magic != SYSTEM_MAGIC:                          # ไม้บอททุก symbol (ทอง + WTI/BTC/คู่อื่น)
+            if not (SYSTEM_MAGIC <= p.magic <= SYSTEM_MAGIC + 9999):   # ทอง (base) + MSE per-algo (base+offset)                          # ไม้บอททุก symbol (ทอง + WTI/BTC/คู่อื่น)
                 continue
             tk = str(p.ticket)
             open_ids.add(tk)

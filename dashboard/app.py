@@ -273,7 +273,7 @@ def _sync_from_mt5(data: dict) -> bool:
                           "entry_price": entry_price})
                 changed = True
         else:
-            is_system = pos.magic == SYSTEM_MAGIC
+            is_system = SYSTEM_MAGIC <= pos.magic <= SYSTEM_MAGIC + 9999   # ทอง base + MSE per-algo
             if is_system:
                 # SYSTEM trade ที่ยังไม่อยู่ใน log — main.py จัดการเอง
                 # ไม่เพิ่มที่นี่เพื่อป้องกัน race condition ทับข้อมูล AI
@@ -334,7 +334,7 @@ def _sync_from_mt5(data: dict) -> bool:
             entry_deal = next((d for d in pos_deals if d.entry == 0), None)
             if entry_deal is None:
                 continue
-            is_system = entry_deal.magic == SYSTEM_MAGIC
+            is_system = SYSTEM_MAGIC <= entry_deal.magic <= SYSTEM_MAGIC + 9999   # ทอง base + MSE per-algo
             if is_system:
                 # SYSTEM trade ที่ปิดแล้วแต่ไม่อยู่ใน log — main.py จัดการเอง ไม่ทับข้อมูล AI
                 continue
@@ -1834,7 +1834,7 @@ def api_live_symbols():
             with _MT5_LOCK:
                 _positions = mt5.positions_get() or []
             for p in _positions:
-                if p.magic == SYSTEM_MAGIC and p.symbol != SYMBOL:
+                if (SYSTEM_MAGIC <= p.magic <= SYSTEM_MAGIC + 9999) and p.symbol != SYMBOL:   # ทอง base + MSE per-algo
                     lg = inv.get(p.symbol, p.symbol)
                     if lg not in seen:
                         out.append({"logical": lg, "label": f"{lg} · open"}); seen.add(lg)

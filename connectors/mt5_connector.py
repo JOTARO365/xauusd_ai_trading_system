@@ -594,7 +594,8 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
                comment: str = "", min_rr: float | None = None,
                confidence_scale: float = 1.0, lot: float | None = None,
                shadow: bool = False, symbol: str | None = None,
-               max_open_override: int | None = None) -> dict:
+               max_open_override: int | None = None,
+               magic: int | None = None) -> dict:
     symbol = symbol or SYMBOL                          # multi-symbol: ระบุ symbol อื่นได้ (default = ทอง; caller เดิมไม่กระทบ)
     if _cfg.DRY_RUN or shadow:                        # shadow = algo paper-fill (ไม่ใช้ทุน, ไม่วางจริง)
         tick = mt5.symbol_info_tick(symbol)
@@ -670,7 +671,10 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         # ตรวจจำนวน order ต่อฝั่ง (สอดคล้องกับ check_open_slot)
         dir_type = 0 if direction.upper() == "BUY" else 1
         open_positions = mt5.positions_get(symbol=symbol) or []
-        same_dir_count = sum(1 for p in open_positions if p.type == dir_type)
+        # cap นับต่อฝั่ง: ทอง (magic=None) นับทุกไม้บน symbol เหมือนเดิม · MSE per-algo (ส่ง magic)
+        # นับเฉพาะ magic ของ algo นั้น → คนละ algo ถือไม้แยกบน symbol เดียวได้ (hedging)
+        same_dir_count = sum(1 for p in open_positions if p.type == dir_type
+                             and (magic is None or p.magic == magic))
         # cap ต่อฝั่ง: default = MAX_OPEN_TRADES (ทอง) — MSE ส่ง override เพื่อ stack symbol อื่นได้เองโดยไม่แตะ cap ทอง
         base_limit = max_open_override if max_open_override is not None else MONEY_MANAGEMENT["max_open_trades"]
         effective_limit = base_limit + count_protected_slots(symbol)
@@ -697,7 +701,7 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         "sl": round(sl, 2),
         "tp": round(tp, 2),
         "deviation": 20,
-        "magic": 20260429,
+        "magic": int(magic) if magic else SYSTEM_MAGIC,
         "comment": _safe_comment(comment),
         "type_time": mt5.ORDER_TIME_GTC,
         "type_filling": _pick_filling(symbol),
@@ -795,7 +799,7 @@ def get_open_positions() -> list:
             "magic":      p.magic,
             "comment":    p.comment,
             "time_open":  p.time,
-            "source":     "SYSTEM" if p.magic == SYSTEM_MAGIC else "MANUAL",
+            "source":     "SYSTEM" if SYSTEM_MAGIC <= p.magic <= SYSTEM_MAGIC + 9999 else "MANUAL",
         }
         for p in positions
     ]
@@ -842,7 +846,7 @@ def get_mt5_history(days: int = 60) -> list:
             "time":      d.time,
             "magic":     d.magic,
             "comment":   d.comment,
-            "source":    "SYSTEM" if d.magic == SYSTEM_MAGIC else "MANUAL",
+            "source":    "SYSTEM" if SYSTEM_MAGIC <= d.magic <= SYSTEM_MAGIC + 9999 else "MANUAL",
             "sl":        sl,
             "tp":        tp,
         })
@@ -1015,7 +1019,7 @@ def get_pending_orders() -> list:
             "magic":        o.magic,
             "comment":      o.comment,
             "expiration":   o.time_expiration,
-            "source":       "SYSTEM" if o.magic == SYSTEM_MAGIC else "MANUAL",
+            "source":       "SYSTEM" if SYSTEM_MAGIC <= o.magic <= SYSTEM_MAGIC + 9999 else "MANUAL",
         }
         for o in orders if o.type in _PENDING_TYPES
     ]
