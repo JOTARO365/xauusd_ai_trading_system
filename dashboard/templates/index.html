@@ -7411,6 +7411,7 @@ function _initNnlbModal() {
       'NNLB = bypass money-management gates บนเงินจริง. ผิดพลาด = เสียเงินจริง ไม่มีปุ่ม undo.\n\nHOLY SHIT ARE YOU FUCKING KIDDING ME BRO — แน่ใจจริงๆนะ?',
       {title:'⚠️ ด่านสุดท้าย · NNLB', ok:'เอาวะ เปิดเลย', cancel:'ไม่เอา ยกเลิก', danger:true});
     nnlbToggle.checked = !!ok;          // ผ่าน 2 ด่าน = เปิด (บันทึกจริงเมื่อกด Save Configuration)
+    if (ok) toast("YOU'RE ABSOLUTELY FUCKING INSANE, BRO 💀", 'err');
   });
 
   if (cancelBtn) cancelBtn.addEventListener('click', function () {
