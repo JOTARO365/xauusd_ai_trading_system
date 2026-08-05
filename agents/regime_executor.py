@@ -134,8 +134,10 @@ def run_regime_executor():
             pass
     try:                                                    # stack guard: ถือครบ ALGO_MAX_STACK = ข้าม (dict-safe)
         from connectors.mt5_connector import get_open_positions
+        from agents.regime_tick import _algo_pos_protected   # ไม้ protected (trailing เลย BE) ไม่กิน slot
         _algo_open = sum(1 for p in (get_open_positions() or [])
-                         if str((p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or "").startswith("ALGO"))
+                         if str((p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or "").startswith("ALGO")
+                         and not _algo_pos_protected(p))
         if _algo_open >= getattr(_cfg, "ALGO_MAX_STACK", 1):
             _hb("HOLD", f"regime=TREND {sig.get('dir')} · ถือครบ {_algo_open} ออเดอร์ ALGO → ไม่เปิดสถานะซ้อน")
             return None

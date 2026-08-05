@@ -26,6 +26,19 @@ _last_traded_hour = None            # dedup: เข้าได้ 1 ไม้ /
 _started = False                     # cold-start gate: กันเข้าเมื่อราคาทะลุ level ไปแล้วก่อนบอทเริ่ม (stale break)
 
 
+def _algo_pos_protected(p):
+    """ไม้ ALGO ทอง (dict จาก get_open_positions) trailing เลย BE แล้ว (risk-free) → ไม่กิน entry-slot."""
+    try:
+        sl = p.get("sl") or 0
+        entry = p.get("open_price") or 0
+        if not sl or not entry:
+            return False
+        buf = float(getattr(config, "BE_BUFFER_PIPS", 200)) * 0.01   # gold point = 0.01
+        return (sl >= entry + buf) if p.get("direction") == "BUY" else (sl <= entry - buf)
+    except Exception:
+        return False
+
+
 def _refresh_levels(hour: int) -> None:
     """คำนวณ regime + Donchian levels ที่ bar-close (เรียกเมื่อขึ้น H1 bar ใหม่) → cache."""
     from agents.regime_shadow import _bars_from_feed
@@ -95,10 +108,11 @@ def _tick() -> None:
         _cmt = lambda p: str((p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or "")
         _pdir = lambda p: (p.get("direction") if isinstance(p, dict) else getattr(p, "direction", None))
         _algo = [p for p in (get_open_positions() or []) if _cmt(p).startswith("ALGO")]
-        if len(_algo) >= getattr(config, "ALGO_MAX_STACK", 1):
+        _active = [p for p in _algo if not _algo_pos_protected(p)]   # ไม้ protected (trailing เลย BE) ไม่กิน slot → เข้าเพิ่มได้
+        if len(_active) >= getattr(config, "ALGO_MAX_STACK", 1):
             return
         # same-direction guard: กัน 2 engine (TSMOM/intraday) เข้าซ้อนทิศเดียวกัน (ALGO_MAX_SAME_DIR=1 → ห้ามดับเบิลทางเดียว; ฝั่งตรงข้ามยังเข้าได้)
-        if sum(1 for p in _algo if _pdir(p) == d) >= getattr(config, "ALGO_MAX_SAME_DIR", 1):
+        if sum(1 for p in _active if _pdir(p) == d) >= getattr(config, "ALGO_MAX_SAME_DIR", 1):
             return
         _structural_on = getattr(config, "STRUCTURAL_SL_GOLD", False)   # structural = SL ปลายไส้ D1 + min lot เสมอ → ข้าม standdown
         if not _structural_on:

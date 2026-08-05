@@ -669,6 +669,13 @@ hold independent, overlapping positions on the same symbol** and each manages on
 Requires a **hedging** account (verified). Position attribution, the SYSTEM/MANUAL source label and the
 open-pair detector all treat the whole `SYSTEM_MAGIC … +9999` band as bot-owned.
 
+**Protected positions free the entry slot:** once a position's SL is trailed past breakeven
+(risk-free, ≥ `BE_BUFFER_PIPS` beyond entry) it no longer counts against the entry caps — the
+per-algo `MSE_MAX_POSITIONS`, the gold `ALGO_MAX_STACK` / `ALGO_MAX_SAME_DIR`, and the global
+`MSE_MAX_TOTAL`. So after one trade is safe, the same algo can add a fresh entry and other algos /
+the opposite direction can still enter on that pair (they were previously blocked by the trailing
+position holding the slot).
+
 **Isolation from gold (verified):** order-slot counting, `count_protected_slots`, force-BE and the
 **daily-trade cap are all per-symbol** — gold filling its slots or hitting its daily cap does **not**
 block a non-gold entry, and vice-versa. Auto-SL protection (`ensure_sl_protection`), stop-loss at

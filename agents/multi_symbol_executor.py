@@ -156,6 +156,21 @@ def _our_positions(broker, magic):
         return None
 
 
+def _position_protected(p, point):
+    """ไม้นี้ trailing เลย BE แล้ว (SL พ้นทุน ±BE_BUFFER = risk-free) → ไม่ควรกิน entry-slot.
+    ใช้ทั้งขยาย global cap และปลด per-combo slot (algo เดิม/อื่นเข้าเพิ่มได้เมื่อไม้เก่าปลอดภัยแล้ว)."""
+    try:
+        import MetaTrader5 as mt5
+        import config as _cfg
+        if not getattr(p, "sl", 0) or not point:
+            return False
+        buf = float(getattr(_cfg, "BE_BUFFER_PIPS", 200)) * point
+        is_buy = p.type == mt5.ORDER_TYPE_BUY
+        return (is_buy and p.sl >= p.price_open + buf) or (not is_buy and p.sl <= p.price_open - buf)
+    except Exception:
+        return False
+
+
 def _total_mse_positions():
     """นับไม้ MSE รวมทุก algo/symbol = magic ในช่วง MSE (per-algo) + symbol != ทอง. คุม exposure รวม (MSE_MAX_TOTAL)."""
     try:
@@ -172,9 +187,7 @@ def _protected_mse_positions():
     ใช้ขยาย global cap: ไม้ protected ไม่นับกิน slot (trailing แล้วปลอดภัย) — pattern เดียวกับ count_protected_slots ทอง."""
     try:
         import MetaTrader5 as mt5
-        import config as _cfg
         from connectors.mt5_connector import SYMBOL as GOLD
-        buf = float(getattr(_cfg, "BE_BUFFER_PIPS", 200))
         n = 0
         for p in (mt5.positions_get() or []):
             if not _is_mse_magic(p.magic) or p.symbol == GOLD or p.sl == 0:
@@ -182,9 +195,7 @@ def _protected_mse_positions():
             info = mt5.symbol_info(p.symbol)
             if not info or not info.point:
                 continue
-            pt = info.point
-            is_buy = p.type == mt5.ORDER_TYPE_BUY
-            if (is_buy and p.sl >= p.price_open + buf * pt) or (not is_buy and p.sl <= p.price_open - buf * pt):
+            if _position_protected(p, info.point):
                 n += 1
         return n
     except Exception:
@@ -593,7 +604,8 @@ def tick(force=False):
             else:
                 managed += _manage(broker, positions, bars, point, digits, cstate)
             room_total = (max_total <= 0) or (total_open + opened < max_total)   # global cap ยังมีที่ว่าง
-            if len(positions) < max_pos and room_total:         # ผ่านทั้ง per-combo + รวมทุก symbol
+            active_pos = sum(1 for p in positions if not _position_protected(p, point))   # ไม้ protected (trailing เลย BE) ไม่กิน slot → เติมไม้สดได้
+            if active_pos < max_pos and room_total:             # ผ่านทั้ง per-combo (ไม่นับ protected) + รวมทุก symbol
                 op = _maybe_enter(algo_id, symbol, broker, bars, point,
                                   sl_mult.get(symbol, 1.0), cstate, max_pos, positions, magic)   # LIVE = วางจริง (โบรก reject เองถ้าปิดคู่)
                 opened += op
