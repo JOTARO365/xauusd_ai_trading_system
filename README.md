@@ -78,7 +78,7 @@ ships a Flask dashboard on port 5050.
 └────────────────────────────────────────────────────────────────────┘
          ↕ Supabase (Postgres/REST) · logs/trades.json fallback
 ┌──────────────────────┐
-│  Dashboard (port 5050)│  ← Docker-ready · Flask + Waitress
+│  Dashboard (port 5050)│  ← Flask + Waitress
 └──────────────────────┘
 ```
 
@@ -235,7 +235,7 @@ flags); changes take effect on the next cycle via `reload_config()`.
 | Component | Requirement |
 |---|---|
 | **Trading Bot** (main.py) | Windows + MetaTrader5 Terminal running |
-| **Dashboard** | Windows / Linux / Docker |
+| **Dashboard** | Windows / Linux |
 | Python | 3.11+ |
 | Node.js | 18+ (for PM2) |
 | Database | Supabase (optional — falls back to `logs/trades.json`) |
@@ -471,77 +471,6 @@ Scenario data is precomputed by `scripts/build_event_scenarios.py` (joins releas
 daily XAU closes → `data/event_scenarios.json`) and served through pass-through `/api/*`
 endpoints, so viewing never triggers an LLM call. Refresh all display data at once with
 `python scripts/refresh_dashboard_data.py` (schedule it via Task Scheduler / cron).
-
----
-
-## Docker
-
-Two modes depending on your setup:
-
-### Mode A — Linux containers (Dashboard only)
-
-Standard Docker Desktop (Linux mode) — **no need to switch modes**
-
-```bash
-# Create .env first
-cp .env.example .env   # Linux/Mac
-copy .env.example .env  # Windows
-
-# Start dashboard + postgres
-docker compose up -d
-
-# View logs
-docker compose logs -f
-
-# Stop
-docker compose down
-```
-
-- Dashboard available at `http://localhost:5050`
-- Trading bot (`main.py`) must run separately on the Windows host via PM2 or `python main.py`
-
-### Mode B — Windows containers (Full system — Bot + Dashboard)
-
-Docker runs everything: **Python, Node.js, PM2** and all Python packages.
-
-**Requirements:**
-1. Docker Desktop on Windows
-2. Switch to Windows containers mode:
-   - Right-click the Docker icon in the system tray
-   - Select **"Switch to Windows containers..."**
-3. MetaTrader5 terminal must be open and logged in on the host
-
-```bash
-# Create .env first
-copy .env.example .env
-
-# Build and run (first build takes ~15-30 min due to large image size)
-docker compose -f docker-compose.windows.yml up -d
-
-# View real-time logs
-docker compose -f docker-compose.windows.yml logs -f
-
-# Check PM2 status inside container
-docker exec xauusd-trading powershell -Command "pm2 list"
-
-# Restart a specific process
-docker exec xauusd-trading powershell -Command "pm2 restart main"
-docker exec xauusd-trading powershell -Command "pm2 restart dashboard"
-
-# Stop everything
-docker compose -f docker-compose.windows.yml down
-```
-
-### Comparison
-
-| | Mode A (Linux) | Mode B (Windows) |
-|---|---|---|
-| **Command** | `docker compose up -d` | `docker compose -f docker-compose.windows.yml up -d` |
-| **Trading Bot** | Must run separately on host | Included |
-| **Image size** | ~500 MB | ~5-7 GB |
-| **Build time** | ~2-5 min | ~15-30 min |
-| **MetaTrader5** | Not supported | Supported (Windows IPC) |
-| **Docker mode** | Linux (default) | Windows containers |
 
 ---
 
@@ -821,11 +750,6 @@ See all variables in [`.env.example`](.env.example)
 ├── main.py                    # Entry point — trading loop (every 300s)
 ├── config.py                  # Load config from .env + reload_config()
 ├── ecosystem.config.js        # PM2 config
-├── Dockerfile                 # Linux image — dashboard only
-├── Dockerfile.windows         # Windows image — bot + dashboard
-├── docker-compose.yml         # Linux mode (dashboard + postgres)
-├── docker-compose.windows.yml # Windows containers mode (full system)
-├── docker-start.ps1           # Startup script for Windows container
 ├── start.bat                  # One-click startup for Windows host
 │
 ├── agents/
