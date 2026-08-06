@@ -30,3 +30,5 @@ data/ff_scrape.json
 # Local-only dashboard plugins (not pushed until approved) — e.g. admin account manager
 dashboard/local_*.py
 data/options_oi_raw.json
+agents/prompts/macro_regime.md.bak
+data/regime_narrative_state.json

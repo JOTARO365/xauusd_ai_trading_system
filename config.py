@@ -290,6 +290,13 @@ SENTIMENT_BLOCK_ABOVE   = int(os.getenv("SENTIMENT_BLOCK_ABOVE") or 60)
 SENTIMENT_REFRESH_MIN   = int(os.getenv("SENTIMENT_REFRESH_MIN") or 30)     # cache score กี่นาที (กัน LLM ยิงถี่)
 SENTIMENT_MODEL         = os.getenv("SENTIMENT_MODEL", "claude-sonnet-4-6")
 
+# ── REGIME NARRATIVE AUTO — LLM เขียน narrative ของ macro_regime.md ใหม่รายสัปดาห์ (จันทร์) จากข่าวสด ──
+# กัน narrative ค้าง (แก้มือ). เขียนเฉพาะโซน narrative (ไม่แตะ MACRO_AUTO block/header) + backup + log. default OFF = kill switch.
+REGIME_NARRATIVE_AUTO   = os.getenv("REGIME_NARRATIVE_AUTO", "false").lower() == "true"
+REGIME_NARRATIVE_MODEL  = os.getenv("REGIME_NARRATIVE_MODEL", "claude-sonnet-4-6")
+# รันทุกเช้า (1 ครั้ง/วัน หลังชั่วโมงนี้ local). จันทร์=baseline สัปดาห์ · วันอื่น=ติดตามสถานการณ์ใหม่ (ไม่ recap)
+REGIME_NARRATIVE_HOUR   = int(os.getenv("REGIME_NARRATIVE_HOUR") or 7)
+
 # ALGO_SIZE_STANDDOWN = safety guard บัญชีเล็ก: ก่อนเปิดไม้ ALGO เช็คว่าถ้าเปิดที่ MIN_LOT จะเสี่ยงเกิน
 # ALGO_MAX_TRADE_RISK_PCT ไหม (min-lot ใหญ่เกินทุน). เกิน → ข้ามไม้ (stand down) ไม่ over-risk. ramp อัตโนมัติ
 # ตามทุน (ทุนโต → ไม้ SL แคบเปิดก่อน, กว้างตามมา). แตะเฉพาะ momentum ALGO. default ON (ปลอดภัย). 0 token.
@@ -435,6 +442,10 @@ def reload_config():
     SENTIMENT_BLOCK_ABOVE    = int(os.getenv("SENTIMENT_BLOCK_ABOVE") or 60)
     SENTIMENT_REFRESH_MIN    = int(os.getenv("SENTIMENT_REFRESH_MIN") or 30)
     SENTIMENT_MODEL          = os.getenv("SENTIMENT_MODEL", "claude-sonnet-4-6")
+    global REGIME_NARRATIVE_AUTO, REGIME_NARRATIVE_MODEL, REGIME_NARRATIVE_HOUR
+    REGIME_NARRATIVE_AUTO    = os.getenv("REGIME_NARRATIVE_AUTO", "false").lower() == "true"
+    REGIME_NARRATIVE_MODEL   = os.getenv("REGIME_NARRATIVE_MODEL", "claude-sonnet-4-6")
+    REGIME_NARRATIVE_HOUR    = int(os.getenv("REGIME_NARRATIVE_HOUR") or 7)
     global TSMOM_LIVE, TSMOM_SHADOW, TSMOM_COEXIST, TSMOM_LONG_ONLY, TSMOM_MIN_ADX, TSMOM_MIN_VOLPCT, TSMOM_LOOKBACKS, TSMOM_SL_ATR, TSMOM_SL_PIPS, TSMOM_SL_CAP_FALLBACK
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
     SPECIALIST_ENABLED       = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"

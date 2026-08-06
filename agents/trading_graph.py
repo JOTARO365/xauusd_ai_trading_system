@@ -387,6 +387,11 @@ def node_position_mgmt(state: TradingState) -> dict:
             logger.info(f"[SHADOW-TSMOM] +{_tt['new_bars']} D1 bar(s)")
     except Exception as _tse:
         logger.error(f"[GRAPH:shadow_tsmom] {_tse}")
+    try:                                                    # weekly auto-refresh ของ macro_regime narrative (flag+ISO-week dedup ในตัว)
+        from agents.regime_narrative import tick as _rn_tick
+        _rn_tick()
+    except Exception as _rne:
+        logger.error(f"[GRAPH:regime_narrative] {_rne}")
     # in-loop MT5→DB sync+reconcile (throttled) — ให้ DB cohort fresh ระหว่าง session (แก้ system-trade stale). fail-soft.
     _periodic_db_sync()
     return {}

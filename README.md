@@ -158,6 +158,16 @@ fabricates one. Gold-only (`regime_tick` active + `regime_executor`); MSE non-go
 untouched (the score is gold-specific). Fail-soft: LLM down → score 0 (neutral), trading unaffected.
 Kill switch: `SENTIMENT_BIAS=false`. The number + reason show on the dashboard (Live tab).
 
+The score reads `agents/prompts/macro_regime.md` as background. To stop that note going stale,
+`REGIME_NARRATIVE_AUTO=true` has `agents/regime_narrative.py` rewrite its **narrative** every **morning**
+with an LLM (once per day, at/after `REGIME_NARRATIVE_HOUR` local), from the same fresh context
+`weekly_outlook` gathers. **Monday** sets the week's baseline phase + catalysts ahead; **Tue–Sun** *track*
+what has developed since Monday (new prints, geopolitics, news) and update the phase — never a recap — so
+the sentiment score stays accurate day to day. It writes **only** the narrative zone — the
+`MACRO_AUTO_START..END` data block (owned by `scripts/update_regime.py`) and the header are preserved —
+backs up the old file to `macro_regime.md.bak` and logs the swap. Fail-soft (errors leave the file
+untouched), default OFF. `scripts/update_regime.py` still refreshes the CPI/Fed/yield data block separately.
+
 ### Position & exit management (always on)
 
 Independent of any entry decision, a fast poll manages open positions every cycle
