@@ -73,26 +73,47 @@ def _write_cache(d):
         pass
 
 
+def _regime_age_days():
+    """อายุ (วัน) ของ macro_regime.md จากบรรทัด 'UPDATED: YYYY-MM-DD' ล่าสุด — บอก LLM ว่า background เก่าแค่ไหน."""
+    try:
+        import re
+        from datetime import date
+        txt = (_BASE / "agents" / "prompts" / "macro_regime.md").read_text(encoding="utf-8")
+        ms = re.findall(r"UPDATED:\s*(\d{4})-(\d{2})-(\d{2})", txt)
+        if ms:
+            y, m, d = map(int, ms[-1])
+            return (date.today() - date(y, m, d)).days
+    except Exception:
+        pass
+    return None
+
+
 def _context():
-    """สร้างบริบทให้ LLM: macro regime (phase ปัจจุบัน) + ข่าวเด่น + calendar. สั้น เพื่อคุม token."""
+    """บริบทให้ LLM. ลำดับความสำคัญ: ข่าว/เหตุการณ์**สด** (worldmonitor/news_impact/calendar) = PRIMARY —
+    macro_regime.md = background ที่ **อาจล้าสมัย** (อัปเดตมือ) ใช้แค่ธีมโครงสร้างช้าๆ ห้าม cap สัญญาณสดที่แรง."""
     parts = []
+    # 1) ข่าว/เหตุการณ์สด = PRIMARY (bot อัปเดตไฟล์พวกนี้ทุก cycle)
+    for fn, label in (("worldmonitor.json", "WORLD MONITOR (สด)"),
+                      ("news_impact.json", "NEWS IMPACT (สด)"),
+                      ("ff_calendar_raw.json", "ECON CALENDAR (สด)")):
+        try:
+            with open(_BASE / "data" / fn, encoding="utf-8") as f:
+                raw = json.load(f)
+            txt = json.dumps(raw, ensure_ascii=False)[:1500]
+            parts.append(f"=== {label} — PRIMARY, weight มากสุด ===\n{txt}")
+        except Exception:
+            pass
+    # 2) macro_regime.md = background (แจ้งอายุ; อาจ lag → ห้ามใช้ cap สัญญาณสด)
     try:
         from agents.analyst import _regime_context
         rc = _regime_context()
         if rc:
-            parts.append("=== MACRO REGIME (current phase — authoritative) ===\n" + rc.strip())
+            age = _regime_age_days()
+            age_txt = f" (อัปเดตมือเมื่อ ~{age} วันก่อน — อาจล้าสมัย)" if age is not None else ""
+            parts.append(f"=== MACRO REGIME BACKGROUND{age_txt} — SECONDARY: ใช้เฉพาะธีมโครงสร้างช้าๆ "
+                         f"ถ้าข่าวสดขัดกับไฟล์นี้ ให้เชื่อข่าวสด ห้ามลดคะแนนเพราะไฟล์นี้บอก 'modest' ===\n" + rc.strip())
     except Exception:
         pass
-    # ข่าวเด่นล่าสุด (worldmonitor / news_impact = compute-in-code อยู่แล้ว, ไม่เสีย token เพิ่ม)
-    for fn, label, key in (("worldmonitor.json", "WORLD MONITOR", None),
-                           ("news_impact.json", "NEWS IMPACT", None)):
-        try:
-            with open(_BASE / "data" / fn, encoding="utf-8") as f:
-                raw = json.load(f)
-            txt = json.dumps(raw, ensure_ascii=False)[:1200]
-            parts.append(f"=== {label} ===\n{txt}")
-        except Exception:
-            pass
     return "\n\n".join(parts) if parts else "(ไม่มีบริบทข่าว/regime — ให้ตอบ 0 neutral)"
 
 
@@ -100,9 +121,12 @@ def _compute():
     from langchain_core.messages import SystemMessage, HumanMessage
     sys_msg = ("You are a gold (XAUUSD) macro strategist. Read the context and output ONE integer "
                "from -100 (strongly bearish for gold) to +100 (strongly bullish), plus a one-line Thai "
-               "reason. Judge gold's ACTUAL expected direction for the CURRENT macro phase — the same "
-               "headline can be bullish or bearish depending on the regime. If the signal is weak or "
-               "mixed, stay near 0. Do not force a strong number.")
+               "reason. WEIGHT THE FRESH NEWS/EVENTS (marked PRIMARY) MOST — they reflect what is driving "
+               "gold RIGHT NOW. The MACRO REGIME BACKGROUND is a hand-updated note that may be weeks stale; "
+               "use it only for slow structural themes and NEVER let it cap a strong fresh signal. Judge "
+               "gold's ACTUAL expected direction; the same headline can be bullish or bearish by regime. "
+               "When today's drivers are strong and one-sided, use a strong number (±60..±90) — do not "
+               "default to a timid mid value. Only stay near 0 if the fresh signals are genuinely mixed/weak.")
     ctx = _context()
     raw = _get_llm().invoke([SystemMessage(content=sys_msg),
                              HumanMessage(content=f"บริบทปัจจุบัน:\n{ctx}\n\nให้คะแนน sentiment ทองตอนนี้")])
