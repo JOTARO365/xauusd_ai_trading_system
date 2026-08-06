@@ -279,6 +279,17 @@ WEEKEND_INTERVAL_SECS = int(os.getenv("WEEKEND_INTERVAL_SECS") or 1800)
 # AUTO_SL_PCT_OTHER = ระยะ auto-SL ของคู่ที่ไม่ใช่ทอง (orphan sl==0) = % ของราคา (ทองใช้ AUTO_SL_PIPS/DEFAULT_SL_PIPS เดิม)
 AUTO_SL_PCT_OTHER     = float(os.getenv("AUTO_SL_PCT_OTHER") or 0.01)
 
+# ── SENTIMENT BIAS — LLM ให้คะแนน sentiment −100..+100 (ข่าว+พื้นฐาน) → soft-bias ทิศ algo ──
+# สวนทิศ = ต้อง break แรงขึ้น (extra_margin) + lot เล็กลง (lot_mult). ไม่ hard-block (data ยังนำ). default OFF = kill switch.
+SENTIMENT_BIAS          = os.getenv("SENTIMENT_BIAS", "false").lower() == "true"
+SENTIMENT_BIAS_DEADBAND = int(os.getenv("SENTIMENT_BIAS_DEADBAND") or 20)   # |score| < นี้ = neutral (เข้า 2 ทาง)
+SENTIMENT_LOT_FLOOR     = float(os.getenv("SENTIMENT_LOT_FLOOR") or 0.5)    # lot สวนทิศต่ำสุด = floor × lot ปกติ
+SENTIMENT_MARGIN_MULT   = float(os.getenv("SENTIMENT_MARGIN_MULT") or 0.5)  # break สวนทิศต้องเกิน level อีก (มากสุด) นี้ × ATR
+# |score| ≥ นี้ + ทิศสวน sentiment = veto (ห้ามเข้าทิศผิด, รอทิศถูก) — factor เลือกทิศ. 0 = ปิด (soft ล้วน)
+SENTIMENT_BLOCK_ABOVE   = int(os.getenv("SENTIMENT_BLOCK_ABOVE") or 60)
+SENTIMENT_REFRESH_MIN   = int(os.getenv("SENTIMENT_REFRESH_MIN") or 30)     # cache score กี่นาที (กัน LLM ยิงถี่)
+SENTIMENT_MODEL         = os.getenv("SENTIMENT_MODEL", "claude-sonnet-4-6")
+
 # ALGO_SIZE_STANDDOWN = safety guard บัญชีเล็ก: ก่อนเปิดไม้ ALGO เช็คว่าถ้าเปิดที่ MIN_LOT จะเสี่ยงเกิน
 # ALGO_MAX_TRADE_RISK_PCT ไหม (min-lot ใหญ่เกินทุน). เกิน → ข้ามไม้ (stand down) ไม่ over-risk. ramp อัตโนมัติ
 # ตามทุน (ทุนโต → ไม้ SL แคบเปิดก่อน, กว้างตามมา). แตะเฉพาะ momentum ALGO. default ON (ปลอดภัย). 0 token.
@@ -416,6 +427,14 @@ def reload_config():
     global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK, ALGO_MAX_SAME_DIR, ALGO_ENTRY_HOURS, MULTI_SYMBOL_LIVE, ALGO_SL_MULT, MSE_MAX_POSITIONS, MSE_MAX_TOTAL, MSE_SL_MIN_ATR, MSE_SL_MAX_ATR, WEEKEND_RUN, WEEKEND_INTERVAL_SECS, AUTO_SL_PCT_OTHER
     global STRUCTURAL_SL_GOLD, STRUCTURAL_SL_MSE, STRUCTURAL_SL_BUFFER_ATR, STRUCTURAL_SL_MIN_ATR, STRUCTURAL_SL_MAX_ATR, STRUCTURAL_SL_TFS, STRUCTURAL_SL_PICK, ALGO_ENTRY_MIN_GAP_ATR
     global ALGO_SIZE_STANDDOWN, ALGO_MAX_TRADE_RISK_PCT
+    global SENTIMENT_BIAS, SENTIMENT_BIAS_DEADBAND, SENTIMENT_LOT_FLOOR, SENTIMENT_MARGIN_MULT, SENTIMENT_BLOCK_ABOVE, SENTIMENT_REFRESH_MIN, SENTIMENT_MODEL
+    SENTIMENT_BIAS           = os.getenv("SENTIMENT_BIAS", "false").lower() == "true"
+    SENTIMENT_BIAS_DEADBAND  = int(os.getenv("SENTIMENT_BIAS_DEADBAND") or 20)
+    SENTIMENT_LOT_FLOOR      = float(os.getenv("SENTIMENT_LOT_FLOOR") or 0.5)
+    SENTIMENT_MARGIN_MULT    = float(os.getenv("SENTIMENT_MARGIN_MULT") or 0.5)
+    SENTIMENT_BLOCK_ABOVE    = int(os.getenv("SENTIMENT_BLOCK_ABOVE") or 60)
+    SENTIMENT_REFRESH_MIN    = int(os.getenv("SENTIMENT_REFRESH_MIN") or 30)
+    SENTIMENT_MODEL          = os.getenv("SENTIMENT_MODEL", "claude-sonnet-4-6")
     global TSMOM_LIVE, TSMOM_SHADOW, TSMOM_COEXIST, TSMOM_LONG_ONLY, TSMOM_MIN_ADX, TSMOM_MIN_VOLPCT, TSMOM_LOOKBACKS, TSMOM_SL_ATR, TSMOM_SL_PIPS, TSMOM_SL_CAP_FALLBACK
     SPECIALIST_SHADOW        = os.getenv("SPECIALIST_SHADOW", "false").lower() == "true"
     SPECIALIST_ENABLED       = os.getenv("SPECIALIST_ENABLED", "false").lower() == "true"

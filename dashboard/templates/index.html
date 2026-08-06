@@ -2257,6 +2257,11 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
           <div class="value" id="mon-sentiment">—</div>
           <div class="sub" id="mon-sent-conf">—</div>
         </div>
+        <div class="card">
+          <div class="label">Sentiment Bias (LLM · gold)</div>
+          <div class="value" id="mon-sent-score">—</div>
+          <div class="sub" id="mon-sent-reason">—</div>
+        </div>
       </div>
     </section>
 
@@ -7040,6 +7045,20 @@ async function loadOptionsOi() {
   } catch (_e) {}
 }
 
+// ── Sentiment Bias score (LLM −100..+100) — display-only, อ่าน cache ที่ bot เขียน ──
+async function loadSentimentScore() {
+  try {
+    const d = await (await fetch('/api/sentiment-score')).json();
+    const v = document.getElementById('mon-sent-score'), r = document.getElementById('mon-sent-reason');
+    if (!v) return;
+    const s = Number(d.score ?? 0);
+    const col = s >= 20 ? 'var(--green)' : s <= -20 ? 'var(--red)' : 'var(--muted)';
+    const dir = s >= 20 ? 'โฟกัส BUY' : s <= -20 ? 'โฟกัส SELL' : 'neutral (เข้า 2 ทาง)';
+    v.innerHTML = `<span style="color:${col}">${s > 0 ? '+' : ''}${s}</span> <span style="font-size:11px;color:var(--muted)">${dir}</span>`;
+    if (r) r.textContent = d.reason || (d.ok === false ? 'ยังไม่มีข้อมูล' : '');
+  } catch (_e) {}
+}
+
 /* ── Price Chart + AI Zones overlay (07-03) — lightweight-charts, data จาก MT5 ── */
 let _chart = null, _candleSeries = null, _zoneLines = [], _clusterLines = [], _chartTf = 'M15', _lastCandleLoad = 0, _chartSym = '';
 
@@ -7679,6 +7698,7 @@ function _bootstrap() {
   setInterval(loadShadowMatrix, 30000); setInterval(loadShadowTsmom, 30000); setInterval(loadRealEdge, 30000); setInterval(loadAlgoSelector, 30000);     // Batch B — multi-pair shadow matrix
   setInterval(loadRegimeAnalytics, 60000);  // regime analytics + ALGO monitor (N-gauge) — compute live, refresh 60s
   setInterval(loadOptionsOi, 1800000);      // options OI walls (GLD→XAU) — OI = daily figure, refresh 30min
+  loadSentimentScore(); setInterval(loadSentimentScore, 60000);   // sentiment bias score (LLM cache) — display 60s
   setInterval(() => { const t = document.getElementById('tab-backtest');   // Performance Breakdown — ค่าปัจจุบัน ระหว่างเปิด Analytics
     if (t && t.classList.contains('active')) loadBacktest(); }, 30000);
   loadDeskTicker();

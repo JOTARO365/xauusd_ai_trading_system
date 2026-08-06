@@ -162,6 +162,18 @@ def run_regime_executor():
     if st == _sw.OFF:
         _hb("SWITCH-OFF", "dashboard switch = OFF → งดเข้า", regime="TREND")
         return None
+    _sent = None                                             # sentiment soft-bias (gold; flag OFF = ไม่แตะ)
+    if getattr(_cfg, "SENTIMENT_BIAS", False):
+        try:
+            from agents.sentiment_score import get_score
+            from agents.sentiment_bias import compute as _sbias
+            _sent = _sbias(sig["dir"], (get_score() or {}).get("score", 0))
+            if _sent.get("block"):                           # สวน sentiment แรง → veto ทิศผิด (รอทิศถูก)
+                _last_bar = rec["bar_ts"]
+                _hb("SENTIMENT-BLOCK", f"{sig.get('dir')} สวน score {_sent['score']} แรง → รอทิศที่ถูก", regime="TREND")
+                return None
+        except Exception:
+            _sent = None
     _hb("ENTER", f"{sig.get('dir')} SL={sig.get('sl_pips')}p TP={sig.get('tp_pips')}p → ส่งคำสั่ง", regime="TREND")
     _last_bar = rec["bar_ts"]
     from connectors.mt5_connector import open_order
@@ -171,6 +183,8 @@ def run_regime_executor():
     sl_pips, tp_pips, _force_min = _structural_sl_gold(sig["dir"], rec.get("close"), rec.get("atr"),
                                                        sig["sl_pips"], tp_pips)
     _lot = float(getattr(_cfg, "MIN_LOT", 0.01)) if _force_min else algo_lot(sl_pips)  # structural = min lot เสมอ
+    if _sent and _sent.get("lot_mult", 1.0) < 1.0:           # สวน sentiment (อ่อน) → lot เล็กลง (floor MIN_LOT)
+        _lot = max(float(getattr(_cfg, "MIN_LOT", 0.01)), round(_lot * _sent["lot_mult"], 2))
     res = open_order(sig["dir"], sl_pips, tp_pips, comment="ALGO-mom",
                      lot=_lot,                              # DRY_RUN/cap/clamp ในตัว
                      shadow=(st == _sw.SHADOW))              # SHADOW → paper-fill

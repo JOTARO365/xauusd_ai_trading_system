@@ -1789,6 +1789,19 @@ def api_volume_profile():
     return jsonify(_cached(f"volprofile:{broker}:{tf}:{count}", _fetch, ttl=60))
 
 
+@app.route("/api/sentiment-score")
+def api_sentiment_score():
+    """LLM sentiment score (−100..+100) + เหตุผล — อ่าน cache ที่ bot เขียน (data/sentiment_score.json).
+    display-only, ไม่ยิง LLM จาก dashboard. 0 token."""
+    def _c():
+        try:
+            with open(os.path.join(_BASE, "../data/sentiment_score.json"), encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {"ok": False, "score": 0, "reason": "ยังไม่มีข้อมูล sentiment"}
+    return jsonify(_cached("sentiment-score", _c, ttl=30))
+
+
 @app.route("/api/options-oi")
 def api_options_oi():
     """Gold options open-interest walls (GLD chain via CBOE → XAU price). proxy 'สัญญาถือ ณ ราคา'

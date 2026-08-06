@@ -139,6 +139,25 @@ Running in parallel, independent of the regime router:
 > veto entries — the algo does. Set `REGIME_LIVE=false` to fall back to the old
 > LLM-decision pipeline.
 
+### Sentiment bias — LLM directional factor (`SENTIMENT_BIAS`, gold, default OFF)
+
+The algo entry is pure momentum, so it can keep taking breakouts in one direction while
+news/fundamentals argue the other way. With `SENTIMENT_BIAS=true`, `agents/sentiment_score.py`
+has an LLM distil the current **gold-specific** picture (macro-regime note + news + calendar)
+into one number **−100..+100** (cached `SENTIMENT_REFRESH_MIN` minutes, so ≤1 call per window),
+and `agents/sentiment_bias.py` turns it into a *soft* directional factor on gold entries:
+
+- **aligned** with the score, or `|score| < SENTIMENT_BIAS_DEADBAND` → no change.
+- **counter** and `|score| ≥ SENTIMENT_BLOCK_ABOVE` (default 60) → **veto** that direction (wait
+  for the right one) — the "pick the correct side" factor.
+- **counter but weaker** → *soft*: size down toward `SENTIMENT_LOT_FLOOR × lot` and (regime_tick)
+  require the break to clear the level by up to `SENTIMENT_MARGIN_MULT × ATR` more.
+
+**Data still decides the entry** — sentiment only vetoes/dampens a wrong-direction signal, it never
+fabricates one. Gold-only (`regime_tick` active + `regime_executor`); MSE non-gold pairs are
+untouched (the score is gold-specific). Fail-soft: LLM down → score 0 (neutral), trading unaffected.
+Kill switch: `SENTIMENT_BIAS=false`. The number + reason show on the dashboard (Live tab).
+
 ### Position & exit management (always on)
 
 Independent of any entry decision, a fast poll manages open positions every cycle

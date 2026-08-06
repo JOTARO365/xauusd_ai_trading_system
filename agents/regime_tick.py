@@ -137,6 +137,28 @@ def _tick() -> None:
             _last_traded_hour = hour
             logger.info(f"[REGIME-TICK] PROXIMITY-SKIP {d}: มีไม้ ALGO ทิศเดียวใกล้ → งดเข้าจุดเดิม")
             return
+        _sent = None                                             # sentiment soft-bias (flag OFF = ไม่แตะ)
+        if getattr(config, "SENTIMENT_BIAS", False):
+            try:
+                from agents.sentiment_score import get_score
+                from agents.sentiment_bias import compute as _sbias
+                _sent = _sbias(d, (get_score() or {}).get("score", 0))
+                if _sent.get("block"):                           # สวน sentiment แรง → veto ทิศผิด (รอทิศถูก)
+                    _last_traded_hour = hour
+                    logger.info(f"[REGIME-TICK] SENTIMENT-BLOCK {d}: สวน score {_sent['score']} แรง → ไม่เข้าทิศนี้")
+                    from agents.algo_state import write_state
+                    write_state("SENTIMENT-BLOCK", regime="TREND", via="tick",
+                                detail=f"{d} สวน sentiment {_sent['score']} → รอทิศที่ถูก")
+                    return
+                if not _sent["aligned"] and _sent["extra_margin_atr"] > 0:   # สวน sentiment → ต้องทะลุแรงกว่า
+                    _atr = float(_cache.get("atr") or 0)
+                    _need = _sent["extra_margin_atr"] * _atr
+                    if _need > 0 and ((d == "BUY" and tick.ask <= _cache["buy"] + _need)
+                                      or (d == "SELL" and tick.bid >= _cache["sell"] - _need)):
+                        logger.info(f"[REGIME-TICK] SENTIMENT-HOLD {d}: สวน score {_sent['score']} → รอ break แรงกว่า (+{_need:.2f})")
+                        return                                   # ไม่ set _last_traded_hour → เข้าได้ถ้า break แรงพอในชม.นี้
+            except Exception:
+                _sent = None
         _last_traded_hour = hour
         from agents.algo_exit import sr_tp_pips                    # P-D: TP ตามแนว S/R (flag OFF → RR2 เดิม)
         from agents.algo_sizing import algo_lot                    # P-E: lot risk-based (flag OFF → fixed เดิม)
@@ -146,6 +168,8 @@ def _tick() -> None:
         _sl_pips, _tp_pips, _force_min = _structural_sl_gold(d, _entry_px, _cache.get("atr"),
                                                              _cache["sl_pips"], _tp_pips)
         _lot = float(getattr(config, "MIN_LOT", 0.01)) if _force_min else algo_lot(_sl_pips)  # structural = min lot เสมอ
+        if _sent and _sent.get("lot_mult", 1.0) < 1.0:          # สวน sentiment (อ่อน) → lot เล็กลง (floor MIN_LOT)
+            _lot = max(float(getattr(config, "MIN_LOT", 0.01)), round(_lot * _sent["lot_mult"], 2))
         res = open_order(d, _sl_pips, _tp_pips, comment="ALGO-mom", lot=_lot,
                          shadow=(_st == _sw.SHADOW))               # SHADOW → paper-fill
         from agents.regime_executor import _log
