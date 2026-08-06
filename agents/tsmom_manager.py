@@ -80,6 +80,16 @@ def _open(direction, atr, shadow):
                        f"{_wi['threshold']*100:.0f}% · ทุน {_wi['equity']:,.0f} · ควรมี ~{_wi['needed_equity']:,.0f} "
                        f"— เปิด order ต่อ (fallback ปิด)")
     lot = algo_lot(sl_pips)
+    if getattr(_cfg, "SENTIMENT_BIAS", False):              # soft-size เท่านั้น: สวน sentiment → lot เล็กลง (คง direction = validated edge)
+        try:
+            from agents.sentiment_score import get_score
+            from agents.sentiment_bias import compute as _sbias
+            _sb = _sbias(direction, (get_score() or {}).get("score", 0))   # ใช้แค่ lot_mult (ไม่สน block/margin ของ tsmom)
+            if _sb.get("lot_mult", 1.0) < 1.0:
+                lot = max(float(getattr(_cfg, "MIN_LOT", 0.01)), round(lot * _sb["lot_mult"], 2))
+                logger.info(f"[TSMOM] สวน sentiment (score {_sb['score']}) → lot ×{_sb['lot_mult']} = {lot}")
+        except Exception:
+            pass
     res = open_order(direction, sl_pips, tp_pips, comment=COMMENT, lot=lot, shadow=shadow)
     ok = True if shadow else bool(isinstance(res, dict) and res.get("success"))
     logger.warning(f"[TSMOM] {'SHADOW ' if shadow else ''}OPEN {direction} SL={sl_pips}p ({sl_src}) lot={lot} → {res}")
