@@ -171,6 +171,16 @@ def manage_tsmom():
         if atr <= 0:
             return None
         can_open = _entry_cond_ok(rates, R)                 # gate: min ADX/vol (default off → True)
+        if can_open and getattr(_cfg, "SENTIMENT_BIAS", False) and target in ("BUY", "SELL"):
+            try:                                            # ห้ามเปิดใหม่สวน sentiment (flip → ปิดไม่เปิดต่อ · ไม่มีไม้ → stand-down)
+                from agents.sentiment_score import get_score
+                from agents.sentiment_bias import compute as _sbias
+                _sb = _sbias(target, (get_score() or {}).get("score", 0))
+                if _sb.get("block"):
+                    can_open = False
+                    logger.info(f"[TSMOM] SENTIMENT-BLOCK {target}: สวน score {_sb['score']} → ไม่เปิดใหม่ (ถือไม้เดิมได้)")
+            except Exception:
+                pass
         # unify: dashboard switch (shadow_switches tsmom_d1:XAUUSD) คุม real/paper/off เหมือนทุกคู่ (derive จาก .env ถ้ายังไม่ toggle)
         st = _sw.gold_state("tsmom_d1")
         if st == _sw.OFF:
