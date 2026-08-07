@@ -2498,7 +2498,10 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       <div class="section-title" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <span>Backtest Research — algo แยกกลุ่ม +EV / −EV</span>
         <span id="btr-updated" style="font-size:10px;color:var(--muted)"></span>
-        <span style="margin-left:auto;display:flex;gap:6px">
+        <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+          <select id="btr-algo" onchange="renderBtr()" style="font-family:var(--mono);font-size:11px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:3px 6px">
+            <option value="all">ทุก algo</option>
+          </select>
           <button class="btr-tab active" data-g="+EV" onclick="filterBtr('+EV')">✅ +EV</button>
           <button class="btr-tab" data-g="-EV" onclick="filterBtr('-EV')">❌ −EV</button>
           <button class="btr-tab" data-g="all" onclick="filterBtr('all')">ทั้งหมด</button>
@@ -7512,7 +7515,15 @@ async function loadBacktestResults() {
     const r = await fetch('/api/backtest-results'); const d = await r.json();
     _btrData = d.results || [];
     const u = document.getElementById('btr-updated');
-    if (u) u.textContent = d.updated ? ('· อัปเดต ' + d.updated + ' · ' + _btrData.length + ' algo') : '';
+    if (u) u.textContent = d.updated ? ('· อัปเดต ' + d.updated + ' · ' + _btrData.length + ' combo') : '';
+    const sel = document.getElementById('btr-algo');
+    if (sel) {
+      const algos = [...new Set(_btrData.map(r => r.algo))].sort();
+      const cur = sel.value || 'all';
+      sel.innerHTML = '<option value="all">ทุก algo</option>' +
+        algos.map(a => `<option value="${a}">${a}</option>`).join('');
+      sel.value = cur;
+    }
     renderBtr();
   } catch (e) { console.error('loadBacktestResults', e); }
 }
@@ -7523,7 +7534,9 @@ function filterBtr(g) {
 }
 function renderBtr() {
   const body = document.getElementById('btr-body'); if (!body) return;
-  const rows = _btrData.filter(r => _btrGroup === 'all' || r.group === _btrGroup);
+  const algoSel = (document.getElementById('btr-algo') || {}).value || 'all';
+  const rows = _btrData.filter(r => (_btrGroup === 'all' || r.group === _btrGroup)
+                                 && (algoSel === 'all' || r.algo === algoSel));
   if (!rows.length) { body.innerHTML = '<tr><td colspan="10" style="color:var(--muted)">—</td></tr>'; return; }
   const num = (v, d = 4) => (v == null ? '—' : (v >= 0 ? '+' : '') + Number(v).toFixed(d));
   const liveC = s => s === 'LIVE' ? 'var(--green)' : (s === 'CUT' ? 'var(--red)' : 'var(--muted)');
