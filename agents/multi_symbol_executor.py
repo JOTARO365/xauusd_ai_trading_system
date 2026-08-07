@@ -254,6 +254,12 @@ def _apply_structural_sl(direction, entry, bars, point, broker, base_sl_pips, ba
     default OFF → base เดิม. fail-soft. คืน (sl_pips, tp_pips, force_min_lot)."""
     import config as _cfg
     from agents import structural_sl
+    try:                                                    # scalp (confluence_15m) ใช้ SL ของตัวเอง — D1-wick กว้างเกินสำหรับ M15 (ผิดจาก backtest)
+        _a = _reg.get(algo_id)
+        if _a is not None and getattr(_a, "klass", "") == "scalp":
+            return base_sl_pips, base_tp_pips, False
+    except Exception:
+        pass
     high, low, close, _t = bars
     atr_list = _simple_atr(high, low, close)
     atr = atr_list[-1] if atr_list else 0.0
@@ -572,9 +578,12 @@ def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max
         vo["dir"], float(vo["entry"]), bars, point, broker, sl_pips_eff, tp_pips_eff, algo_id, symbol)
     _lot = _cfgf("MIN_LOT", 0.01) if _force_min else None   # structural = min lot เสมอ (SL กว้าง, ยอม risk%)
     from connectors.mt5_connector import open_order
+    # structural SL = SL ปลายไส้ D1 (กว้าง) + คง TP → RR ต่ำโดยตั้งใจ (memory: wick-SL คือ risk control ไม่ใช่ RR).
+    # RR gate (min 2.0) จะ reject → bypass ด้วย min_rr ต่ำเฉพาะไม้ structural. non-structural = RR gate ปกติ.
+    _min_rr = 0.1 if _force_min else None
     res = open_order(vo["dir"], sl_pips_eff, tp_pips_eff, lot=_lot,
                      comment=f"MSE-{algo_id}", symbol=broker, max_open_override=max_pos,
-                     magic=magic if magic is not None else _magic_of(algo_id))
+                     min_rr=_min_rr, magic=magic if magic is not None else _magic_of(algo_id))
     if res and res.get("success") and res.get("ticket"):
         combo_state["last_bar_ts"] = vo["bar_ts"]              # dedup **เฉพาะเมื่อสำเร็จ** (fail → retry บาร์เดิมได้หลัง cooldown)
         combo_state.pop("retry_after", None)
