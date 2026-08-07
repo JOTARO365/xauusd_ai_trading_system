@@ -550,6 +550,19 @@ def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max
             return 0
     except Exception:
         pass
+    try:                                                       # event-engine gate (ทองเท่านั้น): PRE=หยุดเข้าก่อนข่าว · POST=block สวนทิศ rubric
+        if symbol.upper().startswith("XAU"):                   # bias() คืน None เมื่อ EVENT_ENGINE_LIVE=false → ไม่กระทบ (shadow)
+            from agents import event_engine as _ee
+            _eb = _ee.bias()
+            if _eb:
+                if _eb["dir"] == "FLAT":
+                    logger.debug(f"[MSE] {algo_id}:{symbol} skip — PRE-event {_eb.get('key')} (หยุดเข้าก่อนข่าว)")
+                    return 0
+                if _eb["dir"] in ("BUY", "SELL") and vo.get("dir") != _eb["dir"]:
+                    logger.debug(f"[MSE] {algo_id}:{symbol} {vo.get('dir')} skip — POST-event สวน bias {_eb['dir']} ({_eb.get('key')})")
+                    return 0
+    except Exception:
+        pass
     if vo["bar_ts"] == combo_state.get("last_bar_ts"):
         return 0                                                # เข้าไม้บาร์นี้ **สำเร็จ**ไปแล้ว (dedup ต่อ signal-bar)
     if _signal_stale(vo["bar_ts"], algo):                       # cold-start: บาร์ปิดก่อน engine เริ่ม = stale
