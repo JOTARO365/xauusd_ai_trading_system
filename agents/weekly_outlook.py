@@ -245,9 +245,14 @@ not a value dump):
 จาก ALGO ROSTER ข้างล่าง แนะนำว่าควรเปิด (enable) algo ไหนบ้างให้เหมาะกับ bias/regime ของสัปดาห์นี้ + ระบุทิศ
 (สำหรับ tsmom_d1: long / short / both) พร้อมเหตุผลสั้นๆ ภาษาชาวบ้าน. ยึด domain ของแต่ละ algo; ตัวไหนไม่เข้าสภาพ
 ตลาดสัปดาห์นี้ให้บอก "พัก (stand down)". เขียนเป็น bullet สั้น algo ละบรรทัด.
-ALGO ROSTER: regime_momentum (momentum breakout · TREND) · tsmom_d1 (time-series momentum D1 · TREND; SELL leg
-−EV → เลือก long เป็นหลัก) · mean_reversion (z-fade · RANGE; ถูก CUT −EV) · regime_momentum_fvg (momentum+FVG ·
-TREND) · sweep_reversal (fade แนวไฮ/โลว์วันก่อน · RANGE/NEUTRAL).
+ALGO ROSTER (✅=+EV backtest, LIVE ได้ · ⚠️=อ่อน/−EV):
+✅ macro_momentum (ทอง H4: breakout + DXY/EURUSD ยืนยันทิศ + sentiment · เข้าจุดสำคัญ ไม่สวน macro) ·
+✅ confluence_15m (ทอง M15 NY-session: breakout + H1+H4+DXY + volume surge · scalp คุณภาพสูง ถี่) ·
+✅ xau_xag_pairs (stat-arb 2-leg XAU-XAG spread z-fade · market-neutral · WR57%) ·
+✅ tsmom_d1 (time-series momentum D1 · 21/63/126 + short-term confirm; long/short/both) ·
+⚠️ regime_momentum (momentum breakout · TREND; ทอง H1 อ่อน, BTC H4 +EV) ·
+⚠️ regime_momentum_fvg (momentum+FVG · TREND; −EV) · mean_reversion (z-fade · RANGE; CUT −EV) ·
+sweep_reversal (fade ไฮ/โลว์วันก่อน · RANGE/NEUTRAL; −EV).
 
 ## 🗓️ ปฏิทิน & Scenario สัปดาห์นี้
 For each key event in calendar: date/time + hot→gold direction / cool→gold direction. Base magnitudes on
