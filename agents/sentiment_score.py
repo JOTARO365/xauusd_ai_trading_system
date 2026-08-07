@@ -50,8 +50,8 @@ def _get_llm():
         from config import ANTHROPIC_API_KEY
         _llm = ChatAnthropic(
             model=getattr(_cfg, "SENTIMENT_MODEL", "claude-sonnet-4-6"),
-            api_key=ANTHROPIC_API_KEY, max_tokens=250, temperature=0,
-            timeout=40, max_retries=1,
+            api_key=ANTHROPIC_API_KEY, max_tokens=400, temperature=0,
+            timeout=45, max_retries=2,
         ).with_structured_output(_schema(), include_raw=True)
     return _llm
 
@@ -103,6 +103,17 @@ def _context():
             parts.append(f"=== {label} — PRIMARY, weight มากสุด ===\n{txt}")
         except Exception:
             pass
+    # 1.5) ตัวเลขเศรษฐกิจ**จริงที่ log ไว้** (release actuals + DXY/yields/real-yield + COT) = ประเมินทิศจากเลข ไม่ใช่กราฟ
+    for fn, label in (("macro_actuals.json", "ECON ACTUALS — release จริง (CPI/NFP/unemp/Fed/retail)"),
+                      ("macro_strip.json", "MACRO STRIP — DXY / 10Y / real-yield"),
+                      ("cot.json", "COT — positioning")):
+        try:
+            with open(_BASE / "data" / fn, encoding="utf-8") as f:
+                raw = json.load(f)
+            txt = json.dumps(raw, ensure_ascii=False)[:900]
+            parts.append(f"=== {label} — PRIMARY (ตัวเลขจริง) ===\n{txt}")
+        except Exception:
+            pass
     # 2) macro_regime.md = background (แจ้งอายุ; อาจ lag → ห้ามใช้ cap สัญญาณสด)
     try:
         from agents.analyst import _regime_context
@@ -125,7 +136,10 @@ def _compute():
                "gold RIGHT NOW. The MACRO REGIME BACKGROUND is a hand-updated note that may be weeks stale; "
                "use it only for slow structural themes and NEVER let it cap a strong fresh signal. Judge "
                "gold's ACTUAL expected direction; the same headline can be bullish or bearish by regime. "
-               "When today's drivers are strong and one-sided, use a strong number (±60..±90) — do not "
+               "Reason from the ACTUAL ECONOMIC NUMBERS provided (real yield, CPI, NFP, unemployment, DXY, "
+               "10Y, COT positioning) — not just news vibes: e.g. positive/rising real yield + strong jobs = "
+               "gold headwind; falling real yield + weak jobs + soft CPI = tailwind. Weigh news + these numbers "
+               "TOGETHER. When today's drivers are strong and one-sided, use a strong number (±60..±90) — do not "
                "default to a timid mid value. Only stay near 0 if the fresh signals are genuinely mixed/weak.")
     ctx = _context()
     raw = _get_llm().invoke([SystemMessage(content=sys_msg),
