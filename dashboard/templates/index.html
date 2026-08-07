@@ -5235,18 +5235,17 @@ function renderSmPotential() {
     const key = a.dir_key || a.algo_id, p = byKey[key];
     const sel = window._smSel === key;
     const mode = a.dir_mode || 'both';
-    // จุดเข้า/สัญญาณ
+    // จุดเข้า — ทุก algo symmetric: โชว์ BUY + SELL (ตาม mode ที่เปิด). ทิศที่ปิด = จาง
     let entry = '<span style="color:var(--muted)">—</span>';
     if (p) {
-      if (p.buy != null || p.sell != null) {
-        const bOk = mode !== 'short', sOk = mode !== 'long';
-        const armed = p.armed ? '' : ` <span style="color:var(--muted);font-size:9px">[${p.regime}→standby]</span>`;
-        entry = `${bOk ? `<span style="color:var(--green)">BUY&gt;${p.buy}</span>` : ''}${bOk && sOk ? ' / ' : ''}${sOk ? `<span style="color:var(--red)">SELL&lt;${p.sell}</span>` : ''}${armed}`;
-      } else if (p.tsmom_vote) {
-        const c = p.tsmom_vote === 'BUY' ? 'var(--green)' : p.tsmom_vote === 'SELL' ? 'var(--red)' : 'var(--muted)';
-        entry = `<span style="color:${c}">vote ${p.tsmom_vote}</span>${p.flip_buy ? ` <span style="color:var(--muted);font-size:9px">BUY&gt;${p.flip_buy}</span>` : ''}`;
-      }
+      const bOk = mode !== 'short', sOk = mode !== 'long';
+      const buyTxt = p.buy != null ? `<span style="color:${bOk?'var(--green)':'var(--muted)'};${bOk?'':'opacity:.5'}">BUY ${p.buy}${bOk?'':' (ปิด)'}</span>` : '';
+      const sellTxt = p.sell != null ? `<span style="color:${sOk?'var(--red)':'var(--muted)'};${sOk?'':'opacity:.5'}">SELL ${p.sell}${sOk?'':' (ปิด)'}</span>` : '';
+      const parts = [buyTxt, sellTxt].filter(Boolean).join(' / ');
+      const vote = p.tsmom_vote ? ` <span style="font-size:9px;color:var(--muted)">(vote ${p.tsmom_vote})</span>` : '';
+      entry = (parts || '<span style="color:var(--muted)">รอสัญญาณ</span>') + vote;
     }
+    const noteTxt = p && p.note ? `<div style="font-size:9px;color:var(--muted);margin-top:1px">${p.note}</div>` : '';
     const modeCol = mode === 'long' ? 'var(--green)' : mode === 'short' ? 'var(--red)' : 'var(--muted)';
     return `<div onclick="showAlgoDetail('${key}')" title="คลิกดูรายละเอียด"
         style="cursor:pointer;flex:1 1 200px;min-width:200px;max-width:300px;border:1px solid ${sel?'var(--gold)':'var(--border)'};border-radius:8px;padding:8px 11px;background:var(--surface)">
@@ -5255,6 +5254,7 @@ function renderSmPotential() {
         ${a.live ? '<span style="color:var(--green);font-size:9px;font-weight:700">🟢LIVE</span>' : ''}
       </div>
       <div style="font-family:var(--mono);font-size:11px;margin-top:3px">${entry}</div>
+      ${noteTxt}
       <div style="font-size:9px;color:${modeCol};margin-top:2px">โหมด: ${mode}</div>
     </div>`;
   }).join('') || '<div style="color:var(--muted);font-size:12px">ยังไม่มีข้อมูล</div>';

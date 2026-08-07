@@ -80,8 +80,9 @@ def _potential():
 
 
 def snapshot():
-    """โอกาสเข้า order ต่อ algo (structured, สำหรับ dashboard). gold: regime_momentum + tsmom_d1.
-    คืน {ok, price, algos:[{algo,name,buy,sell,regime,tsmom_vote,flip,dir_mode}]}. read-only, 0 token."""
+    """โอกาสเข้า order ต่อ algo (structured, สำหรับ dashboard) — ทอง, **buy+sell ทั้ง 2 ทางทุก algo**
+    (ทุก algo symmetric: momentum/fvg=Donchian breakout · mean_rev=z-fade band · sweep=prior-day H/L
+    · tsmom=D1 vote+flip). คืน {ok, price, algos:[{algo,name,regime,buy,sell,note,dir_mode}]}. 0 token."""
     out = {"ok": False, "algos": []}
     try:
         import os, sys
@@ -97,26 +98,62 @@ def snapshot():
             return out
         px = tk.bid
         out["ok"] = True; out["price"] = round(px, 2)
-        # regime_momentum
+        h = mt5.copy_rates_from_pos(S, mt5.TIMEFRAME_H1, 0, 400)
+        hi, lo, cl, tm = (h["high"].astype(float), h["low"].astype(float),
+                          h["close"].astype(float), h["time"])
+        i = len(cl) - 2
+        atr_v = R.atr(hi, lo, cl)
+        reg = R.detect_regime(R.efficiency_ratio(cl)[i], R.adx(hi, lo, cl)[i], R.vol_percentile(cl)[i])
+
+        def _add(algo, name, buy, sell, note):
+            out["algos"].append({"algo": algo, "name": name, "regime": reg,
+                                 "buy": round(buy, 2) if buy else None,
+                                 "sell": round(sell, 2) if sell else None,
+                                 "note": note, "dir_mode": _adir.mode_of(algo)})
+
+        # momentum breakout (regime_momentum + fvg ใช้ Donchian เดียวกัน; fvg เพิ่ม FVG-filter)
         try:
-            h = mt5.copy_rates_from_pos(S, mt5.TIMEFRAME_H1, 0, 400)
-            hi, lo, cl = h["high"].astype(float), h["low"].astype(float), h["close"].astype(float)
-            i = len(cl) - 2
-            reg = R.detect_regime(R.efficiency_ratio(cl)[i], R.adx(hi, lo, cl)[i], R.vol_percentile(cl)[i])
-            lv = R.momentum_levels(i, hi, lo, cl, R.atr(hi, lo, cl))
-            out["algos"].append({"algo": "regime_momentum", "name": "Momentum Breakout",
-                                 "buy": round(lv["buy_level"], 2), "sell": round(lv["sell_level"], 2),
-                                 "regime": reg, "armed": reg == "TREND", "dir_mode": _adir.mode_of("regime_momentum")})
+            lv = R.momentum_levels(i, hi, lo, cl, atr_v)
+            armed = "" if reg == "TREND" else f" · {reg}→standby (เข้าเฉพาะ TREND)"
+            _add("regime_momentum", "Momentum Breakout", lv["buy_level"], lv["sell_level"], "Donchian breakout" + armed)
+            _add("regime_momentum_fvg", "Momentum + FVG", lv["buy_level"], lv["sell_level"], "breakout + FVG confirm" + armed)
         except Exception:
             pass
-        # tsmom_d1
+        # mean_reversion — z-fade band (BUY ต่ำ / SELL สูง)
+        try:
+            win = getattr(R, "MR_WIN", 60); se = getattr(R, "S_ENTRY", 1.25)
+            w = cl[i - win + 1:i + 1]; m, sd = float(w.mean()), float(w.std())
+            rr = "" if reg in ("NEUTRAL", "RANGE") else f" · {reg}→standby (เข้าเฉพาะ RANGE/NEUTRAL)"
+            if sd > 0:
+                _add("mean_reversion", "Mean-Reversion (z-fade)", m - se * sd, m + se * sd, f"fade z±{se}" + rr)
+        except Exception:
+            pass
+        # sweep_reversal — fade prior-day H/L (BUY@low sweep / SELL@high sweep)
+        try:
+            from datetime import datetime, timezone
+            days = {}
+            for k in range(len(cl)):
+                dts = datetime.fromtimestamp(int(tm[k]), timezone.utc).strftime("%Y-%m-%d")
+                dd = days.setdefault(dts, [hi[k], lo[k]])
+                dd[0] = max(dd[0], hi[k]); dd[1] = min(dd[1], lo[k])
+            ordered = sorted(days)
+            rr = "" if reg in ("NEUTRAL", "RANGE") else f" · {reg}→standby (เข้าเฉพาะ RANGE/NEUTRAL)"
+            if len(ordered) >= 2:
+                pdh, pdl = days[ordered[-2]]                 # prior day H/L
+                _add("sweep_reversal", "Sweep Reversal", pdl, pdh, "fade prior-day H/L" + rr)
+        except Exception:
+            pass
+        # tsmom_d1 — D1 vote + flip levels (ทั้ง 2 ทาง)
         try:
             d = mt5.copy_rates_from_pos(S, mt5.TIMEFRAME_D1, 0, 300); dc = d["close"].astype(float); j = len(dc) - 2
             vs = {L: int(np.sign(dc[j] - dc[j - L])) for L in (63, 126, 252)}
             s = sum(vs.values()); vote = "BUY" if s > 0 else "SELL" if s < 0 else "FLAT"
             ups = [dc[j - L] for L in (63, 126, 252) if dc[j] < dc[j - L]]
+            dns = [dc[j - L] for L in (63, 126, 252) if dc[j] > dc[j - L]]
             out["algos"].append({"algo": "tsmom_d1", "name": "TSMOM-D1", "regime": "D1",
-                                 "tsmom_vote": vote, "flip_buy": round(min(ups), 0) if ups else None,
+                                 "buy": round(min(ups), 0) if ups else None,       # ราคาที่ต้องข้ามเพื่อ vote→BUY
+                                 "sell": round(max(dns), 0) if dns else None,       # ต่ำกว่านี้ vote→SELL
+                                 "tsmom_vote": vote, "note": f"D1 vote {vote} · flip levels",
                                  "dir_mode": _adir.mode_of("tsmom_d1")})
         except Exception:
             pass
