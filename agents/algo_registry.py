@@ -371,9 +371,88 @@ class MacroMomAlgo(Algo):
                 "bar_ts": bar_ts, "klass": self.klass}
 
 
+class ConfluenceVol15m(Algo):
+    """15m confluence + order-flow (research 08-07): 15m Donchian breakout เข้าเฉพาะเมื่อ
+    H1 trend + H4 trend + macro(DXY) ตรงทิศ**ทั้งหมด** + tick-volume surge (order-flow หนุน).
+    selective สุด (5 เงื่อนไข) = กรอง noise ที่ฆ่า scalp ทุกตัว. backtest gold M15: exp_R+0.035 OOS+0.199
+    (confluence เฉยๆ −EV → เติม volume พลิก +EV). fire ~166/ปี = small-TF ที่ถี่. gold-only (DXY driver ตรง)."""
+    algo_id = "confluence_15m"
+    version = 1
+    klass = "scalp"
+    timeframe = "M15"
+    mgmt = "managed"
+    eligible_pairs = ["XAUUSD"]
+    BRK = 12
+    RR = 2.0
+    SL_ATR = 1.0
+    VK = 1.5                                            # volume surge (× median)
+    MACRO = "EURUSD"
+
+    def _ctx_live(self, times_last):
+        """ทิศ H1/H4 (EMA50 slope, บาร์ปิดล่าสุด) + macro momentum + volume surge/median. คืน dict หรือ None."""
+        try:
+            import MetaTrader5 as mt5
+            from connectors.pair_collector import _broker_map
+            bm = _broker_map() or {}
+
+            def _slope(sym_or_broker, tf):
+                r = mt5.copy_rates_from_pos(sym_or_broker, tf, 0, 120)
+                if r is None or len(r) < 60:
+                    return 0
+                c = r["close"].astype(float)
+                k = 2 / 51; e = c[0]
+                es = []
+                for v in c:
+                    e = v * k + e * (1 - k); es.append(e)
+                return 1 if es[-2] > es[-5] else -1 if es[-2] < es[-5] else 0
+            gb = bm.get("XAUUSD", "XAUUSD"); eb = bm.get(self.MACRO, self.MACRO)
+            h1 = _slope(gb, mt5.TIMEFRAME_H1); h4 = _slope(gb, mt5.TIMEFRAME_H4)
+            em = mt5.copy_rates_from_pos(eb, mt5.TIMEFRAME_M15, 0, 60)
+            mac = 0
+            if em is not None and len(em) >= 26:
+                ec = em["close"].astype(float); mac = 1 if ec[-2] > ec[-26] else -1
+            mv = mt5.copy_rates_from_pos(gb, mt5.TIMEFRAME_M15, 0, 260)
+            vsurge = False
+            if mv is not None and len(mv) >= 210:
+                tv = mv["tick_volume"].astype(float); med = float(np.median(tv[-201:-1])) or 1
+                vsurge = tv[-2] >= self.VK * med and tv[-2] <= 2.0 * med   # surge แต่ไม่ใช่ข่าว (spike สุด)
+            return {"h1": h1, "h4": h4, "mac": mac, "vsurge": vsurge}
+        except Exception:
+            return None
+
+    def evaluate(self, symbol, bars, ctx=None, point=None):
+        high, low, close, times = bars
+        n = len(close)
+        if n < max(self.BRK, 50) + 5 or not point:
+            return None
+        i = n - 2
+        atr = R.atr(high, low, close); av = float(atr[i]) if atr[i] == atr[i] else 0.0
+        if av <= 0:
+            return None
+        px = float(close[i]); hh = float(high[i - self.BRK:i].max()); ll = float(low[i - self.BRK:i].min())
+        d = "BUY" if px > hh else ("SELL" if px < ll else None)     # 15m breakout = จุดสำคัญ
+        if d is None:
+            return None
+        cx = ctx if (ctx and "h1" in ctx) else self._ctx_live(times[i])
+        if not cx:
+            return None
+        sign = 1 if d == "BUY" else -1
+        if cx["h1"] != sign or cx["h4"] != sign or cx["mac"] != sign or not cx["vsurge"]:
+            return None                                    # ต้อง H1+H4+macro+volume ตรงหมด (order-flow confluence)
+        try:
+            from datetime import datetime, timezone
+            bar_ts = datetime.fromtimestamp(int(times[i]), timezone.utc).isoformat()
+        except Exception:
+            return None
+        slp = round(self.SL_ATR * av / point)
+        return {"algo_id": self.algo_id, "symbol": symbol, "dir": d, "entry": px,
+                "sl_pips": slp, "tp_pips": round(slp * self.RR), "regime": "CONF15M",
+                "bar_ts": bar_ts, "klass": self.klass}
+
+
 ALGO_REGISTRY = {a.algo_id: a for a in (
     RegimeMomentumAlgo(), MeanReversionAlgo(), TSMOMDailyAlgo(),
-    MomentumFVGAlgo(), SweepReversalAlgo(), MacroMomAlgo(),
+    MomentumFVGAlgo(), SweepReversalAlgo(), MacroMomAlgo(), ConfluenceVol15m(),
 )}
 # sr_fade (S/R Book fade) ถูก CUT 2026-08-07: backtest −EV ทุกคู่/ทุก variant (t−4..−22, OOS ลบ) —
 # naive S/R fade ไม่มี edge (เหมือน mean_reversion). หลักฐาน: scripts/sr_fade_backtest.py

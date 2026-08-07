@@ -859,6 +859,19 @@
       "n": 568,
       "live": "LIVE",
       "note": "stat-arb 2-leg (pairs_executor) rolling-β z-fade"
+    },
+    {
+      "group": "+EV",
+      "algo": "confluence_15m",
+      "pair": "XAUUSD",
+      "tf": "M15",
+      "exp_R": 0.035,
+      "t": 0.5,
+      "oos": 0.199,
+      "wr": 36.7,
+      "n": 422,
+      "live": "LIVE",
+      "note": "15m breakout + H1+H4+macro confluence + volume surge (order-flow). fire ~166/ปี. scripts/research_15m.py"
     }
   ]
 }

@@ -70,7 +70,7 @@ def _save_state(state):
 # แต่ละ MSE algo ได้ magic = SYSTEM_MAGIC + offset → ถือไม้แยกบน symbol เดียวกันได้ (account hedging)
 # + จัดการ SL แยกต่อ algo. ทอง = SYSTEM_MAGIC (offset 0, gold path) ไม่ปน. offset 1..999 = ช่วง MSE.
 _ALGO_MAGIC = {"regime_momentum": 1, "mean_reversion": 2, "tsmom_d1": 3,
-               "regime_momentum_fvg": 4, "sweep_reversal": 5, "macro_momentum": 6}
+               "regime_momentum_fvg": 4, "sweep_reversal": 5, "macro_momentum": 6, "confluence_15m": 8}
 _MSE_OFF_MIN, _MSE_OFF_MAX = 1, 9999          # ช่วง offset ที่นับเป็น MSE (ไม่รวม 0 = ทอง/base)
 
 
