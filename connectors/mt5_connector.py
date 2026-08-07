@@ -56,6 +56,19 @@ def _is_swing_comment(pos) -> bool:
     (ไม่มี SWG- comment) → guard นี้เป็น dead code กับ scalp = ไม่เปลี่ยน behavior เดิม"""
     return str(getattr(pos, "comment", "") or "").startswith("SWG-")
 
+
+def _is_tsmom_comment(pos) -> bool:
+    """True ถ้า position เป็นของ TSMOM-D1 sleeve (comment ขึ้นต้น ALGO-TSMOM).
+    TSMOM = trend-following ถือหลายวัน exit-on-D1-flip + disaster SL 3×ATR (tsmom_manager คุมเอง).
+    exit stack ของ intraday (momentum-exit/BE/trailing) ต้อง skip — ไม่งั้นตัดไม้กลางวัน = ทำลาย edge
+    (จับหางเทรนด์ยาวไม่ได้). เหมือน swing sleeve."""
+    return str(getattr(pos, "comment", "") or "").startswith("ALGO-TSMOM")
+
+
+def _is_self_managed(pos) -> bool:
+    """sleeve ที่คุม SL/exit เอง (swing + tsmom) → intraday scalp-guards ต้อง skip."""
+    return _is_swing_comment(pos) or _is_tsmom_comment(pos)
+
 # ── Order retry config ───────────────────────────────────────────────────────
 _RETRYABLE_RETCODES = frozenset({
     10004,   # REQUOTE
@@ -350,7 +363,7 @@ def manage_trailing_stop() -> int:
     moved = 0
 
     for pos in positions:
-        if _is_swing_comment(pos):
+        if _is_self_managed(pos):
             continue   # swing legs ใช้ structural SL คงที่ — ห้าม trail (จะพัง circuit breaker)
         is_buy       = pos.type == 0
         cur_sl       = pos.sl
@@ -1091,7 +1104,7 @@ def manage_breakeven() -> int:
 
     modified = 0
     for pos in positions:
-        if _is_swing_comment(pos):
+        if _is_self_managed(pos):
             continue   # swing legs ใช้ structural SL ของตัวเอง — ห้ามขยับ BE (จะพัง circuit breaker)
         entry  = pos.price_open
         is_buy = pos.type == 0
@@ -1330,7 +1343,7 @@ def manage_partial_close() -> int:
     for pos in positions:
         if pos.magic != SYSTEM_MAGIC:
             continue
-        if _is_swing_comment(pos):
+        if _is_self_managed(pos):
             continue   # swing legs scale-out เองใน swing_manager — ไม่ partial ที่นี่
 
         ticket  = pos.ticket
@@ -1430,6 +1443,8 @@ def _force_breakeven_opposing(new_direction: str, symbol: str | None = None) -> 
     for pos in positions:
         tag = f"ticket={pos.ticket} type={'BUY' if pos.type==0 else 'SELL'} entry={pos.price_open:.2f} sl={pos.sl:.2f}"
 
+        if _is_self_managed(pos):
+            continue                                    # tsmom/swing คุม SL เอง — อย่า force-BE (ทำลาย disaster-SL ถือยาว)
         if pos.type != opp_type:
             logger.debug(f"Force-BE skip {tag}: same direction as new order")
             continue
@@ -1628,7 +1643,7 @@ def manage_momentum_exit() -> int:
         if pos.magic != SYSTEM_MAGIC:
             continue
 
-        if _is_swing_comment(pos):
+        if _is_self_managed(pos):
             continue   # swing legs ถือยาว — ไม่ตัดด้วย momentum-exit
         is_buy       = pos.type == 0
         current      = tick.bid if is_buy else tick.ask
@@ -1718,7 +1733,7 @@ def manage_zone_break_close(chart_data: dict) -> int:
     for pos in positions:
         if pos.magic != SYSTEM_MAGIC:
             continue
-        if _is_swing_comment(pos):
+        if _is_self_managed(pos):
             continue   # swing legs ตั้งใจถือผ่าน zone break (structural SL ลึกกว่า) — ไม่ปิด
         is_buy = pos.type == 0
 
@@ -1873,7 +1888,7 @@ def manage_dynamic_tp() -> int:
 
     extended = 0
     for pos in positions:
-        if _is_swing_comment(pos):
+        if _is_self_managed(pos):
             continue   # swing legs TP = opposite zone คงที่ — ไม่ขยาย dynamic TP
         if pos.tp == 0:
             continue
@@ -2011,6 +2026,8 @@ def manage_post_event_tp(chart_data: dict | None = None) -> int:
     for pos in positions:
         if pos.tp != 0:
             continue   # มี TP แล้ว — ข้าม
+        if _is_self_managed(pos):
+            continue   # tsmom No-TP โดยตั้งใจ (exit-on-flip) — อย่าตั้ง TP = ตัด runner เทรนด์
 
         is_buy       = pos.type == 0
         direction    = "BUY" if is_buy else "SELL"
