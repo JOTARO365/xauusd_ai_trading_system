@@ -379,6 +379,14 @@ def node_position_mgmt(state: TradingState) -> dict:
             logger.info(f"[MSE] {_me['opened']} opened · {_me['managed']} managed · {_me['combos']} combos")
     except Exception as _mee:
         logger.error(f"[GRAPH:multi_symbol_executor] {_mee}")
+    # XAU-XAG pairs-trade (stat-arb 2-leg). gated PAIRS_LIVE (default OFF → 0 order). fail-soft.
+    try:
+        from agents.pairs_executor import tick as _pairs_tick
+        _pt = _pairs_tick()
+        if _pt and _pt.get("action") in ("entry", "exit", "repair-close"):
+            logger.info(f"[PAIRS] {_pt.get('action')} z={_pt.get('z')}")
+    except Exception as _pe:
+        logger.error(f"[GRAPH:pairs_executor] {_pe}")
     # forward TSMOM-D1 equity tracker (trend-follower, per symbol). gated SHADOW_TSMOM. fail-soft. 0 order.
     try:
         from agents.shadow_tsmom import tick as _tsmom_tick

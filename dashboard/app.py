@@ -1829,6 +1829,16 @@ def api_sentiment_score():
     return jsonify(_cached("sentiment-score", _c, ttl=30))
 
 
+@app.route("/api/backtest-results")
+def api_backtest_results():
+    """ผล backtest research (data/backtest_results.json) — จัดกลุ่ม +EV / −EV. display-only, 0 token."""
+    try:
+        with open(os.path.join(_BASE, "../data/backtest_results.json"), encoding="utf-8") as f:
+            return jsonify(json.load(f))
+    except Exception as e:
+        return jsonify({"updated": None, "results": [], "error": str(e)})
+
+
 @app.route("/api/options-oi")
 def api_options_oi():
     """Gold options open-interest walls (GLD chain via CBOE → XAU price). proxy 'สัญญาถือ ณ ราคา'

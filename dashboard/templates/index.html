@@ -2487,6 +2487,35 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-backtest">
 
+    <!-- BACKTEST RESEARCH — algo แยกกลุ่ม +EV / −EV (data/backtest_results.json) -->
+    <style>
+      .btr-tab { font-family:var(--mono); font-size:11px; font-weight:700; padding:3px 10px; border-radius:5px;
+                 border:1px solid var(--border); background:none; color:var(--muted); cursor:pointer; }
+      .btr-tab.active { color:var(--gold); border-color:var(--gold); background:rgba(245,166,35,0.08); }
+      #btr-table th { padding:4px 8px; font-weight:600; }
+    </style>
+    <section id="backtest-research-section" style="margin-bottom:18px">
+      <div class="section-title" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span>Backtest Research — algo แยกกลุ่ม +EV / −EV</span>
+        <span id="btr-updated" style="font-size:10px;color:var(--muted)"></span>
+        <span style="margin-left:auto;display:flex;gap:6px">
+          <button class="btr-tab active" data-g="+EV" onclick="filterBtr('+EV')">✅ +EV</button>
+          <button class="btr-tab" data-g="-EV" onclick="filterBtr('-EV')">❌ −EV</button>
+          <button class="btr-tab" data-g="all" onclick="filterBtr('all')">ทั้งหมด</button>
+        </span>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="btr-table" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
+          <thead><tr style="color:var(--muted);text-align:left">
+            <th>algo</th><th>คู่</th><th>TF</th><th style="text-align:right">exp_R</th>
+            <th style="text-align:right">t</th><th style="text-align:right">OOS</th><th style="text-align:right">WR%</th>
+            <th style="text-align:right">n</th><th>สถานะ</th><th>หมายเหตุ</th>
+          </tr></thead>
+          <tbody id="btr-body"><tr><td colspan="10" style="color:var(--muted)">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- REGIME ROUTER ANALYTICS — regime ไหนของทองเหมาะ algo ไหน + score + weekly (scripts/regime_analytics.py) -->
     <!-- OWNER EDGE — วิจารณญาณ owner × vol/market regime (alpha จริง) -->
     <section id="owner-edge-section" style="margin-bottom:18px">
@@ -3871,7 +3900,7 @@ function switchTab(name) {
   if (name === 'settings')   loadConfig();
   if (name === 'accounting') loadAccounting();
   if (name === 'monitor')    loadMonitor();
-  if (name === 'backtest') { loadBacktest(); loadRegimeAnalytics(); loadDailySummary(); loadOwnerEdge(); }
+  if (name === 'backtest') { loadBacktestResults(); loadBacktest(); loadRegimeAnalytics(); loadDailySummary(); loadOwnerEdge(); }
 }
 
 function jumpTo(id) {
@@ -7474,6 +7503,43 @@ function _bestBucket(buckets) {
   return Object.entries(buckets || {})
     .filter(([, v]) => v.count >= 3)
     .sort(([, a], [, b]) => b.win_rate - a.win_rate)[0] || null;
+}
+
+// ── Backtest Research: +EV / −EV groups (data/backtest_results.json) ──
+let _btrData = [], _btrGroup = '+EV';
+async function loadBacktestResults() {
+  try {
+    const r = await fetch('/api/backtest-results'); const d = await r.json();
+    _btrData = d.results || [];
+    const u = document.getElementById('btr-updated');
+    if (u) u.textContent = d.updated ? ('· อัปเดต ' + d.updated + ' · ' + _btrData.length + ' algo') : '';
+    renderBtr();
+  } catch (e) { console.error('loadBacktestResults', e); }
+}
+function filterBtr(g) {
+  _btrGroup = g;
+  document.querySelectorAll('.btr-tab').forEach(b => b.classList.toggle('active', b.dataset.g === g));
+  renderBtr();
+}
+function renderBtr() {
+  const body = document.getElementById('btr-body'); if (!body) return;
+  const rows = _btrData.filter(r => _btrGroup === 'all' || r.group === _btrGroup);
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="10" style="color:var(--muted)">—</td></tr>'; return; }
+  const num = (v, d = 4) => (v == null ? '—' : (v >= 0 ? '+' : '') + Number(v).toFixed(d));
+  const liveC = s => s === 'LIVE' ? 'var(--green)' : (s === 'CUT' ? 'var(--red)' : 'var(--muted)');
+  body.innerHTML = rows.map(r => {
+    const pos = r.group === '+EV';
+    return '<tr style="border-top:1px solid var(--border)">'
+      + '<td style="padding:4px 8px;color:' + (pos ? 'var(--green)' : 'var(--red)') + ';font-weight:700">' + r.algo + '</td>'
+      + '<td>' + r.pair + '</td><td>' + (r.tf || '—') + '</td>'
+      + '<td style="text-align:right;color:' + ((r.exp_R || 0) >= 0 ? 'var(--green)' : 'var(--red)') + '">' + num(r.exp_R) + '</td>'
+      + '<td style="text-align:right">' + num(r.t, 2) + '</td>'
+      + '<td style="text-align:right">' + num(r.oos) + '</td>'
+      + '<td style="text-align:right">' + (r.wr == null ? '—' : r.wr.toFixed(0)) + '</td>'
+      + '<td style="text-align:right;color:var(--muted)">' + (r.n || '—') + '</td>'
+      + '<td style="color:' + liveC(r.live) + ';font-weight:700">' + r.live + '</td>'
+      + '<td style="color:var(--muted)">' + (r.note || '') + '</td></tr>';
+  }).join('');
 }
 
 async function loadBacktest() {

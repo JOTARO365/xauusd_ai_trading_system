@@ -111,15 +111,12 @@ def _tick() -> None:
         if not entry_hour_ok():                              # session gate (ALGO_ENTRY_HOURS · ว่าง=ทุกชม default)
             return
         from connectors.mt5_connector import get_open_positions, open_order
-        # stack guard: ถือครบ ALGO_MAX_STACK ไม้ = ข้าม (dict-safe — get_open_positions คืน dict)
+        # limit ต่อ algo (user 08-07): momentum เอง (ALGO-mom) ถือ at-risk ได้ ALGO_MAX_STACK(=1) ไม้ — algo อื่นไม่นับ/ไม่บล็อก.
+        # ไม้ trailing เลย BE = risk 0 → ไม่กิน slot → คืน slot เข้าไม้ใหม่ได้เรื่อยๆ (ไม่จำกัดจำนวนตามเวลา).
         _cmt = lambda p: str((p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or "")
-        _pdir = lambda p: (p.get("direction") if isinstance(p, dict) else getattr(p, "direction", None))
-        _algo = [p for p in (get_open_positions() or []) if _cmt(p).startswith("ALGO")]
-        _active = [p for p in _algo if not _algo_pos_protected(p)]   # ไม้ protected (trailing เลย BE) ไม่กิน slot → เข้าเพิ่มได้
+        _algo = [p for p in (get_open_positions() or []) if _cmt(p).startswith("ALGO-mom")]   # per-algo (momentum เอง)
+        _active = [p for p in _algo if not _algo_pos_protected(p)]   # เฉพาะไม้ยัง at-risk (protected ไม่นับ)
         if len(_active) >= getattr(config, "ALGO_MAX_STACK", 1):
-            return
-        # same-direction guard: กัน 2 engine (TSMOM/intraday) เข้าซ้อนทิศเดียวกัน (ALGO_MAX_SAME_DIR=1 → ห้ามดับเบิลทางเดียว; ฝั่งตรงข้ามยังเข้าได้)
-        if sum(1 for p in _active if _pdir(p) == d) >= getattr(config, "ALGO_MAX_SAME_DIR", 1):
             return
         _structural_on = getattr(config, "STRUCTURAL_SL_GOLD", False)   # structural = SL ปลายไส้ D1 + min lot เสมอ → ข้าม standdown
         if not _structural_on:

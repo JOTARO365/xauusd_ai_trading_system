@@ -119,26 +119,65 @@ class TSMOMDailyAlgo(Algo):
     timeframe = "D1"
     mgmt = "tsmom_flip"
     eligible_pairs = [p for p in UNIVERSE if p != "XAUUSD"]
-    LOOKBACKS = (63, 126, 252)
+    LOOKBACKS = (21, 63, 126)          # user 08-07: เพิ่ม short-horizon (เดิม 63/126/252 ช้าไป ขายสวนของสดๆ)
+    CONFIRM_LB = 21                    # short-term ต้องเห็นด้วย ไม่งั้น stand-down (backtest: BTC t0.89→1.76, WTI −EV→+EV)
     SL_ATR = 3.0
 
-    def signal_dir(self, close, i):
-        """ensemble vote ที่บาร์ i (closed) → 'BUY'/'SELL'/None(FLAT). ใช้ทั้ง entry + flip-exit."""
+    def _lookbacks(self):
+        import config as _c
+        raw = getattr(_c, "TSMOM_LOOKBACKS", None)
+        if raw:
+            try:
+                v = tuple(int(x) for x in str(raw).split(",") if x.strip())
+                if v:
+                    return v
+            except Exception:
+                pass
+        return self.LOOKBACKS
+
+    def _confirm_lb(self):
+        import config as _c
+        try:
+            return int(getattr(_c, "TSMOM_CONFIRM_LB", self.CONFIRM_LB) or 0)
+        except Exception:
+            return self.CONFIRM_LB
+
+    def signal_dir(self, close, i, confirm=False, lookbacks=None):
+        """ensemble vote ที่บาร์ i (closed) → 'BUY'/'SELL'/None(FLAT). confirm=True → เพิ่ม short-term gate
+        (ไม่ให้สัญญาณสวน momentum ระยะสั้น CONFIRM_LB วัน = กันขายสวนของขึ้น). ใช้ confirm เฉพาะ entry.
+        lookbacks: override (per-combo H4 short-term); None → config/default."""
         votes = 0
-        for L in self.LOOKBACKS:
+        for L in (lookbacks or self._lookbacks()):
             if i - L >= 0:
                 votes += int(np.sign(close[i] - close[i - L]))
-        return "BUY" if votes > 0 else ("SELL" if votes < 0 else None)
+        d = "BUY" if votes > 0 else ("SELL" if votes < 0 else None)
+        cf = self._confirm_lb()
+        if confirm and d and cf and i - cf >= 0:
+            s = np.sign(close[i] - close[i - cf])
+            if (s > 0 and d == "SELL") or (s < 0 and d == "BUY"):
+                return None                                # short-term สวน → stand-down (ไม่เข้าสวนของสดๆ)
+        return d
 
     def evaluate(self, symbol, bars, ctx=None, point=None):
         high, low, close, times = bars
         n = len(close)
-        if n < max(self.LOOKBACKS) + 5 or not point:
+        _lbs = (ctx or {}).get("lookbacks") or self._lookbacks()   # per-combo H4 override (short-term) หรือ config
+        if n < max(_lbs) + 5 or not point:
             return None
-        i = n - 2                                          # บาร์ D1 ปิดล่าสุด (เหมือน momentum/mean_rev)
-        direction = self.signal_dir(close, i)
+        i = n - 2                                          # บาร์ปิดล่าสุด (D1 default; H4 ถ้า override)
+        direction = self.signal_dir(close, i, confirm=True, lookbacks=_lbs)   # entry = ต้องผ่าน short-term confirm
         if direction is None:
             return None
+        # ข่าว + ตัวเลขเศรษฐกิจ (user 08-07): sentiment คุมทิศ — ไม่เข้าสวน sentiment แรง (gold-specific score)
+        try:
+            if symbol and symbol.upper().startswith("XAU"):
+                from agents.sentiment_bias import compute as _sbias
+                from agents.sentiment_score import get_score
+                _s = _sbias(direction, (get_score() or {}).get("score", 0))
+                if _s.get("block"):
+                    return None                            # sentiment (ข่าว+econ) สวนแรง → stand-down
+        except Exception:
+            pass
         atr = R.atr(high, low, close)
         av = float(atr[i]) if atr[i] == atr[i] else 0.0    # NaN guard
         if av <= 0:
@@ -262,9 +301,79 @@ class SweepReversalAlgo(Algo):
         }
 
 
+class MacroMomAlgo(Algo):
+    """Macro-aligned momentum (research 08-07) — Donchian breakout + DXY-proxy(EURUSD) ยืนยันทิศ, ไม่มี TREND gate.
+    แก้ 2 ปัญหา: (1) เข้า ณ จุดสำคัญ = breakout (2) ไม่สวน macro/sentiment = เข้าเฉพาะทิศที่ DXY หนุน
+    (DXY ลง=EURUSD ขึ้น→ทอง BUY). backtest gold H4: exp_R+0.073 t1.23 OOS+0.14 (gold momentum เดิม −0.09 → พลิก +EV).
+    + gold sentiment gate (ข่าว/econ). timeframe H4. เข้าเฉพาะ XAU (macro driver ตรง). run ผ่าน MSE (own magic)."""
+    algo_id = "macro_momentum"
+    version = 1
+    klass = "swing"
+    timeframe = "H4"
+    mgmt = "managed"                                   # BE + trailing (เหมือน momentum)
+    eligible_pairs = ["XAUUSD"]
+    BRK = 20
+    MLB = 24                                           # macro momentum lookback (บาร์ H4)
+    SL_ATR = 1.5
+    RR = 2.0
+    MACRO = "EURUSD"                                   # DXY-inverse proxy
+
+    def _fetch_macro(self, times):
+        """EURUSD close align ตาม timestamp ทอง (live MT5). คืน np.array (NaN ถ้าไม่มี) หรือ None."""
+        try:
+            import MetaTrader5 as mt5
+            from connectors.pair_collector import _broker_map
+            brk = (_broker_map() or {}).get(self.MACRO, self.MACRO)
+            r = mt5.copy_rates_from_pos(brk, mt5.TIMEFRAME_H4, 0, max(2000, len(times) + 50))
+            if r is None or len(r) < self.MLB + 5:
+                return None
+            emap = {int(t): float(c) for t, c in zip(r["time"], r["close"])}
+            return np.array([emap.get(int(t), np.nan) for t in times], float)
+        except Exception:
+            return None
+
+    def evaluate(self, symbol, bars, ctx=None, point=None):
+        high, low, close, times = bars
+        n = len(close)
+        if n < max(self.BRK, self.MLB) + 5 or not point:
+            return None
+        i = n - 2                                          # แท่ง H4 ปิดล่าสุด
+        atr = R.atr(high, low, close); av = float(atr[i]) if atr[i] == atr[i] else 0.0
+        if av <= 0:
+            return None
+        px = float(close[i]); hh = float(high[i - self.BRK:i].max()); ll = float(low[i - self.BRK:i].min())
+        d = "BUY" if px > hh else ("SELL" if px < ll else None)   # Donchian breakout = จุดสำคัญ
+        if d is None:
+            return None
+        macro = (ctx or {}).get("macro_close")
+        if macro is None:
+            macro = self._fetch_macro(times)               # live fetch
+        if macro is None or len(macro) <= i or macro[i] != macro[i] or macro[i - self.MLB] != macro[i - self.MLB]:
+            return None
+        md = "BUY" if macro[i] > macro[i - self.MLB] else "SELL"   # DXY-proxy direction
+        if d != md:                                        # breakout สวน macro → stand-down (ไม่สวน sentiment โครงสร้าง)
+            return None
+        try:                                               # ข่าว/econ sentiment (gold) — ไม่สวน sentiment สด
+            from agents.sentiment_bias import compute as _sb
+            from agents.sentiment_score import get_score
+            if _sb(d, (get_score() or {}).get("score", 0)).get("block"):
+                return None
+        except Exception:
+            pass
+        try:
+            from datetime import datetime, timezone
+            bar_ts = datetime.fromtimestamp(int(times[i]), timezone.utc).isoformat()
+        except Exception:
+            return None
+        slp = round(self.SL_ATR * av / point)
+        return {"algo_id": self.algo_id, "symbol": symbol, "dir": d, "entry": px,
+                "sl_pips": slp, "tp_pips": round(slp * self.RR), "regime": "MACRO",
+                "bar_ts": bar_ts, "klass": self.klass}
+
+
 ALGO_REGISTRY = {a.algo_id: a for a in (
     RegimeMomentumAlgo(), MeanReversionAlgo(), TSMOMDailyAlgo(),
-    MomentumFVGAlgo(), SweepReversalAlgo(),
+    MomentumFVGAlgo(), SweepReversalAlgo(), MacroMomAlgo(),
 )}
 # sr_fade (S/R Book fade) ถูก CUT 2026-08-07: backtest −EV ทุกคู่/ทุก variant (t−4..−22, OOS ลบ) —
 # naive S/R fade ไม่มี edge (เหมือน mean_reversion). หลักฐาน: scripts/sr_fade_backtest.py

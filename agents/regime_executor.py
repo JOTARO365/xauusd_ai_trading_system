@@ -47,7 +47,7 @@ def _too_close_algo(direction, entry, atr):
             cm = (p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or ""
             tp = p.get("type") if isinstance(p, dict) else getattr(p, "type", None)
             px = p.get("price_open") if isinstance(p, dict) else getattr(p, "price_open", None)
-            if str(cm).startswith("ALGO") and tp == want and px:
+            if str(cm).startswith("ALGO-mom") and tp == want and px:   # per-algo: กัน momentum เกาะจุดเดิมของตัวเอง (algo อื่นไม่นับ)
                 same.append(px)
         from agents import structural_sl
         return structural_sl.near_existing(float(entry), float(atr), same, gap)
@@ -139,14 +139,14 @@ def run_regime_executor():
                 return None
         except Exception:
             pass
-    try:                                                    # stack guard: ถือครบ ALGO_MAX_STACK = ข้าม (dict-safe)
+    try:                                                    # limit ต่อ algo: momentum เอง (ALGO-mom) ยัง at-risk ≤ ALGO_MAX_STACK(1); algo อื่นไม่นับ
         from connectors.mt5_connector import get_open_positions
-        from agents.regime_tick import _algo_pos_protected   # ไม้ protected (trailing เลย BE) ไม่กิน slot
+        from agents.regime_tick import _algo_pos_protected   # ไม้ protected (trailing เลย BE) = risk 0 → ไม่กิน slot
         _algo_open = sum(1 for p in (get_open_positions() or [])
-                         if str((p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or "").startswith("ALGO")
+                         if str((p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or "").startswith("ALGO-mom")
                          and not _algo_pos_protected(p))
         if _algo_open >= getattr(_cfg, "ALGO_MAX_STACK", 1):
-            _hb("HOLD", f"regime=TREND {sig.get('dir')} · ถือครบ {_algo_open} ออเดอร์ ALGO → ไม่เปิดสถานะซ้อน")
+            _hb("HOLD", f"regime=TREND {sig.get('dir')} · momentum ถือ {_algo_open} at-risk แล้ว (protected คืน slot) → รอ")
             return None
     except Exception:
         pass

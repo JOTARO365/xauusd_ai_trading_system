@@ -117,7 +117,31 @@ Running in parallel, independent of the regime router:
   engine stands down (hand-off); set `TSMOM_COEXIST=true` to run **both** engines together
   so the system takes both BUY and SELL intraday opportunities. `ALGO_MAX_SAME_DIR=1` then
   stops the two engines from stacking the *same* direction (opposite side still allowed),
-  and `ALGO_MAX_STACK` caps total concurrent ALGO positions.
+  and `ALGO_MAX_STACK` caps total concurrent **at-risk** ALGO positions (positions whose stop has
+  trailed past break-even are risk-free and no longer occupy a slot, so entries keep filling up to
+  the cap). TSMOM entries are **short-term-aware**: `TSMOM_LOOKBACKS` (default `21,63,126`) plus a
+  `TSMOM_CONFIRM_LB` gate (default `21`) that stands the entry down when short-term momentum opposes
+  the ensemble — so it won't sell into a fresh rally — and, for gold, a news/economic-number
+  sentiment veto (`sentiment_bias`).
+- **Per-combo short-term override** — `ALGO_TF_OVERRIDE` (e.g. `regime_momentum:BTCUSD=H4;tsmom_d1:XAGUSD=H4`)
+  runs a specific algo/symbol combo on a shorter timeframe, with `ALGO_LB_OVERRIDE`
+  (e.g. `tsmom_d1:XAGUSD=6,18,42`) supplying that combo's intraday lookbacks. Backtests found **H4**
+  the shortest timeframe that stays +EV after costs (H1/M15 are −EV); enabled combos: BTC H4 momentum,
+  XAG H4 TSMOM.
+- **Macro-momentum** (`macro_momentum` in `agents/algo_registry.py`) — gold Donchian breakout on **H4**
+  that only fires when the DXY proxy (EURUSD, inverse) confirms the direction, plus the gold news/econ
+  sentiment veto. Motivation: gold's real driver is the dollar/yields, so requiring macro alignment
+  turns the (otherwise −EV) breakout into a small +EV, market-aligned entry (backtest exp_R +0.07,
+  OOS +0.14) that enters at a *key level* and never fights the macro tape. Runs through the
+  multi-symbol engine with its own magic; enable via the Shadow Matrix (`macro_momentum:XAUUSD`).
+- **XAU-XAG pairs-trade** (`agents/pairs_executor.py`) — market-neutral statistical-arbitrage sleeve.
+  Trades the gold–silver spread `XAU − β·XAG` (rolling causal β): fades the z-score (enter |z|≥`PAIRS_Z_IN`,
+  take profit at `PAIRS_Z_OUT`, cut at `PAIRS_Z_STOP`). Two β-hedged legs sized dollar-neutral from each
+  symbol's contract size. Backtest (rolling β, z-stop, 2-leg cost): WR ~57%, OOS +2.45, t 1.89 — the
+  strongest edge found, and market-neutral so its risk is uncorrelated with the directional sleeves.
+  Safeguards: master gate `PAIRS_LIVE` (default OFF), **atomic legs** (if the second leg fails the first is
+  closed immediately — never a naked leg), a wide per-leg disaster stop, and state persistence. Hooked into
+  the cycle like the other engines; kill switch = `PAIRS_LIVE=false`.
 - **Multi-symbol live engine** (`agents/multi_symbol_executor.py`) — extends live execution
   beyond gold to other instruments (currently **WTI oil**) via a per-combo live/shadow toggle in
   the dashboard's Shadow Matrix. **Default OFF** behind a two-layer gate (`MULTI_SYMBOL_LIVE=false`
@@ -579,7 +603,7 @@ This registers At-LogOn / Interactive scheduled tasks for the bot + dashboard th
 |---|---|---|
 | `LESSON_LEARNING` | `true` | RAG-based Lesson Retrieval — remembers past mistakes and warns DecisionMaker (requires GEMINI_API_KEY) |
 | `DRY_RUN` | `false` | Mock MT5 execution — full pipeline runs but no real orders are sent |
-| `NNLB_MODE` | `false` | **No-Risk-No-Lamborghini** — bypasses all gates and money management; lot scales with equity tier |
+| `NNLB_MODE` | `false` | **No-Risk-No-Lamborghini** — bypasses entry gates, RR check, margin check, loss-stack and daily-trade cap; lot scales with equity tier. **Still capped at `MAX_OPEN_TRADES` per side** (protected/trailing positions free the slot, so it keeps entering up to the cap). |
 | `NNLB_BASE_EQUITY` | `100` | NNLB: minimum equity (**USD**) before first order — auto-converted to account currency |
 | `NNLB_EQUITY_PER_LOT` | `100` | NNLB: profit (**USD**) per +0.01 lot — e.g. base 25 + per_lot 25 → equity $75 = lot 0.03 |
 | `NNLB_MAX_LOSS_PCT` | `25` | NNLB: max loss per trade as % of equity — lot auto-reduced to stay within budget |
@@ -1102,9 +1126,11 @@ better value is available):
 
 ## Preset for Small Account (~$28 / 1,000 THB)
 
-Use **NNLB mode** to bypass money management gates and scale lot with equity. NNLB
-values are **USD** and auto-convert to the account currency, so this same preset
-works for a USD or a THB account unchanged:
+Use **NNLB mode** to bypass money-management gates (RR, margin, loss-stack, daily
+cap) and scale lot with equity. It still respects `MAX_OPEN_TRADES` per side —
+positions whose stop has trailed past break-even free their slot, so NNLB keeps
+opening at min lot up to that cap. NNLB values are **USD** and auto-convert to the
+account currency, so this same preset works for a USD or a THB account unchanged:
 
 ```env
 NNLB_MODE=true

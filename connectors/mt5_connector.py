@@ -671,6 +671,19 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
     if no_tp:
         logger.info("No-TP mode: เปิดออเดอร์โดยไม่ตั้ง TP — รอตั้งภายหลังเมื่อ momentum สงบ")
 
+    # ── max_order cap — ทำงานทั้ง 2 โหมด (รวม NNLB) ────────────────────────────
+    # NNLB (user 08-07): ไม่สน loss-stack แต่ยัง cap ที่ max_order + min lot; ไม้ protected (trailing เลย BE)
+    # ไม่กิน slot → คืน slot เข้าเพิ่มได้เรื่อยๆ จนเต็ม max_order. non-NNLB = เหมือนเดิม.
+    dir_type = 0 if direction.upper() == "BUY" else 1
+    open_positions = mt5.positions_get(symbol=symbol) or []
+    # cap นับต่อฝั่ง: ทอง (magic=None) นับทุกไม้บน symbol · MSE per-algo (ส่ง magic) → คนละ algo แยกไม้ได้ (hedging)
+    same_dir_count = sum(1 for p in open_positions if p.type == dir_type
+                         and (magic is None or p.magic == magic))
+    base_limit = max_open_override if max_open_override is not None else MONEY_MANAGEMENT["max_open_trades"]
+    effective_limit = base_limit + count_protected_slots(symbol)   # ไม้ protected คืน slot (trailing → เข้าเพิ่ม)
+    if same_dir_count >= effective_limit:
+        return {"success": False, "error": "Max open trades reached"}
+
     if not _cfg.NNLB_MODE:
         # ตรวจ Risk/Reward ratio — ข้ามถ้า no_tp (ไม่มี TP ให้คำนวณ)
         effective_min_rr = min_rr if min_rr is not None else MONEY_MANAGEMENT["min_rr_ratio"]
@@ -681,19 +694,6 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
             if rr < effective_min_rr:
                 logger.warning(f"RR ratio {rr:.2f} ต่ำกว่าขั้นต่ำ {effective_min_rr:.1f} (dynamic)")
                 return {"success": False, "error": f"RR ratio too low: {rr:.2f} (min={effective_min_rr:.1f})"}
-
-        # ตรวจจำนวน order ต่อฝั่ง (สอดคล้องกับ check_open_slot)
-        dir_type = 0 if direction.upper() == "BUY" else 1
-        open_positions = mt5.positions_get(symbol=symbol) or []
-        # cap นับต่อฝั่ง: ทอง (magic=None) นับทุกไม้บน symbol เหมือนเดิม · MSE per-algo (ส่ง magic)
-        # นับเฉพาะ magic ของ algo นั้น → คนละ algo ถือไม้แยกบน symbol เดียวได้ (hedging)
-        same_dir_count = sum(1 for p in open_positions if p.type == dir_type
-                             and (magic is None or p.magic == magic))
-        # cap ต่อฝั่ง: default = MAX_OPEN_TRADES (ทอง) — MSE ส่ง override เพื่อ stack symbol อื่นได้เองโดยไม่แตะ cap ทอง
-        base_limit = max_open_override if max_open_override is not None else MONEY_MANAGEMENT["max_open_trades"]
-        effective_limit = base_limit + count_protected_slots(symbol)
-        if same_dir_count >= effective_limit:
-            return {"success": False, "error": "Max open trades reached"}
 
         # ตรวจ margin ก่อนส่ง — คำนวณ margin ที่ต้องการสำหรับ lot นี้
         margin_needed = mt5.order_calc_margin(order_type, symbol, lot, price)

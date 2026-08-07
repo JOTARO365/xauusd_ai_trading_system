@@ -316,7 +316,20 @@ TSMOM_DIR_MODE   = (os.getenv("TSMOM_DIR_MODE") or ("long" if TSMOM_LONG_ONLY el
 TSMOM_HEDGE_PENDING = os.getenv("TSMOM_HEDGE_PENDING", "false").lower() == "true"
 TSMOM_MIN_ADX    = float(os.getenv("TSMOM_MIN_ADX") or 0)                    # เข้าเฉพาะ ADX(D1) ≥ นี้ (0 = off; overfit-risk n น้อย)
 TSMOM_MIN_VOLPCT = float(os.getenv("TSMOM_MIN_VOLPCT") or 0)                 # เข้าเฉพาะ vol_percentile(D1) ≥ นี้ (0 = off)
-TSMOM_LOOKBACKS  = os.getenv("TSMOM_LOOKBACKS", "63,126,252")                # ensemble lookback (วัน D1)
+TSMOM_LOOKBACKS  = os.getenv("TSMOM_LOOKBACKS", "21,63,126")                # ensemble lookback (วัน D1) — เพิ่ม short-horizon (08-07)
+TSMOM_CONFIRM_LB = int(os.getenv("TSMOM_CONFIRM_LB") or 21)                  # short-term confirm: ไม่เข้าสวน momentum n วัน (0=off). BTC/WTI EV ดีขึ้น
+# per-combo short-term override (08-07): backtest H4 = short-term ที่ +EV (H1/M15 −EV). "algo:SYM=TF" คั่น ; · lookbacks "algo:SYM=6,18,42"
+ALGO_TF_OVERRIDE = os.getenv("ALGO_TF_OVERRIDE", "regime_momentum:BTCUSD=H4;tsmom_d1:XAGUSD=H4")   # BTC H4 momentum(t1.6) + XAG H4 tsmom
+ALGO_LB_OVERRIDE = os.getenv("ALGO_LB_OVERRIDE", "tsmom_d1:XAGUSD=6,18,42")                        # lookbacks (บาร์ TF) ต่อ combo
+# XAU-XAG pairs-trade (stat-arb, 2-leg market-neutral, 08-07). backtest rolling-β causal: WR57% OOS+2.45 t1.89
+PAIRS_LIVE       = os.getenv("PAIRS_LIVE", "false").lower() == "true"        # master gate (default OFF → 0 order)
+PAIRS_SYMBOLS    = os.getenv("PAIRS_SYMBOLS", "XAUUSD:XAGUSD")               # y:x (spread = y − β·x)
+PAIRS_WIN        = int(os.getenv("PAIRS_WIN") or 120)                        # rolling window (β + z), บาร์ H1
+PAIRS_Z_IN       = float(os.getenv("PAIRS_Z_IN") or 2.0)                     # เข้าเมื่อ |z| ≥
+PAIRS_Z_OUT      = float(os.getenv("PAIRS_Z_OUT") or 0.5)                    # ออกเมื่อ |z| ≤ (กลับ mean)
+PAIRS_Z_STOP     = float(os.getenv("PAIRS_Z_STOP") or 3.5)                   # cut เมื่อ |z| ≥ (spread เบี่ยงต่อ)
+PAIRS_XAU_LOT    = float(os.getenv("PAIRS_XAU_LOT") or 0.0)                  # 0 = ใช้ MIN_LOT (XAG คำนวณ β-hedge)
+PAIRS_DISASTER_ATR = float(os.getenv("PAIRS_DISASTER_ATR") or 6.0)           # disaster SL/ขา (×ATR H1, backstop)
 TSMOM_SL_ATR     = float(os.getenv("TSMOM_SL_ATR") or 3.0)                   # chandelier disaster SL (× ATR D1)
 # TSMOM_SL_PIPS > 0 = override SL เป็นค่าคงที่ (points) แทน chandelier — สำหรับบัญชีเล็กให้เปิด order ได้.
 # ⚠️ SL แคบ = edge TSMOM หาย (backtest: SL<2000p → WR 2-18% โดน noise รูด). = execution-test ไม่ใช่ edge.
@@ -490,12 +503,24 @@ def reload_config():
     TSMOM_SHADOW             = os.getenv("TSMOM_SHADOW", "false").lower() == "true"
     TSMOM_COEXIST            = os.getenv("TSMOM_COEXIST", "false").lower() == "true"         # intraday engine ทำงานคู่ TSMOM
     TSMOM_LONG_ONLY          = os.getenv("TSMOM_LONG_ONLY", "true").lower() == "true"        # legacy (override โดย TSMOM_DIR_MODE)
-    global TSMOM_DIR_MODE, TSMOM_HEDGE_PENDING
+    global TSMOM_DIR_MODE, TSMOM_HEDGE_PENDING, TSMOM_CONFIRM_LB, ALGO_TF_OVERRIDE, ALGO_LB_OVERRIDE
     TSMOM_DIR_MODE           = (os.getenv("TSMOM_DIR_MODE") or ("long" if TSMOM_LONG_ONLY else "both")).lower()
     TSMOM_HEDGE_PENDING      = os.getenv("TSMOM_HEDGE_PENDING", "false").lower() == "true"
+    TSMOM_CONFIRM_LB         = int(os.getenv("TSMOM_CONFIRM_LB") or 21)
+    ALGO_TF_OVERRIDE         = os.getenv("ALGO_TF_OVERRIDE", "regime_momentum:BTCUSD=H4;tsmom_d1:XAGUSD=H4")
+    ALGO_LB_OVERRIDE         = os.getenv("ALGO_LB_OVERRIDE", "tsmom_d1:XAGUSD=6,18,42")
+    global PAIRS_LIVE, PAIRS_SYMBOLS, PAIRS_WIN, PAIRS_Z_IN, PAIRS_Z_OUT, PAIRS_Z_STOP, PAIRS_XAU_LOT, PAIRS_DISASTER_ATR
+    PAIRS_LIVE               = os.getenv("PAIRS_LIVE", "false").lower() == "true"
+    PAIRS_SYMBOLS            = os.getenv("PAIRS_SYMBOLS", "XAUUSD:XAGUSD")
+    PAIRS_WIN                = int(os.getenv("PAIRS_WIN") or 120)
+    PAIRS_Z_IN               = float(os.getenv("PAIRS_Z_IN") or 2.0)
+    PAIRS_Z_OUT              = float(os.getenv("PAIRS_Z_OUT") or 0.5)
+    PAIRS_Z_STOP             = float(os.getenv("PAIRS_Z_STOP") or 3.5)
+    PAIRS_XAU_LOT            = float(os.getenv("PAIRS_XAU_LOT") or 0.0)
+    PAIRS_DISASTER_ATR       = float(os.getenv("PAIRS_DISASTER_ATR") or 6.0)
     TSMOM_MIN_ADX            = float(os.getenv("TSMOM_MIN_ADX") or 0)                        # เข้าเฉพาะ ADX(D1) ≥ นี้
     TSMOM_MIN_VOLPCT         = float(os.getenv("TSMOM_MIN_VOLPCT") or 0)                     # เข้าเฉพาะ vol% ≥ นี้
-    TSMOM_LOOKBACKS          = os.getenv("TSMOM_LOOKBACKS", "63,126,252")
+    TSMOM_LOOKBACKS          = os.getenv("TSMOM_LOOKBACKS", "21,63,126")
     TSMOM_SL_ATR             = float(os.getenv("TSMOM_SL_ATR") or 3.0)
     TSMOM_SL_PIPS            = float(os.getenv("TSMOM_SL_PIPS") or 0)                        # fixed SL override (บัญชีเล็ก)
     TSMOM_SL_CAP_FALLBACK    = os.getenv("TSMOM_SL_CAP_FALLBACK", "true").lower() != "false"  # ทุนไม่พอ→manual auto-SL

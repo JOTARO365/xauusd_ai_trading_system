@@ -381,7 +381,7 @@ def _run_gates(chart_data: dict, sentiment_data: dict, advisor_data: dict | None
     # 0. Daily trade cap — เบรกกันวันพายุ ครอบทั้ง NNLB/ปกติ (ตัดก่อนเรียก Claude = ประหยัด token)
     #    replay 247 ไม้: ไม้ #7+ ของวัน = −411 (n=155) vs ไม้ 1-6 = +139.88; มิ.ย.+ block แต่ไม้แพ้
     _capped, _cap_reason = daily_trade_cap_reached()
-    if _capped:
+    if _capped and not _cfg.NNLB_MODE:      # NNLB (user 08-07): bypass daily cap → เข้าได้เรื่อยๆ จนเต็ม max_order
         return _fail(_cap_reason)
 
     # ── NNLB mode: ข้าม gates ทั้งหมดยกเว้นทิศทาง ────────────────

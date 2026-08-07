@@ -70,7 +70,7 @@ def _save_state(state):
 # แต่ละ MSE algo ได้ magic = SYSTEM_MAGIC + offset → ถือไม้แยกบน symbol เดียวกันได้ (account hedging)
 # + จัดการ SL แยกต่อ algo. ทอง = SYSTEM_MAGIC (offset 0, gold path) ไม่ปน. offset 1..999 = ช่วง MSE.
 _ALGO_MAGIC = {"regime_momentum": 1, "mean_reversion": 2, "tsmom_d1": 3,
-               "regime_momentum_fvg": 4, "sweep_reversal": 5}
+               "regime_momentum_fvg": 4, "sweep_reversal": 5, "macro_momentum": 6}
 _MSE_OFF_MIN, _MSE_OFF_MAX = 1, 9999          # ช่วง offset ที่นับเป็น MSE (ไม่รวม 0 = ทอง/base)
 
 
@@ -373,14 +373,47 @@ def _close_position(broker, p, digits):
         return False
 
 
-def _manage_tsmom(algo_id, symbol, broker, positions, bars, point, digits, combo_state):
+def _parse_combo_map(raw):
+    """'algo:SYM=val;algo2:SYM2=val2' → {(algo,sym): val}. fail-soft {}."""
+    out = {}
+    for part in str(raw or "").split(";"):
+        part = part.strip()
+        if not part or "=" not in part or ":" not in part.split("=", 1)[0]:
+            continue
+        key, val = part.split("=", 1)
+        algo, sym = key.split(":", 1)
+        out[(algo.strip(), sym.strip())] = val.strip()
+    return out
+
+
+def _combo_tf(algo_id, symbol):
+    """per-combo timeframe override (short-term H4 winners) หรือ None → ใช้ algo.timeframe."""
+    import config as _c
+    return _parse_combo_map(getattr(_c, "ALGO_TF_OVERRIDE", "")).get((algo_id, symbol)) or None
+
+
+def _combo_ctx(algo_id, symbol):
+    """ctx per-combo (lookbacks override สำหรับ tsmom H4) → dict หรือ None."""
+    import config as _c
+    v = _parse_combo_map(getattr(_c, "ALGO_LB_OVERRIDE", "")).get((algo_id, symbol))
+    if v:
+        try:
+            lb = tuple(int(x) for x in v.split(",") if x.strip())
+            if lb:
+                return {"lookbacks": lb}
+        except Exception:
+            pass
+    return None
+
+
+def _manage_tsmom(algo_id, symbol, broker, positions, bars, point, digits, combo_state, ctx=None):
     """tsmom = ถือจนสัญญาณ D1 กลับ. re-evaluate; ถ้ามีสัญญาณ dir ตรงข้าม → ปิดไม้ (market).
     disaster SL (ตั้งตอนเข้า) คงเดิม — ไม่ BE/trail. FLAT/บาร์ไม่พอ → ถือต่อ (กัน false-close)."""
     if not positions:
         return 0
     import MetaTrader5 as mt5
     algo = _reg.get(algo_id)
-    vo = algo.evaluate(symbol, bars, point=point) if algo else None
+    vo = algo.evaluate(symbol, bars, ctx=ctx, point=point) if algo else None
     new_dir = vo.get("dir") if vo else None
     if not new_dir:                                       # ไม่มีสัญญาณชัด → ถือต่อ (ไม่ปิด)
         return 0
@@ -496,13 +529,13 @@ def _reconcile_closed(algo_id, symbol, positions, combo_state):
 
 
 # ── entry: signal เดียวกับ shadow → open_order จริง ───────────────────────
-def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max_pos=1, positions=None, magic=None):
+def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max_pos=1, positions=None, magic=None, ctx=None):
     """ถ้ายังไม่ครบ max_pos + มี signal ใหม่ (bar_ts ยังไม่เคยเข้า) → open_order จริง. คืน 1 ถ้าเปิด."""
     import config as _cfg
     algo = _reg.get(algo_id)
     if algo is None:
         return 0
-    vo = algo.evaluate(symbol, bars, point=point)
+    vo = algo.evaluate(symbol, bars, ctx=ctx, point=point)
     if not vo or not vo.get("bar_ts"):
         return 0
     try:                                                       # per-algo direction mode (long/short/both; default both = ไม่กรอง)
@@ -589,7 +622,8 @@ def tick(force=False):
         try:
             broker = bmap.get(symbol, symbol)
             algo_obj = _reg.get(algo_id)
-            tf = getattr(algo_obj, "timeframe", "H1")
+            tf = _combo_tf(algo_id, symbol) or getattr(algo_obj, "timeframe", "H1")   # per-combo short-term override (H4)
+            _ctx = _combo_ctx(algo_id, symbol)                                        # lookbacks override (tsmom H4)
             mgmt = getattr(algo_obj, "mgmt", "managed")
             bars = _bars(broker, tf)
             if bars is None:
@@ -606,14 +640,14 @@ def tick(force=False):
             # ไม้ปิด → บันทึกโดย trade_recorder (universal, comment MSE-<algo>) แล้ว — MSE ไม่ record ซ้ำ
             # management ตาม algo: tsmom = exit-on-flip · อื่น = BE+trailing (SL/TP)
             if mgmt == "tsmom_flip":
-                managed += _manage_tsmom(algo_id, symbol, broker, positions, bars, point, digits, cstate)
+                managed += _manage_tsmom(algo_id, symbol, broker, positions, bars, point, digits, cstate, _ctx)
             else:
                 managed += _manage(broker, positions, bars, point, digits, cstate)
             room_total = (max_total <= 0) or (total_open + opened < max_total)   # global cap ยังมีที่ว่าง
             active_pos = sum(1 for p in positions if not _position_protected(p, point))   # ไม้ protected (trailing เลย BE) ไม่กิน slot → เติมไม้สดได้
             if active_pos < max_pos and room_total:             # ผ่านทั้ง per-combo (ไม่นับ protected) + รวมทุก symbol
                 op = _maybe_enter(algo_id, symbol, broker, bars, point,
-                                  sl_mult.get(symbol, 1.0), cstate, max_pos, positions, magic)   # LIVE = วางจริง (โบรก reject เองถ้าปิดคู่)
+                                  sl_mult.get(symbol, 1.0), cstate, max_pos, positions, magic, _ctx)   # LIVE = วางจริง (โบรก reject เองถ้าปิดคู่)
                 opened += op
             elif not room_total:
                 logger.debug(f"[MSE] {ck}: global cap {max_total} ถึงแล้ว (open={total_open + opened}) — ข้าม entry")
