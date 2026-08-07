@@ -2355,6 +2355,23 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       .cal-legend { display:flex; gap:9px; align-items:center; font-size:9px; color:var(--muted); font-family:var(--mono); margin-left:auto; }
       .cal-legend i { display:inline-block; width:10px; height:3px; border-radius:2px; margin-right:3px; vertical-align:middle; }
     </style>
+    <!-- EVENT ENGINE — ชนข่าว NFP/CPI/FOMC (event_engine.snapshot) -->
+    <section id="event-engine-section" style="margin-bottom:10px">
+      <div class="section-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span>⚡ ชนข่าว — Event Engine (NFP / CPI / FOMC)</span>
+        <span id="ee-mode" style="font-size:10px;font-family:var(--mono);color:var(--muted)"></span>
+      </div>
+      <div class="chart-card" style="padding:14px 16px">
+        <div id="ee-now" style="font-size:13px;font-family:var(--mono);margin-bottom:10px">Loading…</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
+            <thead><tr style="color:var(--muted);text-align:left"><th style="padding:3px 6px">ข่าวถัดไป</th><th>อีก</th><th>forecast</th><th>impact</th><th>ถ้าออก ร้อน→ทอง</th><th>เย็น→ทอง</th></tr></thead>
+            <tbody id="ee-upcoming"><tr><td colspan="6" style="color:var(--muted)">—</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <section id="econ-calendar-section">
       <div class="section-title">ECONOMIC CALENDAR &mdash; This Week (A/F/P)</div>
       <div class="chart-card" style="padding:14px 16px">
@@ -3471,6 +3488,7 @@ function setActiveSystem(v) {                     // ทอง / ทุกคู
   try { fetchData(); } catch (e) {}
   try { loadAccounting(); } catch (e) {}
   try { loadMonitor(); } catch (e) {}
+  try { loadEventEngine(); } catch (e) {}
 }
 let _lastBid = null, _lastAsk = null;
 let _equityHistory = [];
@@ -3902,7 +3920,7 @@ function switchTab(name) {
   if (_sub) _sub.style.display = (name === 'monitor') ? 'flex' : 'none';
   if (name === 'settings')   loadConfig();
   if (name === 'accounting') loadAccounting();
-  if (name === 'monitor')    loadMonitor();
+  if (name === 'monitor')    { loadMonitor(); loadEventEngine(); }
   if (name === 'backtest') { loadBacktestResults(); loadBacktest(); loadRegimeAnalytics(); loadDailySummary(); loadOwnerEdge(); }
 }
 
@@ -7506,6 +7524,29 @@ function _bestBucket(buckets) {
   return Object.entries(buckets || {})
     .filter(([, v]) => v.count >= 3)
     .sort(([, a], [, b]) => b.win_rate - a.win_rate)[0] || null;
+}
+
+// ── Event Engine (NFP/CPI/FOMC) — ชนข่าว panel ──
+async function loadEventEngine() {
+  try {
+    const r = await fetch('/api/event-engine'); const d = await r.json();
+    const mode = document.getElementById('ee-mode');
+    if (mode) mode.textContent = d.live ? '🔴 LIVE (bias/gate)' : '👁 SHADOW (log-only, เก็บ data)';
+    const st = d.state || {}, now = document.getElementById('ee-now');
+    if (now) {
+      if (st.phase === 'PRE') now.innerHTML = '<span style="color:var(--amber);font-weight:700">⚠️ PRE-EVENT: ' + st.key + ' อีก ' + st.in_min + ' นาที → ' + st.action + '</span>';
+      else if (st.phase === 'POST') now.innerHTML = '<span style="color:' + (st.bias_dir === 'BUY' ? 'var(--green)' : 'var(--red)') + ';font-weight:700">📊 POST ' + st.key + ': ' + st.surprise + ' (actual ' + st.actual + ' vs ' + st.forecast + ') → bias ทอง ' + st.bias_dir + (st.magnitude_pct ? ' ~' + st.magnitude_pct + '%' : '') + '</span>';
+      else now.innerHTML = '<span style="color:var(--muted)">ไม่มีข่าวแรงในช่วง window — ปกติ</span>';
+    }
+    const body = document.getElementById('ee-upcoming'), sc = d.scenarios || {}, up = d.upcoming || [];
+    if (!body) return;
+    if (!up.length) { body.innerHTML = '<tr><td colspan="6" style="color:var(--muted)">ไม่มีข่าวแรง USD ใน 72 ชม.</td></tr>'; return; }
+    const dir = (k, leg) => { const s = sc[k]; if (!s || !s[leg]) return '—'; const dd = s[leg].dir; return (dd === 'up' ? '🟢 ขึ้น' : '🔴 ลง') + (s[leg].magnitude_pct ? ' ' + s[leg].magnitude_pct + '%' : ''); };
+    body.innerHTML = up.map(e => '<tr style="border-top:1px solid var(--border)">'
+      + '<td style="padding:3px 6px;font-weight:700">' + e.key + '</td><td>' + e.in_hours + 'ชม</td><td>' + (e.forecast || '—') + '</td>'
+      + '<td style="color:' + (e.impact === 'high' ? 'var(--red)' : 'var(--amber)') + '">' + e.impact + '</td>'
+      + '<td>' + dir(e.key, 'hot') + '</td><td>' + dir(e.key, 'cool') + '</td></tr>').join('');
+  } catch (e) { console.error('loadEventEngine', e); }
 }
 
 // ── Backtest Research: +EV / −EV groups (data/backtest_results.json) ──

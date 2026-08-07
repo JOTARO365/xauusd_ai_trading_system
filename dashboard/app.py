@@ -1829,6 +1829,24 @@ def api_sentiment_score():
     return jsonify(_cached("sentiment-score", _c, ttl=30))
 
 
+@app.route("/api/event-engine")
+def api_event_engine():
+    """Event engine (NFP/CPI/FOMC) — สถานะ + upcoming + scenario rubric. display-only, 0 token."""
+    try:
+        import sys as _sys
+        _sys.path.insert(0, os.path.join(_BASE, ".."))
+        from agents.event_engine import snapshot as _snap
+        snap = _snap()
+    except Exception as e:
+        snap = {"ok": False, "error": str(e)}
+    try:
+        with open(os.path.join(_BASE, "../data/event_scenarios.json"), encoding="utf-8") as f:
+            snap["scenarios"] = json.load(f).get("scenarios", {})
+    except Exception:
+        snap["scenarios"] = {}
+    return jsonify(_cached("event-engine", lambda: snap, ttl=20))
+
+
 @app.route("/api/backtest-results")
 def api_backtest_results():
     """ผล backtest research (data/backtest_results.json) — จัดกลุ่ม +EV / −EV. display-only, 0 token."""
