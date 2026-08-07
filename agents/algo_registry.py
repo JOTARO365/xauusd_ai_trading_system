@@ -262,9 +262,71 @@ class SweepReversalAlgo(Algo):
         }
 
 
+class SRFadeAlgo(Algo):
+    """NEW algo (user idea) — fade ที่แนว S/R Book (price-cluster). ราคาแตะ **support แข็ง** → BUY,
+    แตะ **resistance แข็ง** → SELL. เฉพาะ regime NEUTRAL/RANGE (ไม่ fade TREND) + momentum ไม่สวน
+    (ที่ support ต้อง momentum ไม่ลง / resistance ต้องไม่ขึ้น). S/R = compute_cluster_map (touch-based,
+    causal จากแท่งปิด). SL เลย zone + BUF×ATR, TP = RR×SL. symmetric (BUY+SELL).
+
+    ⚠️ SHADOW-ONLY: ระบบพิสูจน์แล้วว่า naive S/R fade = −EV (mean_reversion CUT, RANGE-fade unvalidated).
+    เปิด shadow เก็บ forward + zone strength/touches → พิสูจน์ว่ากรอง +EV ได้ก่อน toggle LIVE."""
+    algo_id = "sr_fade"
+    version = 1
+    klass = "scalp"
+    eligible_pairs = UNIVERSE
+    BUF_ATR = 0.5
+    RR = 1.5
+    TOL_ATR = 0.4         # "แตะแนว" = ห่าง zone ≤ นี้ × ATR
+    MIN_TOUCH = 3         # zone แข็ง = โดนแตะ ≥ นี้ (กรอง noise)
+
+    def evaluate(self, symbol, bars, ctx=None, point=None):
+        high, low, close, times = bars
+        n = len(close)
+        if n < _MIN_BARS or not point:
+            return None
+        er = R.efficiency_ratio(close); adx_v = R.adx(high, low, close)
+        volpct = R.vol_percentile(close); atr_v = R.atr(high, low, close)
+        i = n - 2
+        reg = R.detect_regime(er[i], adx_v[i], volpct[i])
+        if reg not in ("NEUTRAL", "RANGE"):                      # ไม่ fade ใน TREND (สู้ cascade ไม่ได้)
+            return None
+        av = float(atr_v[i]) if atr_v[i] == atr_v[i] else 0.0
+        if av <= 0:
+            return None
+        from agents.cluster_map import compute_cluster_map          # S/R cluster (causal จากแท่งปิด)
+        cm = compute_cluster_map(high[:n - 1], low[:n - 1], close[:n - 1])   # last = แท่งปิด n-2
+        if not cm.get("ok"):
+            return None
+        px = float(close[i]); mom = cm.get("momentum")
+        sup, res = cm.get("support"), cm.get("resistance")       # nearest sup/res {level,touches,dist_atr}
+        d = zone = None
+        if (sup and sup["touches"] >= self.MIN_TOUCH and px >= sup["level"]
+                and sup["dist_atr"] <= self.TOL_ATR and mom != "down"):
+            d, zone = "BUY", sup["level"]                        # แตะ support แข็ง + momentum ไม่ลง → BUY
+        elif (res and res["touches"] >= self.MIN_TOUCH and px <= res["level"]
+                and res["dist_atr"] <= self.TOL_ATR and mom != "up"):
+            d, zone = "SELL", res["level"]                       # แตะ resistance แข็ง + momentum ไม่ขึ้น → SELL
+        if d is None:
+            return None
+        sign = 1 if d == "BUY" else -1
+        sl_price = zone - sign * self.BUF_ATR * av               # SL เลย zone (ทะลุ = setup ผิด)
+        sl_pips = abs(px - sl_price) / point
+        if sl_pips <= 0:
+            return None
+        try:
+            bar_ts = datetime.fromtimestamp(int(times[i]), timezone.utc).isoformat()
+        except Exception:
+            return None
+        return {
+            "algo_id": self.algo_id, "symbol": symbol, "dir": d,
+            "entry": px, "sl_pips": sl_pips, "tp_pips": sl_pips * self.RR,
+            "regime": reg, "bar_ts": bar_ts, "klass": self.klass,
+        }
+
+
 ALGO_REGISTRY = {a.algo_id: a for a in (
     RegimeMomentumAlgo(), MeanReversionAlgo(), TSMOMDailyAlgo(),
-    MomentumFVGAlgo(), SweepReversalAlgo(),
+    MomentumFVGAlgo(), SweepReversalAlgo(), SRFadeAlgo(),
 )}
 
 
