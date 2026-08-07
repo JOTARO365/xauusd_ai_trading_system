@@ -275,6 +275,8 @@ def build():
                          "live": getattr(_cfg, "TSMOM_LIVE", False), "live_symbol": "XAUUSD",
                          "note": "directional รายวัน · เทรดจริงบนทอง · ดูรายละเอียด TSMOM section",
                          "headline": _hl, "n": _tn, "wr": None, "exp_R": None, "sum_R": None,
+                         "dir_mode": getattr(_cfg, "TSMOM_DIR_MODE", "long"),
+                         "hedge": bool(getattr(_cfg, "TSMOM_HEDGE_PENDING", False)),
                          "pairs_pos": None, "pairs_traded": None, "best": None, "worst": None})
     return {"ok": True, "generated": datetime.now(timezone.utc).isoformat()[:16] + "Z",
             "engine_on": getattr(_cfg, "SHADOW_ENGINE", False),

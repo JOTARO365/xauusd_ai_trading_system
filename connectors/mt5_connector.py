@@ -62,7 +62,8 @@ def _is_tsmom_comment(pos) -> bool:
     TSMOM = trend-following ถือหลายวัน exit-on-D1-flip + disaster SL 3×ATR (tsmom_manager คุมเอง).
     exit stack ของ intraday (momentum-exit/BE/trailing) ต้อง skip — ไม่งั้นตัดไม้กลางวัน = ทำลาย edge
     (จับหางเทรนด์ยาวไม่ได้). เหมือน swing sleeve."""
-    return str(getattr(pos, "comment", "") or "").startswith("ALGO-TSMOM")
+    c = str(getattr(pos, "comment", "") or "")
+    return c.startswith("ALGO-TSMOM") or c.startswith("ALGO-TSHEDGE")   # main + hedge sleeve คุม SL/exit เอง
 
 
 def _is_self_managed(pos) -> bool:

@@ -45,11 +45,14 @@ PHASE: <one paragraph — the dominant macro phase for gold now (Fed stance, rea
 DRIVERS: <ranked list of what moves gold now, most important first>
 FILTER: <which fresh headlines push gold UP vs DOWN this phase>
 CATALYSTS: <the upcoming HIGH-impact events this week from the calendar, with hot/cool gold direction>
-UPDATED: <YYYY-MM-DD> (auto from weekly news — <one-line what changed vs a calmer baseline>)
+RECOMMENDED ALGOS: <given the phase above, which algos to ENABLE and their direction — pick from the
+  ALGO ROSTER in the context. e.g. "tsmom_d1 LONG (D1 uptrend + Fed-easing bias); regime_momentum in
+  TREND; stand down mean_reversion (needs RANGE)". Say the direction mode (long/short/both) for tsmom.>
+UPDATED: <YYYY-MM-DD> (auto from daily news — <one-line what changed vs a calmer baseline>)
 
-Rules: use ONLY the real data in the context (calendar/news/macro/COT/world) — never invent numbers,
-events, price levels, or targets. Be concrete with real event names/figures. Keep it tight (~150-220
-words total). Do NOT add any other sections, preamble, or markdown fences."""
+Rules: use ONLY the real data in the context (calendar/news/macro/COT/world/roster) — never invent
+numbers, events, price levels, or targets. Be concrete with real event names/figures. Keep it tight
+(~180-260 words total). Do NOT add any other sections, preamble, or markdown fences."""
 
 
 def _read_state():
@@ -75,6 +78,21 @@ def _llm_narrative(model, is_monday):
     from agents import weekly_outlook as _wo
     ctx = _wo._gather()                                   # reuse: calendar + news + macro + COT + world + gold_tech
     ctx_txt = json.dumps(ctx, ensure_ascii=False, default=str)[:9000]
+    roster = ("\n\n=== ALGO ROSTER (แนะนำเปิดตัวไหน) ===\n"
+              "- regime_momentum: momentum breakout · domain=TREND (intraday gold)\n"
+              "- tsmom_d1: time-series momentum D1 · domain=TREND(D1) · mode long/short/both (SELL leg −EV → long)\n"
+              "- mean_reversion: z-fade · domain=RANGE (CUT live, −EV OOS)\n"
+              "- regime_momentum_fvg: momentum + FVG filter · domain=TREND\n"
+              "- sweep_reversal: fade prior-day H/L · domain=RANGE/NEUTRAL")
+    try:                                                  # + cell ที่ผ่าน gate จริง (algo_selector) ถ้ามี
+        from agents.algo_selector import build as _asb
+        elig = [f"{r['symbol']}/{r['regime']}→{r['recommend']}"
+                for r in ((_asb() or {}).get("recommendations") or []) if r.get("eligible")]
+        if elig:
+            roster += "\n- DATA-eligible (ผ่าน gate): " + ", ".join(elig)
+    except Exception:
+        pass
+    ctx_txt += roster
     mode = ("MODE — MONDAY BASELINE: it is the start of a new trading week. Set this week's macro "
             "PHASE and the CATALYSTS ahead (this week's high-impact events)."
             if is_monday else

@@ -188,6 +188,7 @@ _CONFIG_SPEC: dict[str, str] = {
     "MULTI_SYMBOL_LIVE": "false", "ALGO_SL_MULT": "WTIUSD:0.7",
     # ── gold engine flags (toggle จาก switch ทองใน Shadow Matrix) ──
     "TSMOM_LIVE": "false", "REGIME_SHADOW_FILL": "false",
+    "TSMOM_DIR_MODE": "long", "TSMOM_HEDGE_PENDING": "false",
     # ── NNLB ──
     "NNLB_MODE": "false", "NNLB_BASE_EQUITY": "100",
     "NNLB_EQUITY_PER_LOT": "100", "NNLB_MAX_LOSS_PCT": "25",

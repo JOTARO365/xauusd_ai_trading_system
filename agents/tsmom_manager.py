@@ -151,6 +151,51 @@ def _reconcile(target, atr, shadow, can_open=True):
     return _open(target, atr, shadow)                        # เปิดตรงข้าม
 
 
+_HEDGE_COMMENT = "ALGO-TSHEDGE"        # ต่างจาก COMMENT (ALGO-TSMOM) กัน _reconcile นับ hedge เป็น main position
+
+
+def _hedge_pending(rates, atr, mode, st):
+    """โหมด long/short → วาง pending LIMIT ทิศตรงข้ามที่โซน S/R ปลอดภัย (long→SELL_LIMIT@resistance,
+    short→BUY_LIMIT@support) + SL 0.6ATR beyond zone + TP RR2 (self-exit). flag TSMOM_HEDGE_PENDING.
+    reuse regime_pending._sr_view (bot_status sr_meta). 1 hedge/ครั้ง (skip ถ้ามีเปิดอยู่). fail-soft."""
+    if not getattr(_cfg, "TSMOM_HEDGE_PENDING", False) or mode not in ("long", "short"):
+        return
+    if st == _sw.OFF:
+        return
+    try:
+        import os, json
+        import regime_lib as R
+        from connectors.mt5_connector import place_pending_order, get_open_positions
+        from agents.regime_pending import _sr_view, _cancel_algo_pendings
+        from agents.algo_sizing import algo_lot
+        # กัน stack: มี hedge เปิดอยู่แล้ว → ไม่วางใหม่
+        for p in (get_open_positions() or []):
+            if str((p.get("comment") if isinstance(p, dict) else getattr(p, "comment", "")) or "").startswith(_HEDGE_COMMENT):
+                return
+        side, otype = ("resistance", "SELL_LIMIT") if mode == "long" else ("support", "BUY_LIMIT")
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        try:
+            with open(os.path.join(base, "logs", "bot_status.json"), encoding="utf-8") as f:
+                bs = json.load(f)
+        except Exception:
+            bs = {}
+        sv = _sr_view(rates["high"], rates["low"], rates["close"], atr, bs)
+        if not sv.get("ok"):
+            return
+        lvl_obj = sv.get(side)
+        if not lvl_obj or not lvl_obj.get("level"):
+            return
+        lvl = float(lvl_obj["level"])
+        sl_pips = max(1, round(0.6 * atr / R.POINT))       # 0.6·ATR เลย zone
+        tp_pips = sl_pips * 2                                # RR2 self-exit (ไม่พึ่ง manager)
+        _cancel_algo_pendings(_HEDGE_COMMENT)              # refresh: ลบ hedge pending เก่าก่อน
+        res = place_pending_order(otype, lvl, sl_pips, tp_pips, comment=_HEDGE_COMMENT,
+                                  expiry_hours=30, lot=algo_lot(sl_pips), shadow=(st == _sw.SHADOW))
+        logger.warning(f"[TSMOM-HEDGE] {otype}@{lvl:.2f} SL={sl_pips}p TP={tp_pips}p (mode={mode}) → {res.get('success')}")
+    except Exception as e:
+        logger.debug(f"[TSMOM-HEDGE] fail: {e}")
+
+
 def manage_tsmom():
     """เรียกทุก cycle จาก node_position_mgmt. act เฉพาะแท่ง D1 ใหม่. fail-soft."""
     if not _enabled():
@@ -165,7 +210,10 @@ def manage_tsmom():
             return None                                      # ยังไม่มีแท่ง D1 ใหม่ → ไม่ทำซ้ำ
         import regime_lib as R
         target = _signal(rates["close"])
-        if target == "SELL" and getattr(_cfg, "TSMOM_LONG_ONLY", False):   # gate: long-only (ขา SELL −EV; audit + segment ยืนยัน)
+        _mode = getattr(_cfg, "TSMOM_DIR_MODE", "long")        # long=BUY-only · short=SELL-only · both=symmetric
+        if _mode == "long" and target == "SELL":               # ขา SELL −EV → FLAT (hedge pending วางแทน ถ้าเปิด)
+            target = "FLAT"
+        elif _mode == "short" and target == "BUY":
             target = "FLAT"
         atr = float(R.atr(rates["high"], rates["low"], rates["close"], 22)[-2])
         if atr <= 0:
@@ -188,6 +236,7 @@ def manage_tsmom():
         shadow = (st == _sw.SHADOW)
         if _reconcile(target, atr, shadow, can_open):       # set bar เฉพาะเมื่อสำเร็จ (open fail → retry รอบหน้า)
             _last_d1_ts = closed_ts
+            _hedge_pending(rates, atr, _mode, st)           # โหมด long/short → วาง LIMIT ทิศตรงข้ามที่โซนปลอดภัย (flag-gated)
         return {"target": target, "atr": atr, "shadow": shadow}
     except Exception as e:
         logger.debug(f"[TSMOM] manage error: {e}")

@@ -5189,6 +5189,15 @@ async function loadShadowMatrix(force) {
       return `<div style="flex:1;min-width:210px;border:1px solid var(--border);border-left:3px solid ${a.live ? 'var(--green)' : col};border-radius:8px;padding:9px 12px;background:var(--surface)">
         <div style="font-weight:700;font-size:13px">${nm} <span style="color:var(--muted);font-size:10px;font-weight:400">${a.regime}</span>${badge}</div>
         ${metric}
+        ${a.dir_mode ? `<div style="margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="font-size:10px;color:var(--muted)">ทิศ:</span>
+          <select class="filter-select" style="padding:2px 22px 2px 8px;font-size:11px" onchange="setGoldFlag('TSMOM_DIR_MODE', this.value, 'TSMOM ทิศ → '+this.options[this.selectedIndex].text)">
+            <option value="long"${a.dir_mode==='long'?' selected':''}>buy only</option>
+            <option value="short"${a.dir_mode==='short'?' selected':''}>sell only</option>
+            <option value="both"${a.dir_mode==='both'?' selected':''}>buy + sell</option>
+          </select>
+          <label style="font-size:10px;color:var(--muted);cursor:pointer"><input type="checkbox"${a.hedge?' checked':''} onchange="setGoldFlag('TSMOM_HEDGE_PENDING', this.checked?'true':'false', 'TSMOM hedge → '+(this.checked?'ON':'OFF'))" style="vertical-align:middle"> hedge pending โซนตรงข้าม</label>
+        </div>` : ''}
         ${a.note ? `<div style="font-size:9px;color:var(--muted);margin-top:3px">${a.note}</div>` : ''}
       </div>`;
     }).join('') || '<div style="color:var(--muted);font-size:12px">ยังไม่มีข้อมูล — กำลังเก็บ (SHADOW_ENGINE)</div>';
