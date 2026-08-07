@@ -26,8 +26,8 @@ MIN_N = 100
 TOL_ATR, MIN_TOUCH, BUF_ATR, RR = 0.4, 3, 0.5, 1.5
 
 
-def run_sr_fade(h, l, c, cost, point):
-    """คืน list ของ R ต่อไม้ (non-overlapping). ใช้ตรรกะเดียวกับ SRFadeAlgo + compute_cluster_map."""
+def run_sr_fade(h, l, c, cost, point, rr=RR, min_touch=MIN_TOUCH, tol_atr=TOL_ATR, buf_atr=BUF_ATR, confirm=False):
+    """คืน list ของ R ต่อไม้ (non-overlapping). variant params: rr / min_touch / tol / confirm (rejection candle)."""
     atr = R.atr(h, l, c); er = R.efficiency_ratio(c); adx = R.adx(h, l, c); vp = R.vol_percentile(c)
     n = len(c); trades = []
     i = max(R.VOL_LOOKBACK + 40, 210)
@@ -41,18 +41,23 @@ def run_sr_fade(h, l, c, cost, point):
         if not cm.get("ok"):
             i += 1; continue
         px = float(c[i]); mom = cm.get("momentum"); sup, res = cm.get("support"), cm.get("resistance")
+        rng = float(h[i] - l[i]) or 1e-9
+        rej_buy = (c[i] - l[i]) / rng >= 0.6              # แท่งปฏิเสธล่าง (ปิดครึ่งบน) = bounce ยืนยัน
+        rej_sell = (h[i] - c[i]) / rng >= 0.6
         d = zone = None
-        if sup and sup["touches"] >= MIN_TOUCH and px >= sup["level"] and sup["dist_atr"] <= TOL_ATR and mom != "down":
+        if (sup and sup["touches"] >= min_touch and px >= sup["level"] and sup["dist_atr"] <= tol_atr
+                and mom != "down" and (not confirm or rej_buy)):
             d, zone = "BUY", sup["level"]
-        elif res and res["touches"] >= MIN_TOUCH and px <= res["level"] and res["dist_atr"] <= TOL_ATR and mom != "up":
+        elif (res and res["touches"] >= min_touch and px <= res["level"] and res["dist_atr"] <= tol_atr
+                and mom != "up" and (not confirm or rej_sell)):
             d, zone = "SELL", res["level"]
         if d is None:
             i += 1; continue
         sign = 1 if d == "BUY" else -1
-        sl_price = zone - sign * BUF_ATR * av; sl_pips = abs(px - sl_price) / point
+        sl_price = zone - sign * buf_atr * av; sl_pips = abs(px - sl_price) / point
         if sl_pips <= 0:
             i += 1; continue
-        sl = px - sign * sl_pips * point; tp = px + sign * sl_pips * RR * point
+        sl = px - sign * sl_pips * point; tp = px + sign * sl_pips * rr * point
         end = min(i + MAX_HOLD, n - 1); r_out = None; exit_i = end
         for j in range(i + 1, end + 1):
             hit_sl = (l[j] <= sl) if sign > 0 else (h[j] >= sl)
@@ -60,7 +65,7 @@ def run_sr_fade(h, l, c, cost, point):
             if hit_sl:                                    # SL-first (conservative)
                 r_out, exit_i = -1.0 - cost / sl_pips, j; break
             if hit_tp:
-                r_out, exit_i = RR - cost / sl_pips, j; break
+                r_out, exit_i = rr - cost / sl_pips, j; break
         if r_out is None:
             r_out = sign * (c[end] - px) / (sl_pips * point) - cost / sl_pips
         trades.append(r_out)
@@ -101,7 +106,19 @@ def main():
         _sc = None
     print(f"\n=== sr_fade backtest (S/R fade · causal · SL-first · cost-adj · OOS70/30 · MIN_N={MIN_N}) ===")
     print("verdict PASS = n≥100 + exp_R>0 + t>2 + OOS exp_R>0\n")
-    if "--all" in sys.argv:
+    # variant grid — ปรับ sr_fade หา +EV: RR สูง (breakeven WR ต่ำ) + confirmation (แท่งปฏิเสธ = กรอง knife) + zone แข็ง
+    VARIANTS = [
+        ("baseline rr1.5", dict(rr=1.5)),
+        ("rr2.0", dict(rr=2.0)),
+        ("rr3.0", dict(rr=3.0)),
+        ("confirm(reject)", dict(rr=1.5, confirm=True)),
+        ("confirm rr2.0", dict(rr=2.0, confirm=True)),
+        ("confirm rr3.0", dict(rr=3.0, confirm=True)),
+        ("confirm rr2.0 touch6", dict(rr=2.0, confirm=True, min_touch=6)),
+        ("confirm rr2.0 tol0.25", dict(rr=2.0, confirm=True, tol_atr=0.25)),
+    ]
+    print(f"⚠️ ลอง {len(VARIANTS)} variants (multiple-testing) — ต้องผ่าน t>2 + OOS>0 ถึงเชื่อ (deflate)\n")
+    if "--all" in sys.argv:                                # หลัง variant ผ่าน → เทสทุกคู่ variant เดียว
         from connectors.pair_collector import _broker_map
         bmap = _broker_map() or {}
         universe = ["XAUUSD", "XAGUSD", "XAUEUR", "EURUSD", "GBPUSD", "USDCHF", "USDJPY", "BTCUSD", "WTIUSD"]
@@ -120,7 +137,10 @@ def main():
         h = np.array([x["high"] for x in r], float); l = np.array([x["low"] for x in r], float)
         c = np.array([x["close"] for x in r], float)
         cost = (_sc.cost_pips(logical) if _sc else None) or 30.0
-        _report(logical, run_sr_fade(h, l, c, cost, float(info.point)))
+        point = float(info.point)
+        print(f"── {logical} (cost={cost}) ──")
+        for name, kw in VARIANTS:
+            _report("  " + name, run_sr_fade(h, l, c, cost, point, **kw))
     mt5.shutdown()
 
 
