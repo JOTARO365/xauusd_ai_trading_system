@@ -387,6 +387,12 @@ def node_position_mgmt(state: TradingState) -> dict:
             logger.info(f"[PAIRS] {_pt.get('action')} z={_pt.get('z')}")
     except Exception as _pe:
         logger.error(f"[GRAPH:pairs_executor] {_pe}")
+    # event-engine (NFP/CPI/FOMC) — SHADOW-first: log สิ่งที่จะทำ (ไม่แตะ trade จนกว่า EVENT_ENGINE_LIVE). fail-soft.
+    try:
+        from agents.event_engine import tick as _ev_tick
+        _ev_tick()
+    except Exception as _eve:
+        logger.error(f"[GRAPH:event_engine] {_eve}")
     # forward TSMOM-D1 equity tracker (trend-follower, per symbol). gated SHADOW_TSMOM. fail-soft. 0 order.
     try:
         from agents.shadow_tsmom import tick as _tsmom_tick

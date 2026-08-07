@@ -134,6 +134,12 @@ Running in parallel, independent of the regime router:
   turns the (otherwise −EV) breakout into a small +EV, market-aligned entry (backtest exp_R +0.07,
   OOS +0.14) that enters at a *key level* and never fights the macro tape. Runs through the
   multi-symbol engine with its own magic; enable via the Shadow Matrix (`macro_momentum:XAUUSD`).
+- **Event engine** (`agents/event_engine.py`, SHADOW-first) — turns the display-only economic
+  calendar (`ff_calendar_raw.json` forecast/actual) + `event_scenarios.json` rubric into an NFP/CPI/FOMC
+  signal: **pre-event** = flag flat/pause before a high-impact release (direction is a coin-flip, the move
+  is large); **post-event** = surprise (actual vs forecast) → gold direction per the rubric. Logs what it
+  *would* do to `data/event_engine_journal.jsonl` for forward validation; affects trading only when
+  `EVENT_ENGINE_LIVE=true` (default false). Kill switch = that flag.
 - **XAU-XAG pairs-trade** (`agents/pairs_executor.py`) — market-neutral statistical-arbitrage sleeve.
   Trades the gold–silver spread `XAU − β·XAG` (rolling causal β): fades the z-score (enter |z|≥`PAIRS_Z_IN`,
   take profit at `PAIRS_Z_OUT`, cut at `PAIRS_Z_STOP`). Two β-hedged legs sized dollar-neutral from each

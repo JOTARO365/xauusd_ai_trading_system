@@ -330,7 +330,11 @@ PAIRS_Z_OUT      = float(os.getenv("PAIRS_Z_OUT") or 0.5)                    # �
 PAIRS_Z_STOP     = float(os.getenv("PAIRS_Z_STOP") or 3.5)                   # cut เมื่อ |z| ≥ (spread เบี่ยงต่อ)
 PAIRS_XAU_LOT    = float(os.getenv("PAIRS_XAU_LOT") or 0.0)                  # 0 = ใช้ MIN_LOT (XAG คำนวณ β-hedge)
 PAIRS_DISASTER_ATR = float(os.getenv("PAIRS_DISASTER_ATR") or 6.0)           # disaster SL/ขา (×ATR H1, backstop)
-CONF15M_SESSION  = os.getenv("CONF15M_SESSION", "13-21")                    # gold confluence_15m: เทรดเฉพาะ ชม UTC นี้ (NY, ตัด Asian chop). ว่าง=ทุกชม
+CONF15M_SESSION  = os.getenv("CONF15M_SESSION", "13-21")
+# event-engine (NFP/CPI/FOMC) — SHADOW-first (log อย่างเดียว จนกว่า validate). ffcalendar+event_scenarios
+EVENT_ENGINE_LIVE = os.getenv("EVENT_ENGINE_LIVE", "false").lower() == "true"   # true=bias/gate trade; false=shadow log
+EVENT_PRE_MIN     = int(os.getenv("EVENT_PRE_MIN") or 30)                        # ก่อนข่าวแรง N นาที = flat/pause
+EVENT_POST_MIN    = int(os.getenv("EVENT_POST_MIN") or 120)                      # หลัง release N นาที = bias window                    # gold confluence_15m: เทรดเฉพาะ ชม UTC นี้ (NY, ตัด Asian chop). ว่าง=ทุกชม
 TSMOM_SL_ATR     = float(os.getenv("TSMOM_SL_ATR") or 3.0)                   # chandelier disaster SL (× ATR D1)
 # TSMOM_SL_PIPS > 0 = override SL เป็นค่าคงที่ (points) แทน chandelier — สำหรับบัญชีเล็กให้เปิด order ได้.
 # ⚠️ SL แคบ = edge TSMOM หาย (backtest: SL<2000p → WR 2-18% โดน noise รูด). = execution-test ไม่ใช่ edge.
@@ -521,6 +525,10 @@ def reload_config():
     PAIRS_DISASTER_ATR       = float(os.getenv("PAIRS_DISASTER_ATR") or 6.0)
     global CONF15M_SESSION
     CONF15M_SESSION          = os.getenv("CONF15M_SESSION", "13-21")
+    global EVENT_ENGINE_LIVE, EVENT_PRE_MIN, EVENT_POST_MIN
+    EVENT_ENGINE_LIVE        = os.getenv("EVENT_ENGINE_LIVE", "false").lower() == "true"
+    EVENT_PRE_MIN            = int(os.getenv("EVENT_PRE_MIN") or 30)
+    EVENT_POST_MIN           = int(os.getenv("EVENT_POST_MIN") or 120)
     TSMOM_MIN_ADX            = float(os.getenv("TSMOM_MIN_ADX") or 0)                        # เข้าเฉพาะ ADX(D1) ≥ นี้
     TSMOM_MIN_VOLPCT         = float(os.getenv("TSMOM_MIN_VOLPCT") or 0)                     # เข้าเฉพาะ vol% ≥ นี้
     TSMOM_LOOKBACKS          = os.getenv("TSMOM_LOOKBACKS", "21,63,126")
