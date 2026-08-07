@@ -272,9 +272,14 @@ def main():
 
     out = {"updated": _today(), "note": "backtest matrix ทุก algo × คู่ (causal · SL-first · cost-adj · OOS70/30). +EV=exp_R>0+OOS≥0+n≥%d" % MIN_N,
            "results": rows}
+    _with_n = sum(1 for r in rows if r.get("n"))            # combo ที่มีผลจริง (ไม่ใช่ no-data)
     if "--print" not in sys.argv:
-        json.dump(out, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-        print(f"\nเขียน {OUT} — {len(rows)} combo (+EV {sum(1 for r in rows if r['group']=='+EV')})")
+        if _with_n < 5:                                     # defensive: MT5/symbol เครื่องนี้รันไม่ครบ → อย่าเขียนทับ committed ด้วยผลว่าง
+            print(f"\n⚠️ ได้ผลจริงแค่ {_with_n} combo (MT5/symbol ไม่พร้อม?) — ไม่เขียนทับ {OUT} (คง committed). "
+                  f"เช็ค MT5 login/symbol แล้วรันใหม่: python scripts/backtest_all.py")
+        else:
+            json.dump(out, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+            print(f"\nเขียน {OUT} — {len(rows)} combo (+EV {sum(1 for r in rows if r['group']=='+EV')})")
     else:
         for r in rows:
             print(f"  {r['group']:4s} {r['algo']:20s} {r['pair']:8s} {r['tf']:3s} exp_R {r.get('exp_R')} t {r.get('t')} OOS {r.get('oos')} n {r.get('n')}")
