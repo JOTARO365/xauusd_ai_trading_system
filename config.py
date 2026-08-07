@@ -266,9 +266,6 @@ STRUCTURAL_SL_MSE     = os.getenv("STRUCTURAL_SL_MSE", "false").lower() == "true
 STRUCTURAL_SL_BUFFER_ATR = float(os.getenv("STRUCTURAL_SL_BUFFER_ATR") or 0.3)
 # ALGO_ENTRY_MIN_GAP_ATR = กัน stack เกาะจุดเดิม: skip เข้าใหม่ถ้ามีไม้ algo ทิศเดียวกันเปิดอยู่ภายใน n×ATR. 0 = ปิด guard
 ALGO_ENTRY_MIN_GAP_ATR = float(os.getenv("ALGO_ENTRY_MIN_GAP_ATR") or 1.0)
-# COLD_START_GATE = ข้าม signal บาร์ที่ปิดก่อน engine เริ่ม (กัน stale-entry ตอน restart). true=ปลอดภัย (รอบาร์สด)
-# false = หลัง restart เข้า signal ปัจจุบันทันที (ไม่รอบาร์ถัดไป)
-COLD_START_GATE       = os.getenv("COLD_START_GATE", "true").lower() == "true"
 # STRUCTURAL_SL_TFS = timeframe ไส้ที่พิจารณา (D1 หรือ H4). STRUCTURAL_SL_PICK = nearest(SL แคบ RR ดี)/farthest(กัน noise มากสุด)
 STRUCTURAL_SL_TFS     = os.getenv("STRUCTURAL_SL_TFS", "H4,D1")
 STRUCTURAL_SL_PICK    = os.getenv("STRUCTURAL_SL_PICK", "farthest")
@@ -483,8 +480,6 @@ def reload_config():
     STRUCTURAL_SL_MSE        = os.getenv("STRUCTURAL_SL_MSE", "false").lower() == "true"        # SL ปลายไส้ D1/H4 — MSE
     STRUCTURAL_SL_BUFFER_ATR = float(os.getenv("STRUCTURAL_SL_BUFFER_ATR") or 0.3)              # เผื่อพ้นไส้ × ATR
     ALGO_ENTRY_MIN_GAP_ATR   = float(os.getenv("ALGO_ENTRY_MIN_GAP_ATR") or 1.0)                # กัน stack เกาะจุดเดิม (0=ปิด)
-    global COLD_START_GATE
-    COLD_START_GATE          = os.getenv("COLD_START_GATE", "true").lower() == "true"
     STRUCTURAL_SL_TFS        = os.getenv("STRUCTURAL_SL_TFS", "H4,D1")                          # timeframe ไส้ (D1/H4)
     STRUCTURAL_SL_PICK       = os.getenv("STRUCTURAL_SL_PICK", "farthest")                       # nearest/farthest
     STRUCTURAL_SL_MIN_ATR    = float(os.getenv("STRUCTURAL_SL_MIN_ATR") or 0.5)                 # legacy (ไม่ใช้)

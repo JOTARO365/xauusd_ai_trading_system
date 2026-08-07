@@ -98,9 +98,6 @@ _TF_SECONDS = {"H1": 3600, "H4": 14400, "D1": 86400}
 
 def _signal_stale(bar_ts_iso, algo):
     """True ถ้าบาร์ของ signal ปิดก่อน engine เริ่ม (bar_ts + tf ≤ start) → stale ไม่ควรเข้า."""
-    import config as _cfg
-    if not getattr(_cfg, "COLD_START_GATE", True):          # ปิด gate → เข้า signal ปัจจุบันทันทีหลัง restart
-        return False
     if _ENGINE_START is None or not bar_ts_iso:
         return False
     try:
