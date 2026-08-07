@@ -107,8 +107,8 @@ def snapshot():
 
         def _add(algo, name, buy, sell, note):
             out["algos"].append({"algo": algo, "name": name, "regime": reg,
-                                 "buy": round(buy, 2) if buy else None,
-                                 "sell": round(sell, 2) if sell else None,
+                                 "buy": round(float(buy), 2) if buy else None,
+                                 "sell": round(float(sell), 2) if sell else None,
                                  "note": note, "dir_mode": _adir.mode_of(algo)})
 
         # momentum breakout (regime_momentum + fvg ใช้ Donchian เดียวกัน; fvg เพิ่ม FVG-filter)
@@ -150,10 +150,12 @@ def snapshot():
             s = sum(vs.values()); vote = "BUY" if s > 0 else "SELL" if s < 0 else "FLAT"
             ups = [dc[j - L] for L in (63, 126, 252) if dc[j] < dc[j - L]]
             dns = [dc[j - L] for L in (63, 126, 252) if dc[j] > dc[j - L]]
+            # tsmom = market entry เมื่อ D1 vote flip (ไม่ใช่ limit ที่ราคา) → flip_* = threshold ไม่ใช่ order price
             out["algos"].append({"algo": "tsmom_d1", "name": "TSMOM-D1", "regime": "D1",
-                                 "buy": round(min(ups), 0) if ups else None,       # ราคาที่ต้องข้ามเพื่อ vote→BUY
-                                 "sell": round(max(dns), 0) if dns else None,       # ต่ำกว่านี้ vote→SELL
-                                 "tsmom_vote": vote, "note": f"D1 vote {vote} · flip levels",
+                                 "buy": None, "sell": None, "kind": "flip", "tsmom_vote": vote,
+                                 "flip_buy": round(float(min(ups)), 0) if ups else None,   # D1 ปิดเหนือนี้ → vote พลิก BUY (เข้า market)
+                                 "flip_sell": round(float(max(dns)), 0) if dns else None,
+                                 "note": f"เข้า market เมื่อ D1 vote พลิก (vote ตอนนี้ {vote})",
                                  "dir_mode": _adir.mode_of("tsmom_d1")})
         except Exception:
             pass

@@ -5235,15 +5235,18 @@ function renderSmPotential() {
     const key = a.dir_key || a.algo_id, p = byKey[key];
     const sel = window._smSel === key;
     const mode = a.dir_mode || 'both';
-    // จุดเข้า — ทุก algo symmetric: โชว์ BUY + SELL (ตาม mode ที่เปิด). ทิศที่ปิด = จาง
+    // จุดเข้า — momentum/fade = ราคา (BUY/SELL) · tsmom = flip condition (market เมื่อ vote พลิก) ไม่ใช่ order ที่ราคา
     let entry = '<span style="color:var(--muted)">—</span>';
-    if (p) {
+    if (p && p.kind === 'flip') {                            // tsmom: vote + flip threshold (ไม่ใช่ order price)
+      const c = p.tsmom_vote === 'BUY' ? 'var(--green)' : p.tsmom_vote === 'SELL' ? 'var(--red)' : 'var(--muted)';
+      const fb = (mode !== 'short' && p.flip_buy) ? ` · พลิก BUY ถ้า D1&gt;${p.flip_buy}` : '';
+      entry = `<span style="color:${c}">vote ${p.tsmom_vote} → เข้า market</span><span style="font-size:9px;color:var(--muted)">${fb}</span>`;
+    } else if (p) {
       const bOk = mode !== 'short', sOk = mode !== 'long';
       const buyTxt = p.buy != null ? `<span style="color:${bOk?'var(--green)':'var(--muted)'};${bOk?'':'opacity:.5'}">BUY ${p.buy}${bOk?'':' (ปิด)'}</span>` : '';
       const sellTxt = p.sell != null ? `<span style="color:${sOk?'var(--red)':'var(--muted)'};${sOk?'':'opacity:.5'}">SELL ${p.sell}${sOk?'':' (ปิด)'}</span>` : '';
       const parts = [buyTxt, sellTxt].filter(Boolean).join(' / ');
-      const vote = p.tsmom_vote ? ` <span style="font-size:9px;color:var(--muted)">(vote ${p.tsmom_vote})</span>` : '';
-      entry = (parts || '<span style="color:var(--muted)">รอสัญญาณ</span>') + vote;
+      entry = parts || '<span style="color:var(--muted)">รอสัญญาณ</span>';
     }
     const noteTxt = p && p.note ? `<div style="font-size:9px;color:var(--muted);margin-top:1px">${p.note}</div>` : '';
     const modeCol = mode === 'long' ? 'var(--green)' : mode === 'short' ? 'var(--red)' : 'var(--muted)';
