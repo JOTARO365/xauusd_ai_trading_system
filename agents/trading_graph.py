@@ -392,6 +392,11 @@ def node_position_mgmt(state: TradingState) -> dict:
         _rn_tick()
     except Exception as _rne:
         logger.error(f"[GRAPH:regime_narrative] {_rne}")
+    try:                                                    # terminal watch: ยังไม่เข้า → บอกว่าจะเข้าตรงไหน algo ไหน (throttled)
+        from agents.algo_watch import tick as _aw_tick
+        _aw_tick()
+    except Exception as _awe:
+        logger.error(f"[GRAPH:algo_watch] {_awe}")
     # in-loop MT5→DB sync+reconcile (throttled) — ให้ DB cohort fresh ระหว่าง session (แก้ system-trade stale). fail-soft.
     _periodic_db_sync()
     return {}
