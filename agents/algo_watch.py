@@ -143,17 +143,6 @@ def snapshot():
                 _add("sweep_reversal", "Sweep Reversal", pdl, pdh, "fade prior-day H/L" + rr)
         except Exception:
             pass
-        # sr_fade — fade ที่ S/R Book cluster (BUY@support / SELL@resistance)
-        try:
-            from agents.cluster_map import compute_cluster_map
-            cm = compute_cluster_map(hi, lo, cl)
-            if cm.get("ok"):
-                sup, res = cm.get("support"), cm.get("resistance")
-                rr = "" if reg in ("NEUTRAL", "RANGE") else f" · {reg}→standby (เข้าเฉพาะ RANGE/NEUTRAL)"
-                _add("sr_fade", "S/R Fade", (sup or {}).get("level"), (res or {}).get("level"),
-                     f"fade แนว S/R Book (แตะ support→BUY / resistance→SELL)" + rr)
-        except Exception:
-            pass
         # tsmom_d1 — D1 vote + flip levels (ทั้ง 2 ทาง)
         try:
             d = mt5.copy_rates_from_pos(S, mt5.TIMEFRAME_D1, 0, 300); dc = d["close"].astype(float); j = len(dc) - 2
