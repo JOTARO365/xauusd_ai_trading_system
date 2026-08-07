@@ -241,6 +241,14 @@ not a value dump):
 - Technical picture: where gold sits in its range, near which key support/resistance (use real prices from
   gold_tech.this_week + daily).
 
+## 🤖 แนะนำเปิด Algo สัปดาห์นี้
+จาก ALGO ROSTER ข้างล่าง แนะนำว่าควรเปิด (enable) algo ไหนบ้างให้เหมาะกับ bias/regime ของสัปดาห์นี้ + ระบุทิศ
+(สำหรับ tsmom_d1: long / short / both) พร้อมเหตุผลสั้นๆ ภาษาชาวบ้าน. ยึด domain ของแต่ละ algo; ตัวไหนไม่เข้าสภาพ
+ตลาดสัปดาห์นี้ให้บอก "พัก (stand down)". เขียนเป็น bullet สั้น algo ละบรรทัด.
+ALGO ROSTER: regime_momentum (momentum breakout · TREND) · tsmom_d1 (time-series momentum D1 · TREND; SELL leg
+−EV → เลือก long เป็นหลัก) · mean_reversion (z-fade · RANGE; ถูก CUT −EV) · regime_momentum_fvg (momentum+FVG ·
+TREND) · sweep_reversal (fade แนวไฮ/โลว์วันก่อน · RANGE/NEUTRAL).
+
 ## 🗓️ ปฏิทิน & Scenario สัปดาห์นี้
 For each key event in calendar: date/time + hot→gold direction / cool→gold direction. Base magnitudes on
 event_scenarios (magnitude% + n) — do not guess; if an event has no stats, say "ไม่มีสถิติ". Convey the
