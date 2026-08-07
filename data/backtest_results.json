@@ -1002,6 +1002,19 @@
       "n": 568,
       "live": "LIVE",
       "note": "stat-arb 2-leg (pairs_executor) rolling-β z-fade"
+    },
+    {
+      "group": "-EV",
+      "algo": "scalp_15m_quickTP",
+      "pair": "XAUUSD",
+      "tf": "M15",
+      "exp_R": -0.08,
+      "t": -2.5,
+      "oos": -0.05,
+      "wr": 60.0,
+      "n": 700,
+      "live": "ไม่สร้าง",
+      "note": "quick-TP scalp RR0.5-1: WR 58-65% แต่ < breakeven(59-67%)+cost → −EV. 15m +EV ได้แค่ RR≥1.5 (confluence_15m). scripts/research_15m_scalp.py"
     }
   ]
 }
