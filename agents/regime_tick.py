@@ -87,7 +87,7 @@ def _tick() -> None:
             _refresh_levels(hour)
         if not _started:                               # cold-start: ราคาทะลุ level ที่ arm ไว้แล้วตั้งแต่ก่อนบอทเริ่ม
             _started = True                            # = break เกิดก่อนเราดู (stale) → seed ชั่วโมงนี้ รอบาร์/level สดถัดไป
-            if _cache["armed"] and ((_cache.get("buy") and tick.ask > _cache["buy"])
+            if getattr(config, "COLD_START_GATE", True) and _cache["armed"] and ((_cache.get("buy") and tick.ask > _cache["buy"])
                                     or (_cache.get("sell") and tick.bid < _cache["sell"])):
                 _last_traded_hour = hour
                 logger.info("[REGIME-TICK] cold-start: ราคาทะลุ level ที่ arm ไว้ก่อนบอทเริ่ม (stale) → รอบาร์สด")

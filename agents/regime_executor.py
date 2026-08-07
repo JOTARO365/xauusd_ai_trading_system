@@ -131,7 +131,7 @@ def run_regime_executor():
             return None
     except Exception:
         pass
-    if _ENGINE_START and rec["bar_ts"]:                     # cold-start: บาร์ปิดก่อน engine เริ่ม = stale → seed + รอบาร์สด
+    if getattr(_cfg, "COLD_START_GATE", True) and _ENGINE_START and rec["bar_ts"]:   # cold-start: บาร์ปิดก่อน engine เริ่ม = stale → seed + รอบาร์สด
         try:
             if datetime.fromisoformat(rec["bar_ts"]).timestamp() + 3600 <= _ENGINE_START:   # H1 = +3600
                 _last_bar = rec["bar_ts"]
