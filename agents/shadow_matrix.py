@@ -258,7 +258,18 @@ def build():
         a["note"] = m.get("note")
         a["live_symbol"] = m.get("live_symbol")
         a["live"] = bool(m.get("live_symbol"))          # momentum = live บน XAUUSD (engine แยก)
+        try:                                            # per-algo direction mode (dropdown ใน dashboard)
+            from agents import algo_dir as _adir
+            a["dir_key"] = a["algo_id"]
+            a["dir_mode"] = _adir.mode_of(a["algo_id"])
+        except Exception:
+            a["dir_mode"] = "both"; a["dir_key"] = a["algo_id"]
     by_algo_list = list(by_algo.values())
+    try:
+        from agents import algo_dir as _adir
+        _tsmom_dir_mode = _adir.mode_of("tsmom_d1")
+    except Exception:
+        _tsmom_dir_mode = "long"
     # TSMOM-D1 = engine ที่ 2 ที่เทรดจริงบนทอง (metric = Sharpe/equity คนละแบบ momentum → field headline แยก)
     try:
         from agents.shadow_tsmom import summary as _ts_summary
@@ -275,7 +286,7 @@ def build():
                          "live": getattr(_cfg, "TSMOM_LIVE", False), "live_symbol": "XAUUSD",
                          "note": "directional รายวัน · เทรดจริงบนทอง · ดูรายละเอียด TSMOM section",
                          "headline": _hl, "n": _tn, "wr": None, "exp_R": None, "sum_R": None,
-                         "dir_mode": getattr(_cfg, "TSMOM_DIR_MODE", "long"),
+                         "dir_key": "tsmom_d1", "dir_mode": _tsmom_dir_mode,
                          "hedge": bool(getattr(_cfg, "TSMOM_HEDGE_PENDING", False)),
                          "pairs_pos": None, "pairs_traded": None, "best": None, "worst": None})
     return {"ok": True, "generated": datetime.now(timezone.utc).isoformat()[:16] + "Z",

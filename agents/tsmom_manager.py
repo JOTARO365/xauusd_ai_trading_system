@@ -210,7 +210,8 @@ def manage_tsmom():
             return None                                      # ยังไม่มีแท่ง D1 ใหม่ → ไม่ทำซ้ำ
         import regime_lib as R
         target = _signal(rates["close"])
-        _mode = getattr(_cfg, "TSMOM_DIR_MODE", "long")        # long=BUY-only · short=SELL-only · both=symmetric
+        from agents import algo_dir as _adir                    # per-algo dir mode (dashboard-editable; seed จาก TSMOM_DIR_MODE)
+        _mode = _adir.mode_of("tsmom_d1")                       # long=BUY-only · short=SELL-only · both=symmetric
         if _mode == "long" and target == "SELL":               # ขา SELL −EV → FLAT (hedge pending วางแทน ถ้าเปิด)
             target = "FLAT"
         elif _mode == "short" and target == "BUY":

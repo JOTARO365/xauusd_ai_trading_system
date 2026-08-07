@@ -100,6 +100,13 @@ def _tick() -> None:
             d = "SELL"
         else:
             return
+        try:                                                # per-algo dir mode (long/short/both; default both = ไม่กรอง)
+            from agents import algo_dir as _adir
+            if not _adir.allowed("regime_momentum", d):
+                _last_traded_hour = hour                    # ถือว่าจัดการชม.นี้ (กัน log ซ้ำ) — ทิศนี้ถูกปิดโดย mode
+                return
+        except Exception:
+            pass
         from agents.algo_gate import entry_hour_ok
         if not entry_hour_ok():                              # session gate (ALGO_ENTRY_HOURS · ว่าง=ทุกชม default)
             return

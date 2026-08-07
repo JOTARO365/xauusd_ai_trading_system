@@ -124,6 +124,13 @@ def run_regime_executor():
     if rec["bar_ts"] and rec["bar_ts"] == _last_bar:        # บาร์นี้เข้าไปแล้ว → ไม่ซ้ำ
         _hb("ARMED", f"regime=TREND {sig.get('dir')} · เข้าออเดอร์บาร์นี้แล้ว (รอบาร์ถัดไป)")
         return None
+    try:                                                    # per-algo dir mode (long/short/both; default both = ไม่กรอง)
+        from agents import algo_dir as _adir
+        if not _adir.allowed("regime_momentum", sig.get("dir")):
+            _hb("DIR-MODE", f"regime=TREND {sig.get('dir')} · ถูกปิดโดย direction mode ของ algo")
+            return None
+    except Exception:
+        pass
     if _ENGINE_START and rec["bar_ts"]:                     # cold-start: บาร์ปิดก่อน engine เริ่ม = stale → seed + รอบาร์สด
         try:
             if datetime.fromisoformat(rec["bar_ts"]).timestamp() + 3600 <= _ENGINE_START:   # H1 = +3600

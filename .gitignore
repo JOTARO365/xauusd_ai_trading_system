@@ -32,3 +32,4 @@ dashboard/local_*.py
 data/options_oi_raw.json
 agents/prompts/macro_regime.md.bak
 data/regime_narrative_state.json
+data/algo_dir_mode.json

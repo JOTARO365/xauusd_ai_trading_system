@@ -1437,6 +1437,20 @@ def api_shadow_orders():
     return jsonify(_cached(f"shadow-orders:{algo}:{symbol}", _c, ttl=30))
 
 
+@app.route("/api/algo-dir", methods=["POST"])
+def api_algo_dir():
+    """ตั้ง direction mode ต่อ algo (long/short/both) → data/algo_dir_mode.json. live-reload. 0 token."""
+    from agents import algo_dir as _adir
+    body = request.get_json(silent=True) or {}
+    algo = (body.get("algo") or "").strip()
+    mode = (body.get("mode") or "").strip().lower()
+    if not algo or mode not in _adir._VALID:
+        return jsonify({"ok": False, "error": f"algo + mode ต้องเป็น {sorted(_adir._VALID)}"}), 400
+    ok = _adir.set_mode(algo, mode)
+    _data_cache.pop("shadow-matrix", None)            # ให้ matrix สะท้อน mode ใหม่ทันที
+    return jsonify({"ok": ok, "algo": algo, "mode": mode})
+
+
 @app.route("/api/shadow-switch", methods=["POST"])
 def api_shadow_switch():
     """Toggle combo (algo,symbol) → SHADOW/LIVE/OFF (data/algo_switches.json). LIVE = executor วางออเดอร์จริง

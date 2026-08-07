@@ -5212,12 +5212,12 @@ async function loadShadowMatrix(force) {
         ${metric}
         ${a.dir_mode ? `<div style="margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span style="font-size:10px;color:var(--muted)">ทิศ:</span>
-          <select class="filter-select" style="padding:2px 22px 2px 8px;font-size:11px" onchange="setGoldFlag('TSMOM_DIR_MODE', this.value, 'TSMOM ทิศ → '+this.options[this.selectedIndex].text)">
+          <select class="filter-select" style="padding:2px 22px 2px 8px;font-size:11px" onchange="setAlgoDir('${a.dir_key||a.algo_id}', this.value)">
             <option value="long"${a.dir_mode==='long'?' selected':''}>buy only</option>
             <option value="short"${a.dir_mode==='short'?' selected':''}>sell only</option>
             <option value="both"${a.dir_mode==='both'?' selected':''}>buy + sell</option>
           </select>
-          <label style="font-size:10px;color:var(--muted);cursor:pointer"><input type="checkbox"${a.hedge?' checked':''} onchange="setGoldFlag('TSMOM_HEDGE_PENDING', this.checked?'true':'false', 'TSMOM hedge → '+(this.checked?'ON':'OFF'))" style="vertical-align:middle"> hedge pending โซนตรงข้าม</label>
+          ${a.dir_key==='tsmom_d1' ? `<label style="font-size:10px;color:var(--muted);cursor:pointer"><input type="checkbox"${a.hedge?' checked':''} onchange="setGoldFlag('TSMOM_HEDGE_PENDING', this.checked?'true':'false', 'TSMOM hedge → '+(this.checked?'ON':'OFF'))" style="vertical-align:middle"> hedge pending โซนตรงข้าม</label>` : ''}
         </div>` : ''}
         ${a.note ? `<div style="font-size:9px;color:var(--muted);margin-top:3px">${a.note}</div>` : ''}
       </div>`;
@@ -5339,6 +5339,19 @@ async function setShadowSwitch(algo, symbol, state) {
     toast(`${algo}:${symbol} → ${state}`, 'ok');
     loadShadowMatrix(true);
   } catch (_e) { toast('เชื่อมต่อ /api/shadow-switch ไม่ได้', 'err'); }
+}
+
+// per-algo direction mode (long/short/both) → /api/algo-dir (data/algo_dir_mode.json, live-reload)
+async function setAlgoDir(algo, mode) {
+  try {
+    const r = await (await fetch('/api/algo-dir', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ algo, mode })
+    })).json();
+    if (!r.ok) { toast('ตั้งทิศไม่สำเร็จ: ' + (r.error || ''), 'err'); return; }
+    toast(`${algo} → ${mode}`, 'ok');
+    loadShadowMatrix(true);
+  } catch (_e) { toast('เชื่อมต่อ /api/algo-dir ไม่ได้', 'err'); }
 }
 
 async function refreshMasterToggle() {

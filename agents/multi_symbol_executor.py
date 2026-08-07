@@ -505,6 +505,12 @@ def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max
     vo = algo.evaluate(symbol, bars, point=point)
     if not vo or not vo.get("bar_ts"):
         return 0
+    try:                                                       # per-algo direction mode (long/short/both; default both = ไม่กรอง)
+        from agents import algo_dir as _adir
+        if not _adir.allowed(algo_id, vo.get("dir")):
+            return 0
+    except Exception:
+        pass
     if vo["bar_ts"] == combo_state.get("last_bar_ts"):
         return 0                                                # เข้าไม้บาร์นี้ **สำเร็จ**ไปแล้ว (dedup ต่อ signal-bar)
     if _signal_stale(vo["bar_ts"], algo):                       # cold-start: บาร์ปิดก่อน engine เริ่ม = stale
