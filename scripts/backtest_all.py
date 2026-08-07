@@ -146,6 +146,52 @@ def bt_macro(h, l, c, macro, cost, pt, brk=20, mlb=24, rr=2.0, sl_atr=1.5, mh=12
     return tr
 
 
+def _htf_slope_map(m15_time, htf_time, htf_close, ema_n=50):
+    e = np.zeros_like(htf_close); e[0] = htf_close[0]; k = 2 / (ema_n + 1)
+    for i in range(1, len(htf_close)):
+        e[i] = htf_close[i] * k + e[i - 1] * (1 - k)
+    slope = np.sign(e - np.concatenate([e[:3], e[:-3]]))
+    idx = np.clip(np.searchsorted(htf_time, m15_time, side="right") - 1, 0, len(slope) - 1)
+    return slope[idx]
+
+
+def bt_conf15m(mt5, sym, e_broker, cost, pt, brk=12, rr=2.0, sl_atr=1.0, vk=1.5, mh=48):
+    """confluence_15m ต่อคู่: 15m breakout + H1+H4+macro ตรง + volume surge. คืน list R."""
+    m = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M15, 0, 40000)
+    if m is None or len(m) < 3000:
+        return []
+    h = m["high"].astype(float); l = m["low"].astype(float); c = m["close"].astype(float)
+    tm = m["time"].astype(np.int64); vol = m["tick_volume"].astype(float)
+    h1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H1, 0, 20000)
+    h4 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H4, 0, 10000)
+    em = mt5.copy_rates_from_pos(e_broker, mt5.TIMEFRAME_M15, 0, 40000)
+    if h1 is None or h4 is None or em is None:
+        return []
+    h1t = _htf_slope_map(tm, h1["time"].astype(np.int64), h1["close"].astype(float))
+    h4t = _htf_slope_map(tm, h4["time"].astype(np.int64), h4["close"].astype(float))
+    emap = {int(t): float(x) for t, x in zip(em["time"], em["close"])}
+    mac = np.array([emap.get(int(t), np.nan) for t in tm], float)
+    atr = R.atr(h, l, c); n = len(c); tr = []; i = 210
+    volmed = np.zeros(n)
+    for kk in range(200, n):
+        volmed[kk] = np.median(vol[kk - 200:kk]) or 1
+    while i < n - 1:
+        av = float(atr[i]) if atr[i] == atr[i] else 0.0
+        if av <= 0 or volmed[i] <= 0 or vol[i] > 2.0 * volmed[i]:
+            i += 1; continue
+        px = float(c[i]); hh = float(h[i - brk:i].max()); ll = float(l[i - brk:i].min())
+        d = 1 if px > hh else -1 if px < ll else 0
+        if not d:
+            i += 1; continue
+        m_ = mac[i]; ml = mac[i - 24] if i - 24 >= 0 else np.nan
+        if (h1t[i] != d or h4t[i] != d or m_ != m_ or ml != ml
+                or (1 if m_ > ml else -1) != d or vol[i] < vk * volmed[i]):
+            i += 1; continue
+        r, ei = _resolve(h, l, c, i, d, px, sl_atr * av / pt, rr, pt, cost, mh)
+        tr.append(r); i = ei + 1
+    return tr
+
+
 def _verdict(s):
     if not s or s["n"] < MIN_N:
         return "-EV"
@@ -212,6 +258,12 @@ def main():
             if mac is not None:
                 note = "breakout + DXY confirm" + ("" if lg in ("XAUUSD", "XAGUSD", "XAUEUR") else " (DXY driver ไม่ตรงคู่นี้)")
                 rows.append(_row("macro_momentum", lg, "H4", _stats(bt_macro(h4, l4, c4, mac, cost, pt)), note))
+        # confluence_15m (ทุกคู่ — backtest ก่อนเปิด eligible; DXY driver ตรงเฉพาะ gold-complex)
+        try:
+            n15 = "15m confluence + volume surge" + ("" if lg in ("XAUUSD", "XAGUSD", "XAUEUR") else " (DXY ไม่ตรงคู่นี้)")
+            rows.append(_row("confluence_15m", lg, "M15", _stats(bt_conf15m(mt5, sym, bm.get("EURUSD", "EURUSD"), cost, pt)), n15))
+        except Exception:
+            pass
         print(f"  {lg}: done")
     # pairs (คง entry ที่ verify แล้ว — stat-arb เฉพาะ XAU~XAG)
     rows.append({"group": "+EV", "algo": "xau_xag_pairs", "pair": "XAU~XAG", "tf": "H1", "exp_R": 1.64,

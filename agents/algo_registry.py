@@ -311,7 +311,7 @@ class MacroMomAlgo(Algo):
     klass = "swing"
     timeframe = "H4"
     mgmt = "managed"                                   # BE + trailing (เหมือน momentum)
-    eligible_pairs = ["XAUUSD"]
+    eligible_pairs = UNIVERSE                          # ทุกคู่ (backtest แล้ว; +EV=XAU/BTC → LIVE, ที่เหลือ SHADOW)
     BRK = 20
     MLB = 24                                           # macro momentum lookback (บาร์ H4)
     SL_ATR = 1.5
@@ -381,19 +381,21 @@ class ConfluenceVol15m(Algo):
     klass = "scalp"
     timeframe = "M15"
     mgmt = "managed"
-    eligible_pairs = ["XAUUSD"]
+    eligible_pairs = UNIVERSE                          # ทุกคู่ (backtest แล้ว; +EV=XAU/BTC → LIVE, ที่เหลือ SHADOW)
     BRK = 12
     RR = 2.0
     SL_ATR = 1.0
     VK = 1.5                                            # volume surge (× median)
     MACRO = "EURUSD"
 
-    def _ctx_live(self, times_last):
-        """ทิศ H1/H4 (EMA50 slope, บาร์ปิดล่าสุด) + macro momentum + volume surge/median. คืน dict หรือ None."""
+    def _ctx_live(self, symbol):
+        """ทิศ H1/H4 (EMA50 slope) + macro(DXY) momentum + volume surge ของ **คู่ที่เทรด** (ไม่ hardcode ทอง).
+        macro = EURUSD (DXY-proxy) เสมอ. คืน dict หรือ None."""
         try:
             import MetaTrader5 as mt5
             from connectors.pair_collector import _broker_map
             bm = _broker_map() or {}
+            brk = bm.get(symbol, symbol); eb = bm.get(self.MACRO, self.MACRO)
 
             def _slope(sym_or_broker, tf):
                 r = mt5.copy_rates_from_pos(sym_or_broker, tf, 0, 120)
@@ -405,13 +407,12 @@ class ConfluenceVol15m(Algo):
                 for v in c:
                     e = v * k + e * (1 - k); es.append(e)
                 return 1 if es[-2] > es[-5] else -1 if es[-2] < es[-5] else 0
-            gb = bm.get("XAUUSD", "XAUUSD"); eb = bm.get(self.MACRO, self.MACRO)
-            h1 = _slope(gb, mt5.TIMEFRAME_H1); h4 = _slope(gb, mt5.TIMEFRAME_H4)
+            h1 = _slope(brk, mt5.TIMEFRAME_H1); h4 = _slope(brk, mt5.TIMEFRAME_H4)
             em = mt5.copy_rates_from_pos(eb, mt5.TIMEFRAME_M15, 0, 60)
             mac = 0
             if em is not None and len(em) >= 26:
                 ec = em["close"].astype(float); mac = 1 if ec[-2] > ec[-26] else -1
-            mv = mt5.copy_rates_from_pos(gb, mt5.TIMEFRAME_M15, 0, 260)
+            mv = mt5.copy_rates_from_pos(brk, mt5.TIMEFRAME_M15, 0, 260)
             vsurge = False
             if mv is not None and len(mv) >= 210:
                 tv = mv["tick_volume"].astype(float); med = float(np.median(tv[-201:-1])) or 1
@@ -433,7 +434,7 @@ class ConfluenceVol15m(Algo):
         d = "BUY" if px > hh else ("SELL" if px < ll else None)     # 15m breakout = จุดสำคัญ
         if d is None:
             return None
-        cx = ctx if (ctx and "h1" in ctx) else self._ctx_live(times[i])
+        cx = ctx if (ctx and "h1" in ctx) else self._ctx_live(symbol)
         if not cx:
             return None
         sign = 1 if d == "BUY" else -1
