@@ -334,7 +334,7 @@ def main():
     step(7, "Backtest per broker (Shadow Matrix / algo-selector)")
     if os.environ.get("SKIP_BACKTEST"):
         print(_WARN + "SKIP_BACKTEST set — ข้าม (รันเอง: python scripts/shadow_backtest_managed.py && "
-              "python scripts/tsmom_backtest_pairs.py)")
+              "python scripts/tsmom_backtest_pairs.py && python scripts/backtest_all.py)")
     else:
         connected = False
         try:
@@ -346,9 +346,10 @@ def main():
             connected = False
         if connected:
             print("     regen backtest ต่อโบรกนี้ (~2-3 นาที · read-only 0 order)…")
-            for scr in ("shadow_backtest_managed.py", "tsmom_backtest_pairs.py"):
+            for scr in ("shadow_backtest_managed.py", "tsmom_backtest_pairs.py", "backtest_all.py"):
                 rc = subprocess.call([sys.executable, os.path.join("scripts", scr)])
                 print((_OK if rc == 0 else _WARN) + f"{scr} " + ("เสร็จ" if rc == 0 else f"exit {rc}"))
+            # backtest_all.py → data/backtest_results.json = matrix ทุก algo×คู่ (+EV/−EV) ที่ dashboard tab Analytics อ่าน
             # SMC candidate backtest — ทุกคู่ผ่าน MT5 (matrix_backtest ต่อ (algo,symbol) → Shadow Matrix)
             rc = subprocess.call([sys.executable, os.path.join("scripts", "smc_backtest.py"), "--all"])
             print((_OK if rc == 0 else _WARN) + "smc_backtest.py --all " +
@@ -360,7 +361,7 @@ def main():
                   ("→ data/smc_backtest.json" if rc == 0 else f"exit {rc}"))
             print(_WARN + "MT5 ยังไม่ต่อ — backtest คู่อื่น (Shadow Matrix) ใช้ของ owner ไปก่อน. ภายหลัง: "
                   "python scripts/shadow_backtest_managed.py && python scripts/tsmom_backtest_pairs.py && "
-                  "python scripts/smc_backtest.py --all")
+                  "python scripts/smc_backtest.py --all && python scripts/backtest_all.py")
 
     # summary + next steps
     print("\n" + "=" * 60)
