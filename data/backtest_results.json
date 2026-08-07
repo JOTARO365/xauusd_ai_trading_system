@@ -86,12 +86,12 @@
       "pair": "XAUUSD",
       "tf": "M15",
       "live": "SHADOW",
-      "note": "15m confluence + volume surge",
-      "exp_R": 0.1453,
-      "t": 1.67,
-      "oos": 0.0373,
-      "wr": 39.7,
-      "n": 287
+      "note": "15m breakout+H1/H4/macro+volume, NY session 13-21 (ตัด Asian chop) → exp_R 1.7× vs all-hours. scripts/gold_scalp_session.py",
+      "exp_R": 0.135,
+      "t": 1.53,
+      "oos": 0.149,
+      "wr": 40.3,
+      "n": 273
     },
     {
       "group": "-EV",

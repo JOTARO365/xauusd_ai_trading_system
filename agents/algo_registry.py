@@ -427,6 +427,20 @@ class ConfluenceVol15m(Algo):
         if n < max(self.BRK, 50) + 5 or not point:
             return None
         i = n - 2
+        # session filter (gold-only): เทรดเฉพาะ NY/London (ทองวิ่ง) ตัด Asian chop → exp_R ~1.7× + OOS ดีขึ้น (backtest 08-07).
+        # BTC/crypto = 24/7 ไม่กรอง. config CONF15M_SESSION="13-21" (UTC); ว่าง=ทุกชม.
+        if symbol and symbol.upper().startswith("XAU"):
+            import config as _cfg
+            sess = str(getattr(_cfg, "CONF15M_SESSION", "13-21") or "").strip()
+            if sess and "-" in sess:
+                try:
+                    lo_h, hi_h = (int(x) for x in sess.split("-"))
+                    from datetime import datetime, timezone
+                    hr = datetime.fromtimestamp(int(times[i]), timezone.utc).hour
+                    if not (lo_h <= hr < hi_h):
+                        return None
+                except Exception:
+                    pass
         atr = R.atr(high, low, close); av = float(atr[i]) if atr[i] == atr[i] else 0.0
         if av <= 0:
             return None
