@@ -79,6 +79,52 @@ def _potential():
     return "ยังไม่เข้า order | " + " | ".join(parts) if len(parts) > 1 else ""
 
 
+def snapshot():
+    """โอกาสเข้า order ต่อ algo (structured, สำหรับ dashboard). gold: regime_momentum + tsmom_d1.
+    คืน {ok, price, algos:[{algo,name,buy,sell,regime,tsmom_vote,flip,dir_mode}]}. read-only, 0 token."""
+    out = {"ok": False, "algos": []}
+    try:
+        import os, sys
+        import numpy as np
+        import MetaTrader5 as mt5
+        import config as _cfg
+        from agents import algo_dir as _adir
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
+        import regime_lib as R
+        S = _cfg.SYMBOL
+        tk = mt5.symbol_info_tick(S)
+        if not tk:
+            return out
+        px = tk.bid
+        out["ok"] = True; out["price"] = round(px, 2)
+        # regime_momentum
+        try:
+            h = mt5.copy_rates_from_pos(S, mt5.TIMEFRAME_H1, 0, 400)
+            hi, lo, cl = h["high"].astype(float), h["low"].astype(float), h["close"].astype(float)
+            i = len(cl) - 2
+            reg = R.detect_regime(R.efficiency_ratio(cl)[i], R.adx(hi, lo, cl)[i], R.vol_percentile(cl)[i])
+            lv = R.momentum_levels(i, hi, lo, cl, R.atr(hi, lo, cl))
+            out["algos"].append({"algo": "regime_momentum", "name": "Momentum Breakout",
+                                 "buy": round(lv["buy_level"], 2), "sell": round(lv["sell_level"], 2),
+                                 "regime": reg, "armed": reg == "TREND", "dir_mode": _adir.mode_of("regime_momentum")})
+        except Exception:
+            pass
+        # tsmom_d1
+        try:
+            d = mt5.copy_rates_from_pos(S, mt5.TIMEFRAME_D1, 0, 300); dc = d["close"].astype(float); j = len(dc) - 2
+            vs = {L: int(np.sign(dc[j] - dc[j - L])) for L in (63, 126, 252)}
+            s = sum(vs.values()); vote = "BUY" if s > 0 else "SELL" if s < 0 else "FLAT"
+            ups = [dc[j - L] for L in (63, 126, 252) if dc[j] < dc[j - L]]
+            out["algos"].append({"algo": "tsmom_d1", "name": "TSMOM-D1", "regime": "D1",
+                                 "tsmom_vote": vote, "flip_buy": round(min(ups), 0) if ups else None,
+                                 "dir_mode": _adir.mode_of("tsmom_d1")})
+        except Exception:
+            pass
+    except Exception:
+        pass
+    return out
+
+
 def tick():
     """เรียกทุก cycle. log potential entry เมื่อยังไม่มีไม้ ALGO + พ้น throttle. fail-soft."""
     try:

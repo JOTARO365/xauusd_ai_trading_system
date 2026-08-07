@@ -1437,6 +1437,18 @@ def api_shadow_orders():
     return jsonify(_cached(f"shadow-orders:{algo}:{symbol}", _c, ttl=30))
 
 
+@app.route("/api/algo-potential")
+def api_algo_potential():
+    """โอกาสเข้า order ต่อ algo (buy/sell + จุดเข้า + regime) — คำนวณสดจาก algo. display-only, 0 token."""
+    def _c():
+        if not (_MT5_AVAILABLE and _ensure_mt5()):
+            return {"ok": False, "algos": []}
+        with _MT5_LOCK:
+            from agents.algo_watch import snapshot
+            return snapshot()
+    return jsonify(_cached("algo-potential", _c, ttl=15))
+
+
 @app.route("/api/algo-dir", methods=["POST"])
 def api_algo_dir():
     """ตั้ง direction mode ต่อ algo (long/short/both) → data/algo_dir_mode.json. live-reload. 0 token."""
