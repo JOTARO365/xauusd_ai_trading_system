@@ -5198,9 +5198,10 @@ function _algoDetailCard(a) {
   const rC = _smRC, fx = _smFx;
   const pl = a.sum_R || 0, col = rC(a.exp_R), accent = a.live ? 'var(--green)' : col;
   const nm = a.name || a.algo_id;
+  const _lsyms = (a.live_syms || []);
   const badge = a.live
-    ? `<span style="background:var(--green);color:#0e1117;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap">🟢 LIVE${a.live_symbol ? ' ' + a.live_symbol : ''}</span>`
-    : (a.algo_id === 'mean_reversion' ? `<span style="background:#555;color:#ddd;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">CUT</span>` : '');
+    ? `<span title="${_lsyms.join(', ') || a.live_symbol || ''}" style="background:var(--green);color:#0e1117;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap">🟢 LIVE${_lsyms.length ? ' ('+_lsyms.length+' คู่)' : (a.live_symbol ? ' '+a.live_symbol : '')}</span>`
+    : (a.algo_id === 'mean_reversion' ? `<span style="background:#555;color:#ddd;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">CUT · shadow</span>` : '<span style="background:#3a3a3a;color:#aaa;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">SHADOW</span>');
   const metric = a.headline
     ? `<div style="font-family:var(--mono);font-size:14px;font-weight:700">${a.headline}</div>`
     : `<div><span style="font-family:var(--mono);font-size:19px;font-weight:700;color:${col}">${fx(pl,1)}R</span>
@@ -5254,7 +5255,7 @@ function renderSmPotential() {
         style="cursor:pointer;flex:1 1 200px;min-width:200px;max-width:300px;border:1px solid ${sel?'var(--gold)':'var(--border)'};border-radius:8px;padding:8px 11px;background:var(--surface)">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
         <span style="font-weight:700;font-size:12px">${a.name || a.algo_id}</span>
-        ${a.live ? '<span style="color:var(--green);font-size:9px;font-weight:700">🟢LIVE</span>' : ''}
+        ${a.live ? `<span title="${(a.live_syms||[]).join(', ')}" style="color:var(--green);font-size:9px;font-weight:700">🟢LIVE${(a.live_syms||[]).length?' '+a.live_syms.length:''}</span>` : '<span style="color:var(--muted);font-size:9px">shadow</span>'}
       </div>
       <div style="font-family:var(--mono);font-size:11px;margin-top:3px">${entry}</div>
       ${noteTxt}

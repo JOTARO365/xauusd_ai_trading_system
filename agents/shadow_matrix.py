@@ -249,6 +249,10 @@ def build():
                     a["best"] = [r["symbol"], expR]
                 if a["worst"] is None or expR < a["worst"][1]:
                     a["worst"] = [r["symbol"], expR]
+    live_syms = {}                                       # LIVE combos จริงต่อ algo (engine + MSE toggle) จาก rows
+    for r in rows:
+        if r.get("live") or str(r.get("exec_mode", "")).startswith("LIVE"):
+            live_syms.setdefault(r["algo_id"], []).append(r["symbol"])
     for a in by_algo.values():
         a["sum_R"] = round(a["sum_R"], 1)
         a["exp_R"] = round(a["sum_R"] / a["n"], 3) if a["n"] else None
@@ -257,7 +261,8 @@ def build():
         a["name"] = m.get("name", a["algo_id"])
         a["note"] = m.get("note")
         a["live_symbol"] = m.get("live_symbol")
-        a["live"] = bool(m.get("live_symbol"))          # momentum = live บน XAUUSD (engine แยก)
+        a["live_syms"] = live_syms.get(a["algo_id"], [])   # คู่ที่รันจริง (LIVE)
+        a["live"] = bool(a["live_syms"]) or bool(m.get("live_symbol"))   # live = มี combo LIVE จริง (ไม่ใช่แค่ gold meta)
         try:                                            # per-algo direction mode (dropdown ใน dashboard)
             from agents import algo_dir as _adir
             a["dir_key"] = a["algo_id"]
