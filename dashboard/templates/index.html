@@ -3337,6 +3337,27 @@ function _woLoading() {
     </div>
   </div>`;
 }
+// styling บทวิเคราะห์: section "แนะนำเปิด Algo" — algo name ใหญ่ขึ้น + สีตามทิศ (buy=เขียว sell=แดง both=ทอง พัก=เทา)
+function _styleAlgoRec(html) {
+  // _mdToHtml → ## = <div ...color:var(--gold)...>, bullet = <div style="padding-left:14px">•..., bold = <b>
+  const m = html.match(/(แนะนำเปิด Algo[\s\S]*?)(<div style="font-weight:700;color:var\(--gold\)|$)/);
+  if (!m) return html;
+  const styled = m[1].replace(/<div style="padding-left:14px">•([\s\S]*?)<\/div>/g, (full, inner) => {
+    const head = ((inner.match(/<b>([\s\S]*?)<\/b>/) || [])[1] || '').toLowerCase();
+    const body = inner.toLowerCase();
+    let col;
+    if (/พัก|stand.?down|\bcut\b|งด/.test(body)) col = 'var(--muted)';
+    else if (/long|buy|ซื้อ/.test(head)) col = 'var(--green)';
+    else if (/short|sell|ขาย/.test(head)) col = 'var(--red)';
+    else if (/both|สองทาง/.test(body)) col = 'var(--gold)';
+    else if (/ซื้อ/.test(body) && !/ขาย/.test(body)) col = 'var(--green)';
+    else if (/ขาย/.test(body) && !/ซื้อ/.test(body)) col = 'var(--red)';
+    else col = 'var(--gold)';
+    const big = inner.replace(/<b>([\s\S]*?)<\/b>/, `<b style="font-size:1.35em;color:${col}">$1</b>`);
+    return `<div style="padding-left:14px;margin:6px 0;color:${col};font-size:1.05em">•${big}</div>`;
+  });
+  return html.replace(m[1], styled);
+}
 let _woPoll = null;
 async function loadWeeklyOutlook() {
   const body = document.getElementById('wo-body'); if (!body) return;
@@ -3347,7 +3368,7 @@ async function loadWeeklyOutlook() {
       body.innerHTML = _woLoading();
       if (!_woPoll) _woPoll = setInterval(loadWeeklyOutlook, 8000);
     } else if (d.markdown) {                          // เสร็จ → บทวิเคราะห์
-      body.innerHTML = _mdToHtml(d.markdown);
+      body.innerHTML = _styleAlgoRec(_mdToHtml(d.markdown));
       const meta = document.getElementById('wo-meta');
       if (meta) meta.textContent = `${d.stale ? '⚠ อาจเก่า · ' : ''}สร้าง ${d.generated || ''} · ${d.model || ''} · ${d.n_events || 0} events`
         + (d.tokens_in ? ` · token in ${d.tokens_in}/out ${d.tokens_out}` : '');
