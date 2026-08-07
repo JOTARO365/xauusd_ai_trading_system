@@ -309,7 +309,7 @@ ALGO_MAX_TRADE_RISK_PCT = float(os.getenv("ALGO_MAX_TRADE_RISK_PCT") or 0.02)   
 TSMOM_LIVE       = os.getenv("TSMOM_LIVE", "false").lower() == "true"
 TSMOM_SHADOW     = os.getenv("TSMOM_SHADOW", "false").lower() == "true"      # log target เฉยๆ ไม่วาง order
 TSMOM_COEXIST    = os.getenv("TSMOM_COEXIST", "false").lower() == "true"     # true → intraday engine ทำงานคู่ TSMOM (ไม่ hand-off) = เข้า BUY+SELL ทั้ง 2 ทาง; cap ด้วย ALGO_MAX_STACK
-TSMOM_LONG_ONLY  = os.getenv("TSMOM_LONG_ONLY", "false").lower() == "true"   # เข้าเฉพาะ BUY (segment: ขา SELL −EV, LONG-only เพิ่มกำไรรวม)
+TSMOM_LONG_ONLY  = os.getenv("TSMOM_LONG_ONLY", "true").lower() == "true"    # default BUY-only (D1 ขึ้น=BUY, ลง=FLAT); backtest: ขา SELL −EV. =false → symmetric
 TSMOM_MIN_ADX    = float(os.getenv("TSMOM_MIN_ADX") or 0)                    # เข้าเฉพาะ ADX(D1) ≥ นี้ (0 = off; overfit-risk n น้อย)
 TSMOM_MIN_VOLPCT = float(os.getenv("TSMOM_MIN_VOLPCT") or 0)                 # เข้าเฉพาะ vol_percentile(D1) ≥ นี้ (0 = off)
 TSMOM_LOOKBACKS  = os.getenv("TSMOM_LOOKBACKS", "63,126,252")                # ensemble lookback (วัน D1)
@@ -485,7 +485,7 @@ def reload_config():
     TSMOM_LIVE               = os.getenv("TSMOM_LIVE", "false").lower() == "true"            # TSMOM directional engine
     TSMOM_SHADOW             = os.getenv("TSMOM_SHADOW", "false").lower() == "true"
     TSMOM_COEXIST            = os.getenv("TSMOM_COEXIST", "false").lower() == "true"         # intraday engine ทำงานคู่ TSMOM
-    TSMOM_LONG_ONLY          = os.getenv("TSMOM_LONG_ONLY", "false").lower() == "true"       # เข้าเฉพาะ BUY
+    TSMOM_LONG_ONLY          = os.getenv("TSMOM_LONG_ONLY", "true").lower() == "true"        # default BUY-only (ขา SELL −EV)
     TSMOM_MIN_ADX            = float(os.getenv("TSMOM_MIN_ADX") or 0)                        # เข้าเฉพาะ ADX(D1) ≥ นี้
     TSMOM_MIN_VOLPCT         = float(os.getenv("TSMOM_MIN_VOLPCT") or 0)                     # เข้าเฉพาะ vol% ≥ นี้
     TSMOM_LOOKBACKS          = os.getenv("TSMOM_LOOKBACKS", "63,126,252")
