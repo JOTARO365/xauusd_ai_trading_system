@@ -62,10 +62,18 @@ def _load_backtest():
     Also merges SMC candidate in-sample backtest (data/smc_backtest.json) for the shadow
     algos regime_momentum_fvg / sweep_reversal (XAU only) so their matrix row shows a ref exp_R."""
     out = {}
+    try:                                                    # base: matrix ครบทุก algo×คู่ (scripts/backtest_all.py) — ให้ทุก algo (รวม macro_momentum) โชว์ ref exp_R
+        bt = json.load(open(os.path.join(_BASE, "data", "backtest_results.json"), encoding="utf-8"))
+        for r in (bt.get("results") or []):
+            if r.get("n") and r.get("algo") and r.get("pair") and "~" not in r["pair"]:
+                out[(r["algo"], r["pair"])] = {"exp_R": r.get("exp_R"), "n": r.get("n"),
+                                               "wr": r.get("wr"), "managed": False}
+    except Exception:
+        pass
     try:
         rows = json.load(open(_BACKTEST, encoding="utf-8"))
-        out = {(r.get("algo_id", "regime_momentum"), r["logical"]): r
-               for r in rows if r.get("ok") and r.get("n")}
+        out.update({(r.get("algo_id", "regime_momentum"), r["logical"]): r
+                    for r in rows if r.get("ok") and r.get("n")})
     except Exception:
         pass
     try:
