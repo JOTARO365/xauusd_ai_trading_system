@@ -52,8 +52,7 @@ def _close_pos(mt5, pos):
 def tick():
     """เรียกทุก cycle. ปิดทุกไม้ระบบเมื่อ equity ≥ baseline×(1+PCT/100). fail-soft."""
     try:
-        if not _cfg("FORCE_CLOSE_PROFIT", False):
-            return None
+        # force-close = บังคับเปิดถาวร (ปิดใน config ไม่ได้ — user 08-08). gate เดียว = capital
         import MetaTrader5 as mt5
         from connectors.mt5_connector import SYSTEM_MAGIC
         a = mt5.account_info()
@@ -103,11 +102,11 @@ def snapshot():
         eq = float(a.equity) if a else 0
         prog = ((eq - base) / (target - base) * 100) if target > base else 0
         min_cap = float(_cfg("FORCE_CLOSE_MIN_CAPITAL", 10000))
-        active = bool(_cfg("FORCE_CLOSE_PROFIT", False)) and eq < min_cap
-        return {"ok": True, "enable": bool(_cfg("FORCE_CLOSE_PROFIT", False)), "min_cap": min_cap,
+        active = eq < min_cap                                 # บังคับเปิดถาวร — gate เดียว = capital
+        return {"ok": True, "enable": True, "min_cap": min_cap,
                 "active": active, "baseline": round(base, 2), "equity": round(eq, 2),
                 "target": round(target, 2), "progress_pct": round(prog, 1),
-                "reason": "lock +100% (ทุน < เกณฑ์ โตไป 10k)" if active else "ปล่อยวิ่ง (ทุน ≥ เกณฑ์ หรือ mode off)",
+                "reason": "lock +100% (ทุน < เกณฑ์ โตไป 10k)" if active else "ปล่อยวิ่ง (ทุน ≥ เกณฑ์)",
                 "last_trigger": st.get("last_trigger")}
     except Exception:
         return {"ok": False}

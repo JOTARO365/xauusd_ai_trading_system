@@ -208,7 +208,7 @@ _CONFIG_SPEC: dict[str, str] = {
     "PAIRS_LIVE": "false", "PAIRS_SYMBOLS": "XAUUSD:XAGUSD", "PAIRS_WIN": "120",
     "PAIRS_Z_IN": "2.0", "PAIRS_Z_OUT": "0.5", "PAIRS_Z_STOP": "3.5", "PAIRS_DISASTER_ATR": "6.0",
     # ── profit-target force-close (lock กำไร X% ของ balance) ──
-    "FORCE_CLOSE_PROFIT": "true", "FORCE_CLOSE_PROFIT_PCT": "100", "FORCE_CLOSE_MIN_CAPITAL": "10000",
+    "FORCE_CLOSE_PROFIT_PCT": "100", "FORCE_CLOSE_MIN_CAPITAL": "10000",
     # ── event-engine (NFP/CPI/FOMC) ──
     "EVENT_ENGINE_LIVE": "false", "EVENT_PRE_MIN": "30", "EVENT_POST_MIN": "120",
     # ── loss-adaptive + LLM algo-router ──
@@ -1898,7 +1898,7 @@ def api_mode_advice():
         rows = [("ALGO_SIZE_STANDDOWN", "true", "false", "safe กันเกินเพดาน(ข้ามไม้) · growth เข้าทุกไม้ให้พอร์ตโต"),
                 ("MOM_LET_RUN", "false", "true", "safe BE กันหมดพอร์ต · growth ปล่อยถึง TP (+EV เต็ม)"),
                 ("RISK_PER_TRADE", "0.5", "3.0", "safe เสี่ยงต่ำ · growth อัด 3% ต่อไม้ (compound เร็ว)"),
-                ("FORCE_CLOSE_PROFIT", "true", "true", "lock กำไร double เพื่อ compound ปลอดภัย"),
+                ("FORCE_CLOSE_MIN_CAPITAL", "10000", "10000", "force-close บังคับเปิดถาวร · lock ทุก double จนทุนถึงค่านี้"),
                 ("NNLB_MODE", "false", "optional", "growth: NNLB = โหมดโตสุด (⚠️ เสี่ยงล้างพอร์ต)"),
                 ("PAIRS_LIVE", "false", "false", "margin 2 legs ไม่พอทั้งคู่")]
     elif eq < 3000:
@@ -1908,7 +1908,7 @@ def api_mode_advice():
                 ("MOM_LET_RUN", "false", "true", "safe BE · growth ปล่อยถึง TP (+119% path)"),
                 ("RISK_PER_TRADE", "0.5", "2.0", "growth อัด 2% ต่อไม้"),
                 ("EVENT_ENGINE_LIVE", "true", "true", "กัน whipsaw ข่าว (ทั้งคู่)"),
-                ("FORCE_CLOSE_PROFIT", "true", "false", "safe lock · growth ปล่อยวิ่ง"),
+                ("FORCE_CLOSE_MIN_CAPITAL", "10000", "10000", "บังคับเปิด · lock double จนทุนถึงค่านี้ (ทุน ≥ = ปล่อยวิ่งเอง)"),
                 ("NNLB_MODE", "false", "optional", "growth: NNLB เร่งโต (⚠️ เสี่ยง)")]
     elif eq < 10000:
         tier = "เล็ก (3k–10k)"
@@ -1918,7 +1918,7 @@ def api_mode_advice():
                 ("RISK_PER_TRADE", "0.5", "1.5", "growth อัด 1.5%"),
                 ("EVENT_ENGINE_LIVE", "true", "true", "กันข่าว"),
                 ("PAIRS_LIVE", "false", "optional", "growth เริ่มเปิดได้ถ้า margin พอ"),
-                ("FORCE_CLOSE_PROFIT", "optional", "false", "growth ปล่อยวิ่ง compound")]
+                ("FORCE_CLOSE_MIN_CAPITAL", "10000", "10000", "บังคับเปิด · ทุน ≥ 10k = ปล่อยวิ่งเอง (tier นี้ใกล้เกณฑ์)")]
     elif eq < 30000:
         tier = "เล็ก-กลาง (10k–30k)"
         note = "safe=+EV เต็ม · growth=เพิ่ม pairs + risk เร่ง compound"
