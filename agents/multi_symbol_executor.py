@@ -289,9 +289,14 @@ def _send_sltp(broker, ticket, new_sl, tp, digits):
 
 
 # ── management: R/ATR-relative BE + trailing (symbol-agnostic) ─────────────
-def _manage(broker, positions, bars, point, digits, combo_state):
+# momentum/breakout algo = ต้องปล่อยวิ่งถึง TP (RR2). trailing แน่นตัดกำไร (replay: +119%→+12%) → trail หลวม (ช้า+กว้าง)
+_MOM_ALGOS = {"macro_momentum", "confluence_15m", "regime_momentum", "regime_momentum_fvg"}
+
+
+def _manage(broker, positions, bars, point, digits, combo_state, algo_id=None):
     """ต่อ position ที่เราถือ → คำนวณ SL เป้าหมาย (BE→trailing, improve-only) แล้ว push ผ่าน SLTP.
-    R (=sl_dist) จำจาก state ต่อ ticket (คงที่แม้ย้าย SL ไป BE แล้ว). fail-soft ต่อ position."""
+    R (=sl_dist) จำจาก state ต่อ ticket (คงที่แม้ย้าย SL ไป BE แล้ว). fail-soft ต่อ position.
+    momentum algo → trailing หลวม (TRAILING_MOM_*) ปล่อยวิ่งถึง TP; fade algo → trailing ปกติ."""
     if not positions:
         return 0
     import MetaTrader5 as mt5
@@ -301,8 +306,9 @@ def _manage(broker, positions, bars, point, digits, combo_state):
     be_trig_r = _cfgf("BE_TRIGGER_R", 0.8)
     be_buf = _cfgf("BE_BUFFER_PIPS", 200) * point
     tr_on = bool(getattr(_cfg, "TRAILING_STOP", False))
-    tr_min_r = _cfgf("TRAILING_MIN_PROFIT_R", 1.5)
-    tr_mult = _cfgf("TRAILING_ATR_MULT", 0.8)
+    _mom = algo_id in _MOM_ALGOS
+    tr_min_r = _cfgf("TRAILING_MOM_MIN_R", 1.9) if _mom else _cfgf("TRAILING_MIN_PROFIT_R", 1.5)
+    tr_mult = _cfgf("TRAILING_MOM_MULT", 3.0) if _mom else _cfgf("TRAILING_ATR_MULT", 0.8)
     tr_look = int(_cfgf("TRAILING_LOOKBACK", 6))
     tickets = combo_state.setdefault("tickets", {})
     moved = 0
@@ -664,7 +670,7 @@ def tick(force=False):
             if mgmt == "tsmom_flip":
                 managed += _manage_tsmom(algo_id, symbol, broker, positions, bars, point, digits, cstate, _ctx)
             else:
-                managed += _manage(broker, positions, bars, point, digits, cstate)
+                managed += _manage(broker, positions, bars, point, digits, cstate, algo_id)
             room_total = (max_total <= 0) or (total_open + opened < max_total)   # global cap ยังมีที่ว่าง
             active_pos = sum(1 for p in positions if not _position_protected(p, point))   # ไม้ protected (trailing เลย BE) ไม่กิน slot → เติมไม้สดได้
             if active_pos < max_pos and room_total:             # ผ่านทั้ง per-combo (ไม่นับ protected) + รวมทุก symbol
