@@ -1861,54 +1861,61 @@ def api_mode_advice():
         ccy = a.currency if a else "?"
     except Exception:
         eq = 0.0; ccy = "?"
+    # 2 profile ต่อ tier: safe (รักษาทุน) · growth (โตเร็ว รับเสี่ยง). tuple (key, safe, growth, why)
     if eq < 1500:
         tier = "จิ๋วมาก (< 1,500) ⚠️"
-        note = "ทุนน้อยเกิน — min-lot risk มหาศาล. เทรดจริง = ข้ามเกือบทุกไม้ (protective). แนะนำเติมทุน หรือ demo เท่านั้น"
-        adv = [("ALGO_SIZE_STANDDOWN", "true", "guard จะข้ามเกือบทุกไม้ (min-lot เสี่ยงเกินเพดาน) = รักษาเงินต้น"),
-               ("FORCE_CLOSE_PROFIT", "true", "lock กำไรทันที (ทุนน้อยมาก)"),
-               ("MOM_LET_RUN", "false", "no-BE = 1 ไม้แพ้กินพอร์ต; เปิด BE"),
-               ("NNLB_MODE", "false", "ห้าม (เสี่ยงล้างพอร์ต)"),
-               ("PAIRS_LIVE", "false", "margin ไม่พอ"), ("ALGO_ROUTER_ENABLE", "false", "ยังไม่ต้อง")]
+        note = "ทุนน้อยมาก. safe=แทบไม่เทรด(โตยาก) · growth=อัดเต็มเพื่อโต แต่เสี่ยงล้างพอร์ตสูง (เหมาะ demo/ยอมเสี่ยง)"
+        rows = [("ALGO_SIZE_STANDDOWN", "true", "false", "safe กันเกินเพดาน(ข้ามไม้) · growth เข้าทุกไม้ให้พอร์ตโต"),
+                ("MOM_LET_RUN", "false", "true", "safe BE กันหมดพอร์ต · growth ปล่อยถึง TP (+EV เต็ม)"),
+                ("RISK_PER_TRADE", "0.5", "3.0", "safe เสี่ยงต่ำ · growth อัด 3% ต่อไม้ (compound เร็ว)"),
+                ("FORCE_CLOSE_PROFIT", "true", "true", "lock กำไร double เพื่อ compound ปลอดภัย"),
+                ("NNLB_MODE", "false", "optional", "growth: NNLB = โหมดโตสุด (⚠️ เสี่ยงล้างพอร์ต)"),
+                ("PAIRS_LIVE", "false", "false", "margin 2 legs ไม่พอทั้งคู่")]
     elif eq < 3000:
         tier = "จิ๋ว (1,500–3,000)"
-        note = "เริ่มเทรดได้บางไม้ (min-lot ผ่านเพดานบางกรณี). เน้นรักษาทุน"
-        adv = [("ALGO_SIZE_STANDDOWN", "true", "กัน over-risk (เข้าเฉพาะไม้ risk ≤ เพดาน)"),
-               ("FORCE_CLOSE_PROFIT", "true", "lock กำไรเร็ว รักษาเงินต้น"),
-               ("MOM_LET_RUN", "false", "เปิด BE กันหมดพอร์ต (no-BE swing แรงไป)"),
-               ("EVENT_ENGINE_LIVE", "true", "กัน whipsaw ข่าว"),
-               ("NNLB_MODE", "false", "เสี่ยงสูงเกิน"), ("PAIRS_LIVE", "false", "margin 2 legs ไม่พอ")]
+        note = "safe=รักษาทุน โตช้า · growth=เข้าทุกไม้ ปล่อยวิ่ง โตเร็วขึ้น (รับ DD สูง)"
+        rows = [("ALGO_SIZE_STANDDOWN", "true", "false", "safe กัน over-risk · growth เข้าทุกไม้ (พอร์ตถึงจะโต)"),
+                ("MOM_LET_RUN", "false", "true", "safe BE · growth ปล่อยถึง TP (+119% path)"),
+                ("RISK_PER_TRADE", "0.5", "2.0", "growth อัด 2% ต่อไม้"),
+                ("EVENT_ENGINE_LIVE", "true", "true", "กัน whipsaw ข่าว (ทั้งคู่)"),
+                ("FORCE_CLOSE_PROFIT", "true", "false", "safe lock · growth ปล่อยวิ่ง"),
+                ("NNLB_MODE", "false", "optional", "growth: NNLB เร่งโต (⚠️ เสี่ยง)")]
     elif eq < 10000:
         tier = "เล็ก (3k–10k)"
-        note = "เทรด +EV core ได้. ยังต้อง guard บัญชีเล็ก"
-        adv = [("ALGO_SIZE_STANDDOWN", "true", "แนะนำเปิด (บัญชีเล็ก)"),
-               ("MOM_LET_RUN", "true", "ปล่อย momentum ถึง TP (+EV)"),
-               ("EVENT_ENGINE_LIVE", "true", "กันข่าว"),
-               ("FORCE_CLOSE_PROFIT", "optional", "lock ถ้าต้องการ"),
-               ("PAIRS_LIVE", "false", "รอทุนโต")]
+        note = "safe=+EV core + guard · growth=ปิด guard เพิ่ม risk เร่งโต"
+        rows = [("MOM_LET_RUN", "true", "true", "ปล่อยถึง TP (+EV) ทั้งคู่"),
+                ("ALGO_SIZE_STANDDOWN", "true", "false", "safe guard · growth ปิด(เข้าทุกไม้)"),
+                ("RISK_PER_TRADE", "0.5", "1.5", "growth อัด 1.5%"),
+                ("EVENT_ENGINE_LIVE", "true", "true", "กันข่าว"),
+                ("PAIRS_LIVE", "false", "optional", "growth เริ่มเปิดได้ถ้า margin พอ"),
+                ("FORCE_CLOSE_PROFIT", "optional", "false", "growth ปล่อยวิ่ง compound")]
     elif eq < 30000:
         tier = "เล็ก-กลาง (10k–30k)"
-        note = "roster +EV เต็ม เริ่มปิด guard ได้"
-        adv = [("MOM_LET_RUN", "true", "+EV ถึง TP"),
-               ("EVENT_ENGINE_LIVE", "true", "กันข่าว"),
-               ("ALGO_SIZE_STANDDOWN", "optional", "ปิดได้ถ้ารับ DD (risk% เริ่มพอเหมาะ)"),
-               ("PAIRS_LIVE", "optional", "เริ่มเปิดได้ (margin เริ่มพอ)"),
-               ("FORCE_CLOSE_PROFIT", "false", "ปล่อยกำไรวิ่ง")]
+        note = "safe=+EV เต็ม · growth=เพิ่ม pairs + risk เร่ง compound"
+        rows = [("MOM_LET_RUN", "true", "true", "+EV ถึง TP"),
+                ("EVENT_ENGINE_LIVE", "true", "true", "กันข่าว"),
+                ("ALGO_SIZE_STANDDOWN", "true", "false", "growth ปิด guard"),
+                ("PAIRS_LIVE", "false", "true", "growth เปิด diversifier"),
+                ("RISK_PER_TRADE", "0.5", "1.5", "growth อัดขึ้น"),
+                ("ALGO_ROUTER_ENABLE", "false", "true", "growth เปิด LLM router")]
     elif eq < 100000:
         tier = "กลาง (30k–100k)"
-        note = "roster +EV เต็ม + diversifier"
-        adv = [("MOM_LET_RUN", "true", "+EV"), ("EVENT_ENGINE_LIVE", "true", "กันข่าว"),
-               ("PAIRS_LIVE", "true", "diversifier market-neutral (margin พอ)"),
-               ("ALGO_ROUTER_ENABLE", "true", "LLM router (ต้องมี credit)"),
-               ("ALGO_SIZE_STANDDOWN", "false", "ทุนพอ"), ("FORCE_CLOSE_PROFIT", "false", "ปล่อยวิ่ง")]
+        note = "safe=roster +EV + diversifier · growth=router + loss-adaptive + risk สูง"
+        rows = [("MOM_LET_RUN", "true", "true", "+EV"), ("EVENT_ENGINE_LIVE", "true", "true", "กันข่าว"),
+                ("PAIRS_LIVE", "true", "true", "diversifier"),
+                ("ALGO_ROUTER_ENABLE", "false", "true", "growth: LLM router สลับ algo (ต้องมี credit)"),
+                ("LOSS_ADAPTIVE_LIVE", "false", "true", "growth: auto ปรับ dir/pause"),
+                ("RISK_PER_TRADE", "0.5", "2.0", "growth อัด 2%")]
     else:
         tier = "ใหญ่ (> 100k)"
-        note = "full roster + router + scale risk ได้"
-        adv = [("MOM_LET_RUN", "true", "+EV"), ("EVENT_ENGINE_LIVE", "true", "กันข่าว"),
-               ("PAIRS_LIVE", "true", "diversifier"), ("ALGO_ROUTER_ENABLE", "true", "LLM router"),
-               ("LOSS_ADAPTIVE_LIVE", "true", "ปรับ dir/pause อัตโนมัติ"),
-               ("ALGO_SIZE_STANDDOWN", "false", "ทุนพอ · พิจารณาเพิ่ม RISK_PER_TRADE")]
+        note = "safe=full +EV · growth=full + router + adaptive + scale risk"
+        rows = [("MOM_LET_RUN", "true", "true", "+EV"), ("PAIRS_LIVE", "true", "true", "diversifier"),
+                ("EVENT_ENGINE_LIVE", "true", "true", "กันข่าว"),
+                ("ALGO_ROUTER_ENABLE", "true", "true", "LLM router"),
+                ("LOSS_ADAPTIVE_LIVE", "false", "true", "growth auto-adapt"),
+                ("RISK_PER_TRADE", "0.5", "2.5", "growth scale risk")]
     return jsonify({"ok": True, "equity": round(eq), "ccy": ccy, "tier": tier, "note": note,
-                    "advice": [{"key": k, "rec": v, "why": w} for k, v, w in adv]})
+                    "advice": [{"key": k, "safe": s, "growth": g, "why": w} for k, s, g, w in rows]})
 
 
 @app.route("/api/pairs")

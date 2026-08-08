@@ -2803,8 +2803,8 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
         <div id="ma-head" style="font-size:13px;font-family:var(--mono);margin-bottom:8px">Loading…</div>
         <div style="overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
-            <thead><tr style="color:var(--muted);text-align:left"><th style="padding:3px 6px">mode</th><th>แนะนำ</th><th>เหตุผล</th></tr></thead>
-            <tbody id="ma-body"><tr><td colspan="3" style="color:var(--muted)">—</td></tr></tbody>
+            <thead><tr style="color:var(--muted);text-align:left"><th style="padding:3px 6px">mode</th><th>🛡️ ปลอดภัย</th><th>🚀 โตเร็ว</th><th>เหตุผล</th></tr></thead>
+            <tbody id="ma-body"><tr><td colspan="4" style="color:var(--muted)">—</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -6072,7 +6072,8 @@ async function loadModeAdvice() {
     const col = v => v === 'true' ? 'var(--green)' : v === 'false' ? 'var(--red)' : 'var(--amber)';
     b.innerHTML = adv.map(a => '<tr style="border-top:1px solid var(--border)">'
       + '<td style="padding:3px 6px;font-weight:700">' + a.key + '</td>'
-      + '<td style="color:' + col(a.rec) + ';font-weight:700">' + a.rec + '</td>'
+      + '<td style="color:' + col(a.safe) + ';font-weight:700">' + a.safe + '</td>'
+      + '<td style="color:' + col(a.growth) + ';font-weight:700">' + a.growth + '</td>'
       + '<td style="color:var(--muted)">' + a.why + '</td></tr>').join('');
   } catch (e) { console.error('loadModeAdvice', e); }
 }
