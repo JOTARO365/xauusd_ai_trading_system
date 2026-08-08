@@ -79,6 +79,89 @@ def r_tsmom(dc, dtm, cost_price, lbs=(21, 63, 126), confirm=21):
     return out
 
 
+def _ema(a, n):
+    e = np.zeros_like(a); e[0] = a[0]; k = 2 / (n + 1)
+    for i in range(1, len(a)):
+        e[i] = a[i] * k + e[i - 1] * (1 - k)
+    return e
+
+
+def _slope_map(m15t, ht, hc, n=50):
+    e = _ema(hc, n); sl = np.sign(e - np.concatenate([e[:3], e[:-3]]))
+    return sl[np.clip(np.searchsorted(ht, m15t, "right") - 1, 0, len(sl) - 1)]
+
+
+def r_conf15m(mt5, sym, e_broker, cost, pt, session=None, brk=12, rr=2.0, sl_atr=1.0, vk=1.5, mh=48):
+    """confluence_15m: M15 breakout + H1+H4+macro + volume surge (+session filter ถ้า gold). คืน [(ts,R)]."""
+    from datetime import datetime, timezone
+    m = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M15, 0, 30000)
+    h1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H1, 0, 15000)
+    h4 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H4, 0, 10000)
+    em = mt5.copy_rates_from_pos(e_broker, mt5.TIMEFRAME_M15, 0, 30000)
+    if m is None or len(m) < 3000 or h1 is None or h4 is None or em is None:
+        return []
+    h, l, c, tm = m["high"].astype(float), m["low"].astype(float), m["close"].astype(float), m["time"].astype(np.int64)
+    vol = m["tick_volume"].astype(float)
+    h1t = _slope_map(tm, h1["time"].astype(np.int64), h1["close"].astype(float))
+    h4t = _slope_map(tm, h4["time"].astype(np.int64), h4["close"].astype(float))
+    emap = {int(t): float(x) for t, x in zip(em["time"], em["close"])}
+    mac = np.array([emap.get(int(t), np.nan) for t in tm], float)
+    atr = R.atr(h, l, c); n = len(c); out = []; i = 210
+    vmed = np.zeros(n)
+    for k in range(200, n):
+        vmed[k] = np.median(vol[k - 200:k]) or 1
+    while i < n - 1:
+        av = float(atr[i]) if atr[i] == atr[i] else 0.0
+        if av <= 0 or vmed[i] <= 0 or vol[i] > 2.0 * vmed[i]:
+            i += 1; continue
+        if session:
+            hr = datetime.fromtimestamp(int(tm[i]), timezone.utc).hour
+            if not (session[0] <= hr < session[1]):
+                i += 1; continue
+        px = float(c[i]); hh = float(h[i - brk:i].max()); ll = float(l[i - brk:i].min())
+        d = 1 if px > hh else -1 if px < ll else 0
+        if not d:
+            i += 1; continue
+        mm = mac[i]; ml = mac[i - 24] if i - 24 >= 0 else np.nan
+        if (h1t[i] != d or h4t[i] != d or mm != mm or ml != ml or (1 if mm > ml else -1) != d or vol[i] < vk * vmed[i]):
+            i += 1; continue
+        r_, ei = _res(h, l, c, i, d, px, max(50, sl_atr * av / pt), rr, pt, cost, mh)
+        out.append((int(tm[i]), r_)); i = ei + 1
+    return out
+
+
+def r_pairs(mt5, xau, xag, cost_y, cost_x, win=120, z_in=2.0, z_out=0.5, z_stop=3.5):
+    """XAU-XAG stat-arb spread z-fade (rolling β causal). คืน [(entry_ts, R)]."""
+    ra = mt5.copy_rates_from_pos(xau, mt5.TIMEFRAME_H1, 0, 40000)
+    rb = mt5.copy_rates_from_pos(xag, mt5.TIMEFRAME_H1, 0, 40000)
+    if ra is None or rb is None:
+        return []
+    mb = {int(t): float(c) for t, c in zip(rb["time"], rb["close"])}
+    ys = []; xs = []; ts = []
+    for t, c in zip(ra["time"], ra["close"]):
+        if int(t) in mb:
+            ys.append(float(c)); xs.append(mb[int(t)]); ts.append(int(t))
+    if len(ys) < win + 50:
+        return []
+    y = np.array(ys); x = np.array(xs); out = []; pos = 0; entry_s = 0.0; entry_sd = 1.0; beta_at = 1.0; ent_t = 0
+    for i in range(win, len(y)):
+        beta = np.polyfit(x[i - win:i], y[i - win:i], 1)[0]
+        sw = y[i - win:i] - beta * x[i - win:i]; m, sd = sw.mean(), sw.std()
+        if sd <= 0:
+            continue
+        z = (y[i] - beta * x[i] - m) / sd
+        if pos == 0:
+            if abs(z) > z_in:
+                pos = -1 if z > 0 else 1; entry_s = y[i] - beta * x[i]; entry_sd = sd; beta_at = beta; ent_t = ts[i]
+        else:
+            if (abs(z) <= z_out) or ((z >= z_stop) if pos == -1 else (z <= -z_stop)):
+                sl_dist = (z_stop - z_in) * entry_sd
+                cost = cost_y + beta_at * cost_x
+                pnl = pos * ((y[i] - beta_at * x[i]) - entry_s) - cost
+                out.append((ent_t, pnl / sl_dist if sl_dist else 0.0)); pos = 0
+    return out
+
+
 def _metrics(trades, e0=10000.0, risk=0.005):
     """trades = [(ts, R)] sorted. fixed-fractional compounding. คืน dict."""
     if not trades:
@@ -161,6 +244,24 @@ def main():
                 contrib.setdefault(algo, []).append(tr[1])
                 if ev.get((algo, lg)) == "+EV":
                     ev_tr.append(tr)
+    # confluence_15m (XAU NY-session + BTC 24/7) — +EV
+    def _cost(lg):
+        return (_sc.cost_pips(lg) if _sc else None) or 30.0
+    for lg, sess in [("XAUUSD", (13, 21)), ("BTCUSD", None)]:
+        brk = bm.get(lg, lg); mt5.symbol_select(brk, True)
+        info = mt5.symbol_info(brk)
+        if not info:
+            continue
+        trs = r_conf15m(mt5, brk, bm.get("EURUSD", "EURUSD"), _cost(lg), float(info.point), session=sess)
+        for tr in trs:
+            all_tr.append(tr); ev_tr.append(tr); contrib.setdefault("confluence_15m", []).append(tr[1])
+    # xau_xag_pairs — +EV market-neutral
+    xau = bm.get("XAUUSD", "XAUUSD"); xag = bm.get("XAGUSD", "XAGUSD")
+    ia = mt5.symbol_info(xau); ib = mt5.symbol_info(xag)
+    if ia and ib:
+        trs = r_pairs(mt5, xau, xag, _cost("XAUUSD") * float(ia.point), _cost("XAGUSD") * float(ib.point))
+        for tr in trs:                                      # pairs = 2-leg, sizing ต่างจาก single-trade → contrib โชว์เฉยๆ ไม่รวม portfolio
+            contrib.setdefault("xau_xag_pairs", []).append(tr[1])
     all_tr.sort(key=lambda x: x[0]); ev_tr.sort(key=lambda x: x[0])
     print("\n%-14s %s" % ("PORTFOLIO", "n / ret% / CAGR% / maxDD% / Sharpe(tr) / WR% / finalEq (E0=10k)"))
     for name, trs in [("ALL combos", all_tr), ("+EV only", ev_tr)]:
