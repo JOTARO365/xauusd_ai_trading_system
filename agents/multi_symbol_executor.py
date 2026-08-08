@@ -301,12 +301,14 @@ def _manage(broker, positions, bars, point, digits, combo_state, algo_id=None):
         return 0
     import MetaTrader5 as mt5
     import config as _cfg
+    _mom = algo_id in _MOM_ALGOS
+    if _mom and bool(getattr(_cfg, "MOM_LET_RUN", True)):
+        return 0                                            # momentum = fixed SL/TP ปล่อยวิ่งถึง TP (replay: +119% vs BE/trail +12%). ไม่ BE/trail
     high, low, close, _times = bars
     atr_v = _simple_atr(high, low, close)
     be_trig_r = _cfgf("BE_TRIGGER_R", 0.8)
     be_buf = _cfgf("BE_BUFFER_PIPS", 200) * point
     tr_on = bool(getattr(_cfg, "TRAILING_STOP", False))
-    _mom = algo_id in _MOM_ALGOS
     tr_min_r = _cfgf("TRAILING_MOM_MIN_R", 1.9) if _mom else _cfgf("TRAILING_MIN_PROFIT_R", 1.5)
     tr_mult = _cfgf("TRAILING_MOM_MULT", 3.0) if _mom else _cfgf("TRAILING_ATR_MULT", 0.8)
     tr_look = int(_cfgf("TRAILING_LOOKBACK", 6))

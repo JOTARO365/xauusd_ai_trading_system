@@ -349,7 +349,8 @@ FORCE_CLOSE_PROFIT = os.getenv("FORCE_CLOSE_PROFIT", "false").lower() == "true"
 FORCE_CLOSE_PROFIT_PCT = float(os.getenv("FORCE_CLOSE_PROFIT_PCT") or 100)
 # trailing หลวมสำหรับ momentum algo (ปล่อยวิ่งถึง TP; replay: trail แน่นตัดกำไร +119%→+12%)
 TRAILING_MOM_MULT = float(os.getenv("TRAILING_MOM_MULT") or 3.0)      # trail กว้าง (×ATR)
-TRAILING_MOM_MIN_R = float(os.getenv("TRAILING_MOM_MIN_R") or 1.9)    # trail หลัง R สูง (ใกล้ TP)                    # gold confluence_15m: เทรดเฉพาะ ชม UTC นี้ (NY, ตัด Asian chop). ว่าง=ทุกชม
+TRAILING_MOM_MIN_R = float(os.getenv("TRAILING_MOM_MIN_R") or 1.9)    # trail หลัง R สูง (ใกล้ TP)
+MOM_LET_RUN = os.getenv("MOM_LET_RUN", "true").lower() == "true"          # momentum algo = fixed SL/TP (ไม่ BE/trail) ปล่อยถึง TP (replay: +119% vs +12%)                    # gold confluence_15m: เทรดเฉพาะ ชม UTC นี้ (NY, ตัด Asian chop). ว่าง=ทุกชม
 TSMOM_SL_ATR     = float(os.getenv("TSMOM_SL_ATR") or 3.0)                   # chandelier disaster SL (× ATR D1)
 # TSMOM_SL_PIPS > 0 = override SL เป็นค่าคงที่ (points) แทน chandelier — สำหรับบัญชีเล็กให้เปิด order ได้.
 # ⚠️ SL แคบ = edge TSMOM หาย (backtest: SL<2000p → WR 2-18% โดน noise รูด). = execution-test ไม่ใช่ edge.
@@ -559,6 +560,8 @@ def reload_config():
     global TRAILING_MOM_MULT, TRAILING_MOM_MIN_R
     TRAILING_MOM_MULT        = float(os.getenv("TRAILING_MOM_MULT") or 3.0)
     TRAILING_MOM_MIN_R       = float(os.getenv("TRAILING_MOM_MIN_R") or 1.9)
+    global MOM_LET_RUN
+    MOM_LET_RUN              = os.getenv("MOM_LET_RUN", "true").lower() == "true"
     TSMOM_MIN_ADX            = float(os.getenv("TSMOM_MIN_ADX") or 0)                        # เข้าเฉพาะ ADX(D1) ≥ นี้
     TSMOM_MIN_VOLPCT         = float(os.getenv("TSMOM_MIN_VOLPCT") or 0)                     # เข้าเฉพาะ vol% ≥ นี้
     TSMOM_LOOKBACKS          = os.getenv("TSMOM_LOOKBACKS", "21,63,126")

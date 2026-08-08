@@ -350,6 +350,9 @@ def main():
                 rc = subprocess.call([sys.executable, os.path.join("scripts", scr)])
                 print((_OK if rc == 0 else _WARN) + f"{scr} " + ("เสร็จ" if rc == 0 else f"exit {rc}"))
             # backtest_all.py → data/backtest_results.json = matrix ทุก algo×คู่ (+EV/−EV) ที่ dashboard tab Analytics อ่าน
+            # portfolio_replay.py → equity curve รวมทั้งระบบ (ระบบปัจจุบันทำเงินเท่าไรบน history) — โชว์อย่างเดียว
+            print("     portfolio replay (system equity บน history)…")
+            subprocess.call([sys.executable, os.path.join("scripts", "portfolio_replay.py")])
             # SMC candidate backtest — ทุกคู่ผ่าน MT5 (matrix_backtest ต่อ (algo,symbol) → Shadow Matrix)
             rc = subprocess.call([sys.executable, os.path.join("scripts", "smc_backtest.py"), "--all"])
             print((_OK if rc == 0 else _WARN) + "smc_backtest.py --all " +
