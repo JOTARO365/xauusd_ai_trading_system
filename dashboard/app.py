@@ -192,6 +192,28 @@ _CONFIG_SPEC: dict[str, str] = {
     # ── NNLB ──
     "NNLB_MODE": "false", "NNLB_BASE_EQUITY": "100",
     "NNLB_EQUITY_PER_LOT": "100", "NNLB_MAX_LOSS_PCT": "25",
+    # ── Algo roster / entry-limit (per-algo × pair) ──
+    "ALGO_MAX_STACK": "1", "MSE_MAX_POSITIONS": "1", "MSE_MAX_TOTAL": "0",
+    "ALGO_ENTRY_MIN_GAP_ATR": "0", "ALGO_SIZE_STANDDOWN": "false",
+    "STRUCTURAL_SL_GOLD": "true", "STRUCTURAL_SL_MSE": "true",
+    # ── momentum let-run (fixed SL/TP, ปล่อยถึง TP) + loose trail ──
+    "MOM_LET_RUN": "true", "TRAILING_MOM_MULT": "3.0", "TRAILING_MOM_MIN_R": "1.9",
+    # ── tsmom v2 + per-combo TF/lookback override ──
+    "TSMOM_LOOKBACKS": "21,63,126", "TSMOM_CONFIRM_LB": "21", "TSMOM_SL_ATR": "3.0",
+    "ALGO_TF_OVERRIDE": "regime_momentum:BTCUSD=H4;tsmom_d1:XAGUSD=H4",
+    "ALGO_LB_OVERRIDE": "tsmom_d1:XAGUSD=6,18,42", "CONF15M_SESSION": "13-21",
+    # ── sentiment bias ──
+    "SENTIMENT_BIAS": "true", "SENTIMENT_BLOCK_ABOVE": "60", "SENTIMENT_REFRESH_MIN": "30",
+    # ── XAU-XAG pairs (stat-arb 2-leg) ──
+    "PAIRS_LIVE": "false", "PAIRS_SYMBOLS": "XAUUSD:XAGUSD", "PAIRS_WIN": "120",
+    "PAIRS_Z_IN": "2.0", "PAIRS_Z_OUT": "0.5", "PAIRS_Z_STOP": "3.5", "PAIRS_DISASTER_ATR": "6.0",
+    # ── profit-target force-close (lock กำไร X% ของ balance) ──
+    "FORCE_CLOSE_PROFIT": "false", "FORCE_CLOSE_PROFIT_PCT": "100",
+    # ── event-engine (NFP/CPI/FOMC) ──
+    "EVENT_ENGINE_LIVE": "false", "EVENT_PRE_MIN": "30", "EVENT_POST_MIN": "120",
+    # ── loss-adaptive + LLM algo-router ──
+    "LOSS_ADAPTIVE_LIVE": "false", "LOSS_STREAK_RECHECK": "3", "LOSS_ADAPTIVE_COOLDOWN_MIN": "240",
+    "ALGO_ROUTER_ENABLE": "false", "ALGO_ROUTER_LIVE": "false", "ALGO_ROUTER_EVERY_HRS": "6",
     # ── News/Twitter — default ว่าง = ใช้ default ในโค้ด (ค่าใน .env จะ OVERRIDE
     #    ทั้งชุด ไม่ merge! default ปลอมตัวเดิมทำ keyword geopolitics/CPI หายเมื่อกด Save) ──
     "X_ACCOUNTS_TO_FOLLOW": "", "X_KEYWORDS": "",
@@ -1827,6 +1849,42 @@ def api_sentiment_score():
         except Exception:
             return {"ok": False, "score": 0, "reason": "ยังไม่มีข้อมูล sentiment"}
     return jsonify(_cached("sentiment-score", _c, ttl=30))
+
+
+@app.route("/api/mode-advice")
+def api_mode_advice():
+    """แนะนำเปิด mode ไหน อิงเงินทุนจริงใน port (equity). display-only."""
+    try:
+        import MetaTrader5 as mt5
+        a = mt5.account_info()
+        eq = float(a.equity) if a else 0.0
+        ccy = a.currency if a else "?"
+    except Exception:
+        eq = 0.0; ccy = "?"
+    if eq < 3000:
+        tier = "จิ๋ว (< 3,000)"
+        adv = [("ALGO_SIZE_STANDDOWN", "true", "กัน over-risk บัญชีจิ๋ว (min-lot เสี่ยงเกินเพดาน = ข้าม)"),
+               ("FORCE_CLOSE_PROFIT", "true", "lock กำไรเร็ว (ทุนน้อย รักษาเงินต้น)"),
+               ("MOM_LET_RUN", "false", "no-BE swing แรงไปสำหรับทุนจิ๋ว — เปิด BE กันหมดพอร์ต"),
+               ("NNLB_MODE", "false", "เสี่ยงสูงเกินสำหรับทุนนี้"),
+               ("PAIRS_LIVE", "false", "margin 2 legs ไม่พอ")]
+    elif eq < 30000:
+        tier = "เล็ก (3k–30k)"
+        adv = [("ALGO_SIZE_STANDDOWN", "true", "แนะนำเปิด (บัญชีเล็ก กัน over-risk)"),
+               ("MOM_LET_RUN", "true", "ปล่อย momentum ถึง TP (+EV, backtest ดีกว่า)"),
+               ("EVENT_ENGINE_LIVE", "true", "กัน whipsaw ช่วงข่าว NFP/CPI"),
+               ("FORCE_CLOSE_PROFIT", "optional", "lock กำไรถ้าต้องการ (ปิดถ้าอยากให้วิ่ง)"),
+               ("PAIRS_LIVE", "false", "รอทุนโต (margin 2 legs)")]
+    else:
+        tier = "กลาง-ใหญ่ (> 30k)"
+        adv = [("MOM_LET_RUN", "true", "+EV ปล่อยถึง TP"),
+               ("EVENT_ENGINE_LIVE", "true", "กันข่าวแรง"),
+               ("PAIRS_LIVE", "true", "diversifier market-neutral (ทุนพอ margin 2 legs)"),
+               ("ALGO_ROUTER_ENABLE", "true", "LLM router สลับ algo (ต้องมี API credit)"),
+               ("ALGO_SIZE_STANDDOWN", "false", "ทุนพอ ไม่ต้อง standdown"),
+               ("FORCE_CLOSE_PROFIT", "false", "ปล่อยกำไรวิ่ง (ทุนพอรับ DD)")]
+    return jsonify({"ok": True, "equity": round(eq), "ccy": ccy, "tier": tier,
+                    "advice": [{"key": k, "rec": v, "why": w} for k, v, w in adv]})
 
 
 @app.route("/api/pairs")

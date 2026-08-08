@@ -2796,6 +2796,20 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
   <!-- ═══════════════════════════════════════════════════════════ -->
   <div class="tab-content" id="tab-settings">
 
+    <!-- MODE ADVICE — แนะนำเปิด mode ตามเงินทุนจริง (api/mode-advice) -->
+    <section id="mode-advice-section" style="margin-bottom:14px">
+      <div class="section-title">💡 แนะนำ mode ตามเงินทุน (port ปัจจุบัน)</div>
+      <div class="chart-card" style="padding:14px 16px">
+        <div id="ma-head" style="font-size:13px;font-family:var(--mono);margin-bottom:8px">Loading…</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
+            <thead><tr style="color:var(--muted);text-align:left"><th style="padding:3px 6px">mode</th><th>แนะนำ</th><th>เหตุผล</th></tr></thead>
+            <tbody id="ma-body"><tr><td colspan="3" style="color:var(--muted)">—</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <div class="settings-notice">
       &#10003;&nbsp;Click <strong>Save Configuration</strong> &mdash; PM2 will auto-restart the bot.
     </div>
@@ -3930,7 +3944,7 @@ function switchTab(name) {
     c.classList.toggle('active', c.id === 'tab-' + name));
   const _sub = document.getElementById('live-submenu');       // submenu โชว์เฉพาะตอนอยู่ Live
   if (_sub) _sub.style.display = (name === 'monitor') ? 'flex' : 'none';
-  if (name === 'settings')   loadConfig();
+  if (name === 'settings')   { loadConfig(); loadModeAdvice(); }
   if (name === 'accounting') loadAccounting();
   if (name === 'monitor')    { loadMonitor(); loadEventEngine(); loadPairs(); }
   if (name === 'backtest') { loadBacktestResults(); loadBacktest(); loadRegimeAnalytics(); loadDailySummary(); loadOwnerEdge(); }
@@ -6045,6 +6059,22 @@ const _BOOL_KEYS = ['PORTFOLIO_PROTECTION','STREAK_PROTECTION','DYNAMIC_TP',
   'LESSON_LEARNING','DRY_RUN','NNLB_MODE','TRAILING_STOP',
   'HTF_DIRECTION_BLOCK','AUTO_SL_PROTECT','EMA_PULLBACK_BLOCK',
   'NEWS_FIRST','HTF_FADE_BLOCK','NEWS_OVERRIDE_TREND','NNLB_FASTPATH','MOMENTUM_RIDE'];
+
+async function loadModeAdvice() {
+  try {
+    const r = await fetch('/api/mode-advice'); const d = await r.json();
+    const head = document.getElementById('ma-head');
+    if (head) head.innerHTML = d.ok ? ('ทุน <b>' + d.equity.toLocaleString() + ' ' + d.ccy + '</b> → tier: <b style="color:var(--gold)">' + d.tier + '</b>') : 'ไม่มีข้อมูลทุน';
+    const b = document.getElementById('ma-body'); if (!b) return;
+    const adv = d.advice || [];
+    if (!adv.length) { b.innerHTML = '<tr><td colspan="3" style="color:var(--muted)">—</td></tr>'; return; }
+    const col = v => v === 'true' ? 'var(--green)' : v === 'false' ? 'var(--red)' : 'var(--amber)';
+    b.innerHTML = adv.map(a => '<tr style="border-top:1px solid var(--border)">'
+      + '<td style="padding:3px 6px;font-weight:700">' + a.key + '</td>'
+      + '<td style="color:' + col(a.rec) + ';font-weight:700">' + a.rec + '</td>'
+      + '<td style="color:var(--muted)">' + a.why + '</td></tr>').join('');
+  } catch (e) { console.error('loadModeAdvice', e); }
+}
 
 async function loadConfig() {
   document.getElementById('cfg-status').textContent = '';
