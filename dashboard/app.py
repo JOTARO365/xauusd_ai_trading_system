@@ -1861,29 +1861,53 @@ def api_mode_advice():
         ccy = a.currency if a else "?"
     except Exception:
         eq = 0.0; ccy = "?"
-    if eq < 3000:
-        tier = "จิ๋ว (< 3,000)"
-        adv = [("ALGO_SIZE_STANDDOWN", "true", "กัน over-risk บัญชีจิ๋ว (min-lot เสี่ยงเกินเพดาน = ข้าม)"),
-               ("FORCE_CLOSE_PROFIT", "true", "lock กำไรเร็ว (ทุนน้อย รักษาเงินต้น)"),
-               ("MOM_LET_RUN", "false", "no-BE swing แรงไปสำหรับทุนจิ๋ว — เปิด BE กันหมดพอร์ต"),
-               ("NNLB_MODE", "false", "เสี่ยงสูงเกินสำหรับทุนนี้"),
-               ("PAIRS_LIVE", "false", "margin 2 legs ไม่พอ")]
+    if eq < 1500:
+        tier = "จิ๋วมาก (< 1,500) ⚠️"
+        note = "ทุนน้อยเกิน — min-lot risk มหาศาล. เทรดจริง = ข้ามเกือบทุกไม้ (protective). แนะนำเติมทุน หรือ demo เท่านั้น"
+        adv = [("ALGO_SIZE_STANDDOWN", "true", "guard จะข้ามเกือบทุกไม้ (min-lot เสี่ยงเกินเพดาน) = รักษาเงินต้น"),
+               ("FORCE_CLOSE_PROFIT", "true", "lock กำไรทันที (ทุนน้อยมาก)"),
+               ("MOM_LET_RUN", "false", "no-BE = 1 ไม้แพ้กินพอร์ต; เปิด BE"),
+               ("NNLB_MODE", "false", "ห้าม (เสี่ยงล้างพอร์ต)"),
+               ("PAIRS_LIVE", "false", "margin ไม่พอ"), ("ALGO_ROUTER_ENABLE", "false", "ยังไม่ต้อง")]
+    elif eq < 3000:
+        tier = "จิ๋ว (1,500–3,000)"
+        note = "เริ่มเทรดได้บางไม้ (min-lot ผ่านเพดานบางกรณี). เน้นรักษาทุน"
+        adv = [("ALGO_SIZE_STANDDOWN", "true", "กัน over-risk (เข้าเฉพาะไม้ risk ≤ เพดาน)"),
+               ("FORCE_CLOSE_PROFIT", "true", "lock กำไรเร็ว รักษาเงินต้น"),
+               ("MOM_LET_RUN", "false", "เปิด BE กันหมดพอร์ต (no-BE swing แรงไป)"),
+               ("EVENT_ENGINE_LIVE", "true", "กัน whipsaw ข่าว"),
+               ("NNLB_MODE", "false", "เสี่ยงสูงเกิน"), ("PAIRS_LIVE", "false", "margin 2 legs ไม่พอ")]
+    elif eq < 10000:
+        tier = "เล็ก (3k–10k)"
+        note = "เทรด +EV core ได้. ยังต้อง guard บัญชีเล็ก"
+        adv = [("ALGO_SIZE_STANDDOWN", "true", "แนะนำเปิด (บัญชีเล็ก)"),
+               ("MOM_LET_RUN", "true", "ปล่อย momentum ถึง TP (+EV)"),
+               ("EVENT_ENGINE_LIVE", "true", "กันข่าว"),
+               ("FORCE_CLOSE_PROFIT", "optional", "lock ถ้าต้องการ"),
+               ("PAIRS_LIVE", "false", "รอทุนโต")]
     elif eq < 30000:
-        tier = "เล็ก (3k–30k)"
-        adv = [("ALGO_SIZE_STANDDOWN", "true", "แนะนำเปิด (บัญชีเล็ก กัน over-risk)"),
-               ("MOM_LET_RUN", "true", "ปล่อย momentum ถึง TP (+EV, backtest ดีกว่า)"),
-               ("EVENT_ENGINE_LIVE", "true", "กัน whipsaw ช่วงข่าว NFP/CPI"),
-               ("FORCE_CLOSE_PROFIT", "optional", "lock กำไรถ้าต้องการ (ปิดถ้าอยากให้วิ่ง)"),
-               ("PAIRS_LIVE", "false", "รอทุนโต (margin 2 legs)")]
+        tier = "เล็ก-กลาง (10k–30k)"
+        note = "roster +EV เต็ม เริ่มปิด guard ได้"
+        adv = [("MOM_LET_RUN", "true", "+EV ถึง TP"),
+               ("EVENT_ENGINE_LIVE", "true", "กันข่าว"),
+               ("ALGO_SIZE_STANDDOWN", "optional", "ปิดได้ถ้ารับ DD (risk% เริ่มพอเหมาะ)"),
+               ("PAIRS_LIVE", "optional", "เริ่มเปิดได้ (margin เริ่มพอ)"),
+               ("FORCE_CLOSE_PROFIT", "false", "ปล่อยกำไรวิ่ง")]
+    elif eq < 100000:
+        tier = "กลาง (30k–100k)"
+        note = "roster +EV เต็ม + diversifier"
+        adv = [("MOM_LET_RUN", "true", "+EV"), ("EVENT_ENGINE_LIVE", "true", "กันข่าว"),
+               ("PAIRS_LIVE", "true", "diversifier market-neutral (margin พอ)"),
+               ("ALGO_ROUTER_ENABLE", "true", "LLM router (ต้องมี credit)"),
+               ("ALGO_SIZE_STANDDOWN", "false", "ทุนพอ"), ("FORCE_CLOSE_PROFIT", "false", "ปล่อยวิ่ง")]
     else:
-        tier = "กลาง-ใหญ่ (> 30k)"
-        adv = [("MOM_LET_RUN", "true", "+EV ปล่อยถึง TP"),
-               ("EVENT_ENGINE_LIVE", "true", "กันข่าวแรง"),
-               ("PAIRS_LIVE", "true", "diversifier market-neutral (ทุนพอ margin 2 legs)"),
-               ("ALGO_ROUTER_ENABLE", "true", "LLM router สลับ algo (ต้องมี API credit)"),
-               ("ALGO_SIZE_STANDDOWN", "false", "ทุนพอ ไม่ต้อง standdown"),
-               ("FORCE_CLOSE_PROFIT", "false", "ปล่อยกำไรวิ่ง (ทุนพอรับ DD)")]
-    return jsonify({"ok": True, "equity": round(eq), "ccy": ccy, "tier": tier,
+        tier = "ใหญ่ (> 100k)"
+        note = "full roster + router + scale risk ได้"
+        adv = [("MOM_LET_RUN", "true", "+EV"), ("EVENT_ENGINE_LIVE", "true", "กันข่าว"),
+               ("PAIRS_LIVE", "true", "diversifier"), ("ALGO_ROUTER_ENABLE", "true", "LLM router"),
+               ("LOSS_ADAPTIVE_LIVE", "true", "ปรับ dir/pause อัตโนมัติ"),
+               ("ALGO_SIZE_STANDDOWN", "false", "ทุนพอ · พิจารณาเพิ่ม RISK_PER_TRADE")]
+    return jsonify({"ok": True, "equity": round(eq), "ccy": ccy, "tier": tier, "note": note,
                     "advice": [{"key": k, "rec": v, "why": w} for k, v, w in adv]})
 
 

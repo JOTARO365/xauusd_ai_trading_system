@@ -6064,7 +6064,8 @@ async function loadModeAdvice() {
   try {
     const r = await fetch('/api/mode-advice'); const d = await r.json();
     const head = document.getElementById('ma-head');
-    if (head) head.innerHTML = d.ok ? ('ทุน <b>' + d.equity.toLocaleString() + ' ' + d.ccy + '</b> → tier: <b style="color:var(--gold)">' + d.tier + '</b>') : 'ไม่มีข้อมูลทุน';
+    if (head) head.innerHTML = d.ok ? ('ทุน <b>' + d.equity.toLocaleString() + ' ' + d.ccy + '</b> → tier: <b style="color:var(--gold)">' + d.tier + '</b>'
+      + (d.note ? '<div style="font-size:11px;color:var(--muted);margin-top:4px">' + d.note + '</div>' : '')) : 'ไม่มีข้อมูลทุน';
     const b = document.getElementById('ma-body'); if (!b) return;
     const adv = d.advice || [];
     if (!adv.length) { b.innerHTML = '<tr><td colspan="3" style="color:var(--muted)">—</td></tr>'; return; }
