@@ -59,6 +59,9 @@ def tick():
         a = mt5.account_info()
         if not a:
             return None
+        min_cap = float(_cfg("FORCE_CLOSE_MIN_CAPITAL", 10000))
+        if a.equity >= min_cap:                             # ทุนถึงเกณฑ์เริ่มต้น → ไม่ force-close, ปล่อยกำไรวิ่ง
+            return {"ok": True, "equity": round(a.equity, 2), "min_cap": min_cap, "active": False, "reason": "ทุน ≥ เกณฑ์ → ปล่อยวิ่ง"}
         st = _load()
         base = float(st.get("baseline", 0) or 0)
         if base <= 0:                                       # capture baseline ครั้งแรก = balance ปัจจุบัน
@@ -99,8 +102,12 @@ def snapshot():
         target = base * (1 + pct / 100.0)
         eq = float(a.equity) if a else 0
         prog = ((eq - base) / (target - base) * 100) if target > base else 0
-        return {"ok": True, "enable": bool(_cfg("FORCE_CLOSE_PROFIT", False)), "baseline": round(base, 2),
-                "equity": round(eq, 2), "target": round(target, 2), "progress_pct": round(prog, 1),
+        min_cap = float(_cfg("FORCE_CLOSE_MIN_CAPITAL", 10000))
+        active = bool(_cfg("FORCE_CLOSE_PROFIT", False)) and eq < min_cap
+        return {"ok": True, "enable": bool(_cfg("FORCE_CLOSE_PROFIT", False)), "min_cap": min_cap,
+                "active": active, "baseline": round(base, 2), "equity": round(eq, 2),
+                "target": round(target, 2), "progress_pct": round(prog, 1),
+                "reason": "lock +100% (ทุน < เกณฑ์ โตไป 10k)" if active else "ปล่อยวิ่ง (ทุน ≥ เกณฑ์ หรือ mode off)",
                 "last_trigger": st.get("last_trigger")}
     except Exception:
         return {"ok": False}

@@ -347,6 +347,7 @@ ALGO_ROUTER_MODEL = os.getenv("ALGO_ROUTER_MODEL", "claude-sonnet-4-6")
 # force-close ทุกไม้เมื่อกำไร X% ของ balance (lock กำไร; roll baseline หลังปิด). default OFF
 FORCE_CLOSE_PROFIT = os.getenv("FORCE_CLOSE_PROFIT", "false").lower() == "true"
 FORCE_CLOSE_PROFIT_PCT = float(os.getenv("FORCE_CLOSE_PROFIT_PCT") or 100)
+FORCE_CLOSE_MIN_CAPITAL = float(os.getenv("FORCE_CLOSE_MIN_CAPITAL") or 10000)   # force-close ทำงานเฉพาะ equity < ค่านี้ (โตเล็ก→เกณฑ์); ≥ = ปล่อยวิ่ง
 # trailing หลวมสำหรับ momentum algo (ปล่อยวิ่งถึง TP; replay: trail แน่นตัดกำไร +119%→+12%)
 TRAILING_MOM_MULT = float(os.getenv("TRAILING_MOM_MULT") or 3.0)      # trail กว้าง (×ATR)
 TRAILING_MOM_MIN_R = float(os.getenv("TRAILING_MOM_MIN_R") or 1.9)    # trail หลัง R สูง (ใกล้ TP)
@@ -557,6 +558,8 @@ def reload_config():
     global FORCE_CLOSE_PROFIT, FORCE_CLOSE_PROFIT_PCT
     FORCE_CLOSE_PROFIT       = os.getenv("FORCE_CLOSE_PROFIT", "false").lower() == "true"
     FORCE_CLOSE_PROFIT_PCT   = float(os.getenv("FORCE_CLOSE_PROFIT_PCT") or 100)
+    global FORCE_CLOSE_MIN_CAPITAL
+    FORCE_CLOSE_MIN_CAPITAL  = float(os.getenv("FORCE_CLOSE_MIN_CAPITAL") or 10000)
     global TRAILING_MOM_MULT, TRAILING_MOM_MIN_R
     TRAILING_MOM_MULT        = float(os.getenv("TRAILING_MOM_MULT") or 3.0)
     TRAILING_MOM_MIN_R       = float(os.getenv("TRAILING_MOM_MIN_R") or 1.9)
