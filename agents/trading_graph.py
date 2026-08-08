@@ -393,6 +393,17 @@ def node_position_mgmt(state: TradingState) -> dict:
         _ev_tick()
     except Exception as _eve:
         logger.error(f"[GRAPH:event_engine] {_eve}")
+    # loss-adaptive (แพ้ติด→เช็ค sentiment→ปรับ dir/pause) + LLM algo-router (auto-swap). gated (default OFF/shadow). fail-soft.
+    try:
+        from agents.loss_adaptive import tick as _la_tick
+        _la_tick()
+    except Exception as _lae:
+        logger.error(f"[GRAPH:loss_adaptive] {_lae}")
+    try:
+        from agents.algo_router_llm import tick as _ar_tick
+        _ar_tick()
+    except Exception as _are:
+        logger.error(f"[GRAPH:algo_router] {_are}")
     # forward TSMOM-D1 equity tracker (trend-follower, per symbol). gated SHADOW_TSMOM. fail-soft. 0 order.
     try:
         from agents.shadow_tsmom import tick as _tsmom_tick

@@ -334,7 +334,16 @@ CONF15M_SESSION  = os.getenv("CONF15M_SESSION", "13-21")
 # event-engine (NFP/CPI/FOMC) — SHADOW-first (log อย่างเดียว จนกว่า validate). ffcalendar+event_scenarios
 EVENT_ENGINE_LIVE = os.getenv("EVENT_ENGINE_LIVE", "false").lower() == "true"   # true=bias/gate trade; false=shadow log
 EVENT_PRE_MIN     = int(os.getenv("EVENT_PRE_MIN") or 30)                        # ก่อนข่าวแรง N นาที = flat/pause
-EVENT_POST_MIN    = int(os.getenv("EVENT_POST_MIN") or 120)                      # หลัง release N นาที = bias window                    # gold confluence_15m: เทรดเฉพาะ ชม UTC นี้ (NY, ตัด Asian chop). ว่าง=ทุกชม
+EVENT_POST_MIN    = int(os.getenv("EVENT_POST_MIN") or 120)                      # หลัง release N นาที = bias window
+# loss-adaptive + LLM algo-router (08-08) — SHADOW/OFF default
+LOSS_ADAPTIVE_LIVE = os.getenv("LOSS_ADAPTIVE_LIVE", "false").lower() == "true"   # true=ปรับ dir/pause จริง; false=log
+LOSS_STREAK_RECHECK = int(os.getenv("LOSS_STREAK_RECHECK") or 3)                  # แพ้ติดกี่ไม้ = trigger
+LOSS_ADAPTIVE_COOLDOWN_MIN = int(os.getenv("LOSS_ADAPTIVE_COOLDOWN_MIN") or 240)
+ALGO_ROUTER_ENABLE = os.getenv("ALGO_ROUTER_ENABLE", "false").lower() == "true"   # เปิด LLM router (ใช้ token)
+ALGO_ROUTER_LIVE   = os.getenv("ALGO_ROUTER_LIVE", "false").lower() == "true"     # true=สลับ switch จริง; false=log
+ALGO_ROUTER_EVERY_HRS = float(os.getenv("ALGO_ROUTER_EVERY_HRS") or 6)
+ALGO_ROUTER_MIN_GAP_MIN = int(os.getenv("ALGO_ROUTER_MIN_GAP_MIN") or 60)
+ALGO_ROUTER_MODEL = os.getenv("ALGO_ROUTER_MODEL", "claude-sonnet-4-6")                    # gold confluence_15m: เทรดเฉพาะ ชม UTC นี้ (NY, ตัด Asian chop). ว่าง=ทุกชม
 TSMOM_SL_ATR     = float(os.getenv("TSMOM_SL_ATR") or 3.0)                   # chandelier disaster SL (× ATR D1)
 # TSMOM_SL_PIPS > 0 = override SL เป็นค่าคงที่ (points) แทน chandelier — สำหรับบัญชีเล็กให้เปิด order ได้.
 # ⚠️ SL แคบ = edge TSMOM หาย (backtest: SL<2000p → WR 2-18% โดน noise รูด). = execution-test ไม่ใช่ edge.
@@ -529,6 +538,15 @@ def reload_config():
     EVENT_ENGINE_LIVE        = os.getenv("EVENT_ENGINE_LIVE", "false").lower() == "true"
     EVENT_PRE_MIN            = int(os.getenv("EVENT_PRE_MIN") or 30)
     EVENT_POST_MIN           = int(os.getenv("EVENT_POST_MIN") or 120)
+    global LOSS_ADAPTIVE_LIVE, LOSS_STREAK_RECHECK, LOSS_ADAPTIVE_COOLDOWN_MIN, ALGO_ROUTER_ENABLE, ALGO_ROUTER_LIVE, ALGO_ROUTER_EVERY_HRS, ALGO_ROUTER_MIN_GAP_MIN, ALGO_ROUTER_MODEL
+    LOSS_ADAPTIVE_LIVE       = os.getenv("LOSS_ADAPTIVE_LIVE", "false").lower() == "true"
+    LOSS_STREAK_RECHECK      = int(os.getenv("LOSS_STREAK_RECHECK") or 3)
+    LOSS_ADAPTIVE_COOLDOWN_MIN = int(os.getenv("LOSS_ADAPTIVE_COOLDOWN_MIN") or 240)
+    ALGO_ROUTER_ENABLE       = os.getenv("ALGO_ROUTER_ENABLE", "false").lower() == "true"
+    ALGO_ROUTER_LIVE         = os.getenv("ALGO_ROUTER_LIVE", "false").lower() == "true"
+    ALGO_ROUTER_EVERY_HRS    = float(os.getenv("ALGO_ROUTER_EVERY_HRS") or 6)
+    ALGO_ROUTER_MIN_GAP_MIN  = int(os.getenv("ALGO_ROUTER_MIN_GAP_MIN") or 60)
+    ALGO_ROUTER_MODEL        = os.getenv("ALGO_ROUTER_MODEL", "claude-sonnet-4-6")
     TSMOM_MIN_ADX            = float(os.getenv("TSMOM_MIN_ADX") or 0)                        # เข้าเฉพาะ ADX(D1) ≥ นี้
     TSMOM_MIN_VOLPCT         = float(os.getenv("TSMOM_MIN_VOLPCT") or 0)                     # เข้าเฉพาะ vol% ≥ นี้
     TSMOM_LOOKBACKS          = os.getenv("TSMOM_LOOKBACKS", "21,63,126")
