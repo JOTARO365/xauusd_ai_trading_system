@@ -1851,6 +1851,36 @@ def api_sentiment_score():
     return jsonify(_cached("sentiment-score", _c, ttl=30))
 
 
+@app.route("/api/comex")
+def api_comex():
+    """COMEX futures (GC gold / SI silver) via Yahoo — delayed ~15 นาที. price/volume/basis vs spot. view-only, 0 token."""
+    import urllib.request as _u
+    def _yf(sym):
+        try:
+            req = _u.Request("https://query1.finance.yahoo.com/v8/finance/chart/" + sym + "?interval=15m&range=1d",
+                             headers={"User-Agent": "Mozilla/5.0"})
+            m = json.loads(_u.urlopen(req, timeout=8).read())["chart"]["result"][0]["meta"]
+            px = m.get("regularMarketPrice"); pc = m.get("previousClose") or m.get("chartPreviousClose")
+            return {"price": px, "prev": pc, "vol": m.get("regularMarketVolume"),
+                    "chg_pct": round((px - pc) / pc * 100, 2) if px and pc else None}
+        except Exception:
+            return None
+    def _build():
+        out = {"gc": _yf("GC=F"), "si": _yf("SI=F"), "delay": "~15 นาที (Yahoo/COMEX)"}
+        try:
+            import MetaTrader5 as mt5
+            import config as _c
+            tk = mt5.symbol_info_tick(_c.SYMBOL)
+            spot = tk.bid if tk else None
+            if spot and out["gc"] and out["gc"]["price"]:
+                out["spot"] = round(spot, 2)
+                out["basis"] = round(out["gc"]["price"] - spot, 2)   # futures − spot (contango>0)
+        except Exception:
+            pass
+        return out
+    return jsonify(_cached("comex", _build, ttl=300))
+
+
 @app.route("/api/mode-advice")
 def api_mode_advice():
     """แนะนำเปิด mode ไหน อิงเงินทุนจริงใน port (equity). display-only."""

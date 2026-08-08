@@ -2355,6 +2355,14 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       .cal-legend { display:flex; gap:9px; align-items:center; font-size:9px; color:var(--muted); font-family:var(--mono); margin-left:auto; }
       .cal-legend i { display:inline-block; width:10px; height:3px; border-radius:2px; margin-right:3px; vertical-align:middle; }
     </style>
+    <!-- COMEX FUTURES (GC/SI) context — delayed ~15m via Yahoo (จากวิดีโอ CME delayed) -->
+    <section id="comex-section" style="margin-bottom:10px">
+      <div class="section-title">🏦 COMEX Futures (GC/SI · delay ~15 นาที · view-only)</div>
+      <div class="chart-card" style="padding:14px 16px">
+        <div id="comex-body" style="font-size:13px;font-family:var(--mono)">Loading…</div>
+      </div>
+    </section>
+
     <!-- XAU-XAG PAIRS (stat-arb) status (pairs_executor.snapshot) -->
     <section id="pairs-section" style="margin-bottom:10px">
       <div class="section-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -3515,6 +3523,7 @@ function setActiveSystem(v) {                     // ทอง / ทุกคู
   try { loadMonitor(); } catch (e) {}
   try { loadEventEngine(); } catch (e) {}
   try { loadPairs(); } catch (e) {}
+  try { loadComex(); } catch (e) {}
 }
 let _lastBid = null, _lastAsk = null;
 let _equityHistory = [];
@@ -3946,7 +3955,7 @@ function switchTab(name) {
   if (_sub) _sub.style.display = (name === 'monitor') ? 'flex' : 'none';
   if (name === 'settings')   { loadConfig(); loadModeAdvice(); }
   if (name === 'accounting') loadAccounting();
-  if (name === 'monitor')    { loadMonitor(); loadEventEngine(); loadPairs(); }
+  if (name === 'monitor')    { loadMonitor(); loadEventEngine(); loadPairs(); loadComex(); }
   if (name === 'backtest') { loadBacktestResults(); loadBacktest(); loadRegimeAnalytics(); loadDailySummary(); loadOwnerEdge(); }
 }
 
@@ -7568,6 +7577,22 @@ function _bestBucket(buckets) {
   return Object.entries(buckets || {})
     .filter(([, v]) => v.count >= 3)
     .sort(([, a], [, b]) => b.win_rate - a.win_rate)[0] || null;
+}
+
+// ── COMEX Futures (GC/SI) context — delayed ──
+async function loadComex() {
+  try {
+    const r = await fetch('/api/comex'); const d = await r.json();
+    const b = document.getElementById('comex-body'); if (!b) return;
+    const fmt = (o, name) => { if (!o || o.price == null) return name + ': —'; const c = (o.chg_pct >= 0 ? 'var(--green)' : 'var(--red)');
+      return name + ': <b>' + o.price + '</b> <span style="color:' + c + '">' + (o.chg_pct >= 0 ? '+' : '') + o.chg_pct + '%</span> · vol ' + (o.vol ? o.vol.toLocaleString() : '—'); };
+    let html = fmt(d.gc, 'GC ทอง') + '<br>' + fmt(d.si, 'SI เงิน');
+    if (d.basis != null) { const bc = d.basis >= 0 ? 'var(--amber)' : 'var(--red)';
+      html += '<div style="margin-top:6px">basis (futures − spot): <span style="color:' + bc + ';font-weight:700">' + (d.basis >= 0 ? '+' : '') + d.basis + '</span> · spot ' + d.spot
+        + '<span style="font-size:11px;color:var(--muted)"> · ' + (d.basis >= 0 ? 'contango (futures แพงกว่า = ปกติ)' : 'backwardation (futures ถูกกว่า = ตึงตัว)') + '</span></div>'; }
+    html += '<div style="font-size:11px;color:var(--muted);margin-top:4px">' + (d.delay || '') + '</div>';
+    b.innerHTML = html;
+  } catch (e) { console.error('loadComex', e); }
 }
 
 // ── XAU-XAG Pairs (stat-arb) status ──
