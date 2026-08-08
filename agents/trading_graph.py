@@ -394,6 +394,11 @@ def node_position_mgmt(state: TradingState) -> dict:
     except Exception as _eve:
         logger.error(f"[GRAPH:event_engine] {_eve}")
     # loss-adaptive (แพ้ติด→เช็ค sentiment→ปรับ dir/pause) + LLM algo-router (auto-swap). gated (default OFF/shadow). fail-soft.
+    try:                                                    # force-close ทุกไม้เมื่อกำไรถึง X% ของ balance (lock). gated. fail-soft.
+        from agents.profit_target import tick as _pt_tick
+        _pt_tick()
+    except Exception as _pte:
+        logger.error(f"[GRAPH:profit_target] {_pte}")
     try:
         from agents.loss_adaptive import tick as _la_tick
         _la_tick()

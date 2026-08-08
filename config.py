@@ -343,7 +343,10 @@ ALGO_ROUTER_ENABLE = os.getenv("ALGO_ROUTER_ENABLE", "false").lower() == "true" 
 ALGO_ROUTER_LIVE   = os.getenv("ALGO_ROUTER_LIVE", "false").lower() == "true"     # true=สลับ switch จริง; false=log
 ALGO_ROUTER_EVERY_HRS = float(os.getenv("ALGO_ROUTER_EVERY_HRS") or 6)
 ALGO_ROUTER_MIN_GAP_MIN = int(os.getenv("ALGO_ROUTER_MIN_GAP_MIN") or 60)
-ALGO_ROUTER_MODEL = os.getenv("ALGO_ROUTER_MODEL", "claude-sonnet-4-6")                    # gold confluence_15m: เทรดเฉพาะ ชม UTC นี้ (NY, ตัด Asian chop). ว่าง=ทุกชม
+ALGO_ROUTER_MODEL = os.getenv("ALGO_ROUTER_MODEL", "claude-sonnet-4-6")
+# force-close ทุกไม้เมื่อกำไร X% ของ balance (lock กำไร; roll baseline หลังปิด). default OFF
+FORCE_CLOSE_PROFIT = os.getenv("FORCE_CLOSE_PROFIT", "false").lower() == "true"
+FORCE_CLOSE_PROFIT_PCT = float(os.getenv("FORCE_CLOSE_PROFIT_PCT") or 100)                    # gold confluence_15m: เทรดเฉพาะ ชม UTC นี้ (NY, ตัด Asian chop). ว่าง=ทุกชม
 TSMOM_SL_ATR     = float(os.getenv("TSMOM_SL_ATR") or 3.0)                   # chandelier disaster SL (× ATR D1)
 # TSMOM_SL_PIPS > 0 = override SL เป็นค่าคงที่ (points) แทน chandelier — สำหรับบัญชีเล็กให้เปิด order ได้.
 # ⚠️ SL แคบ = edge TSMOM หาย (backtest: SL<2000p → WR 2-18% โดน noise รูด). = execution-test ไม่ใช่ edge.
@@ -547,6 +550,9 @@ def reload_config():
     ALGO_ROUTER_EVERY_HRS    = float(os.getenv("ALGO_ROUTER_EVERY_HRS") or 6)
     ALGO_ROUTER_MIN_GAP_MIN  = int(os.getenv("ALGO_ROUTER_MIN_GAP_MIN") or 60)
     ALGO_ROUTER_MODEL        = os.getenv("ALGO_ROUTER_MODEL", "claude-sonnet-4-6")
+    global FORCE_CLOSE_PROFIT, FORCE_CLOSE_PROFIT_PCT
+    FORCE_CLOSE_PROFIT       = os.getenv("FORCE_CLOSE_PROFIT", "false").lower() == "true"
+    FORCE_CLOSE_PROFIT_PCT   = float(os.getenv("FORCE_CLOSE_PROFIT_PCT") or 100)
     TSMOM_MIN_ADX            = float(os.getenv("TSMOM_MIN_ADX") or 0)                        # เข้าเฉพาะ ADX(D1) ≥ นี้
     TSMOM_MIN_VOLPCT         = float(os.getenv("TSMOM_MIN_VOLPCT") or 0)                     # เข้าเฉพาะ vol% ≥ นี้
     TSMOM_LOOKBACKS          = os.getenv("TSMOM_LOOKBACKS", "21,63,126")
