@@ -2355,6 +2355,17 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       .cal-legend { display:flex; gap:9px; align-items:center; font-size:9px; color:var(--muted); font-family:var(--mono); margin-left:auto; }
       .cal-legend i { display:inline-block; width:10px; height:3px; border-radius:2px; margin-right:3px; vertical-align:middle; }
     </style>
+    <!-- XAU-XAG PAIRS (stat-arb) status (pairs_executor.snapshot) -->
+    <section id="pairs-section" style="margin-bottom:10px">
+      <div class="section-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span>⚖️ XAU-XAG Pairs (stat-arb market-neutral)</span>
+        <span id="pairs-mode" style="font-size:10px;font-family:var(--mono);color:var(--muted)"></span>
+      </div>
+      <div class="chart-card" style="padding:14px 16px">
+        <div id="pairs-body" style="font-size:13px;font-family:var(--mono)">Loading…</div>
+      </div>
+    </section>
+
     <!-- EVENT ENGINE — ชนข่าว NFP/CPI/FOMC (event_engine.snapshot) -->
     <section id="event-engine-section" style="margin-bottom:10px">
       <div class="section-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -3489,6 +3500,7 @@ function setActiveSystem(v) {                     // ทอง / ทุกคู
   try { loadAccounting(); } catch (e) {}
   try { loadMonitor(); } catch (e) {}
   try { loadEventEngine(); } catch (e) {}
+  try { loadPairs(); } catch (e) {}
 }
 let _lastBid = null, _lastAsk = null;
 let _equityHistory = [];
@@ -3920,7 +3932,7 @@ function switchTab(name) {
   if (_sub) _sub.style.display = (name === 'monitor') ? 'flex' : 'none';
   if (name === 'settings')   loadConfig();
   if (name === 'accounting') loadAccounting();
-  if (name === 'monitor')    { loadMonitor(); loadEventEngine(); }
+  if (name === 'monitor')    { loadMonitor(); loadEventEngine(); loadPairs(); }
   if (name === 'backtest') { loadBacktestResults(); loadBacktest(); loadRegimeAnalytics(); loadDailySummary(); loadOwnerEdge(); }
 }
 
@@ -7524,6 +7536,23 @@ function _bestBucket(buckets) {
   return Object.entries(buckets || {})
     .filter(([, v]) => v.count >= 3)
     .sort(([, a], [, b]) => b.win_rate - a.win_rate)[0] || null;
+}
+
+// ── XAU-XAG Pairs (stat-arb) status ──
+async function loadPairs() {
+  try {
+    const r = await fetch('/api/pairs'); const d = await r.json();
+    const mode = document.getElementById('pairs-mode');
+    if (mode) mode.textContent = d.live ? '🔴 LIVE' : '👁 OFF';
+    const b = document.getElementById('pairs-body'); if (!b) return;
+    if (!d.ok) { b.innerHTML = '<span style="color:var(--muted)">ไม่มีข้อมูล (pairs engine ปิด/ยังไม่รัน)</span>'; return; }
+    const z = d.z, zc = Math.abs(z) >= 3.5 ? 'var(--red)' : Math.abs(z) >= 2 ? 'var(--amber)' : 'var(--muted)';
+    const pos = d.position ? ('<span style="color:var(--green);font-weight:700">ถือ ' + d.position + ' (เข้าที่ z=' + d.entry_z + ')</span>')
+                           : '<span style="color:var(--muted)">flat (รอ |z|≥2)</span>';
+    b.innerHTML = 'spread z-score: <span style="color:' + zc + ';font-weight:700;font-size:16px">' + (z >= 0 ? '+' : '') + z + '</span>'
+      + ' · β=' + d.beta + ' · ' + pos
+      + '<div style="font-size:11px;color:var(--muted);margin-top:6px">z>+2 → SELL XAU+BUY XAG · z<−2 → BUY XAU+SELL XAG · ออก |z|≤0.5 · cut |z|≥3.5</div>';
+  } catch (e) { console.error('loadPairs', e); }
 }
 
 // ── Event Engine (NFP/CPI/FOMC) — ชนข่าว panel ──

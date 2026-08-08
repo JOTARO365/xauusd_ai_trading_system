@@ -1829,6 +1829,18 @@ def api_sentiment_score():
     return jsonify(_cached("sentiment-score", _c, ttl=30))
 
 
+@app.route("/api/pairs")
+def api_pairs():
+    """XAU-XAG pairs-trade (stat-arb) สถานะสด — z, β, position. display-only, 0 token."""
+    try:
+        import sys as _sys
+        _sys.path.insert(0, os.path.join(_BASE, ".."))
+        from agents.pairs_executor import snapshot as _snap
+        return jsonify(_cached("pairs", _snap, ttl=20))
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
+
 @app.route("/api/event-engine")
 def api_event_engine():
     """Event engine (NFP/CPI/FOMC) — สถานะ + upcoming + scenario rubric. display-only, 0 token."""
