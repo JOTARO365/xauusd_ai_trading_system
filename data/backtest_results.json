@@ -1,6 +1,6 @@
 {
-  "updated": "2026-08-07",
-  "note": "backtest matrix ทุก algo × คู่ (causal · SL-first · cost-adj · OOS70/30). +EV=exp_R>0+OOS≥0+n≥80",
+  "updated": "2026-08-08",
+  "note": "backtest matrix ทุก algo × คู่ (causal · SL-first · cost-adj · OOS70/30). +EV=exp_R>0+OOS≥0+n≥80 | live sync 2026-08-08",
   "results": [
     {
       "group": "+EV",
@@ -9,11 +9,11 @@
       "tf": "H1",
       "live": "LIVE",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": 0.0266,
-      "t": 0.35,
+      "exp_R": 0.0376,
+      "t": 0.5,
       "oos": 0.1474,
-      "wr": 35.3,
-      "n": 368
+      "wr": 35.7,
+      "n": 367
     },
     {
       "group": "+EV",
@@ -22,24 +22,24 @@
       "tf": "H1",
       "live": "LIVE",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": 0.0266,
-      "t": 0.35,
+      "exp_R": 0.0376,
+      "t": 0.5,
       "oos": 0.1474,
-      "wr": 35.3,
-      "n": 368
+      "wr": 35.7,
+      "n": 367
     },
     {
       "group": "-EV",
       "algo": "mean_reversion",
       "pair": "XAUUSD",
       "tf": "H1",
-      "live": "LIVE",
+      "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.0764,
-      "t": -3.14,
-      "oos": -0.054,
+      "exp_R": -0.0749,
+      "t": -3.08,
+      "oos": -0.0548,
       "wr": 48.5,
-      "n": 1690
+      "n": 1692
     },
     {
       "group": "-EV",
@@ -61,9 +61,9 @@
       "tf": "D1",
       "live": "LIVE",
       "note": "ensemble 21/63/126 + confirm21",
-      "exp_R": 0.2141,
+      "exp_R": 0.2137,
       "t": 0.67,
-      "oos": 0.8473,
+      "oos": 0.8452,
       "wr": 29.1,
       "n": 110
     },
@@ -74,10 +74,10 @@
       "tf": "H4",
       "live": "LIVE",
       "note": "breakout + DXY confirm",
-      "exp_R": 0.0728,
-      "t": 1.17,
-      "oos": 0.1867,
-      "wr": 36.6,
+      "exp_R": 0.0677,
+      "t": 1.09,
+      "oos": 0.1883,
+      "wr": 36.4,
       "n": 535
     },
     {
@@ -86,12 +86,12 @@
       "pair": "XAUUSD",
       "tf": "M15",
       "live": "LIVE",
-      "note": "15m breakout+H1/H4/macro+volume, NY session 13-21 (ตัด Asian chop) → exp_R 1.7× vs all-hours. scripts/gold_scalp_session.py",
-      "exp_R": 0.135,
-      "t": 1.53,
-      "oos": 0.149,
+      "note": "15m confluence + volume surge",
+      "exp_R": 0.162,
+      "t": 1.87,
+      "oos": 0.0717,
       "wr": 40.3,
-      "n": 273
+      "n": 288
     },
     {
       "group": "-EV",
@@ -126,11 +126,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.3468,
-      "t": -14.27,
-      "oos": -0.1827,
-      "wr": 48.6,
-      "n": 1726
+      "exp_R": -0.3467,
+      "t": -14.26,
+      "oos": -0.1864,
+      "wr": 48.5,
+      "n": 1724
     },
     {
       "group": "-EV",
@@ -152,9 +152,9 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "ensemble 21/63/126 + confirm21",
-      "exp_R": -0.2079,
+      "exp_R": -0.2101,
       "t": -0.5,
-      "oos": -0.3132,
+      "oos": -0.3166,
       "wr": 26.9,
       "n": 160
     },
@@ -165,9 +165,9 @@
       "tf": "H4",
       "live": "SHADOW",
       "note": "breakout + DXY confirm",
-      "exp_R": -0.1187,
-      "t": -1.68,
-      "oos": 0.015,
+      "exp_R": -0.1198,
+      "t": -1.69,
+      "oos": 0.0113,
       "wr": 34.7,
       "n": 412
     },
@@ -178,11 +178,11 @@
       "tf": "M15",
       "live": "SHADOW",
       "note": "15m confluence + volume surge",
-      "exp_R": -0.2412,
-      "t": -2.62,
-      "oos": -0.0344,
-      "wr": 37.2,
-      "n": 253
+      "exp_R": -0.2471,
+      "t": -2.69,
+      "oos": -0.0494,
+      "wr": 37.0,
+      "n": 254
     },
     {
       "group": "-EV",
@@ -202,7 +202,7 @@
       "algo": "regime_momentum_fvg",
       "pair": "XAUEUR",
       "tf": "H1",
-      "live": "LIVE",
+      "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
       "exp_R": -0.0516,
       "t": -0.7,
@@ -217,11 +217,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.1166,
-      "t": -4.8,
-      "oos": -0.0736,
-      "wr": 49.4,
-      "n": 1698
+      "exp_R": -0.1169,
+      "t": -4.81,
+      "oos": -0.0766,
+      "wr": 49.3,
+      "n": 1699
     },
     {
       "group": "-EV",
@@ -243,9 +243,9 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "ensemble 21/63/126 + confirm21",
-      "exp_R": 0.1798,
+      "exp_R": 0.1796,
       "t": 0.48,
-      "oos": 0.794,
+      "oos": 0.7932,
       "wr": 29.3,
       "n": 92
     },
@@ -256,9 +256,9 @@
       "tf": "H4",
       "live": "SHADOW",
       "note": "breakout + DXY confirm",
-      "exp_R": -0.0483,
+      "exp_R": -0.0481,
       "t": -0.6,
-      "oos": -0.0079,
+      "oos": -0.0071,
       "wr": 33.7,
       "n": 309
     },
@@ -280,26 +280,26 @@
       "algo": "regime_momentum",
       "pair": "XAUJPY",
       "tf": "H1",
-      "live": "LIVE",
+      "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": 0.2138,
-      "t": 1.14,
-      "oos": 0.0796,
-      "wr": 41.3,
-      "n": 63
+      "exp_R": 0.1945,
+      "t": 1.05,
+      "oos": 0.0244,
+      "wr": 40.6,
+      "n": 64
     },
     {
       "group": "-EV",
       "algo": "regime_momentum_fvg",
       "pair": "XAUJPY",
       "tf": "H1",
-      "live": "LIVE",
+      "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": 0.2138,
-      "t": 1.14,
-      "oos": 0.0796,
-      "wr": 41.3,
-      "n": 63
+      "exp_R": 0.1945,
+      "t": 1.05,
+      "oos": 0.0244,
+      "wr": 40.6,
+      "n": 64
     },
     {
       "group": "-EV",
@@ -308,11 +308,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.0353,
-      "t": -0.58,
-      "oos": -0.0009,
-      "wr": 49.6,
-      "n": 272
+      "exp_R": -0.038,
+      "t": -0.63,
+      "oos": 0.0023,
+      "wr": 49.5,
+      "n": 273
     },
     {
       "group": "-EV",
@@ -334,9 +334,9 @@
       "tf": "H4",
       "live": "SHADOW",
       "note": "breakout + DXY confirm (DXY driver ไม่ตรงคู่นี้)",
-      "exp_R": 0.212,
+      "exp_R": 0.2121,
       "t": 0.83,
-      "oos": 0.0221,
+      "oos": 0.0225,
       "wr": 42.4,
       "n": 33
     },
@@ -347,11 +347,11 @@
       "tf": "M15",
       "live": "SHADOW",
       "note": "15m confluence + volume surge (DXY ไม่ตรงคู่นี้)",
-      "exp_R": -0.0303,
-      "t": -0.24,
-      "oos": 0.0075,
-      "wr": 34.6,
-      "n": 127
+      "exp_R": -0.0461,
+      "t": -0.36,
+      "oos": -0.0439,
+      "wr": 34.1,
+      "n": 126
     },
     {
       "group": "-EV",
@@ -360,11 +360,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": -0.1501,
-      "t": -2.02,
-      "oos": -0.1254,
-      "wr": 31.2,
-      "n": 349
+      "exp_R": -0.153,
+      "t": -2.07,
+      "oos": -0.1262,
+      "wr": 31.1,
+      "n": 351
     },
     {
       "group": "-EV",
@@ -373,11 +373,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": -0.1501,
-      "t": -2.02,
-      "oos": -0.1254,
-      "wr": 31.2,
-      "n": 349
+      "exp_R": -0.153,
+      "t": -2.07,
+      "oos": -0.1262,
+      "wr": 31.1,
+      "n": 351
     },
     {
       "group": "-EV",
@@ -386,11 +386,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.1027,
-      "t": -4.42,
+      "exp_R": -0.1033,
+      "t": -4.44,
       "oos": -0.0733,
       "wr": 50.4,
-      "n": 1853
+      "n": 1852
     },
     {
       "group": "-EV",
@@ -399,10 +399,10 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": -0.1266,
-      "t": -3.39,
-      "oos": -0.0967,
-      "wr": 40.3,
+      "exp_R": -0.1243,
+      "t": -3.33,
+      "oos": -0.0891,
+      "wr": 40.4,
       "n": 1082
     },
     {
@@ -412,9 +412,9 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "ensemble 21/63/126 + confirm21",
-      "exp_R": -0.1708,
+      "exp_R": -0.17,
       "t": -1.19,
-      "oos": -0.2748,
+      "oos": -0.2737,
       "wr": 34.2,
       "n": 155
     },
@@ -426,10 +426,10 @@
       "live": "SHADOW",
       "note": "breakout + DXY confirm (DXY driver ไม่ตรงคู่นี้)",
       "exp_R": -0.073,
-      "t": -1.14,
-      "oos": -0.0383,
+      "t": -1.15,
+      "oos": -0.0525,
       "wr": 32.2,
-      "n": 484
+      "n": 485
     },
     {
       "group": "-EV",
@@ -438,11 +438,11 @@
       "tf": "M15",
       "live": "SHADOW",
       "note": "15m confluence + volume surge (DXY ไม่ตรงคู่นี้)",
-      "exp_R": -0.2158,
-      "t": -2.47,
-      "oos": -0.2892,
-      "wr": 35.3,
-      "n": 272
+      "exp_R": -0.2128,
+      "t": -2.44,
+      "oos": -0.2274,
+      "wr": 35.4,
+      "n": 274
     },
     {
       "group": "-EV",
@@ -477,11 +477,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.0672,
-      "t": -2.8,
-      "oos": -0.0602,
-      "wr": 50.3,
-      "n": 1743
+      "exp_R": -0.0684,
+      "t": -2.85,
+      "oos": -0.0603,
+      "wr": 50.2,
+      "n": 1744
     },
     {
       "group": "-EV",
@@ -490,11 +490,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": -0.0365,
-      "t": -0.97,
-      "oos": -0.1036,
+      "exp_R": -0.0375,
+      "t": -1.0,
+      "oos": -0.1067,
       "wr": 42.0,
-      "n": 1073
+      "n": 1074
     },
     {
       "group": "-EV",
@@ -503,9 +503,9 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "ensemble 21/63/126 + confirm21",
-      "exp_R": 0.1338,
+      "exp_R": 0.1334,
       "t": 0.64,
-      "oos": -0.0641,
+      "oos": -0.0639,
       "wr": 33.3,
       "n": 105
     },
@@ -516,11 +516,11 @@
       "tf": "H4",
       "live": "SHADOW",
       "note": "breakout + DXY confirm (DXY driver ไม่ตรงคู่นี้)",
-      "exp_R": -0.0562,
-      "t": -1.39,
-      "oos": -0.116,
+      "exp_R": -0.0566,
+      "t": -1.4,
+      "oos": -0.1171,
       "wr": 32.2,
-      "n": 1196
+      "n": 1197
     },
     {
       "group": "-EV",
@@ -529,11 +529,11 @@
       "tf": "M15",
       "live": "SHADOW",
       "note": "15m confluence + volume surge (DXY ไม่ตรงคู่นี้)",
-      "exp_R": -0.2046,
-      "t": -2.71,
+      "exp_R": -0.1985,
+      "t": -2.63,
       "oos": -0.2148,
-      "wr": 32.6,
-      "n": 340
+      "wr": 32.8,
+      "n": 341
     },
     {
       "group": "-EV",
@@ -542,11 +542,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": -0.0715,
-      "t": -0.94,
-      "oos": -0.1476,
-      "wr": 34.8,
-      "n": 348
+      "exp_R": -0.0764,
+      "t": -1.0,
+      "oos": -0.1538,
+      "wr": 34.7,
+      "n": 349
     },
     {
       "group": "-EV",
@@ -555,11 +555,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": -0.0715,
-      "t": -0.94,
-      "oos": -0.1476,
-      "wr": 34.8,
-      "n": 348
+      "exp_R": -0.0764,
+      "t": -1.0,
+      "oos": -0.1538,
+      "wr": 34.7,
+      "n": 349
     },
     {
       "group": "-EV",
@@ -581,11 +581,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": -0.2002,
-      "t": -5.38,
-      "oos": -0.2203,
-      "wr": 39.5,
-      "n": 1082
+      "exp_R": -0.2021,
+      "t": -5.44,
+      "oos": -0.2313,
+      "wr": 39.4,
+      "n": 1084
     },
     {
       "group": "-EV",
@@ -594,9 +594,9 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "ensemble 21/63/126 + confirm21",
-      "exp_R": 0.0451,
+      "exp_R": 0.0449,
       "t": 0.24,
-      "oos": -0.2012,
+      "oos": -0.2005,
       "wr": 35.2,
       "n": 125
     },
@@ -607,11 +607,11 @@
       "tf": "H4",
       "live": "SHADOW",
       "note": "breakout + DXY confirm (DXY driver ไม่ตรงคู่นี้)",
-      "exp_R": -0.0366,
-      "t": -0.84,
-      "oos": -0.1211,
+      "exp_R": -0.0368,
+      "t": -0.85,
+      "oos": -0.1216,
       "wr": 33.7,
-      "n": 1070
+      "n": 1071
     },
     {
       "group": "-EV",
@@ -620,11 +620,11 @@
       "tf": "M15",
       "live": "SHADOW",
       "note": "15m confluence + volume surge (DXY ไม่ตรงคู่นี้)",
-      "exp_R": -0.1917,
-      "t": -2.29,
-      "oos": -0.3006,
-      "wr": 38.9,
-      "n": 303
+      "exp_R": -0.1851,
+      "t": -2.21,
+      "oos": -0.3111,
+      "wr": 39.1,
+      "n": 304
     },
     {
       "group": "-EV",
@@ -657,13 +657,13 @@
       "algo": "mean_reversion",
       "pair": "USDCHF",
       "tf": "H1",
-      "live": "LIVE",
+      "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.0785,
-      "t": -3.4,
-      "oos": -0.1168,
-      "wr": 52.0,
-      "n": 1878
+      "exp_R": -0.0791,
+      "t": -3.42,
+      "oos": -0.1169,
+      "wr": 51.9,
+      "n": 1879
     },
     {
       "group": "-EV",
@@ -672,11 +672,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": -0.1591,
-      "t": -4.45,
-      "oos": -0.2081,
-      "wr": 39.3,
-      "n": 1167
+      "exp_R": -0.1617,
+      "t": -4.52,
+      "oos": -0.2126,
+      "wr": 39.2,
+      "n": 1165
     },
     {
       "group": "-EV",
@@ -685,9 +685,9 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "ensemble 21/63/126 + confirm21",
-      "exp_R": -0.1193,
-      "t": -0.98,
-      "oos": 0.1752,
+      "exp_R": -0.1187,
+      "t": -0.97,
+      "oos": 0.1758,
       "wr": 32.9,
       "n": 155
     },
@@ -698,9 +698,9 @@
       "tf": "H4",
       "live": "SHADOW",
       "note": "breakout + DXY confirm (DXY driver ไม่ตรงคู่นี้)",
-      "exp_R": -0.0114,
-      "t": -0.12,
-      "oos": -0.0654,
+      "exp_R": -0.0133,
+      "t": -0.14,
+      "oos": -0.0718,
       "wr": 34.2,
       "n": 234
     },
@@ -711,11 +711,11 @@
       "tf": "M15",
       "live": "SHADOW",
       "note": "15m confluence + volume surge (DXY ไม่ตรงคู่นี้)",
-      "exp_R": -0.1998,
-      "t": -1.04,
-      "oos": -0.4535,
-      "wr": 36.8,
-      "n": 57
+      "exp_R": -0.2174,
+      "t": -1.11,
+      "oos": -0.4133,
+      "wr": 36.4,
+      "n": 55
     },
     {
       "group": "-EV",
@@ -750,11 +750,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.0804,
+      "exp_R": -0.0806,
       "t": -3.36,
-      "oos": -0.1038,
+      "oos": -0.1045,
       "wr": 49.4,
-      "n": 1744
+      "n": 1743
     },
     {
       "group": "-EV",
@@ -776,9 +776,9 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "ensemble 21/63/126 + confirm21",
-      "exp_R": 0.0459,
-      "t": 0.28,
-      "oos": -0.181,
+      "exp_R": 0.0468,
+      "t": 0.29,
+      "oos": -0.1817,
       "wr": 32.6,
       "n": 144
     },
@@ -789,11 +789,11 @@
       "tf": "H4",
       "live": "SHADOW",
       "note": "breakout + DXY confirm (DXY driver ไม่ตรงคู่นี้)",
-      "exp_R": -0.0496,
-      "t": -0.82,
-      "oos": -0.1483,
-      "wr": 32.7,
-      "n": 535
+      "exp_R": -0.053,
+      "t": -0.87,
+      "oos": -0.1533,
+      "wr": 32.6,
+      "n": 536
     },
     {
       "group": "-EV",
@@ -802,10 +802,10 @@
       "tf": "M15",
       "live": "SHADOW",
       "note": "15m confluence + volume surge (DXY ไม่ตรงคู่นี้)",
-      "exp_R": -0.302,
-      "t": -2.14,
+      "exp_R": -0.335,
+      "t": -2.4,
       "oos": -0.1625,
-      "wr": 28.6,
+      "wr": 27.5,
       "n": 91
     },
     {
@@ -813,7 +813,7 @@
       "algo": "regime_momentum",
       "pair": "BTCUSD",
       "tf": "H1",
-      "live": "LIVE",
+      "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
       "exp_R": 0.0269,
       "t": 0.34,
@@ -839,26 +839,26 @@
       "algo": "mean_reversion",
       "pair": "BTCUSD",
       "tf": "H1",
-      "live": "LIVE",
+      "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.093,
+      "exp_R": -0.0929,
       "t": -3.87,
-      "oos": -0.0425,
-      "wr": 48.6,
-      "n": 1742
+      "oos": -0.0368,
+      "wr": 48.7,
+      "n": 1743
     },
     {
       "group": "-EV",
       "algo": "sweep_reversal",
       "pair": "BTCUSD",
       "tf": "H1",
-      "live": "LIVE",
+      "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": -0.0104,
-      "t": -0.26,
-      "oos": 0.0184,
-      "wr": 42.9,
-      "n": 974
+      "exp_R": -0.0056,
+      "t": -0.14,
+      "oos": 0.0169,
+      "wr": 43.2,
+      "n": 973
     },
     {
       "group": "+EV",
@@ -867,9 +867,9 @@
       "tf": "D1",
       "live": "LIVE",
       "note": "ensemble 21/63/126 + confirm21",
-      "exp_R": 2.0586,
+      "exp_R": 2.062,
       "t": 1.76,
-      "oos": 2.7469,
+      "oos": 2.7515,
       "wr": 39.8,
       "n": 88
     },
@@ -880,9 +880,9 @@
       "tf": "H4",
       "live": "LIVE",
       "note": "breakout + DXY confirm (DXY driver ไม่ตรงคู่นี้)",
-      "exp_R": 0.0529,
-      "t": 0.73,
-      "oos": 0.0469,
+      "exp_R": 0.0526,
+      "t": 0.72,
+      "oos": 0.0459,
       "wr": 39.2,
       "n": 408
     },
@@ -893,11 +893,11 @@
       "tf": "M15",
       "live": "LIVE",
       "note": "15m confluence + volume surge (DXY ไม่ตรงคู่นี้)",
-      "exp_R": 0.0761,
-      "t": 0.56,
+      "exp_R": 0.0861,
+      "t": 0.63,
       "oos": 0.2156,
-      "wr": 39.0,
-      "n": 118
+      "wr": 39.3,
+      "n": 117
     },
     {
       "group": "-EV",
@@ -906,9 +906,9 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": -0.0843,
-      "t": -1.21,
-      "oos": -0.1728,
+      "exp_R": -0.1001,
+      "t": -1.44,
+      "oos": -0.1897,
       "wr": 32.1,
       "n": 408
     },
@@ -919,9 +919,9 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": -0.0843,
-      "t": -1.21,
-      "oos": -0.1728,
+      "exp_R": -0.1001,
+      "t": -1.44,
+      "oos": -0.1897,
       "wr": 32.1,
       "n": 408
     },
@@ -932,11 +932,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.105,
-      "t": -4.38,
-      "oos": -0.0219,
+      "exp_R": -0.124,
+      "t": -5.17,
+      "oos": -0.042,
       "wr": 47.7,
-      "n": 1736
+      "n": 1737
     },
     {
       "group": "-EV",
@@ -945,9 +945,9 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": -0.0257,
-      "t": -0.68,
-      "oos": 0.0034,
+      "exp_R": -0.0498,
+      "t": -1.33,
+      "oos": -0.0237,
       "wr": 41.9,
       "n": 1082
     },
@@ -958,9 +958,9 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "ensemble 21/63/126 + confirm21",
-      "exp_R": 1.0382,
-      "t": 1.2,
-      "oos": 1.2239,
+      "exp_R": 1.0228,
+      "t": 1.19,
+      "oos": 1.2081,
       "wr": 34.5,
       "n": 110
     },
@@ -971,9 +971,9 @@
       "tf": "H4",
       "live": "SHADOW",
       "note": "breakout + DXY confirm (DXY driver ไม่ตรงคู่นี้)",
-      "exp_R": -0.0355,
-      "t": -0.54,
-      "oos": -0.1835,
+      "exp_R": -0.0451,
+      "t": -0.69,
+      "oos": -0.1919,
       "wr": 33.1,
       "n": 462
     },
@@ -984,11 +984,11 @@
       "tf": "M15",
       "live": "SHADOW",
       "note": "15m confluence + volume surge (DXY ไม่ตรงคู่นี้)",
-      "exp_R": -0.1834,
-      "t": -1.66,
-      "oos": -0.1129,
-      "wr": 32.5,
-      "n": 163
+      "exp_R": -0.2619,
+      "t": -2.39,
+      "oos": -0.222,
+      "wr": 31.7,
+      "n": 164
     },
     {
       "group": "+EV",
@@ -1000,21 +1000,8 @@
       "oos": 2.45,
       "wr": 57.0,
       "n": 568,
-      "live": "SHADOW",
+      "live": "LIVE",
       "note": "stat-arb 2-leg (pairs_executor) rolling-β z-fade"
-    },
-    {
-      "group": "-EV",
-      "algo": "scalp_15m_quickTP",
-      "pair": "XAUUSD",
-      "tf": "M15",
-      "exp_R": -0.08,
-      "t": -2.5,
-      "oos": -0.05,
-      "wr": 60.0,
-      "n": 700,
-      "live": "ไม่สร้าง",
-      "note": "quick-TP scalp RR0.5-1: WR 58-65% แต่ < breakeven(59-67%)+cost → −EV. 15m +EV ได้แค่ RR≥1.5 (confluence_15m). scripts/research_15m_scalp.py"
     }
   ]
 }
