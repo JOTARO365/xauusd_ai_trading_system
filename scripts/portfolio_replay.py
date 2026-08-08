@@ -19,12 +19,28 @@ sys.path.insert(0, _ROOT); sys.path.insert(0, os.path.join(_ROOT, "scripts"))
 import regime_lib as R                                   # noqa: E402
 
 
-def _res(h, l, c, i, sign, px, slp, rr, pt, cost, mh):
+_MANAGED = False                                          # --managed → BE+trailing แทน SL/TP ตายตัว
+_BE_R = 1.2                                               # profit ≥ 1.2R → ย้าย SL ไป BE
+_BE_BUF = 0.15                                            # BE buffer = 0.15×SL (lock บวกนิด)
+_TRAIL_R = 1.5                                            # หลัง BE + ≥1.5R → เริ่ม trail
+_TRAIL_ATR = 0.5                                          # trail = 0.5×ATR ใต้/เหนือราคา
+
+
+def _res(h, l, c, i, sign, px, slp, rr, pt, cost, mh, atr=None):
+    """SL-first fixed SL/TP. ถ้า _MANAGED + atr → BE+trailing (เหมือน live)."""
     sl = px - sign * slp * pt; tp = px + sign * slp * rr * pt
-    n = len(c); end = min(i + mh, n - 1)
+    n = len(c); end = min(i + mh, n - 1); be = False
     for j in range(i + 1, end + 1):
-        if (l[j] <= sl) if sign > 0 else (h[j] >= sl):
-            return -1.0 - cost / slp, j
+        if _MANAGED and atr is not None:
+            prog = sign * (c[j] - px) / (slp * pt)         # R progress (close)
+            av = float(atr[j]) if atr[j] == atr[j] else 0.0
+            if not be and prog >= _BE_R:                   # → BE (risk ~0)
+                sl = px + sign * _BE_BUF * slp * pt; be = True
+            if be and prog >= _TRAIL_R and av > 0:         # trailing
+                nsl = c[j] - sign * _TRAIL_ATR * av
+                sl = max(sl, nsl) if sign > 0 else min(sl, nsl)
+        if (l[j] <= sl) if sign > 0 else (h[j] >= sl):     # SL hit (fixed/BE/trailed)
+            return sign * (sl - px) / (slp * pt) - cost / slp, j
         if (h[j] >= tp) if sign > 0 else (l[j] <= tp):
             return rr - cost / slp, j
     return sign * (c[end] - px) / (slp * pt) - cost / slp, end
@@ -41,7 +57,7 @@ def r_momentum(h, l, c, tm, cost, pt, brk=20, rr=2.0, mh=120):
         d = 1 if px > hh else -1 if px < ll else 0
         if not d:
             i += 1; continue
-        rr_, ei = _res(h, l, c, i, d, px, 1.5 * av / pt, rr, pt, cost, mh)
+        rr_, ei = _res(h, l, c, i, d, px, 1.5 * av / pt, rr, pt, cost, mh, atr=atr)
         out.append((int(tm[i]), rr_)); i = ei + 1
     return out
 
@@ -56,7 +72,7 @@ def r_macro(h, l, c, tm, macro, cost, pt, brk=20, mlb=24, rr=2.0, mh=120):
         d = 1 if px > hh else -1 if px < ll else 0
         if not d or macro[i] != macro[i] or macro[i - mlb] != macro[i - mlb] or d != (1 if macro[i] > macro[i - mlb] else -1):
             i += 1; continue
-        rr_, ei = _res(h, l, c, i, d, px, 1.5 * av / pt, rr, pt, cost, mh)
+        rr_, ei = _res(h, l, c, i, d, px, 1.5 * av / pt, rr, pt, cost, mh, atr=atr)
         out.append((int(tm[i]), rr_)); i = ei + 1
     return out
 
@@ -125,7 +141,7 @@ def r_conf15m(mt5, sym, e_broker, cost, pt, session=None, brk=12, rr=2.0, sl_atr
         mm = mac[i]; ml = mac[i - 24] if i - 24 >= 0 else np.nan
         if (h1t[i] != d or h4t[i] != d or mm != mm or ml != ml or (1 if mm > ml else -1) != d or vol[i] < vk * vmed[i]):
             i += 1; continue
-        r_, ei = _res(h, l, c, i, d, px, max(50, sl_atr * av / pt), rr, pt, cost, mh)
+        r_, ei = _res(h, l, c, i, d, px, max(50, sl_atr * av / pt), rr, pt, cost, mh, atr=atr)
         out.append((int(tm[i]), r_)); i = ei + 1
     return out
 
@@ -192,6 +208,8 @@ def main():
         from agents import shadow_cost as _sc
     except Exception:
         _sc = None
+    global _MANAGED
+    _MANAGED = "--managed" in sys.argv
     risk = 0.005
     if "--risk" in sys.argv:
         try:
@@ -206,7 +224,7 @@ def main():
         ev = {(r["algo"], r["pair"]): r["group"] for r in bt}
     except Exception:
         ev = {}
-    print("\n=== PORTFOLIO REPLAY (รวมทุก algo×คู่ → equity curve) · fixed-fractional risk %.2f%%/ไม้ ===" % (risk * 100))
+    print("\n=== PORTFOLIO REPLAY · %s · risk %.2f%%/ไม้ ===" % ("MANAGED (BE+trailing)" if _MANAGED else "fixed SL/TP", risk * 100))
     all_tr = []; ev_tr = []; contrib = {}
     e_url = bm.get("EURUSD", "EURUSD"); mt5.symbol_select(e_url, True)
     reH4 = mt5.copy_rates_from_pos(e_url, mt5.TIMEFRAME_H4, 0, 15000)
