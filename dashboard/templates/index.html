@@ -5487,6 +5487,7 @@ async function setGoldFlag(key, value, label) {
     if (r && r.error) { toast('บันทึกไม่สำเร็จ: ' + r.error, 'err'); return; }
     toast(label + ' (live-reload)', 'ok');
     loadShadowMatrix(true);
+    if (typeof loadBacktestResults === 'function') loadBacktestResults();
   } catch (_e) { toast('เชื่อมต่อ /api/config ไม่ได้', 'err'); }
 }
 
@@ -5500,6 +5501,7 @@ async function setShadowSwitch(algo, symbol, state) {
     if (!r.ok) { toast('เปลี่ยน switch ไม่สำเร็จ: ' + (r.error || ''), 'err'); return; }
     toast(`${algo}:${symbol} → ${state}`, 'ok');
     loadShadowMatrix(true);
+    if (typeof loadBacktestResults === 'function') loadBacktestResults();
   } catch (_e) { toast('เชื่อมต่อ /api/shadow-switch ไม่ได้', 'err'); }
 }
 
@@ -7677,7 +7679,8 @@ function renderBtr() {
       + '<td style="text-align:right">' + num(r.oos) + '</td>'
       + '<td style="text-align:right">' + (r.wr == null ? '—' : r.wr.toFixed(0)) + '</td>'
       + '<td style="text-align:right;color:var(--muted)">' + (r.n || '—') + '</td>'
-      + '<td style="color:' + liveC(r.live) + ';font-weight:700">' + r.live + '</td>'
+      + '<td>' + (r.switch_kind && r.switch_kind !== 'none' ? switchCell(r)
+                  : '<span style="color:' + liveC(r.live) + ';font-weight:700">' + r.live + '</span>') + '</td>'
       + '<td style="color:var(--muted)">' + (r.note || '') + '</td></tr>';
   }).join('');
 }

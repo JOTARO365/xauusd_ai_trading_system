@@ -1980,12 +1980,27 @@ def api_event_engine():
 
 @app.route("/api/backtest-results")
 def api_backtest_results():
-    """ผล backtest research (data/backtest_results.json) — จัดกลุ่ม +EV / −EV. display-only, 0 token."""
+    """ผล backtest research (data/backtest_results.json) — จัดกลุ่ม +EV / −EV.
+    join live-switch state ต่อ (algo,pair) จาก shadow_matrix → ตารางเปิด live ได้ในหน้านี้เลย
+    (reuse switchCell เดิม: gold-engine ↔ gold_state · MSE combo ↔ shadow-switch). display-only, 0 token."""
     try:
         with open(os.path.join(_BASE, "../data/backtest_results.json"), encoding="utf-8") as f:
-            return jsonify(json.load(f))
+            data = json.load(f)
     except Exception as e:
         return jsonify({"updated": None, "results": [], "error": str(e)})
+    try:                                                    # switch metadata ต่อ combo (route gold vs MSE ถูกจาก matrix)
+        from agents.shadow_matrix import build as _sm_build
+        sw = {(r["algo_id"], r["symbol"]): r for r in (_sm_build().get("rows") or [])}
+        for r in (data.get("results") or []):
+            m = sw.get((r.get("algo"), r.get("pair")))
+            if m:
+                r["switch_kind"] = m.get("switch_kind")
+                r["switch_state"] = m.get("switch_state")
+                r["exec_mode"] = m.get("exec_mode")
+                r["algo_id"] = r.get("algo"); r["symbol"] = r.get("pair")   # switchCell อ่าน field เหล่านี้
+    except Exception:
+        pass
+    return jsonify(data)
 
 
 @app.route("/api/options-oi")
