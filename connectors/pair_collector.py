@@ -34,29 +34,77 @@ def _tfmap(mt5):
             "h4": mt5.TIMEFRAME_H4, "d1": mt5.TIMEFRAME_D1}
 
 
-def _broker_map():
-    """logical → broker symbol. **source เดียว = .env `BROKER_SYM_<LOGICAL>`** (ต่อโบรกเกอร์).
-    ทอง XAUUSD → BROKER_SYM_XAUUSD หรือ config.SYMBOL. universe_probe.json = fallback เก่า (กัน setup ที่ยังไม่ย้าย)."""
+# logical → token-groups (ทุก group ต้องปรากฏในชื่อ) สำหรับ auto-resolve ข้ามโบรก (mirror probe_universe._TOK)
+_ALIAS = {
+    "XAUUSD": [("XAU", "GOLD")], "XAGUSD": [("XAG", "SILVER")],
+    "XAUEUR": [("XAU", "GOLD"), ("EUR",)], "XAUJPY": [("XAU", "GOLD"), ("JPY",)],
+    "AUDUSD": [("AUD",), ("USD",)], "EURUSD": [("EUR",), ("USD",)], "GBPUSD": [("GBP",), ("USD",)],
+    "USDCHF": [("USD",), ("CHF",)], "USDJPY": [("USD",), ("JPY",)],
+    "BTCUSD": [("BTC", "BITCOIN"), ("USD",)], "WTIUSD": [("WTI", "USOIL", "OILCASH", "CRUDE", "XTI", "USOUSD")],
+}
+_MAP_CACHE = {"map": None}
+
+
+def _auto_resolve(missing):
+    """probe โบรกสด: match logical → broker symbol ด้วย token + prefer trade_mode=FULL. คืน {logical:sym}."""
     try:
-        import config as _cfg                          # โหลดก่อน (trigger load_dotenv) → os.getenv เห็น .env จริง
+        import MetaTrader5 as mt5
+        syms = mt5.symbols_get() or []
+    except Exception:
+        return {}
+    names = [s.name for s in syms]
+    full = {s.name for s in syms if getattr(s, "trade_mode", 0) != 0}   # tradeable
+    found = {}
+    for lg in missing:
+        groups = _ALIAS.get(lg)
+        if not groups:
+            continue
+        cands = [n for n in names if all(any(tok in n.upper() for tok in g) for g in groups)]
+        if lg in ("XAUUSD", "XAGUSD"):                 # metal-USD: ต้องขึ้นต้น metal + ไม่มี quote-ccy อื่น
+            cands = [c for c in cands if c.upper().startswith(("GOLD", "SILVER", "XAU", "XAG"))
+                     and not any(q in c.upper() for q in ("EUR", "JPY", "GBP", "AUD", "CHF"))]
+        base = groups[0]                                # prefer ชื่อขึ้นต้น base token (BTCUSD > GBTC), tradeable, สั้น
+        cands.sort(key=lambda c: (c not in full, not c.upper().startswith(tuple(base)), len(c)))
+        if cands:
+            found[lg] = cands[0]
+    return found
+
+
+def _broker_map():
+    """logical → broker symbol (robust ข้ามโบรก). ลำดับ: .env BROKER_SYM_* / SYMBOL → universe_probe.json →
+    **auto-resolve สด** (probe symbols_get ด้วย token, verify มีจริง). cache/session. ไม่ fallback logical ดิบ."""
+    if _MAP_CACHE["map"] is not None:
+        return _MAP_CACHE["map"]
+    try:
+        import config as _cfg
     except Exception:
         _cfg = None
     out = {}
-    for k in COLLECT:                                  # .env = primary (structure เดียว)
+    for k in COLLECT:                                  # 1) .env override (ชนะเสมอ)
         ov = os.getenv(f"BROKER_SYM_{k}")
         if ov and ov.strip():
             out[k] = ov.strip()
-    # ทอง: default จาก SYMBOL (ใช้กันทั้งระบบอยู่แล้ว) ถ้าไม่ได้ตั้ง BROKER_SYM_XAUUSD
     if "XAUUSD" not in out and _cfg and getattr(_cfg, "SYMBOL", None):
         out["XAUUSD"] = _cfg.SYMBOL
-    if out:
-        return out
-    try:                                               # fallback: universe_probe.json (backward-compat)
+    try:                                               # 2) probe.json เติมที่ขาด (ไม่ทับ .env)
         p = json.load(open(_PROBE, encoding="utf-8"))
-        inst = p.get("instruments", {})
-        return {k: (inst.get(k, {}).get("broker_symbol") or k) for k in COLLECT if k in inst}
+        for k, v in (p.get("instruments", {}) or {}).items():
+            if k in COLLECT and k not in out and v.get("broker_symbol"):
+                out[k] = v["broker_symbol"]
     except Exception:
-        return {}
+        pass
+    # 3) verify + auto-resolve: symbol ที่ยังขาด หรือ map ไว้แต่ไม่มีจริงในโบรก → probe สด
+    try:
+        import MetaTrader5 as mt5
+        avail = {s.name for s in (mt5.symbols_get() or [])}
+        if avail:                                      # (ถ้า MT5 ไม่ต่อ ข้าม verify — ใช้ค่าที่มี)
+            missing = [k for k in COLLECT if k not in out or out.get(k) not in avail]
+            if missing:
+                out.update(_auto_resolve(missing))
+    except Exception:
+        pass
+    _MAP_CACHE["map"] = out
+    return out
 
 
 def _write_json(path, obj):

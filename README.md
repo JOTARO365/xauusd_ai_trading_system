@@ -1244,3 +1244,13 @@ scale risk down. Above the floor, the structural SL rule resumes. This is an exp
 capital-conditional exception to the "SL = D1/H4 wick always" directive, approved for small
 accounts only. Cuts per-trade risk (e.g. 44%→32% of a 3k account at current vol; more in calm
 markets). Kill switch: `ATR_SL_SMALL_CAP=false`.
+
+### Cross-broker symbol resolution (robust)
+
+`connectors/pair_collector._broker_map()` resolves each logical symbol (XAUUSD, BTCUSD, …) to the
+broker's actual name (GOLD#, BTCUSD#, OILCash#, …) in this order: (1) `.env BROKER_SYM_<LOGICAL>` /
+`SYMBOL` override, (2) `data/universe_probe.json`, (3) **live auto-resolve** — probes
+`mt5.symbols_get()` by token patterns and picks the tradeable, base-prefixed match. Every mapped
+symbol is verified to exist on the broker; any missing/mismatched one is auto-re-resolved. This means
+a fresh machine on a different broker populates data + backtests with no manual config and no stale
+`universe_probe.json` breakage. Session-cached; restart to re-probe after switching brokers.
