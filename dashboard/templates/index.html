@@ -1271,6 +1271,29 @@
   </style>
 </head>
 <body>
+<!-- inline SVG icon sprite (self-contained, theme-aware ผ่าน currentColor · แทน emoji ใน UI) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="ic-chart" viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l3-4 3 3 4-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="ic-star" viewBox="0 0 24 24"><path d="M12 2l3 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.9 21l1.2-6.8-5-4.9 6.9-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10c1 1 1 2 1 3h6c0-1 0-2 1-3a6 6 0 0 0-4-10z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-zap" viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-scale" viewBox="0 0 24 24"><path d="M12 3v18M5 21h14M12 3l-6 5a4 4 0 0 0 8 0zM12 3l6 5a4 4 0 0 1-8 0z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="ic-news" viewBox="0 0 24 24"><path d="M4 4h13v16H6a2 2 0 0 1-2-2zM17 8h3v10a2 2 0 0 1-2 2M7 8h7M7 12h7M7 16h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="ic-unlock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="ic-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></symbol>
+  <symbol id="ic-eye" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="ic-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="ic-bank" viewBox="0 0 24 24"><path d="M3 10l9-6 9 6M4 10v9M20 10v9M8 10v9M16 10v9M2 21h20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-shield" viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-rocket" viewBox="0 0 24 24"><path d="M5 15c-1 1-2 5-2 5s4-1 5-2M9 11a4 4 0 0 1 0 6M15 5c4-2 6 0 4 4-1 4-6 8-9 9l-4-4c1-3 5-8 9-9z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-crystal" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 5 12c-1 1-1 2-1 3H8c0-1 0-2-1-3A7 7 0 0 1 12 2zM12 6v6M9 9l6 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+</svg>
+<style>
+  .ic { width: 1.05em; height: 1.05em; vertical-align: -0.16em; display: inline-block; flex: none; }
+</style>
 
 <!-- inline SVG icon sprite (Lucide) — reference ด้วย class ic + use href=#i-NAME · stroke=currentColor สืบสีจาก parent -->
 <style>.ic{width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block;margin-right:3px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:5px}table{font-family:var(--mono)}table th,table td{padding:4px 8px}</style>
@@ -1457,8 +1480,8 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       <button class="tab-sub-item" onclick="goSection('algo-journal-section')">Trade Score</button>
       <button class="tab-sub-item" onclick="goSection('gold-regime-section')">Regime</button>
       <button class="tab-sub-item" onclick="goSection('econ-calendar-section')">Calendar</button>
-      <button class="tab-sub-item" onclick="goSection('pairlots-section')">🎚️ Lot ต่อคู่</button>
-      <button class="tab-sub-item" onclick="goSection('pairs-section')">⚖️ Pairs</button>
+      <button class="tab-sub-item" onclick="goSection('pairlots-section')"><svg class="ic"><use href="#ic-sliders"/></svg> Lot ต่อคู่</button>
+      <button class="tab-sub-item" onclick="goSection('pairs-section')"><svg class="ic"><use href="#ic-scale"/></svg> Pairs</button>
       <button class="tab-sub-item" onclick="goSection('event-engine-section')">Event Engine</button>
       <button class="tab-sub-item" onclick="goSection('comex-section')">COMEX</button>
     </div>
@@ -1913,7 +1936,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
         </div>
       </div>
       <div style="margin-top:8px;border:1px solid var(--border);border-radius:6px;overflow:hidden">
-        <div class="section-title" style="font-size:11px;padding:7px 10px;margin:0;border-bottom:1px solid var(--border);background:var(--surface2)">📰 ข่าว + ความรุนแรง · <span style="color:var(--muted);text-transform:none;letter-spacing:0">กด tab = กรองข่าว + จุดบนแผนที่</span></div>
+        <div class="section-title" style="font-size:11px;padding:7px 10px;margin:0;border-bottom:1px solid var(--border);background:var(--surface2)"><svg class="ic"><use href="#ic-news"/></svg> ข่าว + ความรุนแรง · <span style="color:var(--muted);text-transform:none;letter-spacing:0">กด tab = กรองข่าว + จุดบนแผนที่</span></div>
         <div id="wm-news-tabs" style="display:flex;gap:4px;flex-wrap:wrap;padding:6px 9px;border-bottom:1px solid var(--border);background:var(--bg,var(--bg2))">
           <button class="ntab active" onclick="switchNewsTab('all',this)">ทั้งหมด</button>
           <button class="ntab" onclick="switchNewsTab('gold',this)"><svg class="ic"><use href="#i-award"/></svg>ทองคำ</button>
@@ -2370,7 +2393,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
     </style>
     <!-- COMEX FUTURES (GC/SI) context — delayed ~15m via Yahoo (จากวิดีโอ CME delayed) -->
     <section id="comex-section" style="margin-bottom:10px">
-      <div class="section-title">🏦 COMEX Futures (GC/SI · delay ~15 นาที · view-only)</div>
+      <div class="section-title"><svg class="ic"><use href="#ic-bank"/></svg> COMEX Futures (GC/SI · delay ~15 นาที · view-only)</div>
       <div class="chart-card" style="padding:14px 16px">
         <div id="comex-body" style="font-size:13px;font-family:var(--mono)">Loading…</div>
       </div>
@@ -2379,7 +2402,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
     <!-- XAU-XAG PAIRS (stat-arb) status (pairs_executor.snapshot) -->
     <!-- PER-PAIR LOT SIZE — กำหนด lot แต่ละคู่อิสระ (แก้ contract ต่างกัน: ทอง 100 vs BTC 1) -->
     <section id="pairlots-section" style="margin-bottom:10px">
-      <div class="section-title">🎚️ Lot ต่อคู่ (กำหนดอิสระ · lot=0 → ใช้ FIXED_LOT global / FF)</div>
+      <div class="section-title"><svg class="ic"><use href="#ic-sliders"/></svg> Lot ต่อคู่ (กำหนดอิสระ · lot=0 → ใช้ FIXED_LOT global / FF)</div>
       <div class="chart-card" style="padding:12px 14px;overflow-x:auto">
         <div id="pairlots-note" style="font-size:10px;color:var(--muted);margin-bottom:6px"></div>
         <table style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
@@ -2877,7 +2900,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
 
     <!-- MODE ADVICE — แนะนำเปิด mode ตามเงินทุนจริง (api/mode-advice) -->
     <section id="mode-advice-section" style="margin-bottom:14px">
-      <div class="section-title">💡 แนะนำ mode ตามเงินทุน (port ปัจจุบัน)</div>
+      <div class="section-title"><svg class="ic"><use href="#ic-bulb"/></svg> แนะนำ mode ตามเงินทุน (port ปัจจุบัน)</div>
       <div class="chart-card" style="padding:14px 16px">
         <div id="ma-head" style="font-size:13px;font-family:var(--mono);margin-bottom:8px">Loading…</div>
         <div style="overflow-x:auto">

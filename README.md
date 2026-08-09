@@ -1254,3 +1254,12 @@ broker's actual name (GOLD#, BTCUSD#, OILCash#, …) in this order: (1) `.env BR
 symbol is verified to exist on the broker; any missing/mismatched one is auto-re-resolved. This means
 a fresh machine on a different broker populates data + backtests with no manual config and no stale
 `universe_probe.json` breakage. Session-cached; restart to re-probe after switching brokers.
+
+### Dashboard icons
+
+The dashboard uses a self-contained inline **SVG icon sprite** (top of `templates/index.html`,
+feather-style, theme-aware via `currentColor`) — reference an icon with
+`<svg class="ic"><use href="#ic-<name>"/></svg>` (chart, calendar, star, bulb, zap, scale, sliders,
+news, lock/unlock, target, eye, mic, bank, shield, rocket, crystal). Inline (not external CDN) so it
+loads instantly, works if any CDN is blocked, and adapts to light/dark. Text symbols (arrows →↑↓,
+✓✗⚠, status dots 🟢🔴) stay as text — they are inline indicators, not decorative icons.
