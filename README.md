@@ -1227,3 +1227,11 @@ single wide-SL gold/XAUEUR/pairs trade (~1,300–1,900฿ at min-lot) from wipin
 while low-risk instruments (WTI ~50฿, BTC ~270฿) still trade. Gold auto-unlocks as equity grows
 (~9k+); at/above the floor the gate is inert. Derived + validated in
 `scripts/survival_sim.py` / `docs/reviews/survival-sim-5yr.md`. Kill switch: `CAPITAL_GATE_ENABLE=false`.
+
+### Fixed-fractional sizing below threshold (A2)
+
+When `FF_SIZING_ENABLE` and equity < `CAPITAL_GATE_FLOOR`, all algos size by fixed-fractional
+(`FF_RISK_PCT`% of equity ÷ SL distance) instead of fixed lot — constant % risk per trade to cut
+drawdown. At/above the floor, fixed-lot resumes (growth). NOTE: with the wide structural SL +
+`MIN_LOT` floor, FF is effectively inert on small accounts (the min lot already exceeds the target
+risk); the full drawdown benefit requires a tighter SL. Kill switch: `FF_SIZING_ENABLE=false`.

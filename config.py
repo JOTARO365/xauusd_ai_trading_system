@@ -352,6 +352,9 @@ FORCE_CLOSE_MIN_CAPITAL = float(os.getenv("FORCE_CLOSE_MIN_CAPITAL") or 20000)  
 CAPITAL_GATE_ENABLE = (os.getenv("CAPITAL_GATE_ENABLE") or "false").lower() == "true"   # บล็อกไม้เสี่ยงเกิน %ทุน ตอนทุน<FLOOR
 CAPITAL_GATE_FLOOR = float(os.getenv("CAPITAL_GATE_FLOOR") or 20000)                    # ทุน<ค่านี้ = gate ทำงาน; ≥ = ปิด
 CAPITAL_GATE_MAX_RISK_PCT = float(os.getenv("CAPITAL_GATE_MAX_RISK_PCT") or 15)         # บล็อกถ้า risk/ไม้ > %นี้ ของ equity
+# ── fixed-fractional sizing เฉพาะทุน < CAPITAL_GATE_FLOOR (A2 08-09; ≥ = fixed-lot เดิม) ──
+FF_SIZING_ENABLE = (os.getenv("FF_SIZING_ENABLE") or "false").lower() == "true"
+FF_RISK_PCT = float(os.getenv("FF_RISK_PCT") or 1.0)
 # trailing หลวมสำหรับ momentum algo (ปล่อยวิ่งถึง TP; replay: trail แน่นตัดกำไร +119%→+12%)
 TRAILING_MOM_MULT = float(os.getenv("TRAILING_MOM_MULT") or 3.0)      # trail กว้าง (×ATR)
 TRAILING_MOM_MIN_R = float(os.getenv("TRAILING_MOM_MIN_R") or 1.9)    # trail หลัง R สูง (ใกล้ TP)
@@ -568,6 +571,9 @@ def reload_config():
     CAPITAL_GATE_ENABLE = (os.getenv("CAPITAL_GATE_ENABLE") or "false").lower() == "true"
     CAPITAL_GATE_FLOOR = float(os.getenv("CAPITAL_GATE_FLOOR") or 20000)
     CAPITAL_GATE_MAX_RISK_PCT = float(os.getenv("CAPITAL_GATE_MAX_RISK_PCT") or 15)
+    global FF_SIZING_ENABLE, FF_RISK_PCT
+    FF_SIZING_ENABLE = (os.getenv("FF_SIZING_ENABLE") or "false").lower() == "true"
+    FF_RISK_PCT = float(os.getenv("FF_RISK_PCT") or 1.0)
     global TRAILING_MOM_MULT, TRAILING_MOM_MIN_R
     TRAILING_MOM_MULT        = float(os.getenv("TRAILING_MOM_MULT") or 3.0)
     TRAILING_MOM_MIN_R       = float(os.getenv("TRAILING_MOM_MIN_R") or 1.9)

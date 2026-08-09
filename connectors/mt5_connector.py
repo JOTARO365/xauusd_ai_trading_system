@@ -648,6 +648,22 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         lot, err = _nnlb_lot_and_check(account.equity, sl_pips)
         if err:
             return {"success": False, "error": err}
+    elif getattr(_cfg, "FF_SIZING_ENABLE", False) and account.equity < float(getattr(_cfg, "CAPITAL_GATE_FLOOR", 20000)):
+        # fixed-fractional sizing (ทุก​ algo, ทุนเล็ก): risk %คงที่ของ equity → size ∝ 1/SL → ลด DD (A2 08-09)
+        _otype = mt5.ORDER_TYPE_BUY if direction.upper() == "BUY" else mt5.ORDER_TYPE_SELL
+        _p = tick.ask if direction.upper() == "BUY" else tick.bid
+        _sld = sl_pips * point
+        _slp = _p - _sld if direction.upper() == "BUY" else _p + _sld
+        _risk1 = abs(mt5.order_calc_profit(_otype, symbol, 1.0, _p, _slp) or 0.0)   # ขาดทุน(บาท)/1.0lot ถ้าโดน SL
+        if _risk1 > 0:
+            _step = sym_info.volume_step or 0.01
+            _ff = (float(getattr(_cfg, "FF_RISK_PCT", 1.0)) / 100.0 * account.equity) / _risk1
+            lot = max(_cfg.MIN_LOT, min(round(_ff / _step) * _step, _cfg.MAX_LOT))
+            logger.info("[FF-SIZING] equity %.0f < %.0f → fixed-fractional %.1f%% → lot %.2f (risk %.0f฿)" % (
+                account.equity, float(getattr(_cfg, "CAPITAL_GATE_FLOOR", 20000)),
+                float(getattr(_cfg, "FF_RISK_PCT", 1.0)), lot, lot * _risk1))
+        else:
+            lot = calculate_lot_size(account.balance, sl_pips, confidence_scale)
     else:
         lot = calculate_lot_size(account.balance, sl_pips, confidence_scale)
 
