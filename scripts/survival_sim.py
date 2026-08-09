@@ -31,6 +31,9 @@ sys.path.insert(0, _ROOT)
 
 # ── constants (วัดจริงจาก MT5 08-09) ──
 THB_PER_USD_PER_LOT = 3305.7          # กำไร/ขาดทุน บาท ต่อ $1 ราคาเคลื่อน ต่อ 1.0 lot ทอง
+THB_PER_USD_PER_LOT_XAG = 165280.0    # เงิน: $1 move ต่อ 1.0 lot (contract 5000; 0.01lot=1652.8฿/$1)
+XAG_PX0 = 63.53
+XAG_VOL_MULT = 1.4                    # เงินผันผวน ~1.4× ทอง (ratio จาก hist)
 MARGIN_PER_LOT_THB = 14353.4          # margin บาท ต่อ 1.0 lot (1:1000)
 MIN_LOT = 0.01
 LOT_STEP = 0.01
@@ -297,3 +300,133 @@ if __name__ == "__main__":
     if "--paths" in sys.argv:
         p = int(sys.argv[sys.argv.index("--paths") + 1])
     run(paths=p)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ROSTER MODEL — live combos จริง + affordability-gated routing (user 08-09)
+# แต่ละ combo: risk_thb (วัด min-lot จริง) · exp_R (backtest, haircut small-n) · wr · freq
+# affordability gate: ข้าม combo ถ้า min-lot risk > AFFORD_CAP×equity → ทุนเล็ก auto เข้าเฉพาะ WTI/BTC
+# ══════════════════════════════════════════════════════════════════════════════
+EDGE_CAP = 0.25          # haircut: exp_R เกินนี้ = small-sample artifact (BTC 2.06/WTI 1.02) → cap
+AFFORD_CAP = 0.15        # เข้าไม้ได้ถ้า min-lot risk ≤ 15% ของ equity (กัน one-loss ruin)
+BT_YEARS = 3.5           # ประมาณช่วง backtest → freq/ปี = n/BT_YEARS
+
+# (algo, sym, risk_thb@min-lot [วัดจริง], exp_R [backtest], wr, n)
+_LIVE = [
+    ("regime_momentum",     "XAUUSD", 1372, 0.0376, 35.7, 367),
+    ("regime_momentum_fvg", "XAUUSD", 1372, 0.0376, 35.7, 367),
+    ("macro_momentum",      "XAUUSD", 1372, 0.0677, 36.4, 535),
+    ("confluence_15m",      "XAUUSD", 1372, 0.1620, 40.3, 288),
+    ("tsmom_d1",            "XAUUSD", 1372, 0.2137, 29.1, 110),
+    ("tsmom_d1",            "XAUEUR", 1289, 0.1796, 29.3, 92),
+    ("tsmom_d1",            "BTCUSD",  268, 2.0620, 39.8, 88),   # exp_R จะโดน cap 0.25
+    ("macro_momentum",      "BTCUSD",  268, 0.0526, 39.2, 408),
+    ("confluence_15m",      "BTCUSD",  268, 0.0861, 39.3, 117),
+    ("tsmom_d1",            "WTIUSD",   49, 1.0228, 34.5, 110),  # exp_R จะโดน cap 0.25
+    ("xau_xag_pairs",       "XAUXAG", 1259, 0.1000, 57.0, 120),  # market-neutral (วัด z-stop จริง)
+]
+# regime → ตัวคูณ edge (momentum ดีใน trend, แย่ใน chop; pairs กลับกัน — mean-revert ดีใน range)
+_REG_MULT = {"soft_landing": 1.0, "recession": 1.3, "stagflation": 1.4,
+             "yield_spike": 1.2, "chop_range": 0.4, "tail_crisis": 0.7}
+_REG_MULT_MR = {"soft_landing": 1.0, "recession": 0.7, "stagflation": 0.6,
+                "yield_spike": 0.8, "chop_range": 1.4, "tail_crisis": 0.7}
+
+
+def _combos(haircut=True):
+    out = []
+    for algo, sym, risk, expR, wr, n in _LIVE:
+        e = min(expR, EDGE_CAP) if haircut else expR
+        wrf = wr / 100.0
+        rr = (e + (1 - wrf)) / wrf if wrf > 0 else 2.0    # RR โดยนัยจาก exp_R,wr
+        freq_yr = max(10, min(120, n / BT_YEARS))
+        out.append({"algo": algo, "sym": sym, "risk": float(risk), "exp_R": e, "wr": wrf,
+                    "rr": max(0.3, rr), "fpb": freq_yr / BARS_PER_YEAR,
+                    "mr": algo == "xau_xag_pairs"})
+    return out
+
+
+def _run_roster(rng, tiered, start_eq, combos, reg):
+    """1 path 5 ปี event-driven: gen trade events ต่อ combo (Poisson) → sort → process sequential.
+    reg = regime array รายวัน (แชร์ทั้ง 2 model ให้ path เดียวกัน). เร็วกว่า per-bar loop มาก."""
+    total_bars = YEARS * BARS_PER_YEAR
+    # gen events ต่อ combo: จำนวน ~ Poisson(fpb×bars), เวลาสุ่ม
+    ev_t = []; ev_c = []
+    for ci, cb in enumerate(combos):
+        k = rng.poisson(cb["fpb"] * total_bars)
+        if k <= 0:
+            continue
+        ev_t.append(rng.integers(0, total_bars, size=k)); ev_c.append(np.full(k, ci))
+    if not ev_t:
+        return {"survived": True, "final_eq": start_eq, "maxdd": 0.0, "n_trades": 0, "ruin_year": None}
+    et = np.concatenate(ev_t); ec = np.concatenate(ev_c)
+    order = np.argsort(et, kind="stable"); et = et[order]; ec = ec[order]
+    wins = rng.random(len(et))                            # สุ่ม outcome ล่วงหน้า (vectorized)
+    equity = start_eq; peak = start_eq; maxdd = 0.0; ruined = False; ruin_bar = None; ntr = 0
+    ruin_floor = 40.0
+    for j in range(len(et)):
+        cb = combos[ec[j]]
+        if tiered and cb["risk"] > AFFORD_CAP * equity:   # ข้ามไม้เสี่ยงเกิน % ทุน (ทุนเล็ก auto WTI/BTC)
+            continue
+        actual_risk = max(RISK_PCT * equity, cb["risk"])  # min-lot floor → over-risk ทุนเล็ก
+        if actual_risk > equity:
+            continue
+        scen = _SC_KEYS[reg[et[j] // BARS_PER_DAY]]
+        eff_expR = cb["exp_R"] * (_REG_MULT_MR if cb["mr"] else _REG_MULT)[scen]
+        p = min(0.95, max(0.02, (eff_expR + 1) / (1 + cb["rr"])))
+        r_mult = cb["rr"] if wins[j] < p else -1.0
+        equity += r_mult * actual_risk; ntr += 1
+        if equity <= ruin_floor:
+            ruined = True; ruin_bar = et[j]; equity = max(equity, 0.0); break
+        peak = max(peak, equity); dd = (peak - equity) / peak if peak > 0 else 0
+        maxdd = max(maxdd, dd)
+    survived = (not ruined) and equity > ruin_floor
+    return {"survived": survived, "final_eq": equity, "maxdd": maxdd, "n_trades": ntr,
+            "ruin_year": (ruin_bar / BARS_PER_YEAR) if ruin_bar else None}
+
+
+def _gen_regime(rng):
+    n_days = YEARS * DAYS_PER_YEAR
+    reg = np.empty(n_days, dtype=int)
+    cur = rng.choice(len(_SC_KEYS), p=_SC_PROB); p_sw = 1.0 / _REGIME_DAYS
+    for d in range(n_days):
+        if rng.random() < p_sw:
+            cur = rng.choice(len(_SC_KEYS), p=_SC_PROB)
+        reg[d] = cur
+    return reg
+
+
+def run_roster(paths=500, tiers=(1000, 3000, 20000, 50000), seed=777):
+    rng = np.random.default_rng(seed)
+    print("=" * 82)
+    print("SURVIVAL · LIVE ROSTER จริง · 5 ปี · %d paths · affordability-gate (tiered) vs เข้าทุกคู่" % paths)
+    print("combos LIVE: %d (XAU×5, XAUEUR, BTC×3, WTI, pairs) · edge cap %.2f (haircut small-n) · afford ≤%.0f%%/ไม้"
+          % (len(_LIVE), EDGE_CAP, AFFORD_CAP * 100))
+    print("risk/ไม้@min-lot: WTI 49฿ · BTC 268฿ · XAU 1372฿ · XAUEUR 1289฿ · pairs 1259฿")
+    print("=" * 82)
+    print("%-9s %-11s %7s %10s %9s %10s %7s" % ("ทุนเริ่ม", "model", "รอด%", "median฿", "p10฿", "p90฿", "medDD%"))
+    combos = _combos()
+    MODELS = [("เข้าทุกคู่", False), ("tiered-afford", True)]
+    acc = {(c, name): {"fin": [], "surv": 0, "dd": []} for c in tiers for name, _ in MODELS}
+    for _ in range(paths):                                # gen path (regime+events) ครั้งเดียว รันทุก tier×model
+        pseed = int(rng.integers(1 << 62))
+        reg = _gen_regime(np.random.default_rng(pseed))
+        for c in tiers:
+            for name, ti in MODELS:
+                r = _run_roster(np.random.default_rng(pseed + 1), ti, float(c), combos, reg)
+                a = acc[(c, name)]; a["fin"].append(r["final_eq"]); a["dd"].append(r["maxdd"]); a["surv"] += r["survived"]
+    res = {}
+    for c in tiers:
+        for name, _ in MODELS:
+            a = acc[(c, name)]; fin = np.array(a["fin"])
+            row = {"surv": round(a["surv"] / paths * 100, 1), "median": round(float(np.median(fin))),
+                   "p10": round(float(np.percentile(fin, 10))), "p90": round(float(np.percentile(fin, 90))),
+                   "dd": round(float(np.median(a["dd"])) * 100, 1)}
+            res[(c, name)] = row
+            print("%-9d %-11s %6.1f%% %10d %9d %10d %6.1f%%" % (
+                c, name, row["surv"], row["median"], row["p10"], row["p90"], row["dd"]))
+        d = res[(c, "tiered-afford")]["surv"] - res[(c, "เข้าทุกคู่")]["surv"]
+        print("            → affordability-gate ช่วย survival %+.1f pp\n" % d)
+    print("=" * 82)
+    print("low-risk sleeve จริงใน roster LIVE = WTI (49฿) + BTC (268฿) — ไม่ใช่ pairs/gold.")
+    print("⚠️ edge WTI/BTC-tsmom ดิบสูง (1.0/2.06) = small-n artifact → cap 0.25. ถ้าจริง 0/−EV survival ตก.")
+    return res

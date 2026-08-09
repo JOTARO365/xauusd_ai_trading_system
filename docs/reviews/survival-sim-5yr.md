@@ -71,3 +71,31 @@ back to the low-edge sleeve, whereas gold-only grows to ~137k but survives only 
 (exp_R 0.05). Our FX single-symbol backtests came out ~flat-to-negative, so if that sleeve is
 actually 0/−EV, tiered only delays ruin without growth. No proven low-risk +EV instrument
 exists in-hand yet — that is the gap to close before tiering is real.
+
+## LIVE-roster affordability-gated model (real live symbols)
+
+Tested the actual LIVE roster (11 combos: XAU×5, XAUEUR, BTC×3, WTI, pairs) with per-symbol
+measured min-lot THB risk and backtest edge (small-n edges capped at 0.25). Affordability gate:
+skip any combo whose min-lot risk > 15% of equity.
+
+Measured min-lot risk/trade: **WTI 49฿ · BTC 268฿** · XAU 1,372฿ · XAUEUR 1,289฿ · **pairs 1,259฿**.
+→ pairs is NOT a low-risk sleeve (silver leg dominates); the real low-risk live instruments are
+WTI and BTC.
+
+| start | all-combos survive | tiered-afford survive | tiered median (edge capped) | tiered median (edge=0) |
+|-------|--------------------|-----------------------|-----------------------------|------------------------|
+| 1,000 | 21% | 100% | 1,648 | 705 |
+| 3,000 | 28% | 100% | 8,066 | 1,218 |
+| 20,000 | 75% | 100% | 395,188 | 1,523 |
+| 50,000 | 97% | 100% | 541,151 | 6,403 |
+
+**Two-layer conclusion:**
+1. **Survival (100%) is structural** — the affordability gate makes ruin mathematically impossible
+   (a 49–268฿ trade can't wipe a 1,000฿ account), and holds even with edge=0.
+2. **Growth requires the low-risk instruments to be genuinely +EV.** With edge=0 the account
+   survives but slowly bleeds (1,000→705). WTI/BTC-tsmom raw edges (1.02 / 2.06) are small-n
+   artifacts (WTI was −EV on prior re-validation), so the growth column is optimistic until
+   WTI/BTC edge is independently validated.
+
+**Actionable:** route sub-20k capital to WTI+BTC (survives for free), but validate their edge
+before trusting compounding — pairs and gold stay off-limits below ~20k by the affordability gate.
