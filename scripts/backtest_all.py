@@ -117,26 +117,46 @@ def bt_tsmom(h, l, c, cost_price, lbs=(21, 63, 126), confirm=21, sl_atr=3.0):
     return tr
 
 
-def bt_meanrev(h, l, c, cost, pt, win=60, z=1.25, rr=1.0, sl_atr=1.2, mh=120):
+def bt_meanrev(h, l, c, cost, pt, win=20, z=1.25, s_stop=2.5, hl_max=10, sl_atr=1.5, tk=3):
+    """ตรง algo_mean_reversion live: win20 · RANGE-only · OU half-life gate · zone SL (m∓2.5σ, floor ATR)
+    · TP=กลับ mean · time-stop 3×half-life (audit fix 08-09; เดิม win60/NEUTRAL+RANGE/fixed SL/rr1 = คนละ algo)."""
     atr = R.atr(h, l, c); er = R.efficiency_ratio(c); adx = R.adx(h, l, c); vp = R.vol_percentile(c)
     n = len(c); tr = []; i = max(R.VOL_LOOKBACK, win) + 2
     while i < n - 1:
         av = float(atr[i]) if atr[i] == atr[i] else 0.0
-        if av <= 0 or R.detect_regime(er[i], adx[i], vp[i]) not in ("NEUTRAL", "RANGE"):
+        if av <= 0 or R.detect_regime(er[i], adx[i], vp[i]) != "RANGE":      # RANGE-only (ตรง live)
             i += 1; continue
-        w = c[i - win + 1:i + 1]; m, sd = float(w.mean()), float(w.std())
+        w = c[i - win + 1:i + 1]
+        hl = R.ou_halflife(w)
+        if hl > hl_max:                                                       # OU gate: reversion เร็วพอ
+            i += 1; continue
+        m, sd = float(w.mean()), float(w.std())
         if sd <= 0:
             i += 1; continue
         zz = (float(c[i]) - m) / sd
         d = 1 if zz <= -z else -1 if zz >= z else 0
         if not d:
             i += 1; continue
-        r, ei = _resolve(h, l, c, i, d, float(c[i]), sl_atr * av / pt, rr, pt, cost, mh)
-        tr.append(r); i = ei + 1
+        px = float(c[i])
+        sl_price = (m - s_stop * sd) if d > 0 else (m + s_stop * sd)         # zone SL เลย band
+        sl_dist = max(abs(px - sl_price), sl_atr * av)                       # floor ด้วย ATR
+        tp_dist = max(abs(px - m), sl_atr * av)                              # TP = กลับ mean
+        mh = max(1, round(tk * hl))                                          # time-stop 3×half-life
+        end = min(i + mh, n - 1); R_out = None; ei = end
+        for j in range(i + 1, end + 1):
+            if d > 0:
+                if l[j] <= px - sl_dist:   R_out = -1.0 - cost * pt / sl_dist; ei = j; break
+                if h[j] >= px + tp_dist:   R_out = tp_dist / sl_dist - cost * pt / sl_dist; ei = j; break
+            else:
+                if h[j] >= px + sl_dist:   R_out = -1.0 - cost * pt / sl_dist; ei = j; break
+                if l[j] <= px - tp_dist:   R_out = tp_dist / sl_dist - cost * pt / sl_dist; ei = j; break
+        if R_out is None:
+            R_out = d * (c[end] - px) / sl_dist - cost * pt / sl_dist
+        tr.append(R_out); i = ei + 1
     return tr
 
 
-def bt_sweep(h, l, c, tm, cost, pt, rr=1.5, sl_atr=1.0, mh=120):
+def bt_sweep(h, l, c, tm, cost, pt, rr=1.5, buf_atr=0.5, mh=120):
     atr = R.atr(h, l, c); er = R.efficiency_ratio(c); adx = R.adx(h, l, c); vp = R.vol_percentile(c)
     day = np.array([datetime.fromtimestamp(int(t), timezone.utc).toordinal() for t in tm])
     n = len(c); pdh = np.full(n, np.nan); pdl = np.full(n, np.nan)
@@ -152,14 +172,19 @@ def bt_sweep(h, l, c, tm, cost, pt, rr=1.5, sl_atr=1.0, mh=120):
         av = float(atr[i]) if atr[i] == atr[i] else 0.0
         if av <= 0 or R.detect_regime(er[i], adx[i], vp[i]) not in ("NEUTRAL", "RANGE") or pdh[i] != pdh[i]:
             i += 1; continue
-        px = float(c[i]); d = 0
+        px = float(c[i]); d = 0; swept = 0.0
         if l[i] < pdl[i] and px > pdl[i]:
-            d = 1
+            d = 1; swept = float(l[i])                    # BUY: sweep prior-day low
         elif h[i] > pdh[i] and px < pdh[i]:
-            d = -1
+            d = -1; swept = float(h[i])                   # SELL: sweep prior-day high
         if not d:
             i += 1; continue
-        r, ei = _resolve(h, l, c, i, d, px, sl_atr * av / pt, rr, pt, cost, mh)
+        # SL เลยปลาย sweep wick + buf×ATR (ตรง SweepReversalAlgo live; เดิม fixed 1.0×ATR = ผิด)
+        sl_price = swept - d * buf_atr * av
+        sl_pips = abs(px - sl_price) / pt
+        if sl_pips <= 0:
+            i += 1; continue
+        r, ei = _resolve(h, l, c, i, d, px, sl_pips, rr, pt, cost, mh)
         tr.append(r); i = ei + 1
     return tr
 

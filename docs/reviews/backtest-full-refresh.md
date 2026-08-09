@@ -47,3 +47,17 @@ should be set false**. confluence_15m gold, our best combo, has OOS ≈ 0 once t
 removed — genuinely marginal, not the 0.16 it appeared. Remaining backtest simplifications
 (managed BE/trail exits, macro/tsmom sentiment gates, mean_reversion/sweep divergences) are noted
 in the audit for later.
+
+## Remaining audit fixes applied — mean_reversion + sweep_reversal
+
+- **bt_meanrev** rewritten to match `algo_mean_reversion` live: window 20 (was 60), RANGE-only (was
+  NEUTRAL+RANGE), OU half-life gate (>10 skip, was absent), zone SL `m∓2.5σ` floored at 1.5×ATR
+  (was fixed 1.2×ATR), TP = distance back to mean (was RR=1.0), time-stop 3×half-life (was 120).
+  Post-fix: XAUUSD −0.070 (t−2.50), EURUSD −0.049, USDCHF −0.081 — honestly −EV (matches the cut).
+- **bt_sweep** SL now = distance beyond the sweep wick + 0.5×ATR (live `SweepReversalAlgo`), was a
+  flat 1.0×ATR. Post-fix XAUUSD −0.025, XAGUSD −0.318 — −EV.
+
+All 6 parity-audit findings are now resolved (conf look-ahead + session, tsmom units + disaster SL,
+pairs hardcode→causal, mean_reversion 5-divergences, sweep SL). Inherent-only items remain
+(managed BE/trail exits, macro/tsmom sentiment gates — no historical series). The backtest now
+faithfully reflects live algo logic; no fabricated or hardcoded numbers remain.
