@@ -263,9 +263,18 @@ def _apply_structural_sl(direction, entry, bars, point, broker, base_sl_pips, ba
     high, low, close, _t = bars
     atr_list = _simple_atr(high, low, close)
     atr = atr_list[-1] if atr_list else 0.0
+    _enabled = getattr(_cfg, "STRUCTURAL_SL_MSE", False)
+    if _enabled and getattr(_cfg, "ATR_SL_SMALL_CAP", False):   # ทุนเล็ก → ATR SL (native) แทน structural (user 08-09)
+        try:                                                   # → SL แคบ → FF sizing คุม risk/DD ได้จริง
+            import MetaTrader5 as _mt5
+            _a = _mt5.account_info()
+            if _a and _a.equity < float(getattr(_cfg, "CAPITAL_GATE_FLOOR", 20000)):
+                _enabled = False
+        except Exception:
+            pass
     sl_pips, tp_pips, meta = structural_sl.live_adjust(
         direction, entry, atr, point, broker, base_sl_pips, base_tp_pips, _cfg,
-        enabled=getattr(_cfg, "STRUCTURAL_SL_MSE", False))
+        enabled=_enabled)
     if meta is not None:
         logger.info(f"[MSE] structural SL {algo_id}:{symbol} {meta['base_pips']}p → {meta['struct_pips']}p "
                     f"(ปลายไส้ D1 @ {meta['sl_price']}) → min lot")

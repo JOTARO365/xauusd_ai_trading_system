@@ -64,10 +64,15 @@ def _structural_sl_gold(direction, entry, atr, base_sl_pips, base_tp_pips):
         from agents import structural_sl
         info = mt5.symbol_info(SYMBOL)
         point = float(info.point) if info and info.point else 0.0
+        _enabled = getattr(_cfg, "STRUCTURAL_SL_GOLD", False)
+        if _enabled and getattr(_cfg, "ATR_SL_SMALL_CAP", False):   # ทุนเล็ก → ATR SL แทน structural (user 08-09)
+            _a = mt5.account_info()
+            if _a and _a.equity < float(getattr(_cfg, "CAPITAL_GATE_FLOOR", 20000)):
+                _enabled = False
         sl_pips, tp_pips, meta = structural_sl.live_adjust(
             direction, float(entry or 0), float(atr or 0), point, SYMBOL,
             float(base_sl_pips), float(base_tp_pips), _cfg,
-            enabled=getattr(_cfg, "STRUCTURAL_SL_GOLD", False))
+            enabled=_enabled)
         if meta is not None:
             logger.info(f"[ALGO] structural SL {meta['base_pips']}p → {meta['struct_pips']}p "
                         f"(ปลายไส้ D1 @ {meta['sl_price']}) → min lot")

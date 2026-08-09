@@ -355,6 +355,7 @@ CAPITAL_GATE_MAX_RISK_PCT = float(os.getenv("CAPITAL_GATE_MAX_RISK_PCT") or 15) 
 # ── fixed-fractional sizing เฉพาะทุน < CAPITAL_GATE_FLOOR (A2 08-09; ≥ = fixed-lot เดิม) ──
 FF_SIZING_ENABLE = (os.getenv("FF_SIZING_ENABLE") or "false").lower() == "true"
 FF_RISK_PCT = float(os.getenv("FF_RISK_PCT") or 1.0)
+ATR_SL_SMALL_CAP = (os.getenv("ATR_SL_SMALL_CAP") or "false").lower() == "true"   # ทุน<FLOOR → ATR SL แทน structural (ให้ FF คุม DD)
 # trailing หลวมสำหรับ momentum algo (ปล่อยวิ่งถึง TP; replay: trail แน่นตัดกำไร +119%→+12%)
 TRAILING_MOM_MULT = float(os.getenv("TRAILING_MOM_MULT") or 3.0)      # trail กว้าง (×ATR)
 TRAILING_MOM_MIN_R = float(os.getenv("TRAILING_MOM_MIN_R") or 1.9)    # trail หลัง R สูง (ใกล้ TP)
@@ -574,6 +575,8 @@ def reload_config():
     global FF_SIZING_ENABLE, FF_RISK_PCT
     FF_SIZING_ENABLE = (os.getenv("FF_SIZING_ENABLE") or "false").lower() == "true"
     FF_RISK_PCT = float(os.getenv("FF_RISK_PCT") or 1.0)
+    global ATR_SL_SMALL_CAP
+    ATR_SL_SMALL_CAP = (os.getenv("ATR_SL_SMALL_CAP") or "false").lower() == "true"
     global TRAILING_MOM_MULT, TRAILING_MOM_MIN_R
     TRAILING_MOM_MULT        = float(os.getenv("TRAILING_MOM_MULT") or 3.0)
     TRAILING_MOM_MIN_R       = float(os.getenv("TRAILING_MOM_MIN_R") or 1.9)

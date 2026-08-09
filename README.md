@@ -1235,3 +1235,12 @@ When `FF_SIZING_ENABLE` and equity < `CAPITAL_GATE_FLOOR`, all algos size by fix
 drawdown. At/above the floor, fixed-lot resumes (growth). NOTE: with the wide structural SL +
 `MIN_LOT` floor, FF is effectively inert on small accounts (the min lot already exceeds the target
 risk); the full drawdown benefit requires a tighter SL. Kill switch: `FF_SIZING_ENABLE=false`.
+
+### ATR SL below capital threshold (composes with FF sizing)
+
+`ATR_SL_SMALL_CAP`: while equity < `CAPITAL_GATE_FLOOR`, entries skip the wide structural (D1/H4
+wick) SL and use the algo's native ATR-based SL instead, so fixed-fractional sizing can actually
+scale risk down. Above the floor, the structural SL rule resumes. This is an explicit,
+capital-conditional exception to the "SL = D1/H4 wick always" directive, approved for small
+accounts only. Cuts per-trade risk (e.g. 44%→32% of a 3k account at current vol; more in calm
+markets). Kill switch: `ATR_SL_SMALL_CAP=false`.
