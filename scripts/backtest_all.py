@@ -189,7 +189,7 @@ def bt_sweep(h, l, c, tm, cost, pt, rr=1.5, buf_atr=0.5, mh=120):
     return tr
 
 
-def bt_macro(h, l, c, macro, cost, pt, brk=20, mlb=24, rr=2.0, sl_atr=1.5, mh=120):
+def bt_macro(h, l, c, macro, cost, pt, brk=20, mlb=24, rr=2.0, sl_atr=1.5, mh=120, msign=1):
     atr = R.atr(h, l, c); n = len(c); tr = []; i = max(R.VOL_LOOKBACK, brk, mlb) + 2
     while i < n - 1:
         av = float(atr[i]) if atr[i] == atr[i] else 0.0
@@ -199,7 +199,7 @@ def bt_macro(h, l, c, macro, cost, pt, brk=20, mlb=24, rr=2.0, sl_atr=1.5, mh=12
         d = 1 if px > hh else -1 if px < ll else 0
         if not d or macro[i] != macro[i] or macro[i - mlb] != macro[i - mlb]:
             i += 1; continue
-        if d != (1 if macro[i] > macro[i - mlb] else -1):
+        if d != (1 if msign * (macro[i] - macro[i - mlb]) > 0 else -1):   # USD-factor ต่อคู่ (structural sign)
             i += 1; continue
         r, ei = _resolve(h, l, c, i, d, px, sl_atr * av / pt, rr, pt, cost, mh)
         tr.append(r); i = ei + 1
@@ -323,13 +323,14 @@ def main():
         return (_sc.cost_pips(lg) if _sc else None) or 30.0
 
     # macro proxy (EURUSD) สำหรับ macro_momentum
-    def macro_series(sym, tm, tf):
-        e = bm.get("EURUSD", "EURUSD"); mt5.symbol_select(e, True)
+    def macro_series(lg, tm, tf):
+        macro_lg, sign = R.macro_for(lg)                   # structural driver ต่อคู่ (XAUJPY→USDJPY, XAUEUR→EURUSD−)
+        e = bm.get(macro_lg, macro_lg); mt5.symbol_select(e, True)
         r = mt5.copy_rates_from_pos(e, tf, 0, len(tm) + 500)
         if r is None:
-            return None
+            return None, sign
         emap = {int(t): float(c) for t, c in zip(r["time"], r["close"])}
-        return np.array([emap.get(int(t), np.nan) for t in tm], float)
+        return np.array([emap.get(int(t), np.nan) for t in tm], float), sign
 
     print("backtest matrix: algo × pair (causal · cost-adj · OOS)…")
     for lg in universe:
@@ -363,10 +364,11 @@ def main():
         rh4 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H4, 0, 30000)
         if rh4 is not None and len(rh4) > 500:
             h4 = rh4["high"].astype(float); l4 = rh4["low"].astype(float); c4 = rh4["close"].astype(float)
-            mac = macro_series(sym, rh4["time"], mt5.TIMEFRAME_H4)
+            mac, msign = macro_series(lg, rh4["time"], mt5.TIMEFRAME_H4)
             if mac is not None:
-                note = "breakout + DXY confirm" + ("" if lg in ("XAUUSD", "XAGUSD", "XAUEUR") else " (DXY driver ไม่ตรงคู่นี้)")
-                rows.append(_row("macro_momentum", lg, "H4", _stats(bt_macro(h4, l4, c4, mac, cost, pt)), note))
+                _mlg, _ = R.macro_for(lg)
+                note = "breakout + %s confirm (structural, sign %+d)" % (_mlg, msign)
+                rows.append(_row("macro_momentum", lg, "H4", _stats(bt_macro(h4, l4, c4, mac, cost, pt, msign=msign)), note))
         # confluence_15m (ทุกคู่ — backtest ก่อนเปิด eligible; DXY driver ตรงเฉพาะ gold-complex)
         try:
             n15 = "15m confluence + volume surge" + ("" if lg in ("XAUUSD", "XAGUSD", "XAUEUR") else " (DXY ไม่ตรงคู่นี้)")

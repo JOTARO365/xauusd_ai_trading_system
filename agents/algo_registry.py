@@ -318,12 +318,12 @@ class MacroMomAlgo(Algo):
     RR = 2.0
     MACRO = "EURUSD"                                   # DXY-inverse proxy
 
-    def _fetch_macro(self, times):
-        """EURUSD close align ตาม timestamp ทอง (live MT5). คืน np.array (NaN ถ้าไม่มี) หรือ None."""
+    def _fetch_macro(self, times, macro_logical=None):
+        """macro close align ตาม timestamp (live MT5). macro_logical = driver ต่อคู่ (structural). คืน np.array หรือ None."""
         try:
             import MetaTrader5 as mt5
             from connectors.pair_collector import _broker_map
-            brk = (_broker_map() or {}).get(self.MACRO, self.MACRO)
+            brk = (_broker_map() or {}).get(macro_logical or self.MACRO, macro_logical or self.MACRO)
             r = mt5.copy_rates_from_pos(brk, mt5.TIMEFRAME_H4, 0, max(2000, len(times) + 50))
             if r is None or len(r) < self.MLB + 5:
                 return None
@@ -345,12 +345,13 @@ class MacroMomAlgo(Algo):
         d = "BUY" if px > hh else ("SELL" if px < ll else None)   # Donchian breakout = จุดสำคัญ
         if d is None:
             return None
+        macro_logical, msign = R.macro_for(symbol)         # structural driver ต่อคู่ (XAUJPY→USDJPY, XAUEUR→EURUSD−)
         macro = (ctx or {}).get("macro_close")
         if macro is None:
-            macro = self._fetch_macro(times)               # live fetch
+            macro = self._fetch_macro(times, macro_logical)   # live fetch (per-pair)
         if macro is None or len(macro) <= i or macro[i] != macro[i] or macro[i - self.MLB] != macro[i - self.MLB]:
             return None
-        md = "BUY" if macro[i] > macro[i - self.MLB] else "SELL"   # DXY-proxy direction
+        md = "BUY" if msign * (macro[i] - macro[i - self.MLB]) > 0 else "SELL"   # USD-factor direction ต่อคู่
         if d != md:                                        # breakout สวน macro → stand-down (ไม่สวน sentiment โครงสร้าง)
             return None
         try:                                               # ข่าว/econ sentiment (gold) — ไม่สวน sentiment สด

@@ -144,6 +144,21 @@ def detect_regime(er, adx_v, volpct):
 REGIME_ALGO = {"TREND": "momentum_breakout"}   # display/analytics map (sync กับ STRATEGIES ด้านล่าง)
 
 
+# ── macro driver ต่อคู่ (structural, ไม่ fit) — macro_momentum: breakout ต้องตรงทิศ USD-factor ──
+# (macro_logical, sign): sign=+1 → asset ขึ้นเมื่อ macro ขึ้น. เหตุผลโครงสร้างตาม currency ที่ quote:
+#   USD-quoted (ทอง/เงิน/น้ำมัน/BTC) → EURUSD (+): EURUSD ขึ้น=USD อ่อน=asset ขึ้น
+#   XAUJPY → USDJPY (+): USDJPY ขึ้น=JPY อ่อน=ทองในเยนขึ้น · XAUEUR → EURUSD (−): EUR อ่อน=ทองในยูโรขึ้น
+MACRO_MAP = {
+    "XAUUSD": ("EURUSD", 1), "XAGUSD": ("EURUSD", 1), "WTIUSD": ("EURUSD", 1), "BTCUSD": ("EURUSD", 1),
+    "XAUJPY": ("USDJPY", 1), "XAUEUR": ("EURUSD", -1),
+}
+
+
+def macro_for(symbol):
+    """คืน (macro_logical, sign) ต่อคู่. default = (EURUSD, +1) — USD-factor proxy."""
+    return MACRO_MAP.get(str(symbol).upper(), ("EURUSD", 1))
+
+
 # ─────────────────────────── algorithm library (EXECUTION — deterministic, ONE/regime) ───────────────────────────
 def algo_momentum_breakout(i, high, low, close, atr_v, point=None):
     """TREND: Donchian breakout + ATR SL/TP. entry = ราคาทะลุ N-bar high/low (คำนวณจาก data ไม่ prediction).

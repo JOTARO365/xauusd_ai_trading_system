@@ -83,3 +83,22 @@ confirming it was a bull-window artifact (matches the prior finding: gold moment
 isn't there, and full history confirms it (per quant-sat ch3: use the methods to REJECT, not to
 manufacture edge). The disciplined action is to keep −EV combos shadow/off, not force them live.
 No fabricated or hardcoded numbers were introduced.
+
+## Structural per-pair macro driver (legit fix, not curve-fit)
+
+macro_momentum used EURUSD (DXY proxy) as the macro confirm for ALL pairs — wrong for non-USD-quoted
+gold. Added a structural per-pair map (`regime_lib.MACRO_MAP` / `macro_for`), used by both the live
+`MacroMomAlgo` and `bt_macro`:
+- USD-quoted (XAU/XAG/WTI/BTC ·USD) → EURUSD (+): EURUSD up = USD weak = asset up.
+- XAUJPY → USDJPY (+): JPY weakness lifts gold-in-JPY.
+- XAUEUR → EURUSD (−): EUR weakness lifts gold-in-EUR.
+
+This is a currency-structural choice, NOT parameter tuning to a backtest. Result:
+- **macro_momentum XAUEUR: −EV → +EV** (exp_R 0.113, t1.42, OOS 0.460, n336) — now the 2nd-strongest
+  +EV combo, using the correct EUR-inverted driver.
+- macro_momentum XAUUSD unchanged (0.068) — fixing one pair did NOT touch the others (the goal).
+- XAUJPY: no result (only 11 months of data — hard limit, unchanged).
+
++EV total 10 → 11. macro_momentum XAUEUR is now a live-enable candidate. Discipline held: only the
+structurally-correct driver was changed per pair; no BRK/SL/RR was tuned per pair (that would be
+curve-fitting).
