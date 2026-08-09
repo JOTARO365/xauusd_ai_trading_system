@@ -22,6 +22,19 @@ UNIVERSE = ["XAUUSD", "XAGUSD", "XAUEUR", "XAUJPY", "AUDUSD", "EURUSD", "GBPUSD"
             "BTCUSD", "WTIUSD"]
 
 
+def _season_block(symbol, direction, times, i):
+    """gold seasonal gate (structural, flag SEASONALITY_GATE): True=entry สวน seasonal แรง → block. XAU only."""
+    try:
+        import config as _c
+        if not getattr(_c, "SEASONALITY_GATE", False):
+            return False
+        from agents import seasonality as _sz
+        mo = datetime.fromtimestamp(int(times[i]), timezone.utc).month
+        return _sz.blocks(symbol, direction, mo)
+    except Exception:
+        return False
+
+
 class Algo:
     """Base contract. Subclasses set the class attrs and implement evaluate().
 
@@ -59,6 +72,8 @@ class RegimeMomentumAlgo(Algo):
         sig = rec.get("signal")
         if not sig or sig.get("algo") != "momentum_breakout":
             return None                                  # stand-down (not TREND, or no breakout)
+        if _season_block(symbol, sig["dir"], times, len(close) - 2):
+            return None                                   # ทอง: ไม่สวน seasonal แรง
         from agents import algo_pair_config as _apc       # per-pair tune SL/RR (BRK = global, ผ่าน compute_shadow_signal)
         _sl_atr = float(_apc.get(self.algo_id, symbol, "SL_ATR", R.ATR_SL))
         _rr = float(_apc.get(self.algo_id, symbol, "RR", R.RR))
@@ -188,6 +203,8 @@ class TSMOMDailyAlgo(Algo):
         direction = self.signal_dir(close, i, confirm=True, lookbacks=_lbs, confirm_lb=_cf)   # per-pair confirm
         if direction is None:
             return None
+        if _season_block(symbol, direction, times, i):     # ทอง: ไม่สวน seasonal แรง
+            return None
         # ข่าว + ตัวเลขเศรษฐกิจ (user 08-07): sentiment คุมทิศ — ไม่เข้าสวน sentiment แรง (gold-specific score)
         try:
             if symbol and symbol.upper().startswith("XAU"):
@@ -201,6 +218,8 @@ class TSMOMDailyAlgo(Algo):
         atr = R.atr(high, low, close)
         av = float(atr[i]) if atr[i] == atr[i] else 0.0    # NaN guard
         if av <= 0:
+            return None
+        if _season_block(symbol, direction, times, i):     # ทอง (XAUEUR/XAUJPY): ไม่สวน seasonal แรง
             return None
         try:
             from datetime import datetime, timezone
@@ -382,6 +401,8 @@ class MacroMomAlgo(Algo):
         md = "BUY" if msign * (macro[i] - macro[i - mlb]) > 0 else "SELL"   # USD-factor direction ต่อคู่
         if d != md:                                        # breakout สวน macro → stand-down (ไม่สวน sentiment โครงสร้าง)
             return None
+        if _season_block(symbol, d, times, i):             # ทอง: ไม่สวน seasonal แรง
+            return None
         try:                                               # ข่าว/econ sentiment (gold) — ไม่สวน sentiment สด
             from agents.sentiment_bias import compute as _sb
             from agents.sentiment_score import get_score
@@ -488,6 +509,8 @@ class ConfluenceVol15m(Algo):
         sign = 1 if d == "BUY" else -1
         if cx["h1"] != sign or cx["h4"] != sign or cx["mac"] != sign or not cx["vsurge"]:
             return None                                    # ต้อง H1+H4+macro+volume ตรงหมด (order-flow confluence)
+        if _season_block(symbol, d, times, i):             # ทอง: ไม่สวน seasonal แรง
+            return None
         try:
             from datetime import datetime, timezone
             bar_ts = datetime.fromtimestamp(int(times[i]), timezone.utc).isoformat()

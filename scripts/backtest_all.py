@@ -47,7 +47,22 @@ def _resolve(h, l, c, i, sign, px, slp, rr, pt, cost, max_hold):
     return sign * (c[end] - px) / (slp * pt) - cost / slp, end
 
 
-def bt_momentum(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, trend=True, mh=120):
+def _season_bt(sym, d, tm, i):
+    """seasonal gate (parity กับ live): True=block. XAU + SEASONALITY_GATE เท่านั้น."""
+    if tm is None or not sym:
+        return False
+    try:
+        import config as _c
+        if not getattr(_c, "SEASONALITY_GATE", False):
+            return False
+        from agents import seasonality as _sz
+        mo = datetime.fromtimestamp(int(tm[i]), timezone.utc).month
+        return _sz.blocks(sym, "BUY" if d > 0 else "SELL", mo)
+    except Exception:
+        return False
+
+
+def bt_momentum(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, trend=True, mh=120, tm=None, sym=None):
     atr = R.atr(h, l, c); er = R.efficiency_ratio(c); adx = R.adx(h, l, c); vp = R.vol_percentile(c)
     n = len(c); tr = []; i = max(R.VOL_LOOKBACK, brk) + 2
     while i < n - 1:
@@ -56,14 +71,14 @@ def bt_momentum(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, trend=True, mh=12
             i += 1; continue
         px = float(c[i]); hh = float(h[i - brk:i].max()); ll = float(l[i - brk:i].min())
         d = 1 if px > hh else -1 if px < ll else 0
-        if not d:
+        if not d or _season_bt(sym, d, tm, i):
             i += 1; continue
         r, ei = _resolve(h, l, c, i, d, px, sl_atr * av / pt, rr, pt, cost, mh)
         tr.append(r); i = ei + 1
     return tr
 
 
-def bt_momentum_fvg(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, mh=120, fvg_lb=6):
+def bt_momentum_fvg(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, mh=120, fvg_lb=6, tm=None, sym=None):
     """regime_momentum_fvg: bt_momentum + FVG confluence filter (ตรงกับ MomentumFVGAlgo live).
     ต้องมี FVG หนุนทิศใน fvg_lb แท่งก่อน entry: bull low[j]>high[j-2] / bear high[j]<low[j-2] ไม่งั้น skip."""
     atr = R.atr(h, l, c); er = R.efficiency_ratio(c); adx = R.adx(h, l, c); vp = R.vol_percentile(c)
@@ -74,7 +89,7 @@ def bt_momentum_fvg(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, mh=120, fvg_l
             i += 1; continue
         px = float(c[i]); hh = float(h[i - brk:i].max()); ll = float(l[i - brk:i].min())
         d = 1 if px > hh else -1 if px < ll else 0
-        if not d:
+        if not d or _season_bt(sym, d, tm, i):
             i += 1; continue
         ok = False                                          # FVG confluence (เหมือน live)
         for j in range(max(2, i - fvg_lb), i + 1):
@@ -189,7 +204,7 @@ def bt_sweep(h, l, c, tm, cost, pt, rr=1.5, buf_atr=0.5, mh=120):
     return tr
 
 
-def bt_macro(h, l, c, macro, cost, pt, brk=20, mlb=24, rr=2.0, sl_atr=1.5, mh=120, msign=1):
+def bt_macro(h, l, c, macro, cost, pt, brk=20, mlb=24, rr=2.0, sl_atr=1.5, mh=120, msign=1, tm=None, sym=None):
     atr = R.atr(h, l, c); n = len(c); tr = []; i = max(R.VOL_LOOKBACK, brk, mlb) + 2
     while i < n - 1:
         av = float(atr[i]) if atr[i] == atr[i] else 0.0
@@ -200,6 +215,8 @@ def bt_macro(h, l, c, macro, cost, pt, brk=20, mlb=24, rr=2.0, sl_atr=1.5, mh=12
         if not d or macro[i] != macro[i] or macro[i - mlb] != macro[i - mlb]:
             i += 1; continue
         if d != (1 if msign * (macro[i] - macro[i - mlb]) > 0 else -1):   # USD-factor ต่อคู่ (structural sign)
+            i += 1; continue
+        if _season_bt(sym, d, tm, i):
             i += 1; continue
         r, ei = _resolve(h, l, c, i, d, px, sl_atr * av / pt, rr, pt, cost, mh)
         tr.append(r); i = ei + 1
@@ -216,7 +233,7 @@ def _htf_slope_map(m15_time, htf_time, htf_close, ema_n=50):
     return slope[idx]
 
 
-def bt_conf15m(mt5, sym, e_broker, cost, pt, brk=12, rr=2.0, sl_atr=1.0, vk=1.5, mh=48, session=None):
+def bt_conf15m(mt5, sym, e_broker, cost, pt, brk=12, rr=2.0, sl_atr=1.0, vk=1.5, mh=48, session=None, season_sym=None):
     """confluence_15m ต่อคู่: 15m breakout + H1+H4+macro ตรง + volume surge. คืน list R.
     session: override 'lo-hi' UTC (None → config default สำหรับ XAU)."""
     m = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M15, 0, 40000)
@@ -263,6 +280,8 @@ def bt_conf15m(mt5, sym, e_broker, cost, pt, brk=12, rr=2.0, sl_atr=1.0, vk=1.5,
         px = float(c[i]); hh = float(h[i - brk:i].max()); ll = float(l[i - brk:i].min())
         d = 1 if px > hh else -1 if px < ll else 0
         if not d:
+            i += 1; continue
+        if _season_bt(season_sym, d, tm, i):
             i += 1; continue
         m_ = mac[i]; ml = mac[i - 24] if i - 24 >= 0 else np.nan
         if (h1t[i] != d or h4t[i] != d or m_ != m_ or ml != ml
@@ -355,9 +374,9 @@ def main():
         pt = float(info.point); cost = cost_of(lg)
         h = rh["high"].astype(float); l = rh["low"].astype(float); c = rh["close"].astype(float); tm = rh["time"]
         # momentum (H1) — regime_momentum = breakout · fvg = breakout + FVG filter (แยกจริง, ไม่ก๊อป)
-        rows.append(_row("regime_momentum", lg, "H1", _stats(bt_momentum(h, l, c, cost, pt)),
+        rows.append(_row("regime_momentum", lg, "H1", _stats(bt_momentum(h, l, c, cost, pt, tm=tm, sym=lg)),
                          "Donchian breakout TREND-gate"))
-        rows.append(_row("regime_momentum_fvg", lg, "H1", _stats(bt_momentum_fvg(h, l, c, cost, pt)),
+        rows.append(_row("regime_momentum_fvg", lg, "H1", _stats(bt_momentum_fvg(h, l, c, cost, pt, tm=tm, sym=lg)),
                          "Donchian breakout + FVG confluence filter"))
         # mean_reversion (H1)
         rows.append(_row("mean_reversion", lg, "H1", _stats(bt_meanrev(h, l, c, cost, pt)), "z-fade RANGE"))
@@ -376,11 +395,11 @@ def main():
             if mac is not None:
                 _mlg, _ = R.macro_for(lg)
                 note = "breakout + %s confirm (structural, sign %+d)" % (_mlg, msign)
-                rows.append(_row("macro_momentum", lg, "H4", _stats(bt_macro(h4, l4, c4, mac, cost, pt, msign=msign)), note))
+                rows.append(_row("macro_momentum", lg, "H4", _stats(bt_macro(h4, l4, c4, mac, cost, pt, msign=msign, tm=rh4["time"], sym=lg)), note))
         # confluence_15m (ทุกคู่ — backtest ก่อนเปิด eligible; DXY driver ตรงเฉพาะ gold-complex)
         try:
             n15 = "15m confluence + volume surge" + ("" if lg in ("XAUUSD", "XAGUSD", "XAUEUR") else " (DXY ไม่ตรงคู่นี้)")
-            rows.append(_row("confluence_15m", lg, "M15", _stats(bt_conf15m(mt5, sym, bm.get("EURUSD", "EURUSD"), cost, pt)), n15))
+            rows.append(_row("confluence_15m", lg, "M15", _stats(bt_conf15m(mt5, sym, bm.get("EURUSD", "EURUSD"), cost, pt, season_sym=lg)), n15))
         except Exception:
             pass
         print(f"  {lg}: done")
