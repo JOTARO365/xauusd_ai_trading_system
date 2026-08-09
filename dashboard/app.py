@@ -2004,6 +2004,38 @@ def api_backtest_results():
     return jsonify(data)
 
 
+@app.route("/api/risk-sat")
+def api_risk_sat():
+    """SAT risk metrics (Sharpe/maxDD/VaR) จากไม้ปิดจริง. display-only, 0 token."""
+    def _c():
+        from agents.risk_analytics import summary
+        return summary()
+    return jsonify(_cached("risk-sat", _c, ttl=120))
+
+
+@app.route("/api/equity-curve")
+def api_equity_curve():
+    """equity curve + underwater (drawdown over time). display-only, 0 token."""
+    def _c():
+        from agents.risk_analytics import equity_curve
+        return equity_curve()
+    return jsonify(_cached("equity-curve", _c, ttl=120))
+
+
+@app.route("/api/cointegration")
+def api_cointegration():
+    """cointegration monitor (ADF/Hurst/half-life ทุกคู่). heavy (MT5 scan) → cache 1hr. 0 token."""
+    def _c():
+        try:
+            from scripts.cointegration_scan import run
+            rows = run(tf_name="H1", count=8000) or []
+            return {"ok": True, "rows": rows,
+                    "note": "ADF<-2.86(5%)+Hurst<0.5+split-half = cointegrated. 55คู่→false-pos ~2.8 (multiple-testing)"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+    return jsonify(_cached("cointegration", _c, ttl=3600))
+
+
 @app.route("/api/options-oi")
 def api_options_oi():
     """Gold options open-interest walls (GLD chain via CBOE → XAU price). proxy 'สัญญาถือ ณ ราคา'
