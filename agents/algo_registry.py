@@ -59,13 +59,17 @@ class RegimeMomentumAlgo(Algo):
         sig = rec.get("signal")
         if not sig or sig.get("algo") != "momentum_breakout":
             return None                                  # stand-down (not TREND, or no breakout)
+        from agents import algo_pair_config as _apc       # per-pair tune SL/RR (BRK = global, ผ่าน compute_shadow_signal)
+        _sl_atr = float(_apc.get(self.algo_id, symbol, "SL_ATR", R.ATR_SL))
+        _rr = float(_apc.get(self.algo_id, symbol, "RR", R.RR))
+        _slp = sig["sl_pips"] * (_sl_atr / R.ATR_SL) if R.ATR_SL else sig["sl_pips"]   # scale SL ตาม per-pair ATR mult
         return {
             "algo_id": self.algo_id,
             "symbol":  symbol,
             "dir":     sig["dir"],
             "entry":   rec["close"],                     # real closed-bar price (n-2), same as executor/journal
-            "sl_pips": sig["sl_pips"],
-            "tp_pips": sig["tp_pips"],
+            "sl_pips": round(_slp),
+            "tp_pips": round(_slp * _rr),
             "regime":  rec["regime"],
             "bar_ts":  rec["bar_ts"],                    # dedup key: one signal per (algo,symbol,bar)
             "klass":   self.klass,
@@ -142,16 +146,28 @@ class TSMOMDailyAlgo(Algo):
         except Exception:
             return self.CONFIRM_LB
 
-    def signal_dir(self, close, i, confirm=False, lookbacks=None):
-        """ensemble vote ที่บาร์ i (closed) → 'BUY'/'SELL'/None(FLAT). confirm=True → เพิ่ม short-term gate
-        (ไม่ให้สัญญาณสวน momentum ระยะสั้น CONFIRM_LB วัน = กันขายสวนของขึ้น). ใช้ confirm เฉพาะ entry.
-        lookbacks: override (per-combo H4 short-term); None → config/default."""
+    def _pair_lbs(self, symbol):
+        """per-pair lookbacks override (algo_pair_config) → global → default. รับ list หรือ 'a,b,c'."""
+        from agents import algo_pair_config as _apc
+        raw = _apc.get(self.algo_id, symbol, "lookbacks", None)
+        if raw:
+            try:
+                v = tuple(int(x) for x in (raw if isinstance(raw, (list, tuple)) else str(raw).split(",")))
+                if v:
+                    return v
+            except Exception:
+                pass
+        return self._lookbacks()
+
+    def signal_dir(self, close, i, confirm=False, lookbacks=None, confirm_lb=None):
+        """ensemble vote ที่บาร์ i (closed) → 'BUY'/'SELL'/None(FLAT). confirm=True → short-term gate.
+        lookbacks/confirm_lb: override (per-pair/per-combo); None → config/default."""
         votes = 0
         for L in (lookbacks or self._lookbacks()):
             if i - L >= 0:
                 votes += int(np.sign(close[i] - close[i - L]))
         d = "BUY" if votes > 0 else ("SELL" if votes < 0 else None)
-        cf = self._confirm_lb()
+        cf = confirm_lb if confirm_lb is not None else self._confirm_lb()
         if confirm and d and cf and i - cf >= 0:
             s = np.sign(close[i] - close[i - cf])
             if (s > 0 and d == "SELL") or (s < 0 and d == "BUY"):
@@ -161,11 +177,15 @@ class TSMOMDailyAlgo(Algo):
     def evaluate(self, symbol, bars, ctx=None, point=None):
         high, low, close, times = bars
         n = len(close)
-        _lbs = (ctx or {}).get("lookbacks") or self._lookbacks()   # per-combo H4 override (short-term) หรือ config
+        from agents import algo_pair_config as _apc            # per-pair tune (default=global)
+        _lbs = (ctx or {}).get("lookbacks") or self._pair_lbs(symbol)   # per-pair/combo override หรือ config
+        _cf = _apc.get(self.algo_id, symbol, "CONFIRM_LB", None)
+        _cf = int(_cf) if _cf is not None else None
+        _sl_atr = float(_apc.get(self.algo_id, symbol, "SL_ATR", self.SL_ATR))
         if n < max(_lbs) + 5 or not point:
             return None
         i = n - 2                                          # บาร์ปิดล่าสุด (D1 default; H4 ถ้า override)
-        direction = self.signal_dir(close, i, confirm=True, lookbacks=_lbs)   # entry = ต้องผ่าน short-term confirm
+        direction = self.signal_dir(close, i, confirm=True, lookbacks=_lbs, confirm_lb=_cf)   # per-pair confirm
         if direction is None:
             return None
         # ข่าว + ตัวเลขเศรษฐกิจ (user 08-07): sentiment คุมทิศ — ไม่เข้าสวน sentiment แรง (gold-specific score)
@@ -189,7 +209,7 @@ class TSMOMDailyAlgo(Algo):
             return None
         return {
             "algo_id": self.algo_id, "symbol": symbol, "dir": direction,
-            "entry": float(close[i]), "sl_pips": (self.SL_ATR * av) / point, "tp_pips": 0.0,   # 0 = no-TP (exit-on-flip)
+            "entry": float(close[i]), "sl_pips": (_sl_atr * av) / point, "tp_pips": 0.0,   # 0 = no-TP (exit-on-flip)
             "regime": "TSMOM", "bar_ts": bar_ts, "klass": self.klass,
         }
 
@@ -287,7 +307,10 @@ class SweepReversalAlgo(Algo):
         if d is None:
             return None
         sign = 1 if d == "BUY" else -1
-        sl_pips = abs(float(close[i]) - (swept - sign * self.BUF_ATR * av)) / point
+        from agents import algo_pair_config as _apc            # per-pair tune (default=global)
+        _buf = float(_apc.get(self.algo_id, symbol, "BUF_ATR", self.BUF_ATR))
+        _rr = float(_apc.get(self.algo_id, symbol, "RR", self.RR))
+        sl_pips = abs(float(close[i]) - (swept - sign * _buf * av)) / point
         if sl_pips <= 0:
             return None
         try:
@@ -296,7 +319,7 @@ class SweepReversalAlgo(Algo):
             return None
         return {
             "algo_id": self.algo_id, "symbol": symbol, "dir": d,
-            "entry": float(close[i]), "sl_pips": sl_pips, "tp_pips": sl_pips * self.RR,
+            "entry": float(close[i]), "sl_pips": sl_pips, "tp_pips": sl_pips * _rr,
             "regime": reg, "bar_ts": bar_ts, "klass": self.klass,
         }
 
