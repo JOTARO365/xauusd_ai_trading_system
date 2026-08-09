@@ -667,6 +667,23 @@ def tick(force=False):
     dirty = False
     opened = managed = ok = 0
 
+    # reap: ปิดไม้ทุก combo ใน state (รวม combo ที่ toggle SHADOW/OFF ไปแล้ว → live loop ข้าม) →
+    # record real_fill (feature-rich จาก ctx ตอน entry) + pop. MSE เป็นเจ้าของ record ไม้ non-gold
+    # (trade_recorder ข้าม MSE-*). กัน ghost สะสม + edge-data leak. dedup กัน dup. fail-soft.
+    try:
+        import MetaTrader5 as _mt5r
+        _all_open = _mt5r.positions_get() or []
+        for _ck, _cs in list(state.items()):
+            if not (_cs.get("tickets")):
+                continue
+            _ra, _, _rs = _ck.rpartition(":")
+            if _reconcile_closed(_ra, _rs, _all_open, _cs):
+                dirty = True
+            if not _cs.get("tickets"):
+                _cs.pop("tickets", None); dirty = True
+    except Exception as _re:
+        logger.debug(f"[MSE] reap fail: {_re}")
+
     for algo_id, symbol in live:
         try:
             broker = bmap.get(symbol, symbol)

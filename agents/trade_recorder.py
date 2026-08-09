@@ -200,9 +200,13 @@ def tick(force=False):
         if pos is None:                                      # fetch fail → ข้าม (กัน false-close)
             return None
         reg = _load_reg()
+        reg = {tk: c for tk, c in reg.items()                          # MSE non-gold ย้ายให้ multi_symbol_executor record เอง (feature-rich)
+               if not str(c.get("comment") or "").startswith("MSE-")}  # → ล้าง MSE-* ที่ค้าง กัน false-close feature-less
         open_ids = set()
         for p in pos:
             if not (SYSTEM_MAGIC <= p.magic <= SYSTEM_MAGIC + 9999):   # ทอง (base) + MSE per-algo (base+offset)                          # ไม้บอททุก symbol (ทอง + WTI/BTC/คู่อื่น)
+                continue
+            if str(p.comment or "").startswith("MSE-"):                # MSE non-gold → executor เป็นเจ้าของ record (feature-rich); ข้าม กัน dedup ชน features หาย
                 continue
             tk = str(p.ticket)
             open_ids.add(tk)
