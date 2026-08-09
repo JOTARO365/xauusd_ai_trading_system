@@ -45,6 +45,12 @@ RISK_PCT = 0.005                      # fixed-fractional 0.5%/ไม้ (over-ri
 FORCE_CLOSE_MIN_CAP = 20000.0        # < นี้ = lock double (roll baseline); ≥ = ปล่อยวิ่ง
 FORCE_CLOSE_PCT = 100.0
 SENTIMENT_ACC = 0.62                  # sentiment/ข่าว อ่านทิศ regime ถูก ~62% (edge บางจริง ไม่ perfect)
+# ── model ใหม่: capital-tiered router — ทุน < FLOOR เทรด sleeve เสี่ยงต่ำ (FX/micro-ish) แทนทอง ──
+TIER_FLOOR = 20000.0                  # < นี้ = low-risk sleeve · ≥ = gold structural sleeve
+SMALL_RISK_THB = 150.0               # ขาดทุน/ไม้ ของ instrument เล็ก ที่ min-lot (เทียบทอง ~1190)
+SMALL_EXP_R = 0.05                    # edge บางของ sleeve เล็ก (FX ~flat; หน้าที่ = อยู่รอด+โตช้า ไม่ใช่กำไรหลัก)
+SMALL_RR = 1.5
+SMALL_FREQ = 0.08                     # โอกาสเข้าไม้ต่อ bar (~130 ไม้/ปี ใกล้ทอง)
 
 # ── scenarios (อิง consensus กองทุน/นักลงทุนโลก 2026 · gold-centric · 5-yr) ──
 SCENARIOS = {
@@ -136,9 +142,10 @@ def _gen_path(rng, hist_lr):
 _SLEEVES = [(30, 40, 2.0, 12), (8, 16, 2.0, 8)]   # ช้า(trend) · เร็ว(intraday breakout)
 
 
-def _run_system(price, sent, start_equity, ext, force_close=True):
+def _run_system(price, sent, start_equity, ext, force_close=True, tiered=False, rng=None):
     """รัน 2 sleeve breakout + sentiment gate + money model บาท. ext = pre-computed (hi,lo) ต่อ sleeve.
-    force_close: ปิดตะกร้าลอยทั้งหมดเมื่อ floating equity ≥ baseline×2 (ระหว่างทุน < เกณฑ์) = lock กำไร."""
+    force_close: ปิดตะกร้าลอยทั้งหมดเมื่อ floating equity ≥ baseline×2 (ระหว่างทุน < เกณฑ์) = lock กำไร.
+    tiered: ทุน < TIER_FLOOR → เทรด sleeve เสี่ยงต่ำ (statistical) แทนทอง; ≥ FLOOR → gold sleeve."""
     n = len(price)
     equity = start_equity; baseline = start_equity; peak = start_equity
     maxdd = 0.0; ruined = False; ruin_bar = None; n_trades = 0; wins = 0; sumR = 0.0; n_forced = 0
@@ -153,8 +160,21 @@ def _run_system(price, sent, start_equity, ext, force_close=True):
                 tot += ((px - op["entry"]) * op["dir"]) * op["lot"] * THB_PER_USD_PER_LOT
         return tot
 
+    p_small = (SMALL_EXP_R + 1) / (1 + SMALL_RR)         # win prob ให้ exp_R ตรงเป้า
     for i in range(start, n):
         px = price[i]
+        # ── TIERED: ทุน < FLOOR → เทรด sleeve เสี่ยงต่ำ (statistical) แทนทอง ──
+        if tiered and equity < TIER_FLOOR:
+            if rng is not None and rng.random() < SMALL_FREQ:
+                risk_thb = max(RISK_PCT * equity, SMALL_RISK_THB)   # min-lot floor ของ instrument เล็ก
+                r_mult = SMALL_RR if rng.random() < p_small else -1.0
+                equity += r_mult * risk_thb
+                n_trades += 1; sumR += r_mult; wins += (r_mult > 0)
+                if equity <= SMALL_RISK_THB * 0.5:      # ต่ำกว่าไม้เล็กสุด = ล้าง
+                    ruined = True; ruin_bar = i; equity = max(equity, 0.0); break
+                peak = max(peak, equity); dd = (peak - equity) / peak if peak > 0 else 0
+                maxdd = max(maxdd, dd)
+            continue                                    # ทุน < FLOOR ไม่แตะทอง
         # ── force-close ตะกร้าลอย: floating equity ≥ baseline×2 (ทุน < เกณฑ์) → ปิดหมด lock ──
         if force_close and equity < FORCE_CLOSE_MIN_CAP and any(o is not None for o in opens):
             fe = equity + _float_pnl(px)
@@ -238,38 +258,35 @@ def run(paths=600, tiers=(1000, 3000, 20000, 50000), seed=12345):
     print("money: min-lot %.2f · SL structural · margin/stop-out · force-close<%.0f · risk %.2f%%/ไม้ · sentiment %.0f%%acc"
           % (MIN_LOT, FORCE_CLOSE_MIN_CAP, RISK_PCT * 100, SENTIMENT_ACC * 100))
     print("=" * 78)
-    acc = {(c, fc): {"fin": [], "surv": 0, "dd": [], "ntr": [], "expR": [], "wr": []}
-           for c in tiers for fc in (True, False)}
-    for _ in range(paths):                              # gen path ครั้งเดียว รันทุก tier × force-close on/off
+    MODELS = [("gold-only", False), ("tiered", True)]    # A = ทองตลอด · B = < 20k เทรด sleeve เสี่ยงต่ำ
+    acc = {(c, m): {"fin": [], "surv": 0, "dd": [], "ntr": []} for c in tiers for m, _ in MODELS}
+    for _ in range(paths):
         price, sent = _gen_path(rng, hist)
         ext = [_roll_prev_ext(price, s[0]) for s in _SLEEVES]
+        prng = np.random.default_rng(int(rng.integers(1 << 62)))   # child rng ต่อ path (small-sleeve ไม่กวน path)
         for c in tiers:
-            for fc in (True, False):
-                r = _run_system(price, sent, float(c), ext, force_close=fc)
-                a = acc[(c, fc)]; a["fin"].append(r["final_eq"]); a["dd"].append(r["maxdd"]); a["ntr"].append(r["n_trades"])
-                if r["exp_R"] is not None:
-                    a["expR"].append(r["exp_R"]); a["wr"].append(r["wr"])
+            for name, ti in MODELS:
+                r = _run_system(price, sent, float(c), ext, force_close=True, tiered=ti,
+                                rng=np.random.default_rng(int(prng.integers(1 << 62))))
+                a = acc[(c, name)]; a["fin"].append(r["final_eq"]); a["dd"].append(r["maxdd"]); a["ntr"].append(r["n_trades"])
                 if r["survived"]:
                     a["surv"] += 1
-    print("A/B: force-close ON (ปิดตะกร้าลอย +100% ทุน<20k) vs OFF\n")
-    print("%-9s %-10s %7s %10s %9s %10s %7s" % ("ทุนเริ่ม", "force-close", "รอด%", "median฿", "p10฿", "p90฿", "medDD%"))
+    print("model ใหม่: TIERED = ทุน < %.0f เทรด sleeve เสี่ยงต่ำ (ขาดทุน/ไม้ ~%.0f฿ · exp_R %.2f) · ≥ = gold sleeve\n"
+          % (TIER_FLOOR, SMALL_RISK_THB, SMALL_EXP_R))
+    print("%-9s %-10s %7s %10s %9s %10s %7s" % ("ทุนเริ่ม", "model", "รอด%", "median฿", "p10฿", "p90฿", "medDD%"))
     results = {}
     for c in tiers:
-        for fc in (True, False):
-            a = acc[(c, fc)]; fin = np.array(a["fin"])
+        for name, _ in MODELS:
+            a = acc[(c, name)]; fin = np.array(a["fin"])
             row = {"survive_pct": round(a["surv"] / paths * 100, 1),
                    "median": round(float(np.median(fin))), "p10": round(float(np.percentile(fin, 10))),
                    "p90": round(float(np.percentile(fin, 90))), "med_dd": round(float(np.median(a["dd"])) * 100, 1)}
-            results[(c, fc)] = row
+            results[(c, name)] = row
             print("%-9d %-10s %6.1f%% %10d %9d %10d %6.1f%%" % (
-                c, "ON" if fc else "OFF", row["survive_pct"], row["median"], row["p10"], row["p90"], row["med_dd"]))
-        d = results[(c, True)]["survive_pct"] - results[(c, False)]["survive_pct"]
-        print("          → force-close ช่วย survival %+.1f pp\n" % d)
+                c, name, row["survive_pct"], row["median"], row["p10"], row["p90"], row["med_dd"]))
+        d = results[(c, "tiered")]["survive_pct"] - results[(c, "gold-only")]["survive_pct"]
+        print("          → tiered ช่วย survival %+.1f pp\n" % d)
     print("=" * 78)
-    ref = acc[(max(tiers), True)]
-    if ref["expR"]:
-        print("realized edge (tier %d): exp_R %.3f · WR %.1f%%  ← เทียบ backtest จริง ~0.04-0.16"
-              % (max(tiers), float(np.mean(ref["expR"])), float(np.mean(ref["wr"]))))
     print("\nสโคป: sleeve ทอง directional (structural SL) เท่านั้น. BTC/FX/pairs ตัดออก.")
     print("ตีความ: survival ขับด้วย min-lot vs ทุน — ไม้ทองแพ้ที่ทุนเล็ก = ล้างทันที.")
     return results

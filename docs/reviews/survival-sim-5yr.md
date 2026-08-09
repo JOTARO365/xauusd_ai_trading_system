@@ -49,3 +49,25 @@ only triggers after +100%) never fires in time. What it *does* do is lock the ga
 won early: p90 at 1,000 THB jumps from 135 (dead) to 104,601. So force-close is a profit-lock for
 survivors, not a ruin-guard. Above the 20k threshold it is inactive by design (0 effect). The only
 real ruin-guard is sufficient capital so a single losing gold trade ≠ account wipeout.
+
+## New model — capital-tiered router (cut gold structural-SL below 20k)
+
+Below 20k: trade a low-$-risk sleeve (~150 THB loss/trade, exp_R 0.05, RR 1.5) so a losing
+trade can't wipe the account; at/above 20k: the gold structural sleeve (real edge).
+
+| start | gold-only survive | tiered survive | Δ | tiered median | tiered DD |
+|-------|-------------------|----------------|---|---------------|-----------|
+| 1,000 | 12.8% | 37.4% | +25pp | 25 | 90% |
+| 3,000 | 22.4% | 77.4% | +55pp | 7,088 | 64% |
+| 20,000 | 67.2% | 99.6% | +32pp | 18,410 | 47% |
+| 50,000 | 92.0% | 99.8% | +8pp | 191,887 | 46% |
+
+Tiered massively raises survival (3k: 22%→77%) by keeping small accounts out of the gold
+min-lot trap until they can afford it. Tradeoff: at small capital growth is slow (the low-risk
+sleeve edge is thin); a 20k account stays safe but barely grows because dips below 20k route
+back to the low-edge sleeve, whereas gold-only grows to ~137k but survives only 67%.
+
+**Load-bearing caveat:** the tiered result assumes the low-risk sleeve is genuinely +EV
+(exp_R 0.05). Our FX single-symbol backtests came out ~flat-to-negative, so if that sleeve is
+actually 0/−EV, tiered only delays ruin without growth. No proven low-risk +EV instrument
+exists in-hand yet — that is the gap to close before tiering is real.
