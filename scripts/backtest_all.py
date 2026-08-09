@@ -216,8 +216,9 @@ def _htf_slope_map(m15_time, htf_time, htf_close, ema_n=50):
     return slope[idx]
 
 
-def bt_conf15m(mt5, sym, e_broker, cost, pt, brk=12, rr=2.0, sl_atr=1.0, vk=1.5, mh=48):
-    """confluence_15m ต่อคู่: 15m breakout + H1+H4+macro ตรง + volume surge. คืน list R."""
+def bt_conf15m(mt5, sym, e_broker, cost, pt, brk=12, rr=2.0, sl_atr=1.0, vk=1.5, mh=48, session=None):
+    """confluence_15m ต่อคู่: 15m breakout + H1+H4+macro ตรง + volume surge. คืน list R.
+    session: override 'lo-hi' UTC (None → config default สำหรับ XAU)."""
     m = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M15, 0, 40000)
     if m is None or len(m) < 3000:
         return []
@@ -238,13 +239,20 @@ def bt_conf15m(mt5, sym, e_broker, cost, pt, brk=12, rr=2.0, sl_atr=1.0, vk=1.5,
         volmed[kk] = np.median(vol[kk - 200:kk]) or 1
     # live gate: gold เทรดเฉพาะ CONF15M_SESSION (default 13-21 UTC, XAU only) — เหมือน ConfluenceVol15m
     _sess = None
+    _sraw = session if session is not None else None
     if str(sym).upper().startswith("XAU"):
         try:
             import config as _cfg
-            _a, _b = str(getattr(_cfg, "CONF15M_SESSION", "13-21")).split("-")
+            _sr = _sraw if _sraw else str(getattr(_cfg, "CONF15M_SESSION", "13-21"))
+            _a, _b = str(_sr).split("-")
             _sess = (int(_a), int(_b))
         except Exception:
             _sess = (13, 21)
+    elif _sraw and "-" in str(_sraw):                          # sweep session บนคู่ non-XAU ได้ด้วย
+        try:
+            _a, _b = str(_sraw).split("-"); _sess = (int(_a), int(_b))
+        except Exception:
+            _sess = None
     hours = np.array([datetime.fromtimestamp(int(t), timezone.utc).hour for t in tm]) if _sess else None
     while i < n - 1:
         av = float(atr[i]) if atr[i] == atr[i] else 0.0
