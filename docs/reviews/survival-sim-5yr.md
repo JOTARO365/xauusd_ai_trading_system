@@ -99,3 +99,36 @@ WTI and BTC.
 
 **Actionable:** route sub-20k capital to WTI+BTC (survives for free), but validate their edge
 before trusting compounding — pairs and gold stay off-limits below ~20k by the affordability gate.
+
+## WTI/BTC edge validation (adversarial)
+
+The affordability-gate makes small accounts survive, but only *grows* them if the low-risk live
+instruments (WTI/BTC) have real edge. Validation verdict: **they do not.**
+
+| combo | exp_R | t | OOS | n | remove top-3 winners | best-trade share |
+|-------|-------|---|-----|---|----------------------|------------------|
+| tsmom_d1 WTIUSD | 0.215 | 1.25 | +1.21 | 110 | → −0.001 (t 0.00) | 9.2R = 39% of profit |
+| tsmom_d1 BTCUSD | 0.420 | 1.79 | +2.75 | 88 | → 0.132 (t 0.79) | 11R = 30% of profit |
+| macro_momentum BTCUSD | 0.053 | 0.72 | +0.05 | 408 | — | noise |
+| confluence_15m BTCUSD | 0.086 | 0.63 | +0.22 | 117 | — | noise |
+
+- Deflated-t threshold for 77 searched combos ≈ **2.95**; every WTI/BTC t (0.63–1.79) is far below.
+- Removing 3 outlier trades collapses both tsmom edges to zero → the "edge" is a handful of
+  outlier moves, not a repeatable signal (matches the prior finding that WTI momentum was
+  window-bias).
+
+**Conclusion:** no validated +EV low-risk instrument exists. The tiered/affordability gate is a
+*ruin-guard* (structural, survives even at edge=0), not a growth engine. Small accounts routed to
+WTI/BTC will survive but not reliably grow until a genuinely validated low-risk edge is found or
+capital is deposited to the gold-viable zone.
+
+## Live implementation — Capital Affordability Gate
+
+Ported to `connectors/mt5_connector.open_order` (the single choke point all order paths pass
+through). When `CAPITAL_GATE_ENABLE` and `equity < CAPITAL_GATE_FLOOR` (20k), an entry is blocked
+if its THB risk (`order_calc_profit` at the actual lot/SL) exceeds `CAPITAL_GATE_MAX_RISK_PCT`
+(15%) of equity. Verified: at 1k/3k gold/XAUEUR/pairs (~1,300–1,900฿) are blocked while WTI (50฿)
+passes; gold unlocks around 9.15k; at ≥20k the gate is off. Block-only, additive to existing
+gates, kill-switch `CAPITAL_GATE_ENABLE=false`. Shipped **off by default** — Monday's live run
+takes all algo signals unblocked, with structural SL + capital-gated force-close as the risk
+controls; the gate is available to switch on for small-capital protection later.

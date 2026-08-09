@@ -1217,3 +1217,13 @@ solicitation to trade. Trading leveraged instruments like gold (XAUUSD) carries 
 high risk of loss. **Use at your own risk**, start on a demo account, and never
 risk money you cannot afford to lose. The authors accept no liability for any
 financial losses incurred through use of this system.
+
+### Capital Affordability Gate (small-account ruin-guard)
+
+Optional entry gate (`CAPITAL_GATE_ENABLE`, default **off**). While equity is below
+`CAPITAL_GATE_FLOOR` (default 20,000), any order whose THB risk exceeds
+`CAPITAL_GATE_MAX_RISK_PCT` (default 15%) of equity is blocked at `open_order`. This stops a
+single wide-SL gold/XAUEUR/pairs trade (~1,300–1,900฿ at min-lot) from wiping a small account,
+while low-risk instruments (WTI ~50฿, BTC ~270฿) still trade. Gold auto-unlocks as equity grows
+(~9k+); at/above the floor the gate is inert. Derived + validated in
+`scripts/survival_sim.py` / `docs/reviews/survival-sim-5yr.md`. Kill switch: `CAPITAL_GATE_ENABLE=false`.

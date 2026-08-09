@@ -209,6 +209,7 @@ _CONFIG_SPEC: dict[str, str] = {
     "PAIRS_Z_IN": "2.0", "PAIRS_Z_OUT": "0.5", "PAIRS_Z_STOP": "3.5", "PAIRS_DISASTER_ATR": "6.0",
     # ── profit-target force-close (lock กำไร X% ของ balance) ──
     "FORCE_CLOSE_PROFIT_PCT": "100", "FORCE_CLOSE_MIN_CAPITAL": "20000",
+    "CAPITAL_GATE_ENABLE": "false", "CAPITAL_GATE_FLOOR": "20000", "CAPITAL_GATE_MAX_RISK_PCT": "15",
     # ── event-engine (NFP/CPI/FOMC) ──
     "EVENT_ENGINE_LIVE": "false", "EVENT_PRE_MIN": "30", "EVENT_POST_MIN": "120",
     # ── loss-adaptive + LLM algo-router ──

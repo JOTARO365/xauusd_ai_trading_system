@@ -684,6 +684,22 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
     if same_dir_count >= effective_limit:
         return {"success": False, "error": "Max open trades reached"}
 
+    # ── Capital affordability gate (small-account ruin-guard · sim-derived 08-09) ──
+    # ทุน < FLOOR: บล็อกไม้ที่ risk (บาท) > MAX% ของ equity. min-lot ทอง/XAUEUR/pairs กว้าง
+    # (~1,200-1,900฿) = ล้างไม้เดียวที่ทุนเล็ก → บล็อกจนทุนโตพอ. WTI/BTC (risk เล็ก) ผ่าน.
+    # ≥ FLOOR = ปิด gate (เทรดเต็ม). validate: survival_sim 08-09 (afford-gate → รอด 100%).
+    if getattr(_cfg, "CAPITAL_GATE_ENABLE", False):
+        _floor = float(getattr(_cfg, "CAPITAL_GATE_FLOOR", 20000))
+        if account.equity < _floor:
+            _risk = abs(mt5.order_calc_profit(order_type, symbol, lot, price, sl) or 0.0)
+            _cap = float(getattr(_cfg, "CAPITAL_GATE_MAX_RISK_PCT", 15)) / 100.0 * account.equity
+            if _risk > _cap > 0:
+                msg = (f"[CAPITAL_GATE] {symbol} risk {_risk:.0f} > {_cap:.0f} "
+                       f"({getattr(_cfg,'CAPITAL_GATE_MAX_RISK_PCT',15):.0f}% ของ equity {account.equity:.0f}) "
+                       f"— block ไม้เสี่ยงเกินสำหรับทุนเล็ก")
+                logger.warning(msg)
+                return {"success": False, "error": msg}
+
     if not _cfg.NNLB_MODE:
         # ตรวจ Risk/Reward ratio — ข้ามถ้า no_tp (ไม่มี TP ให้คำนวณ)
         effective_min_rr = min_rr if min_rr is not None else MONEY_MANAGEMENT["min_rr_ratio"]

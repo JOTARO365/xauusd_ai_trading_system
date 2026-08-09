@@ -348,6 +348,10 @@ ALGO_ROUTER_MODEL = os.getenv("ALGO_ROUTER_MODEL", "claude-sonnet-4-6")
 FORCE_CLOSE_PROFIT = os.getenv("FORCE_CLOSE_PROFIT", "false").lower() == "true"
 FORCE_CLOSE_PROFIT_PCT = float(os.getenv("FORCE_CLOSE_PROFIT_PCT") or 100)
 FORCE_CLOSE_MIN_CAPITAL = float(os.getenv("FORCE_CLOSE_MIN_CAPITAL") or 20000)   # force-close ทำงานเฉพาะ equity < ค่านี้ (โตเล็ก→เกณฑ์); ≥ = ปล่อยวิ่ง
+# ── Capital affordability gate (small-account ruin-guard, sim-derived 08-09) ──
+CAPITAL_GATE_ENABLE = (os.getenv("CAPITAL_GATE_ENABLE") or "false").lower() == "true"   # บล็อกไม้เสี่ยงเกิน %ทุน ตอนทุน<FLOOR
+CAPITAL_GATE_FLOOR = float(os.getenv("CAPITAL_GATE_FLOOR") or 20000)                    # ทุน<ค่านี้ = gate ทำงาน; ≥ = ปิด
+CAPITAL_GATE_MAX_RISK_PCT = float(os.getenv("CAPITAL_GATE_MAX_RISK_PCT") or 15)         # บล็อกถ้า risk/ไม้ > %นี้ ของ equity
 # trailing หลวมสำหรับ momentum algo (ปล่อยวิ่งถึง TP; replay: trail แน่นตัดกำไร +119%→+12%)
 TRAILING_MOM_MULT = float(os.getenv("TRAILING_MOM_MULT") or 3.0)      # trail กว้าง (×ATR)
 TRAILING_MOM_MIN_R = float(os.getenv("TRAILING_MOM_MIN_R") or 1.9)    # trail หลัง R สูง (ใกล้ TP)
@@ -560,6 +564,10 @@ def reload_config():
     FORCE_CLOSE_PROFIT_PCT   = float(os.getenv("FORCE_CLOSE_PROFIT_PCT") or 100)
     global FORCE_CLOSE_MIN_CAPITAL
     FORCE_CLOSE_MIN_CAPITAL  = float(os.getenv("FORCE_CLOSE_MIN_CAPITAL") or 20000)
+    global CAPITAL_GATE_ENABLE, CAPITAL_GATE_FLOOR, CAPITAL_GATE_MAX_RISK_PCT
+    CAPITAL_GATE_ENABLE = (os.getenv("CAPITAL_GATE_ENABLE") or "false").lower() == "true"
+    CAPITAL_GATE_FLOOR = float(os.getenv("CAPITAL_GATE_FLOOR") or 20000)
+    CAPITAL_GATE_MAX_RISK_PCT = float(os.getenv("CAPITAL_GATE_MAX_RISK_PCT") or 15)
     global TRAILING_MOM_MULT, TRAILING_MOM_MIN_R
     TRAILING_MOM_MULT        = float(os.getenv("TRAILING_MOM_MULT") or 3.0)
     TRAILING_MOM_MIN_R       = float(os.getenv("TRAILING_MOM_MIN_R") or 1.9)
