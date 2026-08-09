@@ -136,16 +136,38 @@ def _gen_path(rng, hist_lr):
 _SLEEVES = [(30, 40, 2.0, 12), (8, 16, 2.0, 8)]   # ช้า(trend) · เร็ว(intraday breakout)
 
 
-def _run_system(price, sent, start_equity, ext):
-    """รัน 2 sleeve breakout + sentiment gate + money model บาท. ext = pre-computed (hi,lo) ต่อ sleeve."""
+def _run_system(price, sent, start_equity, ext, force_close=True):
+    """รัน 2 sleeve breakout + sentiment gate + money model บาท. ext = pre-computed (hi,lo) ต่อ sleeve.
+    force_close: ปิดตะกร้าลอยทั้งหมดเมื่อ floating equity ≥ baseline×2 (ระหว่างทุน < เกณฑ์) = lock กำไร."""
     n = len(price)
     equity = start_equity; baseline = start_equity; peak = start_equity
-    maxdd = 0.0; ruined = False; ruin_bar = None; n_trades = 0; wins = 0; sumR = 0.0
+    maxdd = 0.0; ruined = False; ruin_bar = None; n_trades = 0; wins = 0; sumR = 0.0; n_forced = 0
     ruin_floor = MARGIN_PER_LOT_THB * MIN_LOT           # ต่ำกว่านี้ = stop-out
     opens = [None, None]                                 # open trade ต่อ sleeve (cap 1 = per-algo×pair)
     start = max(s[0] for s in _SLEEVES) + 1
+
+    def _float_pnl(px):                                  # กำไร/ขาดทุนลอยของ position ที่เปิดอยู่ (บาท)
+        tot = 0.0
+        for op in opens:
+            if op is not None:
+                tot += ((px - op["entry"]) * op["dir"]) * op["lot"] * THB_PER_USD_PER_LOT
+        return tot
+
     for i in range(start, n):
         px = price[i]
+        # ── force-close ตะกร้าลอย: floating equity ≥ baseline×2 (ทุน < เกณฑ์) → ปิดหมด lock ──
+        if force_close and equity < FORCE_CLOSE_MIN_CAP and any(o is not None for o in opens):
+            fe = equity + _float_pnl(px)
+            if fe >= baseline * (1 + FORCE_CLOSE_PCT / 100):
+                for k, op in enumerate(opens):
+                    if op is None:
+                        continue
+                    r_mult = ((px - op["entry"]) * op["dir"]) / op["risk_px"]
+                    equity += r_mult * op["lot"] * op["risk_px"] * THB_PER_USD_PER_LOT
+                    n_trades += 1; sumR += r_mult; wins += (r_mult > 0); opens[k] = None
+                baseline = equity; n_forced += 1
+                peak = max(peak, equity); dd = (peak - equity) / peak if peak > 0 else 0
+                maxdd = max(maxdd, dd)
         # ── manage ──
         for k, (brk, mh, rr, lb) in enumerate(_SLEEVES):
             op = opens[k]
@@ -167,8 +189,6 @@ def _run_system(price, sent, start_equity, ext):
             n_trades += 1; sumR += r_mult; wins += (r_mult > 0); opens[k] = None
             if equity <= ruin_floor:
                 ruined = True; ruin_bar = i; equity = max(equity, 0.0); break
-            if equity < FORCE_CLOSE_MIN_CAP and equity >= baseline * (1 + FORCE_CLOSE_PCT / 100):
-                baseline = equity
             peak = max(peak, equity); dd = (peak - equity) / peak if peak > 0 else 0
             maxdd = max(maxdd, dd)
         if ruined:
@@ -205,7 +225,7 @@ def _run_system(price, sent, start_equity, ext):
                         "risk_px": risk_px, "lot": lot, "expiry": i + mh}
     survived = (not ruined) and equity > ruin_floor
     return {"survived": survived, "ruin_year": (ruin_bar / BARS_PER_YEAR) if ruin_bar else None,
-            "final_eq": equity, "maxdd": maxdd, "n_trades": n_trades,
+            "final_eq": equity, "maxdd": maxdd, "n_trades": n_trades, "n_forced": n_forced,
             "wr": (wins / n_trades * 100) if n_trades else None, "exp_R": (sumR / n_trades) if n_trades else None}
 
 
@@ -218,42 +238,38 @@ def run(paths=600, tiers=(1000, 3000, 20000, 50000), seed=12345):
     print("money: min-lot %.2f · SL structural · margin/stop-out · force-close<%.0f · risk %.2f%%/ไม้ · sentiment %.0f%%acc"
           % (MIN_LOT, FORCE_CLOSE_MIN_CAP, RISK_PCT * 100, SENTIMENT_ACC * 100))
     print("=" * 78)
-    acc = {c: {"fin": [], "surv": 0, "ruin": [], "dd": [], "ntr": []} for c in tiers}
-    for _ in range(paths):                              # gen path ครั้งเดียว รันทุก tier (เร็ว 4×)
+    acc = {(c, fc): {"fin": [], "surv": 0, "dd": [], "ntr": [], "expR": [], "wr": []}
+           for c in tiers for fc in (True, False)}
+    for _ in range(paths):                              # gen path ครั้งเดียว รันทุก tier × force-close on/off
         price, sent = _gen_path(rng, hist)
         ext = [_roll_prev_ext(price, s[0]) for s in _SLEEVES]
         for c in tiers:
-            r = _run_system(price, sent, float(c), ext)
-            a = acc[c]; a["fin"].append(r["final_eq"]); a["dd"].append(r["maxdd"]); a["ntr"].append(r["n_trades"])
-            if r["exp_R"] is not None:
-                a.setdefault("expR", []).append(r["exp_R"]); a.setdefault("wr", []).append(r["wr"])
-            if r["survived"]:
-                a["surv"] += 1
-            if r["ruin_year"] is not None:
-                a["ruin"].append(r["ruin_year"])
-    print("%-9s %7s %7s %10s %9s %10s %7s %6s" % ("ทุนเริ่ม", "รอด%", "ล้าง%", "median฿", "p10฿", "p90฿", "medDD%", "ไม้/ป"))
+            for fc in (True, False):
+                r = _run_system(price, sent, float(c), ext, force_close=fc)
+                a = acc[(c, fc)]; a["fin"].append(r["final_eq"]); a["dd"].append(r["maxdd"]); a["ntr"].append(r["n_trades"])
+                if r["exp_R"] is not None:
+                    a["expR"].append(r["exp_R"]); a["wr"].append(r["wr"])
+                if r["survived"]:
+                    a["surv"] += 1
+    print("A/B: force-close ON (ปิดตะกร้าลอย +100% ทุน<20k) vs OFF\n")
+    print("%-9s %-10s %7s %10s %9s %10s %7s" % ("ทุนเริ่ม", "force-close", "รอด%", "median฿", "p10฿", "p90฿", "medDD%"))
     results = {}
     for c in tiers:
-        a = acc[c]; fin = np.array(a["fin"])
-        row = {"survive_pct": round(a["surv"] / paths * 100, 1),
-               "ruin_pct": round((paths - a["surv"]) / paths * 100, 1),
-               "median": round(float(np.median(fin))), "p10": round(float(np.percentile(fin, 10))),
-               "p90": round(float(np.percentile(fin, 90))), "med_dd": round(float(np.median(a["dd"])) * 100, 1),
-               "trades_yr": round(float(np.median(a["ntr"])) / YEARS, 1),
-               "med_ruin_year": round(float(np.median(a["ruin"])), 2) if a["ruin"] else None}
-        results[c] = row
-        print("%-9d %6.1f%% %6.1f%% %10d %9d %10d %6.1f%% %6.1f" % (
-            c, row["survive_pct"], row["ruin_pct"], row["median"], row["p10"], row["p90"],
-            row["med_dd"], row["trades_yr"]))
+        for fc in (True, False):
+            a = acc[(c, fc)]; fin = np.array(a["fin"])
+            row = {"survive_pct": round(a["surv"] / paths * 100, 1),
+                   "median": round(float(np.median(fin))), "p10": round(float(np.percentile(fin, 10))),
+                   "p90": round(float(np.percentile(fin, 90))), "med_dd": round(float(np.median(a["dd"])) * 100, 1)}
+            results[(c, fc)] = row
+            print("%-9d %-10s %6.1f%% %10d %9d %10d %6.1f%%" % (
+                c, "ON" if fc else "OFF", row["survive_pct"], row["median"], row["p10"], row["p90"], row["med_dd"]))
+        d = results[(c, True)]["survive_pct"] - results[(c, False)]["survive_pct"]
+        print("          → force-close ช่วย survival %+.1f pp\n" % d)
     print("=" * 78)
-    ref = acc[max(tiers)]                                # edge อ้างอิงจาก tier ใหญ่ (sizing สะอาด)
-    if ref.get("expR"):
+    ref = acc[(max(tiers), True)]
+    if ref["expR"]:
         print("realized edge (tier %d): exp_R %.3f · WR %.1f%%  ← เทียบ backtest จริง ~0.04-0.16"
               % (max(tiers), float(np.mean(ref["expR"])), float(np.mean(ref["wr"]))))
-    for c in tiers:
-        ry = results[c]["med_ruin_year"]
-        if ry is not None:
-            print("  ทุน %d: เคสล้าง median ที่ปี %.2f" % (c, ry))
     print("\nสโคป: sleeve ทอง directional (structural SL) เท่านั้น. BTC/FX/pairs ตัดออก.")
     print("ตีความ: survival ขับด้วย min-lot vs ทุน — ไม้ทองแพ้ที่ทุนเล็ก = ล้างทันที.")
     return results
