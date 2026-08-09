@@ -209,7 +209,7 @@ _CONFIG_SPEC: dict[str, str] = {
     "PAIRS_Z_IN": "2.0", "PAIRS_Z_OUT": "0.5", "PAIRS_Z_STOP": "3.5", "PAIRS_DISASTER_ATR": "6.0",
     # ── profit-target force-close (lock กำไร X% ของ balance) ──
     "FORCE_CLOSE_PROFIT_PCT": "100", "FORCE_CLOSE_MIN_CAPITAL": "20000",
-    "CAPITAL_GATE_ENABLE": "false", "CAPITAL_GATE_FLOOR": "20000", "CAPITAL_GATE_MAX_RISK_PCT": "15", "FF_SIZING_ENABLE": "true", "FF_RISK_PCT": "1.0", "ATR_SL_SMALL_CAP": "true",
+    "CAPITAL_GATE_ENABLE": "false", "CAPITAL_GATE_FLOOR": "20000", "CAPITAL_GATE_MAX_RISK_PCT": "15", "FF_SIZING_ENABLE": "true", "FF_RISK_PCT": "1.0", "ATR_SL_SMALL_CAP": "true", "SEASONALITY_GATE": "true", "CUSTOM_LOT_ENABLE": "false",
     # ── event-engine (NFP/CPI/FOMC) ──
     "EVENT_ENGINE_LIVE": "false", "EVENT_PRE_MIN": "30", "EVENT_POST_MIN": "120",
     # ── loss-adaptive + LLM algo-router ──
@@ -2002,6 +2002,56 @@ def api_backtest_results():
     except Exception:
         pass
     return jsonify(data)
+
+
+@app.route("/api/pair-lots")
+def api_pair_lots():
+    """lot ต่อคู่ (dashboard แก้ได้) + contract/min/risk% ต่อ symbol เพื่อดูผลกระทบ. 0 token."""
+    def _c():
+        from agents import pair_lots as _pl
+        cur = _pl.all_lots()
+        rows = []
+        eq = None
+        if _MT5_AVAILABLE and _ensure_mt5():
+            from connectors.pair_collector import _broker_map
+            bm = _broker_map() or {}
+            with _MT5_LOCK:
+                a = mt5.account_info()
+                eq = float(a.equity) if a else None
+                for lg in ["XAUUSD", "BTCUSD", "XAUEUR", "XAGUSD", "WTIUSD", "XAUJPY"]:
+                    s = bm.get(lg, lg); mt5.symbol_select(s, True)
+                    si = mt5.symbol_info(s); t = mt5.symbol_info_tick(s)
+                    if not si or not t:
+                        continue
+                    lot = cur.get(lg) or 0
+                    sld = {"XAUUSD": 40, "XAUEUR": 34, "XAGUSD": 1, "BTCUSD": 800, "WTIUSD": 1.5, "XAUJPY": 4000}.get(lg, 40)
+                    px = t.ask or t.bid
+                    rlot = lot or si.volume_min
+                    risk = abs(mt5.order_calc_profit(mt5.ORDER_TYPE_BUY, s, rlot, px, px - sld) or 0)
+                    rows.append({"logical": lg, "broker": s, "lot": lot, "min": si.volume_min,
+                                 "max": si.volume_max, "contract": si.trade_contract_size,
+                                 "risk": round(risk), "risk_pct": round(risk / eq * 100, 1) if eq else None,
+                                 "using_min": not lot})
+        return {"ok": True, "equity": eq, "rows": rows, "lots": cur,
+                "note": "lot=0 → ใช้ FIXED_LOT global / FF. risk = ที่ lot นี้ (หรือ min) เมื่อโดน SL ทั่วไป"}
+    return jsonify(_cached("pair-lots", _c, ttl=15))
+
+
+@app.route("/api/pair-lots", methods=["POST"])
+def api_pair_lots_set():
+    """ตั้ง lot ของคู่ (lot<=0/ว่าง = ลบ = ใช้ global). 0 token."""
+    from agents import pair_lots as _pl
+    b = request.get_json(silent=True) or {}
+    sym = (b.get("symbol") or "").strip()
+    if not sym:
+        return jsonify({"ok": False, "error": "symbol required"}), 400
+    try:
+        lot = float(b.get("lot")) if b.get("lot") not in (None, "") else 0
+    except Exception:
+        return jsonify({"ok": False, "error": "lot ต้องเป็นตัวเลข"}), 400
+    ok = _pl.set_lot(sym, lot)
+    _data_cache.pop("pair-lots", None)
+    return jsonify({"ok": ok, "symbol": sym, "lot": lot})
 
 
 @app.route("/api/risk-sat")

@@ -1,0 +1,1 @@
+{"_doc": "lot ต่อคู่ (logical key เช่น XAUUSD/BTCUSD). แก้จาก dashboard (Settings: CUSTOM_LOT_ENABLE). ว่าง/ไม่มี key = ใช้ FIXED_LOT global หรือ FF. clamp MIN_LOT/MAX_LOT เสมอ."}

@@ -2364,6 +2364,25 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
     </section>
 
     <!-- XAU-XAG PAIRS (stat-arb) status (pairs_executor.snapshot) -->
+    <!-- PER-PAIR LOT SIZE — กำหนด lot แต่ละคู่อิสระ (แก้ contract ต่างกัน: ทอง 100 vs BTC 1) -->
+    <section id="pairlots-section" style="margin-bottom:10px">
+      <div class="section-title">🎚️ Lot ต่อคู่ (กำหนดอิสระ · lot=0 → ใช้ FIXED_LOT global / FF)</div>
+      <div class="chart-card" style="padding:12px 14px;overflow-x:auto">
+        <div id="pairlots-note" style="font-size:10px;color:var(--muted);margin-bottom:6px"></div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
+          <thead><tr style="color:var(--muted);text-align:left">
+            <th title="คู่ logical">คู่</th><th title="broker symbol">broker</th>
+            <th style="text-align:right" title="contract size (ทอง 100 · BTC 1 · micro เล็กกว่า)">contract</th>
+            <th style="text-align:right" title="lot ขั้นต่ำโบรก">min</th>
+            <th style="text-align:right" title="lot ที่กำหนด (0=global)">lot</th>
+            <th style="text-align:right" title="ความเสี่ยง(บาท)/ไม้ ที่ lot นี้เมื่อโดน SL ทั่วไป">risk฿</th>
+            <th style="text-align:right" title="% ของทุน">%ทุน</th><th>ตั้งค่า</th>
+          </tr></thead>
+          <tbody id="pairlots-body"><tr><td colspan="8" style="color:var(--muted)">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
     <section id="pairs-section" style="margin-bottom:10px">
       <div class="section-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span>⚖️ XAU-XAG Pairs (stat-arb market-neutral)</span>
@@ -3994,7 +4013,7 @@ function switchTab(name) {
   if (_sub) _sub.style.display = (name === 'monitor') ? 'flex' : 'none';
   if (name === 'settings')   { loadConfig(); loadModeAdvice(); }
   if (name === 'accounting') loadAccounting();
-  if (name === 'monitor')    { loadMonitor(); loadEventEngine(); loadPairs(); loadComex(); }
+  if (name === 'monitor')    { loadMonitor(); loadEventEngine(); loadPairs(); loadComex(); loadPairLots(); }
   if (name === 'backtest') { loadBacktestResults(); loadBacktest(); loadRegimeAnalytics(); loadDailySummary(); loadOwnerEdge(); loadRiskSat(); loadEquityCurve(); loadCointegration(); }
 }
 
@@ -7637,6 +7656,41 @@ async function loadComex() {
 }
 
 // ── XAU-XAG Pairs (stat-arb) status ──
+async function loadPairLots() {
+  const body = document.getElementById('pairlots-body'); if (!body) return;
+  try {
+    const d = await (await fetch('/api/pair-lots')).json();
+    document.getElementById('pairlots-note').textContent =
+      (d.note || '') + (d.equity ? (' · ทุน ' + Math.round(d.equity) + '฿') : '');
+    const rows = d.rows || [];
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="8" style="color:var(--muted)">— (MT5 ไม่ต่อ)</td></tr>'; return; }
+    body.innerHTML = rows.map(r => {
+      const pc = r.risk_pct;
+      const pcC = pc == null ? 'var(--muted)' : (pc > 100 ? 'var(--red)' : pc > 30 ? 'var(--gold)' : 'var(--green)');
+      return '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:3px 6px;font-weight:700">' + r.logical + '</td>'
+        + '<td style="color:var(--muted)">' + r.broker + '</td>'
+        + '<td style="text-align:right">' + r.contract + '</td>'
+        + '<td style="text-align:right;color:var(--muted)">' + r.min + '</td>'
+        + '<td style="text-align:right"><input id="plot-' + r.logical + '" type="number" step="0.01" min="0" value="'
+          + (r.lot || '') + '" placeholder="' + r.min + '" style="width:64px;text-align:right;font-family:var(--mono);font-size:12px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 4px"></td>'
+        + '<td style="text-align:right">' + r.risk + (r.using_min ? '*' : '') + '</td>'
+        + '<td style="text-align:right;color:' + pcC + ';font-weight:700">' + (pc == null ? '—' : pc + '%') + '</td>'
+        + '<td><button onclick="savePairLot(\'' + r.logical + '\')" style="font-size:11px;padding:2px 8px;border:1px solid var(--gold);color:var(--gold);background:none;border-radius:4px;cursor:pointer">ตั้ง</button></td></tr>';
+    }).join('') + '<tr><td colspan="8" style="color:var(--muted);font-size:10px;padding-top:4px">* = risk คำนวณที่ min-lot (ยังไม่กำหนด lot)</td></tr>';
+  } catch (e) { body.innerHTML = '<tr><td colspan="8" style="color:var(--red)">เชื่อมต่อ /api/pair-lots ไม่ได้</td></tr>'; }
+}
+async function savePairLot(sym) {
+  const el = document.getElementById('plot-' + sym); if (!el) return;
+  try {
+    const r = await (await fetch('/api/pair-lots', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: sym, lot: el.value }) })).json();
+    if (!r.ok) { toast('ตั้ง lot ไม่สำเร็จ: ' + (r.error || ''), 'err'); return; }
+    toast(sym + ' → lot ' + (r.lot || 'global'), 'ok');
+    loadPairLots();
+  } catch (_e) { toast('เชื่อมต่อไม่ได้', 'err'); }
+}
+
 async function loadPairs() {
   try {
     const r = await fetch('/api/pairs'); const d = await r.json();

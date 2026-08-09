@@ -143,6 +143,17 @@ def _apply_regime_sizing(lot: float) -> float:
     return lot
 
 
+def _pair_lot_for(symbol):
+    """lot ต่อคู่ (data/pair_lots.json) จาก broker symbol → logical. None = ไม่กำหนด."""
+    try:
+        from agents import pair_lots as _pl
+        from connectors.pair_collector import _broker_map as _bm
+        logical = {v: k for k, v in (_bm() or {}).items()}.get(symbol, symbol)
+        return _pl.lot_for(logical)
+    except Exception:
+        return None
+
+
 def calculate_lot_size(account_balance: float, sl_pips: float,
                        confidence_scale: float = 1.0) -> float:
     """คำนวณ lot size โดยปรับตาม confidence_scale (0.5–1.0)
@@ -648,6 +659,10 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         lot, err = _nnlb_lot_and_check(account.equity, sl_pips)
         if err:
             return {"success": False, "error": err}
+    elif getattr(_cfg, "CUSTOM_LOT_ENABLE", False) and _pair_lot_for(symbol) is not None:
+        # mode custom lot: lot ต่อคู่ (dashboard) — user เลือกเอง → override FF/global (แต่ยังผ่าน clamp/guards)
+        lot = max(_cfg.MIN_LOT, min(_pair_lot_for(symbol), _cfg.MAX_LOT))
+        logger.info(f"[CUSTOM-LOT] {symbol} → lot {lot} (กำหนดต่อคู่ dashboard)")
     elif getattr(_cfg, "FF_SIZING_ENABLE", False) and account.equity < float(getattr(_cfg, "CAPITAL_GATE_FLOOR", 20000)):
         # fixed-fractional sizing (ทุก​ algo, ทุนเล็ก): risk %คงที่ของ equity → size ∝ 1/SL → ลด DD (A2 08-09)
         _otype = mt5.ORDER_TYPE_BUY if direction.upper() == "BUY" else mt5.ORDER_TYPE_SELL
