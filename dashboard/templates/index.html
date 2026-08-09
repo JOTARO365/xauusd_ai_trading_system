@@ -5830,7 +5830,7 @@ async function loadRegimeAnalytics() {
     const tb  = document.getElementById('ra-tbody');
     const vv  = document.getElementById('ra-verdict');
     if (!d.ok) { if (tb) tb.innerHTML = '<tr><td colspan="8" style="padding:4px 8px;color:var(--muted)">' + (d.error || 'no data') + '</td></tr>'; return; }
-    if (vv) vv.textContent = '<svg class="ic"><use href="#ic-scale"/></svg> ' + (d.verdict || '');
+    if (vv) vv.innerHTML = '<svg class="ic"><use href="#ic-scale"/></svg> ' + (d.verdict || '');
     const gcol = g => g === 'A' ? 'var(--green)' : (g === 'B' ? 'var(--gold)' : (g === 'C' ? 'var(--red)' : 'var(--muted)'));
     const rows = (d.historical && d.historical.regimes) || [];
     if (tb) tb.innerHTML = rows.map(r => {
@@ -7108,7 +7108,7 @@ function renderVerdict(bs) {
        : m15.direction === 'DOWN' && mk.trend === 'BEARISH' ? 'SELL' : null)
     : null;
   const rideEl = document.getElementById('verdict-ride');
-  rideEl.textContent = rideDir ? `<svg class="ic"><use href="#ic-zap"/></svg> RIDE ${rideDir}` : 'off';
+  rideEl.innerHTML = rideDir ? `<svg class="ic"><use href="#ic-zap"/></svg> RIDE ${rideDir}` : 'off';
   rideEl.style.color = rideDir ? 'var(--gold)' : 'var(--muted)';
 }
 
@@ -7740,7 +7740,7 @@ async function loadPairs() {
   try {
     const r = await fetch('/api/pairs'); const d = await r.json();
     const mode = document.getElementById('pairs-mode');
-    if (mode) mode.textContent = d.live ? '<svg class="ic" style="color:var(--red)"><use href="#ic-dot"/></svg> LIVE' : '<svg class="ic"><use href="#ic-eye"/></svg> OFF';
+    if (mode) mode.innerHTML = d.live ? '<svg class="ic" style="color:var(--red)"><use href="#ic-dot"/></svg> LIVE' : '<svg class="ic"><use href="#ic-eye"/></svg> OFF';
     const b = document.getElementById('pairs-body'); if (!b) return;
     if (!d.ok) { b.innerHTML = '<span style="color:var(--muted)">ไม่มีข้อมูล (pairs engine ปิด/ยังไม่รัน)</span>'; return; }
     const z = d.z, zc = Math.abs(z) >= 3.5 ? 'var(--red)' : Math.abs(z) >= 2 ? 'var(--amber)' : 'var(--muted)';
@@ -7757,7 +7757,7 @@ async function loadEventEngine() {
   try {
     const r = await fetch('/api/event-engine'); const d = await r.json();
     const mode = document.getElementById('ee-mode');
-    if (mode) mode.textContent = d.live ? '<svg class="ic" style="color:var(--red)"><use href="#ic-dot"/></svg> LIVE (bias/gate)' : '<svg class="ic"><use href="#ic-eye"/></svg> SHADOW (log-only, เก็บ data)';
+    if (mode) mode.innerHTML = d.live ? '<svg class="ic" style="color:var(--red)"><use href="#ic-dot"/></svg> LIVE (bias/gate)' : '<svg class="ic"><use href="#ic-eye"/></svg> SHADOW (log-only, เก็บ data)';
     const st = d.state || {}, now = document.getElementById('ee-now');
     if (now) {
       if (st.phase === 'PRE') now.innerHTML = '<span style="color:var(--amber);font-weight:700">⚠️ PRE-EVENT: ' + st.key + ' อีก ' + st.in_min + ' นาที → ' + st.action + '</span>';
