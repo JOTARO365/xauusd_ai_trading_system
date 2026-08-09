@@ -4,12 +4,12 @@
 เพราะความสัมพันธ์ของทองกับมาโคร **ไม่คงที่ — มันพลิกตาม regime**
 (เช่น เงินเฟ้อร้อน → ทองขึ้น เมื่อ Fed ผ่อน/real yields ลง  แต่ → ทองลง เมื่อ Fed สู้เงินเฟ้อ)
 
-⚠️ หลักการถาวร — geopolitical/oil มี **2 channel ขัดกัน อย่าคิดชั้นเดียว**:
-  (ก) วิกฤต → safe-haven → ทองขึ้น (เร็ว, ระยะสั้น, acute)
-  (ข) วิกฤต → น้ำมันพุ่ง → เงินเฟ้อ → **Fed ขึ้นดอก/real yield ขึ้น → ทองลง** (ช้า, ระยะกลาง)
-  ตัวชี้ว่าอันไหนชนะ = **Fed reaction function**: Fed โหมด cut/ห่วง growth → look-through น้ำมัน → (ก) ชนะ;
-  Fed โหมดสู้เงินเฟ้อ + reacts to oil → (ข) ชนะ. **ถ้า inflation กำลังร้อน/มีสิทธิขึ้นดอก → geopolitical = ทองลง ไม่ใช่ขึ้น**
-  → sentiment ต้องถ่วง 2 channel ตาม Fed mode ปัจจุบัน ไม่ใช่ให้ +คะแนน safe-haven อัตโนมัติ
+⚠️ DURABLE PRINCIPLE — geopolitics/oil has **two opposing channels; never reason single-layer**:
+  (a) crisis → safe-haven → gold UP (fast, short-term, acute)
+  (b) crisis → oil spike → inflation → **Fed hawkish / real yields up → gold DOWN** (slow, medium-term)
+  Which one wins = the **Fed reaction function**: Fed in cut/growth-worried mode → looks through oil → (a) wins;
+  Fed in inflation-fighting mode + reacts to oil → (b) wins. **If inflation is hot / a hike is plausible, geopolitics = gold DOWN, not up.**
+  → sentiment must weight BOTH channels by the current Fed mode, not auto-add a safe-haven +score.
 
 วิธีใช้:
 - อัปเดตไฟล์นี้เมื่อ **ช่วงเศรษฐกิจเปลี่ยน** (Fed เปลี่ยนโหมด, ธีมข่าวใหญ่เปลี่ยน) — ไม่ใช่ทุกวัน
