@@ -223,7 +223,7 @@ def bt_conf15m(mt5, sym, e_broker, cost, pt, brk=12, rr=2.0, sl_atr=1.0, vk=1.5,
         return []
     h = m["high"].astype(float); l = m["low"].astype(float); c = m["close"].astype(float)
     tm = m["time"].astype(np.int64); vol = m["tick_volume"].astype(float)
-    h1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H1, 0, 20000)
+    h1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H1, 0, 50000)
     h4 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H4, 0, 10000)
     em = mt5.copy_rates_from_pos(e_broker, mt5.TIMEFRAME_M15, 0, 40000)
     if h1 is None or h4 is None or em is None:
@@ -267,8 +267,8 @@ def bt_conf15m(mt5, sym, e_broker, cost, pt, brk=12, rr=2.0, sl_atr=1.0, vk=1.5,
 
 def bt_pairs(mt5, xau_sym, xag_sym, cost_price, win=120, z_in=2.0, z_out=0.5, z_stop=3.5):
     """causal stat-arb XAU-XAG: rolling-β z-fade (เหมือน pairs_executor). R = pnl_spread/risk − cost. คืน list R."""
-    a = mt5.copy_rates_from_pos(xau_sym, mt5.TIMEFRAME_H1, 0, 20000)
-    b = mt5.copy_rates_from_pos(xag_sym, mt5.TIMEFRAME_H1, 0, 20000)
+    a = mt5.copy_rates_from_pos(xau_sym, mt5.TIMEFRAME_H1, 0, 50000)
+    b = mt5.copy_rates_from_pos(xag_sym, mt5.TIMEFRAME_H1, 0, 50000)
     if a is None or b is None:
         return []
     mb = {int(t): float(c) for t, c in zip(b["time"], b["close"])}
@@ -337,7 +337,7 @@ def main():
         try:
             mt5.symbol_select(sym, True)
             info = mt5.symbol_info(sym)
-            rh = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H1, 0, 30000)
+            rh = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H1, 0, 50000)
             rd = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_D1, 0, 3000)
         except Exception:
             info = rh = rd = None

@@ -3,17 +3,17 @@
   "note": "backtest matrix ทุก algo × คู่ (causal · SL-first · cost-adj · OOS70/30). +EV=exp_R>0+OOS≥0+n≥80",
   "results": [
     {
-      "group": "+EV",
+      "group": "-EV",
       "algo": "regime_momentum",
       "pair": "XAUUSD",
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": 0.0376,
-      "t": 0.5,
-      "oos": 0.1474,
-      "wr": 35.7,
-      "n": 367
+      "exp_R": -0.0026,
+      "t": -0.04,
+      "oos": 0.0613,
+      "wr": 34.8,
+      "n": 607
     },
     {
       "group": "+EV",
@@ -22,11 +22,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout + FVG confluence filter",
-      "exp_R": 0.0239,
-      "t": 0.3,
-      "oos": 0.0841,
+      "exp_R": 0.0097,
+      "t": 0.16,
+      "oos": 0.0162,
       "wr": 35.2,
-      "n": 335
+      "n": 549
     },
     {
       "group": "-EV",
@@ -35,11 +35,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.0702,
-      "t": -2.5,
-      "oos": -0.0424,
-      "wr": 47.3,
-      "n": 807
+      "exp_R": -0.0875,
+      "t": -4.1,
+      "oos": -0.0322,
+      "wr": 46.5,
+      "n": 1395
     },
     {
       "group": "-EV",
@@ -48,11 +48,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": -0.0249,
-      "t": -0.57,
-      "oos": -0.0424,
+      "exp_R": -0.0402,
+      "t": -1.19,
+      "oos": -0.0579,
       "wr": 40.8,
-      "n": 796
+      "n": 1339
     },
     {
       "group": "+EV",
@@ -100,11 +100,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": -0.248,
-      "t": -3.3,
-      "oos": 0.1461,
-      "wr": 33.1,
-      "n": 362
+      "exp_R": -0.3634,
+      "t": -6.1,
+      "oos": 0.001,
+      "wr": 32.4,
+      "n": 577
     },
     {
       "group": "-EV",
@@ -113,11 +113,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout + FVG confluence filter",
-      "exp_R": -0.1808,
-      "t": -2.21,
-      "oos": 0.1803,
-      "wr": 35.4,
-      "n": 314
+      "exp_R": -0.314,
+      "t": -4.84,
+      "oos": 0.0418,
+      "wr": 34.1,
+      "n": 501
     },
     {
       "group": "-EV",
@@ -126,11 +126,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.3379,
-      "t": -12.09,
-      "oos": -0.2996,
-      "wr": 36.4,
-      "n": 813
+      "exp_R": -0.4319,
+      "t": -20.08,
+      "oos": -0.3246,
+      "wr": 34.8,
+      "n": 1467
     },
     {
       "group": "-EV",
@@ -139,11 +139,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": -0.3177,
-      "t": -7.43,
-      "oos": -0.166,
-      "wr": 39.3,
-      "n": 839
+      "exp_R": -0.4536,
+      "t": -13.46,
+      "oos": -0.2082,
+      "wr": 37.8,
+      "n": 1396
     },
     {
       "group": "-EV",
@@ -191,11 +191,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": -0.0516,
-      "t": -0.7,
-      "oos": -0.0805,
-      "wr": 34.2,
-      "n": 374
+      "exp_R": -0.0586,
+      "t": -1.01,
+      "oos": 0.1248,
+      "wr": 35.0,
+      "n": 611
     },
     {
       "group": "-EV",
@@ -204,11 +204,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout + FVG confluence filter",
-      "exp_R": -0.0927,
-      "t": -1.22,
-      "oos": -0.0557,
-      "wr": 32.8,
-      "n": 344
+      "exp_R": -0.0918,
+      "t": -1.53,
+      "oos": 0.0582,
+      "wr": 33.9,
+      "n": 558
     },
     {
       "group": "-EV",
@@ -217,11 +217,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.0818,
-      "t": -3.06,
-      "oos": -0.066,
-      "wr": 46.6,
-      "n": 897
+      "exp_R": -0.1389,
+      "t": -6.75,
+      "oos": -0.0495,
+      "wr": 44.1,
+      "n": 1538
     },
     {
       "group": "-EV",
@@ -230,11 +230,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": -0.1408,
-      "t": -3.41,
-      "oos": -0.1358,
-      "wr": 38.5,
-      "n": 867
+      "exp_R": -0.1494,
+      "t": -4.66,
+      "oos": -0.1554,
+      "wr": 39.8,
+      "n": 1462
     },
     {
       "group": "-EV",
@@ -360,11 +360,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": -0.153,
-      "t": -2.07,
-      "oos": -0.1262,
-      "wr": 31.1,
-      "n": 351
+      "exp_R": -0.0928,
+      "t": -1.6,
+      "oos": -0.1575,
+      "wr": 33.2,
+      "n": 594
     },
     {
       "group": "-EV",
@@ -373,11 +373,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout + FVG confluence filter",
-      "exp_R": -0.1931,
-      "t": -2.45,
-      "oos": -0.0982,
-      "wr": 29.7,
-      "n": 303
+      "exp_R": -0.152,
+      "t": -2.48,
+      "oos": -0.1854,
+      "wr": 31.2,
+      "n": 516
     },
     {
       "group": "-EV",
@@ -386,11 +386,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.103,
-      "t": -3.82,
-      "oos": -0.0901,
-      "wr": 46.8,
-      "n": 949
+      "exp_R": -0.1351,
+      "t": -6.39,
+      "oos": -0.0935,
+      "wr": 45.4,
+      "n": 1537
     },
     {
       "group": "-EV",
@@ -399,11 +399,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": -0.081,
-      "t": -1.92,
-      "oos": 0.0028,
-      "wr": 41.0,
-      "n": 851
+      "exp_R": -0.0901,
+      "t": -2.83,
+      "oos": -0.0383,
+      "wr": 40.9,
+      "n": 1493
     },
     {
       "group": "-EV",
@@ -451,11 +451,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": -0.1419,
-      "t": -1.94,
-      "oos": -0.0904,
-      "wr": 30.6,
-      "n": 359
+      "exp_R": -0.1081,
+      "t": -1.91,
+      "oos": -0.1126,
+      "wr": 31.8,
+      "n": 606
     },
     {
       "group": "-EV",
@@ -464,11 +464,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout + FVG confluence filter",
-      "exp_R": -0.1857,
+      "exp_R": -0.1448,
       "t": -2.44,
-      "oos": -0.1359,
-      "wr": 29.2,
-      "n": 322
+      "oos": -0.1673,
+      "wr": 30.6,
+      "n": 542
     },
     {
       "group": "-EV",
@@ -477,11 +477,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.0489,
-      "t": -1.85,
-      "oos": -0.0913,
-      "wr": 48.7,
-      "n": 946
+      "exp_R": -0.0685,
+      "t": -3.19,
+      "oos": -0.0761,
+      "wr": 47.9,
+      "n": 1470
     },
     {
       "group": "-EV",
@@ -490,11 +490,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": -0.0767,
-      "t": -1.81,
-      "oos": -0.1039,
-      "wr": 40.1,
-      "n": 831
+      "exp_R": -0.1099,
+      "t": -3.4,
+      "oos": -0.0846,
+      "wr": 38.8,
+      "n": 1419
     },
     {
       "group": "+EV",
@@ -542,11 +542,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": -0.0764,
-      "t": -1.0,
-      "oos": -0.1538,
-      "wr": 34.7,
-      "n": 349
+      "exp_R": -0.1307,
+      "t": -2.3,
+      "oos": -0.0065,
+      "wr": 32.8,
+      "n": 613
     },
     {
       "group": "-EV",
@@ -555,11 +555,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout + FVG confluence filter",
-      "exp_R": -0.0614,
-      "t": -0.76,
-      "oos": -0.0827,
-      "wr": 35.1,
-      "n": 316
+      "exp_R": -0.1058,
+      "t": -1.76,
+      "oos": 0.0011,
+      "wr": 33.6,
+      "n": 554
     },
     {
       "group": "-EV",
@@ -568,11 +568,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.0973,
-      "t": -3.75,
-      "oos": -0.0946,
-      "wr": 46.7,
-      "n": 966
+      "exp_R": -0.1132,
+      "t": -5.44,
+      "oos": -0.0968,
+      "wr": 45.9,
+      "n": 1511
     },
     {
       "group": "-EV",
@@ -581,11 +581,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": -0.1156,
-      "t": -2.74,
-      "oos": -0.1246,
-      "wr": 41.5,
-      "n": 863
+      "exp_R": -0.1683,
+      "t": -5.15,
+      "oos": -0.1636,
+      "wr": 39.0,
+      "n": 1408
     },
     {
       "group": "-EV",
@@ -633,11 +633,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": -0.1263,
-      "t": -1.6,
-      "oos": -0.0657,
-      "wr": 32.4,
-      "n": 315
+      "exp_R": -0.1841,
+      "t": -3.16,
+      "oos": -0.0315,
+      "wr": 30.6,
+      "n": 565
     },
     {
       "group": "-EV",
@@ -646,11 +646,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout + FVG confluence filter",
-      "exp_R": -0.1996,
-      "t": -2.45,
-      "oos": 0.0093,
-      "wr": 29.9,
-      "n": 284
+      "exp_R": -0.2314,
+      "t": -3.85,
+      "oos": -0.0749,
+      "wr": 29.0,
+      "n": 513
     },
     {
       "group": "-EV",
@@ -659,11 +659,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.0806,
-      "t": -3.38,
-      "oos": -0.066,
-      "wr": 48.1,
-      "n": 1074
+      "exp_R": -0.1079,
+      "t": -5.65,
+      "oos": -0.1005,
+      "wr": 46.6,
+      "n": 1720
     },
     {
       "group": "-EV",
@@ -672,11 +672,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": -0.1477,
-      "t": -3.61,
-      "oos": -0.185,
-      "wr": 39.1,
-      "n": 892
+      "exp_R": -0.1653,
+      "t": -5.23,
+      "oos": -0.1958,
+      "wr": 38.7,
+      "n": 1482
     },
     {
       "group": "-EV",
@@ -724,11 +724,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": -0.0719,
-      "t": -1.0,
-      "oos": -0.2298,
-      "wr": 32.8,
-      "n": 384
+      "exp_R": -0.0667,
+      "t": -1.19,
+      "oos": -0.1475,
+      "wr": 33.7,
+      "n": 638
     },
     {
       "group": "-EV",
@@ -737,11 +737,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout + FVG confluence filter",
-      "exp_R": -0.0705,
+      "exp_R": -0.0555,
       "t": -0.95,
-      "oos": -0.1961,
-      "wr": 32.9,
-      "n": 359
+      "oos": -0.1055,
+      "wr": 34.1,
+      "n": 590
     },
     {
       "group": "-EV",
@@ -750,11 +750,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.0871,
-      "t": -3.15,
-      "oos": -0.0579,
-      "wr": 46.3,
-      "n": 862
+      "exp_R": -0.0697,
+      "t": -3.34,
+      "oos": -0.0829,
+      "wr": 48.2,
+      "n": 1475
     },
     {
       "group": "-EV",
@@ -763,11 +763,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": -0.1518,
-      "t": -3.53,
-      "oos": -0.192,
-      "wr": 37.0,
-      "n": 790
+      "exp_R": -0.1617,
+      "t": -4.86,
+      "oos": -0.1499,
+      "wr": 37.5,
+      "n": 1321
     },
     {
       "group": "-EV",
@@ -815,11 +815,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": 0.0269,
-      "t": 0.34,
-      "oos": -0.0138,
-      "wr": 35.7,
-      "n": 322
+      "exp_R": -0.0383,
+      "t": -0.62,
+      "oos": -0.0134,
+      "wr": 34.0,
+      "n": 527
     },
     {
       "group": "-EV",
@@ -828,11 +828,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout + FVG confluence filter",
-      "exp_R": -0.0442,
-      "t": -0.54,
-      "oos": -0.0343,
-      "wr": 33.3,
-      "n": 297
+      "exp_R": -0.0531,
+      "t": -0.82,
+      "oos": -0.1093,
+      "wr": 33.4,
+      "n": 476
     },
     {
       "group": "-EV",
@@ -841,11 +841,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.09,
-      "t": -3.41,
-      "oos": -0.0735,
-      "wr": 47.9,
-      "n": 907
+      "exp_R": -0.1251,
+      "t": -5.87,
+      "oos": -0.0723,
+      "wr": 45.9,
+      "n": 1413
     },
     {
       "group": "+EV",
@@ -854,11 +854,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": 0.0044,
-      "t": 0.09,
-      "oos": 0.0361,
-      "wr": 42.6,
-      "n": 698
+      "exp_R": 0.0175,
+      "t": 0.48,
+      "oos": 0.0608,
+      "wr": 43.7,
+      "n": 1179
     },
     {
       "group": "-EV",
@@ -882,7 +882,7 @@
       "note": "breakout + DXY confirm (DXY driver ไม่ตรงคู่นี้)",
       "exp_R": 0.0524,
       "t": 0.72,
-      "oos": 0.0453,
+      "oos": 0.0454,
       "wr": 39.2,
       "n": 408
     },
@@ -906,11 +906,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout TREND-gate",
-      "exp_R": -0.1001,
-      "t": -1.44,
-      "oos": -0.1897,
-      "wr": 32.1,
-      "n": 408
+      "exp_R": -0.0823,
+      "t": -1.52,
+      "oos": -0.1663,
+      "wr": 33.1,
+      "n": 680
     },
     {
       "group": "-EV",
@@ -919,11 +919,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "Donchian breakout + FVG confluence filter",
-      "exp_R": -0.15,
-      "t": -2.09,
-      "oos": -0.1598,
-      "wr": 30.5,
-      "n": 371
+      "exp_R": -0.1121,
+      "t": -1.99,
+      "oos": -0.2521,
+      "wr": 32.1,
+      "n": 617
     },
     {
       "group": "-EV",
@@ -932,11 +932,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.1264,
-      "t": -4.12,
-      "oos": -0.0784,
-      "wr": 45.4,
-      "n": 758
+      "exp_R": -0.115,
+      "t": -4.96,
+      "oos": -0.0863,
+      "wr": 46.4,
+      "n": 1333
     },
     {
       "group": "-EV",
@@ -945,11 +945,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": -0.0346,
-      "t": -0.82,
-      "oos": -0.0177,
-      "wr": 41.6,
-      "n": 859
+      "exp_R": -0.0399,
+      "t": -1.2,
+      "oos": -0.1139,
+      "wr": 41.8,
+      "n": 1394
     },
     {
       "group": "+EV",
@@ -997,11 +997,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "stat-arb 2-leg rolling-β z-fade (causal) · ⚠️ cointegration-scan: ไม่ผ่าน split-half",
-      "exp_R": -1.8132,
-      "t": -0.89,
-      "oos": 2.1332,
-      "wr": 38.3,
-      "n": 441
+      "exp_R": -6.5856,
+      "t": -4.94,
+      "oos": 0.1834,
+      "wr": 33.0,
+      "n": 1166
     }
   ]
 }

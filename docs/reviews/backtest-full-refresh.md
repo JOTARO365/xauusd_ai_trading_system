@@ -61,3 +61,25 @@ All 6 parity-audit findings are now resolved (conf look-ahead + session, tsmom u
 pairs hardcode→causal, mean_reversion 5-divergences, sweep SL). Inherent-only items remain
 (managed BE/trail exits, macro/tsmom sentiment gates — no historical series). The backtest now
 faithfully reflects live algo logic; no fabricated or hardcoded numbers remain.
+
+## Full-history (50k H1) refresh — the honest +EV/−EV picture
+
+Bumped H1 backtest depth 20k/30k → 50k (full available: XAUUSD back to 2018, ~8y; XAUJPY only
+5,240 bars ≈ 11 months — broker recently added it). This removes the recent-bull-window bias.
+
+Result: +EV 11 → **10**. `regime_momentum XAUUSD` fell out (+0.038 on 3.4y → −EV on 8y) —
+confirming it was a bull-window artifact (matches the prior finding: gold momentum −0.137 full vs
++0.085 recent). Every surviving +EV combo still has t < 2 (best confluence_15m XAU t1.72).
+
+### Why the −EV combos are −EV (categorised)
+1. **Bull-window artifact** — looked +EV on the short recent window, −EV on full history (gold
+   momentum). Using full data is the fix; it reveals the truth (−EV), it cannot make it +EV.
+2. **n < 80 hard data limit** — XAUJPY (11 months of data only), tsmom BTC (79). Positive exp_R +
+   OOS but too few trades to trust. Not fixable in code — needs more history the broker doesn't have.
+3. **Wrong-instrument / no edge** — macro_momentum on FX (DXY driver is gold-specific), momentum on
+   arbitrary pairs. −EV by construction; correct.
+
+**Conclusion:** −EV cannot be turned +EV without hardcoding or curve-fitting — the edge genuinely
+isn't there, and full history confirms it (per quant-sat ch3: use the methods to REJECT, not to
+manufacture edge). The disciplined action is to keep −EV combos shadow/off, not force them live.
+No fabricated or hardcoded numbers were introduced.
