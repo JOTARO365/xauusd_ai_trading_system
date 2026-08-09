@@ -63,6 +63,32 @@ def bt_momentum(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, trend=True, mh=12
     return tr
 
 
+def bt_momentum_fvg(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, mh=120, fvg_lb=6):
+    """regime_momentum_fvg: bt_momentum + FVG confluence filter (ตรงกับ MomentumFVGAlgo live).
+    ต้องมี FVG หนุนทิศใน fvg_lb แท่งก่อน entry: bull low[j]>high[j-2] / bear high[j]<low[j-2] ไม่งั้น skip."""
+    atr = R.atr(h, l, c); er = R.efficiency_ratio(c); adx = R.adx(h, l, c); vp = R.vol_percentile(c)
+    n = len(c); tr = []; i = max(R.VOL_LOOKBACK, brk) + 2
+    while i < n - 1:
+        av = float(atr[i]) if atr[i] == atr[i] else 0.0
+        if av <= 0 or R.detect_regime(er[i], adx[i], vp[i]) != "TREND":
+            i += 1; continue
+        px = float(c[i]); hh = float(h[i - brk:i].max()); ll = float(l[i - brk:i].min())
+        d = 1 if px > hh else -1 if px < ll else 0
+        if not d:
+            i += 1; continue
+        ok = False                                          # FVG confluence (เหมือน live)
+        for j in range(max(2, i - fvg_lb), i + 1):
+            if d > 0 and l[j] > h[j - 2]:
+                ok = True; break
+            if d < 0 and h[j] < l[j - 2]:
+                ok = True; break
+        if not ok:
+            i += 1; continue                                # ไม่มี FVG → skip (filter จริง)
+        r, ei = _resolve(h, l, c, i, d, px, sl_atr * av / pt, rr, pt, cost, mh)
+        tr.append(r); i = ei + 1
+    return tr
+
+
 def bt_tsmom(c, cost_price, lbs=(21, 63, 126), confirm=21):
     tr = []; pos = 0; entry = 0.0; start = max(max(lbs), confirm or 0) + 2
     for i in range(start, len(c)):
@@ -238,10 +264,11 @@ def main():
             print(f"  {lg}: ข้อมูลไม่พอ"); continue
         pt = float(info.point); cost = cost_of(lg)
         h = rh["high"].astype(float); l = rh["low"].astype(float); c = rh["close"].astype(float); tm = rh["time"]
-        # momentum (H1)
-        for aid in ("regime_momentum", "regime_momentum_fvg"):
-            s = _stats(bt_momentum(h, l, c, cost, pt))
-            rows.append(_row(aid, lg, "H1", s, "Donchian breakout TREND-gate"))
+        # momentum (H1) — regime_momentum = breakout · fvg = breakout + FVG filter (แยกจริง, ไม่ก๊อป)
+        rows.append(_row("regime_momentum", lg, "H1", _stats(bt_momentum(h, l, c, cost, pt)),
+                         "Donchian breakout TREND-gate"))
+        rows.append(_row("regime_momentum_fvg", lg, "H1", _stats(bt_momentum_fvg(h, l, c, cost, pt)),
+                         "Donchian breakout + FVG confluence filter"))
         # mean_reversion (H1)
         rows.append(_row("mean_reversion", lg, "H1", _stats(bt_meanrev(h, l, c, cost, pt)), "z-fade RANGE"))
         # sweep_reversal (H1)
