@@ -2555,6 +2555,32 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       </div>
     </section>
 
+    <!-- SAT RISK & VALIDATION (จาก quant-sat skill: ch12/13 risk, ch10 cointegration) -->
+    <section id="sat-risk-section" style="margin-bottom:18px">
+      <div class="section-title">SAT Risk Metrics — Sharpe · Max Drawdown · VaR (ไม้ปิดจริง)</div>
+      <div id="risksat-body" style="font-size:12px;font-family:var(--mono);color:var(--muted)">Loading…</div>
+    </section>
+
+    <section id="equity-curve-section" style="margin-bottom:18px">
+      <div class="section-title">Equity Curve + Underwater (drawdown over time)</div>
+      <div style="overflow-x:auto"><svg id="equity-svg" width="100%" height="220" style="min-width:600px"></svg></div>
+      <div id="equity-note" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
+    </section>
+
+    <section id="cointegration-section" style="margin-bottom:18px">
+      <div class="section-title">Cointegration Monitor — คู่ไหนเทรด stat-arb ได้ (ADF·Hurst·half-life)</div>
+      <div style="overflow-x:auto">
+        <table id="coint-table" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
+          <thead><tr style="color:var(--muted);text-align:left">
+            <th>คู่</th><th style="text-align:right">ADF t</th><th style="text-align:right">Hurst</th>
+            <th style="text-align:right">half-life</th><th style="text-align:right">corr</th><th>tradeable</th>
+          </tr></thead>
+          <tbody id="coint-body"><tr><td colspan="6" style="color:var(--muted)">Loading… (scan หนัก, cache 1ชม.)</td></tr></tbody>
+        </table>
+      </div>
+      <div id="coint-note" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
+    </section>
+
     <!-- REGIME ROUTER ANALYTICS — regime ไหนของทองเหมาะ algo ไหน + score + weekly (scripts/regime_analytics.py) -->
     <!-- OWNER EDGE — วิจารณญาณ owner × vol/market regime (alpha จริง) -->
     <section id="owner-edge-section" style="margin-bottom:18px">
@@ -3956,7 +3982,7 @@ function switchTab(name) {
   if (name === 'settings')   { loadConfig(); loadModeAdvice(); }
   if (name === 'accounting') loadAccounting();
   if (name === 'monitor')    { loadMonitor(); loadEventEngine(); loadPairs(); loadComex(); }
-  if (name === 'backtest') { loadBacktestResults(); loadBacktest(); loadRegimeAnalytics(); loadDailySummary(); loadOwnerEdge(); }
+  if (name === 'backtest') { loadBacktestResults(); loadBacktest(); loadRegimeAnalytics(); loadDailySummary(); loadOwnerEdge(); loadRiskSat(); loadEquityCurve(); loadCointegration(); }
 }
 
 function jumpTo(id) {
@@ -7675,7 +7701,7 @@ function renderBtr() {
       + '<td style="padding:4px 8px;color:' + (pos ? 'var(--green)' : 'var(--red)') + ';font-weight:700">' + r.algo + '</td>'
       + '<td>' + r.pair + '</td><td>' + (r.tf || '—') + '</td>'
       + '<td style="text-align:right;color:' + ((r.exp_R || 0) >= 0 ? 'var(--green)' : 'var(--red)') + '">' + num(r.exp_R) + '</td>'
-      + '<td style="text-align:right">' + num(r.t, 2) + '</td>'
+      + '<td style="text-align:right">' + num(r.t, 2) + ' ' + tBadge(r.t) + '</td>'
       + '<td style="text-align:right">' + num(r.oos) + '</td>'
       + '<td style="text-align:right">' + (r.wr == null ? '—' : r.wr.toFixed(0)) + '</td>'
       + '<td style="text-align:right;color:var(--muted)">' + (r.n || '—') + '</td>'
@@ -7683,6 +7709,80 @@ function renderBtr() {
                   : '<span style="color:' + liveC(r.live) + ';font-weight:700">' + r.live + '</span>') + '</td>'
       + '<td style="color:var(--muted)">' + (r.note || '') + '</td></tr>';
   }).join('');
+}
+
+// validation badge (SAT ch3/16): deflated-t ~2.95 (77 combo). t>2.95 ผ่านจริง · >2 ก้ำกึ่ง · else noise
+function tBadge(t) {
+  if (t == null) return '';
+  if (t >= 2.95) return '<span style="color:var(--green)" title="ผ่าน deflated-t (multiple-testing)">✅</span>';
+  if (t >= 2.0)  return '<span style="color:var(--gold)" title="t>2 แต่ยังไม่ถึง deflated 2.95">◐</span>';
+  return '<span style="color:var(--red)" title="t<2 = noise (ไม่นัยสำคัญ)">⚠</span>';
+}
+
+async function loadRiskSat() {
+  const el = document.getElementById('risksat-body'); if (!el) return;
+  try {
+    const d = await (await fetch('/api/risk-sat')).json();
+    if (d.collecting) { el.innerHTML = '<span style="color:var(--gold)">' + (d.note || 'collecting') + '</span>'; return; }
+    if (!d.ok) { el.textContent = 'ไม่มีข้อมูล'; return; }
+    const c = v => (v >= 0 ? 'var(--green)' : 'var(--red)');
+    el.innerHTML =
+      '<div style="display:flex;gap:18px;flex-wrap:wrap">'
+      + '<div>Sharpe <b style="color:' + c(d.sharpe) + '">' + d.sharpe + '</b></div>'
+      + '<div>Max DD <b style="color:var(--red)">' + d.max_dd_pct + '%</b> (' + d.max_dd_days + ' วัน)</div>'
+      + '<div>WR <b>' + d.wr + '%</b></div>'
+      + '<div>net PnL <b style="color:' + c(d.total_pnl) + '">' + d.total_pnl + '฿</b></div>'
+      + '<div>n <b>' + d.n + '</b> (' + d.span_days + ' วัน)</div></div>'
+      + '<div style="margin-top:8px">VaR95 <b>' + d.var95_hist + '฿</b>(hist)/' + d.var95_param + '(param) · '
+      + 'VaR99 <b>' + d.var99_hist + '฿</b>/' + d.var99_param + '</div>'
+      + '<div style="color:var(--muted);font-size:10px;margin-top:4px">' + (d.note || '') + '</div>';
+  } catch (e) { el.textContent = 'เชื่อมต่อ /api/risk-sat ไม่ได้'; }
+}
+
+async function loadEquityCurve() {
+  const svg = document.getElementById('equity-svg'); if (!svg) return;
+  try {
+    const d = await (await fetch('/api/equity-curve')).json();
+    const pts = d.points || [];
+    document.getElementById('equity-note').textContent =
+      pts.length ? ('n=' + d.n + ' · เริ่ม ' + d.start_equity + '฿') : 'ยังไม่มีไม้ปิด';
+    if (pts.length < 2) { svg.innerHTML = ''; return; }
+    const W = Math.max(600, svg.clientWidth || 600), H = 220, pad = 30;
+    const eqs = pts.map(p => p.equity), dds = pts.map(p => p.dd_pct);
+    const emin = Math.min(...eqs), emax = Math.max(...eqs);
+    const x = i => pad + i / (pts.length - 1) * (W - 2 * pad);
+    const yE = v => 10 + (1 - (v - emin) / (emax - emin || 1)) * (H * 0.55);
+    const ddmax = Math.max(...dds, 1);
+    const yD = v => H * 0.62 + (v / ddmax) * (H * 0.32);
+    const eqPath = eqs.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + yE(v).toFixed(1)).join(' ');
+    const ddPath = dds.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + yD(v).toFixed(1)).join(' ');
+    svg.innerHTML =
+      '<path d="' + eqPath + '" fill="none" stroke="var(--gold)" stroke-width="1.5"/>'
+      + '<path d="' + ddPath + '" fill="none" stroke="var(--red)" stroke-width="1"/>'
+      + '<text x="' + pad + '" y="12" fill="var(--gold)" font-size="10">equity ' + emax.toFixed(0) + '</text>'
+      + '<text x="' + pad + '" y="' + (H - 4) + '" fill="var(--red)" font-size="10">underwater max ' + ddmax.toFixed(1) + '%</text>';
+  } catch (e) { document.getElementById('equity-note').textContent = 'เชื่อมต่อไม่ได้'; }
+}
+
+async function loadCointegration() {
+  const body = document.getElementById('coint-body'); if (!body) return;
+  try {
+    const d = await (await fetch('/api/cointegration')).json();
+    const rows = (d.rows || []);
+    document.getElementById('coint-note').textContent = d.note || '';
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="6" style="color:var(--muted)">—</td></tr>'; return; }
+    rows.sort((a, b) => (a.adf || 0) - (b.adf || 0));
+    body.innerHTML = rows.map(r => {
+      const hl = (r.hl == null || !isFinite(r.hl)) ? 'inf' : Math.round(r.hl);
+      return '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:3px 6px">' + r.pair + '</td>'
+        + '<td style="text-align:right;color:' + ((r.adf || 0) < -2.86 ? 'var(--green)' : 'var(--muted)') + '">' + (r.adf || 0).toFixed(2) + '</td>'
+        + '<td style="text-align:right">' + (r.hurst || 0).toFixed(2) + '</td>'
+        + '<td style="text-align:right">' + hl + '</td>'
+        + '<td style="text-align:right;color:var(--muted)">' + (r.corr == null ? '—' : r.corr.toFixed(2)) + '</td>'
+        + '<td>' + (r.tradeable ? '<span style="color:var(--green);font-weight:700">✅ YES</span>' : '<span style="color:var(--muted)">—</span>') + '</td></tr>';
+    }).join('');
+  } catch (e) { body.innerHTML = '<tr><td colspan="6" style="color:var(--red)">เชื่อมต่อ /api/cointegration ไม่ได้</td></tr>'; }
 }
 
 async function loadBacktest() {
