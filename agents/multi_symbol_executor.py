@@ -608,9 +608,19 @@ def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max
         vo["dir"], float(vo["entry"]), bars, point, broker, sl_pips_eff, tp_pips_eff, algo_id, symbol)
     _lot = _cfgf("MIN_LOT", 0.01) if _force_min else None   # structural = min lot เสมอ (SL กว้าง, ยอม risk%)
     from connectors.mt5_connector import open_order
-    # structural SL = SL ปลายไส้ D1 (กว้าง) + คง TP → RR ต่ำโดยตั้งใจ (memory: wick-SL คือ risk control ไม่ใช่ RR).
-    # RR gate (min 2.0) จะ reject → bypass ด้วย min_rr ต่ำเฉพาะไม้ structural. non-structural = RR gate ปกติ.
-    _min_rr = 0.1 if _force_min else None
+    # RR gate ของ open_order = global 2.0 (คู่กับ decision_maker path ทอง). MSE เป็น validated-edge path
+    # คนละเรื่อง: algo ใส่ RR ที่ backtest ผ่านลง tp_pips แล้ว (sweep BTC 1.5, macro BTC 2.5) → gate 2.0
+    # จะ reject edge ที่ validate มา. ใช้ RR ต่อ combo (algo_pair_config → algo default → global) เป็น floor แทน,
+    # หัก spread-tolerance กันโดน reject เพราะ gate คิด RR ใหม่จาก price จริง (มี spread) เทียบ SL/TP จาก signal.
+    if _force_min:
+        _min_rr = 0.1                                         # structural (ทอง): SL ปลายไส้ D1 กว้าง = risk control ไม่ใช่ RR
+    else:
+        from agents import algo_pair_config as _apc
+        from config import MONEY_MANAGEMENT as _mm
+        _base_rr = _apc.get(algo_id, symbol, "RR", None)
+        if _base_rr is None:
+            _base_rr = getattr(algo, "RR", None) or _mm["min_rr_ratio"]
+        _min_rr = max(0.1, float(_base_rr) - _cfgf("MSE_RR_SPREAD_TOL", 0.05))
     res = open_order(vo["dir"], sl_pips_eff, tp_pips_eff, lot=_lot,
                      comment=f"MSE-{algo_id}", symbol=broker, max_open_override=max_pos,
                      min_rr=_min_rr, magic=magic if magic is not None else _magic_of(algo_id))

@@ -258,6 +258,9 @@ MSE_MAX_TOTAL         = int(os.getenv("MSE_MAX_TOTAL") or 0)
 # MSE_SL_MIN_ATR / MSE_SL_MAX_ATR = clamp SL ของ MSE เป็น multiple ของ ATR (กัน ATR เพี้ยน→SL บ้าๆ; ไม่แตะ edge เคสปกติ). 0 = ปิด clamp ฝั่งนั้น
 MSE_SL_MIN_ATR        = float(os.getenv("MSE_SL_MIN_ATR") or 0.5)
 MSE_SL_MAX_ATR        = float(os.getenv("MSE_SL_MAX_ATR") or 4.0)
+# MSE_RR_SPREAD_TOL = ผ่อน RR gate ของ MSE ต่ำกว่า validated RR เท่านี้ (กัน gate reject ไม้ที่ backtest ผ่าน
+# เพราะ RR ถูกคิดใหม่จาก price จริง+spread เทียบ SL/TP จาก signal). 0 = ไม่ผ่อน. เฉพาะ MSE ไม่แตะ decision_maker
+MSE_RR_SPREAD_TOL     = float(os.getenv("MSE_RR_SPREAD_TOL") or 0.05)
 # Structural SL = วาง SL ที่ "ปลายไส้แท่ง D1 ปิดล่าสุด" เสมอ (BUY→D1.low−buf, SELL→D1.high+buf), ไม่ clamp
 # ไม่ fallback (user directive 07-30). ทุนน้อย → lot=min เสมอ + ข้าม risk-cap. แก้ "เข้าถูกทางแต่โดน SL ก่อน".
 STRUCTURAL_SL_GOLD    = os.getenv("STRUCTURAL_SL_GOLD", "false").lower() == "true"   # gold ALGO-mom (regime_executor/tick)
@@ -480,7 +483,7 @@ def reload_config():
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
     global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT, REGIME_SHADOW
     global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING, REGIME_SR_ENTRY, REGIME_PENDING_FADE, REGIME_SR_EXIT
-    global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK, ALGO_MAX_SAME_DIR, ALGO_ENTRY_HOURS, MULTI_SYMBOL_LIVE, ALGO_SL_MULT, MSE_MAX_POSITIONS, MSE_MAX_TOTAL, MSE_SL_MIN_ATR, MSE_SL_MAX_ATR, WEEKEND_RUN, WEEKEND_INTERVAL_SECS, AUTO_SL_PCT_OTHER
+    global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK, ALGO_MAX_SAME_DIR, ALGO_ENTRY_HOURS, MULTI_SYMBOL_LIVE, ALGO_SL_MULT, MSE_MAX_POSITIONS, MSE_MAX_TOTAL, MSE_SL_MIN_ATR, MSE_SL_MAX_ATR, MSE_RR_SPREAD_TOL, WEEKEND_RUN, WEEKEND_INTERVAL_SECS, AUTO_SL_PCT_OTHER
     global STRUCTURAL_SL_GOLD, STRUCTURAL_SL_MSE, STRUCTURAL_SL_BUFFER_ATR, STRUCTURAL_SL_MIN_ATR, STRUCTURAL_SL_MAX_ATR, STRUCTURAL_SL_TFS, STRUCTURAL_SL_PICK, ALGO_ENTRY_MIN_GAP_ATR
     global ALGO_SIZE_STANDDOWN, ALGO_MAX_TRADE_RISK_PCT
     global SENTIMENT_BIAS, SENTIMENT_BIAS_DEADBAND, SENTIMENT_LOT_FLOOR, SENTIMENT_MARGIN_MULT, SENTIMENT_BLOCK_ABOVE, SENTIMENT_REFRESH_MIN, SENTIMENT_MODEL
@@ -518,6 +521,7 @@ def reload_config():
     MSE_MAX_TOTAL            = int(os.getenv("MSE_MAX_TOTAL") or 0)                            # เพดานรวมไม้ MSE ทุก symbol (0=ไม่จำกัด)
     MSE_SL_MIN_ATR           = float(os.getenv("MSE_SL_MIN_ATR") or 0.5)                       # clamp SL ≥ n×ATR (0=ปิด)
     MSE_SL_MAX_ATR           = float(os.getenv("MSE_SL_MAX_ATR") or 4.0)                       # clamp SL ≤ n×ATR (0=ปิด)
+    MSE_RR_SPREAD_TOL        = float(os.getenv("MSE_RR_SPREAD_TOL") or 0.05)                   # ผ่อน RR gate MSE ต่ำกว่า validated RR (กัน spread reject)
     WEEKEND_RUN              = os.getenv("WEEKEND_RUN", "false").lower() == "true"             # รัน loop วันหยุด (เก็บ BTC)
     WEEKEND_INTERVAL_SECS   = int(os.getenv("WEEKEND_INTERVAL_SECS") or 1800)                 # loop ห่างวันหยุด (ลด token)
     AUTO_SL_PCT_OTHER       = float(os.getenv("AUTO_SL_PCT_OTHER") or 0.01)                    # auto-SL คู่ non-gold = %ราคา

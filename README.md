@@ -679,6 +679,7 @@ full-size and exits on daily flip (no TP), matching exactly what its backtest va
 | `MSE_MAX_TOTAL` | `0` | Global cap across **all** MSE symbols (guards exposure when several are live). `0` = no global cap (per-symbol only). |
 | `MSE_SL_MIN_ATR` / `MSE_SL_MAX_ATR` | `0.5` / `4.0` | Clamp the SL into `[min, max] × ATR` (safety against a broken/spiking ATR). Normal SLs (~1×ATR) are untouched; only pathological values are clamped. `0` disables that side. |
 | `MSE_ENTRY_RETRY_COOLDOWN` | `300` | After an open **fails** (margin/spread/disabled), wait this many seconds before retrying the same signal-bar — instead of marking it handled forever. Prevents both retry-spam and permanent false-blocks. |
+| `MSE_RR_SPREAD_TOL` | `0.05` | MSE uses each combo's **validated RR** (`algo_pair_config.RR` → algo default → global) as its `open_order` RR gate, **not** the global `MIN_RR_RATIO` 2.0 — so a validated 1.5-RR edge (e.g. sweep BTC) isn't rejected by the gold-tuned 2.0 floor. This subtracts a small tolerance from that floor because the gate recomputes RR from the **actual fill price (with spread)** vs the signal-price SL/TP; without it, a correctly-sized trade at exactly its target RR is rejected by spread alone. `0` = no tolerance. Does **not** affect the DecisionMaker/gold path (still 2.0). |
 
 **Structural SL — SL at the D1/H4 candle wick** (algo momentum: gold `regime_executor`/`regime_tick` + all MSE combos):
 
