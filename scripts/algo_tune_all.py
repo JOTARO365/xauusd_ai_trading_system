@@ -93,7 +93,8 @@ def run():
     bm = _broker_map() or {}
     # candidate = +EV/near-miss จาก backtest ต่อ family
     bt = json.load(open(os.path.join(_ROOT, "data", "backtest_results.json"), encoding="utf-8"))["results"]
-    cand = {r["pair"] for r in bt if (r.get("exp_R") or -9) > 0 and (r.get("n") or 0) >= 50}
+    # ทุกคู่ที่มี data พอ (>=50 ไม้) — sweep ครบ ไม่ใช่แค่ +EV (user: tune คู่ที่เหลือ)
+    cand = {r["pair"] for r in bt if (r.get("n") or 0) >= 50 and "~" not in r["pair"]}
 
     def cost_of(lg):
         s = bm.get(lg, lg); si = mt5.symbol_info(s)
@@ -109,7 +110,7 @@ def run():
 
     lines = ["# Algo Tune — all families (anti-overfit sweep)\n",
              "Robust pick = clears deflated-t (√(2·lnN)) AND OOS>0, ranked by OOS. Not the in-sample peak.\n"]
-    momentum_pairs = [p for p in ("XAUUSD", "XAGUSD", "XAUEUR", "BTCUSD", "WTIUSD") if p in cand]
+    momentum_pairs = sorted(cand)   # ทุกคู่
     print("candidates:", sorted(cand))
 
     def report(family, pair, best, peak, defl):
@@ -135,7 +136,7 @@ def run():
 
     # macro (H4)
     lines.append("\n## macro_momentum (H4)")
-    for p in [x for x in ("XAUUSD", "XAUEUR", "BTCUSD") if x in cand]:
+    for p in [x for x in ("XAUUSD", "XAGUSD", "XAUEUR", "XAUJPY", "BTCUSD") if x in cand]:   # macro=gold-complex+BTC (FX circular)
         s = bm.get(p, p); mt5.symbol_select(s, True)
         r = mt5.copy_rates_from_pos(s, mt5.TIMEFRAME_H4, 0, 30000)
         if r is None or len(r) < 1000:
@@ -150,7 +151,7 @@ def run():
 
     # tsmom (D1)
     lines.append("\n## tsmom_d1 (D1)")
-    for p in [x for x in ("XAUUSD", "XAUEUR", "WTIUSD", "EURUSD", "BTCUSD") if x in cand]:
+    for p in sorted(cand):   # tsmom ทุกคู่
         s = bm.get(p, p); mt5.symbol_select(s, True)
         r = mt5.copy_rates_from_pos(s, mt5.TIMEFRAME_D1, 0, 3000)
         if r is None or len(r) < 300:
@@ -161,7 +162,7 @@ def run():
 
     # sweep (H1)
     lines.append("\n## sweep_reversal (H1)")
-    for p in [x for x in ("BTCUSD", "XAUUSD") if x in cand]:
+    for p in sorted(cand):   # sweep ทุกคู่
         r = h1(p)
         if r is None or len(r) < 2000:
             continue
