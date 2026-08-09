@@ -1290,6 +1290,10 @@
   <symbol id="ic-shield" viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   <symbol id="ic-rocket" viewBox="0 0 24 24"><path d="M5 15c-1 1-2 5-2 5s4-1 5-2M9 11a4 4 0 0 1 0 6M15 5c4-2 6 0 4 4-1 4-6 8-9 9l-4-4c1-3 5-8 9-9z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="ic-crystal" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 5 12c-1 1-1 2-1 3H8c0-1 0-2-1-3A7 7 0 0 1 12 2zM12 6v6M9 9l6 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="ic-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="currentColor"/></symbol>
+  <symbol id="ic-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></symbol>
+  <symbol id="ic-alert" viewBox="0 0 24 24"><path d="M12 2l10 18H2zM12 9v5M12 17.5v.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 <style>
   .ic { width: 1.05em; height: 1.05em; vertical-align: -0.16em; display: inline-block; flex: none; }
@@ -2082,7 +2086,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
                   style="padding:2px 10px;cursor:pointer;font-weight:700">…</button></span>
       </div>
       <!-- TOP: โอกาสเข้า order (algo + buy/sell + จุดเข้า) — คลิกดูรายละเอียดด้านล่าง -->
-      <div style="font-size:11px;color:var(--muted);margin:2px 0 5px">💡 โอกาสเข้า order — คลิก card เพื่อดูรายละเอียด</div>
+      <div style="font-size:11px;color:var(--muted);margin:2px 0 5px"><svg class="ic"><use href="#ic-bulb"/></svg> โอกาสเข้า order — คลิก card เพื่อดูรายละเอียด</div>
       <div id="sm-potential" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"></div>
       <!-- BOTTOM: รายละเอียด algo (row card) แสดงเมื่อคลิก card ด้านบน -->
       <div id="sm-detail" style="margin-bottom:10px"></div>
@@ -2421,7 +2425,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
 
     <section id="pairs-section" style="margin-bottom:10px">
       <div class="section-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span>⚖️ XAU-XAG Pairs (stat-arb market-neutral)</span>
+        <span><svg class="ic"><use href="#ic-scale"/></svg> XAU-XAG Pairs (stat-arb market-neutral)</span>
         <span id="pairs-mode" style="font-size:10px;font-family:var(--mono);color:var(--muted)"></span>
       </div>
       <div class="chart-card" style="padding:14px 16px">
@@ -2432,7 +2436,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
     <!-- EVENT ENGINE — ชนข่าว NFP/CPI/FOMC (event_engine.snapshot) -->
     <section id="event-engine-section" style="margin-bottom:10px">
       <div class="section-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span>⚡ ชนข่าว — Event Engine (NFP / CPI / FOMC)</span>
+        <span><svg class="ic"><use href="#ic-zap"/></svg> ชนข่าว — Event Engine (NFP / CPI / FOMC)</span>
         <span id="ee-mode" style="font-size:10px;font-family:var(--mono);color:var(--muted)"></span>
       </div>
       <div class="chart-card" style="padding:14px 16px">
@@ -2593,15 +2597,15 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
           <select id="btr-algo" onchange="renderBtr()" style="font-family:var(--mono);font-size:11px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:3px 6px">
             <option value="all">ทุก algo</option>
           </select>
-          <button class="btr-tab active" data-g="+EV" onclick="filterBtr('+EV')">✅ +EV</button>
-          <button class="btr-tab" data-g="-EV" onclick="filterBtr('-EV')">❌ −EV</button>
+          <button class="btr-tab active" data-g="+EV" onclick="filterBtr('+EV')"><svg class="ic" style="color:var(--green)"><use href="#ic-check"/></svg> +EV</button>
+          <button class="btr-tab" data-g="-EV" onclick="filterBtr('-EV')"><svg class="ic" style="color:var(--red)"><use href="#ic-x"/></svg> −EV</button>
           <button class="btr-tab" data-g="all" onclick="filterBtr('all')">ทั้งหมด</button>
         </span>
       </div>
       <div style="font-size:10px;color:var(--muted);margin:2px 0 6px;line-height:1.5">
         <b>exp_R</b>=กำไรคาดหวัง/ไม้ (หน่วย R) · <b>t</b>=ความมั่นใจว่า edge จริง (&gt;2 นัยสำคัญ, &lt;1 noise) ·
         <b>OOS</b>=ผลนอกข้อมูล fit (&gt;0 ไม่ overfit) · <b>WR%</b>=ไม้กำไร · <b>n</b>=จำนวนไม้ (&lt;80 น้อยเกิน) ·
-        <span style="color:var(--green)">✅</span>ผ่าน deflated-t · <span style="color:var(--gold)">◐</span>t&gt;2 · <span style="color:var(--red)">⚠</span>noise
+        <span style="color:var(--green)"><svg class="ic" style="color:var(--green)"><use href="#ic-check"/></svg> </span>ผ่าน deflated-t · <span style="color:var(--gold)">◐</span>t&gt;2 · <span style="color:var(--red)">⚠</span>noise
       </div>
       <div style="overflow-x:auto">
         <table id="btr-table" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
@@ -2905,7 +2909,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
         <div id="ma-head" style="font-size:13px;font-family:var(--mono);margin-bottom:8px">Loading…</div>
         <div style="overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
-            <thead><tr style="color:var(--muted);text-align:left"><th style="padding:3px 6px">mode</th><th>🛡️ ปลอดภัย</th><th>🚀 โตเร็ว</th><th>เหตุผล</th></tr></thead>
+            <thead><tr style="color:var(--muted);text-align:left"><th style="padding:3px 6px">mode</th><th><svg class="ic"><use href="#ic-shield"/></svg> ปลอดภัย</th><th><svg class="ic"><use href="#ic-rocket"/></svg> โตเร็ว</th><th>เหตุผล</th></tr></thead>
             <tbody id="ma-body"><tr><td colspan="4" style="color:var(--muted)">—</td></tr></tbody>
           </table>
         </div>
@@ -3505,7 +3509,7 @@ function _mdToHtml(md) {
 function _woLoading() {
   return `<div style="padding:22px 0">
     <div class="wo-ring"></div>
-    <div class="wo-status" style="text-align:center;margin-top:16px;font-size:14px">🔮 AI กำลังวิเคราะห์แนวโน้มสัปดาห์…</div>
+    <div class="wo-status" style="text-align:center;margin-top:16px;font-size:14px"><svg class="ic"><use href="#ic-crystal"/></svg> AI กำลังวิเคราะห์แนวโน้มสัปดาห์…</div>
     <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:6px">สังเคราะห์ ปฏิทิน · DXY · Fed · COT · เทคนิคทอง · ข่าว (~30 วิ)</div>
     <div style="max-width:640px;margin:22px auto 0">
       <div class="wo-skel" style="width:42%"></div>
@@ -4846,13 +4850,13 @@ function renderAllLayers() {
       label: show ? `${_wmShort(h.name)}${mv != null ? ` ${mv > 0 ? '+' : ''}${mv}%` : ''}` : '',
       title: `${h.name}${mv != null ? ` · ${h.sym} ${mv > 0 ? '+' : ''}${mv}%` : ''}` });
   });
-  // news markers — เฉพาะข่าวในหมวด (tab) ที่เลือก. ประกาศ→📅 pin, อื่นๆ→dot severity
+  // news markers — เฉพาะข่าวในหมวด (tab) ที่เลือก. ประกาศ→<svg class="ic"><use href="#ic-calendar"/></svg> pin, อื่นๆ→dot severity
   _wmNews.forEach((n) => {
     if (!_newsMatchTab(n) || n.lat == null || n.lng == null) return;
-    if (n.sched) {                                  // ข่าวการประกาศ (calendar) → 📅 pin + countdown
+    if (n.sched) {                                  // ข่าวการประกาศ (calendar) → <svg class="ic"><use href="#ic-calendar"/></svg> pin + countdown
       const col = n.impact === 'high' ? '#ef4444' : '#ffaa00', cd = _wmCountdown(n.ev_ts);
       s += _mk(n.lat + 3, n.lng, 2.3, col, { glow: true, labelCol: col,
-        label: `📅${n.ccy || ''}${cd ? ' ' + cd : ''}`, title: n.title });
+        label: `<svg class="ic"><use href="#ic-calendar"/></svg> ${n.ccy || ''}${cd ? ' ' + cd : ''}`, title: n.title });
     } else {
       const col = n.tier >= 3 ? '#ef4444' : (n.tier >= 2 ? '#f59e0b' : '#e8b04b');
       s += _mk(n.lat, n.lng, 2.4 + 1.0 * n.tier, col, { pulse: n.tier >= 2, title: n.title || '' });
@@ -4979,7 +4983,7 @@ function renderUnifiedNews(wm, ni) {
     });
   }
   (_wmCtx.events || []).forEach(e => {                // ข่าวการประกาศ (economic calendar)
-    items.push({ tier: e.impact === 'high' ? 3 : 2, title: `📅 ${e.name}`,
+    items.push({ tier: e.impact === 'high' ? 3 : 2, title: `<svg class="ic"><use href="#ic-calendar"/></svg> ${e.name}`,
       source: `${e.ccy} · ${e.impact}${e.forecast ? ` f:${e.forecast}` : ''}`,
       ts: e.ts ? Date.parse(e.ts) / 1000 : 0, tag: 'announce', sched: true, us: e.ccy === 'USD',
       cats: _catsOf(e.name, true, 'announce'), ccy: e.ccy, impact: e.impact, ev_ts: e.ts, lat: e.lat, lng: e.lng });
@@ -5004,7 +5008,7 @@ function _renderNewsList() {
     const tm = it.ts ? new Date(it.ts * 1000).toISOString().slice(5, 16).replace('T', ' ') : '';
     const trend = it.tag === 'bull' ? '<span style="color:var(--green)" title="bullish gold">▲</span>'
       : (it.tag === 'bear' ? '<span style="color:var(--red)" title="bearish gold">▼</span>'
-        : (it.sched ? '<span style="color:var(--amber)" title="scheduled">📅</span>'
+        : (it.sched ? '<span style="color:var(--amber)" title="scheduled"><svg class="ic"><use href="#ic-calendar"/></svg> </span>'
           : '<span style="color:var(--muted)" title="geopolitical">◆</span>'));
     const url = it.url ? _wmUrl(it.url) : '';       // กดพาดหัว = เปิดข่าว (allowlist http(s))
     const titleHtml = url && url !== '#'
@@ -5029,7 +5033,7 @@ async function loadEcosystem() {
       return;
     }
     const g = d.gold || {}, s = d.sentiment || {};
-    (function(){var _e=document.getElementById('eco-emoji');if(_e)_e.style.background=({'🟢':'var(--green)','🟡':'var(--amber)','🔴':'var(--red)','⚪':'var(--muted)'}[s.emoji]||'var(--muted)');})(); set('eco-label', s.label || '—'); set('eco-detail', s.detail || '');
+    (function(){var _e=document.getElementById('eco-emoji');if(_e)_e.style.background=({'<svg class="ic" style="color:var(--green)"><use href="#ic-dot"/></svg> ':'var(--green)','🟡':'var(--amber)','<svg class="ic" style="color:var(--red)"><use href="#ic-dot"/></svg> ':'var(--red)','⚪':'var(--muted)'}[s.emoji]||'var(--muted)');})(); set('eco-label', s.label || '—'); set('eco-detail', s.detail || '');
     if (g.move !== null && g.move !== undefined) {
       const gc = g.move > 0 ? 'var(--green)' : (g.move < 0 ? 'var(--red)' : 'var(--muted)');
       const grsi = (g.rsi === null || g.rsi === undefined) ? ''
@@ -5384,7 +5388,7 @@ function _algoDetailCard(a) {
   const nm = a.name || a.algo_id;
   const _lsyms = (a.live_syms || []);
   const badge = a.live
-    ? `<span title="${_lsyms.join(', ') || a.live_symbol || ''}" style="background:var(--green);color:#0e1117;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap">🟢 LIVE${_lsyms.length ? ' ('+_lsyms.length+' คู่)' : (a.live_symbol ? ' '+a.live_symbol : '')}</span>`
+    ? `<span title="${_lsyms.join(', ') || a.live_symbol || ''}" style="background:var(--green);color:#0e1117;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap"><svg class="ic" style="color:var(--green)"><use href="#ic-dot"/></svg> LIVE${_lsyms.length ? ' ('+_lsyms.length+' คู่)' : (a.live_symbol ? ' '+a.live_symbol : '')}</span>`
     : (a.algo_id === 'mean_reversion' ? `<span style="background:#555;color:#ddd;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">CUT · shadow</span>` : '<span style="background:#3a3a3a;color:#aaa;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">SHADOW</span>');
   const metric = a.headline
     ? `<div style="font-family:var(--mono);font-size:14px;font-weight:700">${a.headline}</div>`
@@ -5439,7 +5443,7 @@ function renderSmPotential() {
         style="cursor:pointer;flex:1 1 200px;min-width:200px;max-width:300px;border:1px solid ${sel?'var(--gold)':'var(--border)'};border-radius:8px;padding:8px 11px;background:var(--surface)">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
         <span style="font-weight:700;font-size:12px">${a.name || a.algo_id}</span>
-        ${a.live ? `<span title="${(a.live_syms||[]).join(', ')}" style="color:var(--green);font-size:9px;font-weight:700">🟢LIVE${(a.live_syms||[]).length?' '+a.live_syms.length:''}</span>` : '<span style="color:var(--muted);font-size:9px">shadow</span>'}
+        ${a.live ? `<span title="${(a.live_syms||[]).join(', ')}" style="color:var(--green);font-size:9px;font-weight:700"><svg class="ic" style="color:var(--green)"><use href="#ic-dot"/></svg> LIVE${(a.live_syms||[]).length?' '+a.live_syms.length:''}</span>` : '<span style="color:var(--muted);font-size:9px">shadow</span>'}
       </div>
       <div style="font-family:var(--mono);font-size:11px;margin-top:3px">${entry}</div>
       ${noteTxt}
@@ -5498,7 +5502,7 @@ async function loadShadowMatrix(force) {
       const regime = r.algo_id === 'mean_reversion' ? 'RANGE' : (r.algo_id === 'regime_momentum' ? 'TREND' : '—');
       const key = (r.algo_id + '__' + r.symbol).replace(/[^A-Za-z0-9_]/g, '');
       return `<tr style="text-align:left;border-top:1px solid var(--border)">
-        <td style="padding:4px 8px;cursor:pointer" onclick="toggleShadowOrders('${r.algo_id}','${r.symbol}','${key}')" title="ดูไม้ราย order"><span id="ca-${key}" style="color:var(--muted);font-size:9px;display:inline-block;width:9px">▶</span> ${r.algo_id}${r.live ? ' <span style="color:var(--green);font-size:9px;font-weight:700">🟢LIVE</span>' : ''}</td>
+        <td style="padding:4px 8px;cursor:pointer" onclick="toggleShadowOrders('${r.algo_id}','${r.symbol}','${key}')" title="ดูไม้ราย order"><span id="ca-${key}" style="color:var(--muted);font-size:9px;display:inline-block;width:9px">▶</span> ${r.algo_id}${r.live ? ' <span style="color:var(--green);font-size:9px;font-weight:700"><svg class="ic" style="color:var(--green)"><use href="#ic-dot"/></svg> LIVE</span>' : ''}</td>
         <td style="padding:4px 8px;font-weight:700">${r.symbol}</td>
         <td style="padding:4px 8px;color:var(--muted)">${regime}</td>
         <td style="padding:4px 8px">${r.n}</td>
@@ -5687,8 +5691,8 @@ async function loadAlgoSelector() {
            <span>${a}</span><span>${(p * 100).toFixed(0)}%</span></div>`).join('');
       const trust = r.trust ? '<span style="color:var(--green)">✓ พอเชื่อ</span>' : '<span style="color:var(--amber,#e0a030)">✗ ESS ต่ำ</span>';
       const gate = r.eligible
-        ? '<span style="color:var(--green)">🔓 ผ่าน gate — พร้อม enable (P3b)</span>'
-        : `<span style="color:var(--muted)">🔒 ${r.gate_reason || 'ไม่ผ่าน gate'}</span>`;
+        ? '<span style="color:var(--green)"><svg class="ic"><use href="#ic-unlock"/></svg> ผ่าน gate — พร้อม enable (P3b)</span>'
+        : `<span style="color:var(--muted)"><svg class="ic"><use href="#ic-lock"/></svg> ${r.gate_reason || 'ไม่ผ่าน gate'}</span>`;
       const border = r.eligible ? 'var(--green)' : '#262320';
       return `<div style="border:1px solid ${border};border-radius:8px;padding:8px 12px;min-width:180px;background:var(--card,#161a20)">
         <div style="font-weight:700;font-size:12px">${r.symbol} · ${r.regime}</div>
@@ -5709,7 +5713,7 @@ async function loadAlgoSelector() {
         <td style="padding:4px 8px;color:var(--muted);font-size:11px">${pull > 0 ? '+' : ''}${pull}</td>
         <td style="padding:4px 8px;color:${rC(c.shrunk_exp_R)}">${c.shrunk_exp_R > 0 ? '+' : ''}${c.shrunk_exp_R}</td>
         <td style="padding:4px 8px;color:var(--muted);font-size:11px">${c.edge_p ?? '—'}</td>
-        <td style="padding:4px 8px;font-size:11px;color:${c.eligible ? 'var(--green)' : 'var(--muted)'}">${c.eligible ? '🔓 ผ่าน' : '🔒 ' + (c.gate_reason || '')}</td>
+        <td style="padding:4px 8px;font-size:11px;color:${c.eligible ? 'var(--green)' : 'var(--muted)'}">${c.eligible ? '<svg class="ic"><use href="#ic-unlock"/></svg> ผ่าน' : '<svg class="ic"><use href="#ic-lock"/></svg> ' + (c.gate_reason || '')}</td>
       </tr>`;
     }).join('') || '<tr><td colspan="11" style="color:var(--muted);padding:4px 8px">ยังไม่มี cell</td></tr>';
   } catch (_e) {}
@@ -5826,7 +5830,7 @@ async function loadRegimeAnalytics() {
     const tb  = document.getElementById('ra-tbody');
     const vv  = document.getElementById('ra-verdict');
     if (!d.ok) { if (tb) tb.innerHTML = '<tr><td colspan="8" style="padding:4px 8px;color:var(--muted)">' + (d.error || 'no data') + '</td></tr>'; return; }
-    if (vv) vv.textContent = '⚖ ' + (d.verdict || '');
+    if (vv) vv.textContent = '<svg class="ic"><use href="#ic-scale"/></svg> ' + (d.verdict || '');
     const gcol = g => g === 'A' ? 'var(--green)' : (g === 'B' ? 'var(--gold)' : (g === 'C' ? 'var(--red)' : 'var(--muted)'));
     const rows = (d.historical && d.historical.regimes) || [];
     if (tb) tb.innerHTML = rows.map(r => {
@@ -5933,7 +5937,7 @@ async function loadCalibration() {
     const sgEl = document.getElementById('calib-suggest');
     if (sgEl) {
       if (!sg || sg.status === 'insufficient') {
-        sgEl.innerHTML = '<div style="font-size:10px;color:var(--muted)">💡 conf-floor: ' +
+        sgEl.innerHTML = '<div style="font-size:10px;color:var(--muted)"><svg class="ic"><use href="#ic-bulb"/></svg> conf-floor: ' +
           ((sg && sg.note) || 'ข้อมูลไม่เพียงพอ') + '</div>';
       } else {
         const style = {
@@ -5941,7 +5945,7 @@ async function loadCalibration() {
           suggest_raise:         { c: 'var(--gold)',  bg: 'rgba(74,222,128,0.12)', icon: '⬆' },
           suggest_lower_cautious:{ c: 'var(--red)',   bg: 'rgba(232,59,59,0.10)',  icon: '⚠' },
           no_profitable_floor:   { c: 'var(--red)',   bg: 'rgba(232,59,59,0.10)',  icon: '⚠' },
-        }[sg.status] || { c: 'var(--muted)', bg: 'rgba(255,255,255,0.04)', icon: '💡' };
+        }[sg.status] || { c: 'var(--muted)', bg: 'rgba(255,255,255,0.04)', icon: '<svg class="ic"><use href="#ic-bulb"/></svg> ' };
         const head = (sg.suggested_floor != null && sg.status !== 'no_profitable_floor')
           ? 'MIN_TECH_CONF: ปัจจุบัน ' + sg.current_floor + ' · แนะนำ ' + sg.suggested_floor
           : 'MIN_TECH_CONF: ปัจจุบัน ' + sg.current_floor;
@@ -6403,7 +6407,7 @@ async function fetchCalendar() {
 }
 
 // Detailed economic calendar (UHAS-style) — summary chips, day groups + remaining count,
-// live countdown, gold★ tag, expected-impact %, A/F/P; click a gold event → expand scenario stats.
+// live countdown, gold<svg class="ic"><use href="#ic-star"/></svg> tag, expected-impact %, A/F/P; click a gold event → expand scenario stats.
 // "เกี่ยวกับทอง" (นิยามผู้ใช้) = ข่าว USD ทั้งหมด (ดอลลาร์ขับทอง) + ประกาศดอกเบี้ยธนาคารกลาง ECB/Fed (EUR/USD)
 function _isGoldRelated(e) {
   if ((e.currency || '').toUpperCase() === 'USD') return true;
@@ -6438,7 +6442,7 @@ function renderCalendarDetailed(events) {
   let html = `<div class="cal-summary">
     ${chip('all', 'ทั้งหมด', evs.length)}
     ${chip('usd', 'USD', usdN)}
-    ${chip('gold', '★ เกี่ยวกับทอง', goldN, true)}
+    ${chip('gold', '<svg class="ic"><use href="#ic-star"/></svg> เกี่ยวกับทอง', goldN, true)}
     ${chip('unreleased', 'ยังไม่ออก', unrel)}
     <span class="cal-legend"><span><i style="background:var(--red)"></i>High</span><span><i style="background:var(--amber)"></i>Med</span><span><i style="background:var(--muted2)"></i>Low</span></span>
   </div>`;
@@ -6478,8 +6482,8 @@ function renderCalendarDetailed(events) {
         <div class="cal-hd">
           <span class="cal-time" style="min-width:40px">${timeStr}</span>
           <span class="cal-badge-inline ${impCls(e.impact)}">${impLbl(e.impact)}</span>
-          <span class="cal-curr" style="margin:0">${_isGoldRelated(e) ? '★ ' : ''}${e.currency || ''}</span>
-          <span class="cal-name" style="margin:0;padding:0;flex:1;min-width:120px">${isSpeech ? '<span style="color:var(--red);font-weight:700" title="live speech">🔴▶ </span>' : ''}${e.title || ''}${th ? `<span style="display:block;font-size:9px;color:var(--muted);font-weight:400;margin-top:1px">${th}</span>` : ''}</span>
+          <span class="cal-curr" style="margin:0">${_isGoldRelated(e) ? '<svg class="ic"><use href="#ic-star"/></svg> ' : ''}${e.currency || ''}</span>
+          <span class="cal-name" style="margin:0;padding:0;flex:1;min-width:120px">${isSpeech ? '<span style="color:var(--red);font-weight:700" title="live speech"><svg class="ic" style="color:var(--red)"><use href="#ic-dot"/></svg> ▶ </span>' : ''}${e.title || ''}${th ? `<span style="display:block;font-size:9px;color:var(--muted);font-weight:400;margin-top:1px">${th}</span>` : ''}</span>
           ${expStr}${cd}
         </div>
         <div class="cal-afp">
@@ -6503,7 +6507,7 @@ function renderCalendarDetailed(events) {
       html += `<div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;padding:5px 9px;background:var(--surface);border-radius:5px">
         <span class="cal-badge-inline ${impCls(e.impact)}">${impLbl(e.impact)}</span>
         <span style="color:var(--muted);min-width:34px">${e.currency || ''}</span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${key ? '★ ' : ''}${th || e.title || ''}</span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${key ? '<svg class="ic"><use href="#ic-star"/></svg> ' : ''}${th || e.title || ''}</span>
         ${exp ? `<span class="cal-exp">±${exp.toFixed(2)}%</span>` : ''}
         <span class="es-cd" data-ts="${ts}" style="min-width:78px;text-align:right"><span class="es-cd-big" style="font-weight:800">—</span></span>
       </div>`;
@@ -6816,7 +6820,7 @@ function renderFeed() {
   if (!el) return;
   const scMap = (_eventScenarios && _eventScenarios.scenarios) || {};
 
-  // ── 📅 Calendar group (sorted by time) ──
+  // ── <svg class="ic"><use href="#ic-calendar"/></svg> Calendar group (sorted by time) ──
   const evs = (_calEvents || []).filter(e => e.timestamp_iso)
     .map(e => ({ ...e, t: Date.parse(e.timestamp_iso) }))
     .sort((a, b) => a.t - b.t);
@@ -6877,7 +6881,7 @@ function renderFeed() {
     return `<div class="feed-item">${row}${detail}</div>`;
   }).join('');
 
-  // ── 📰 News group (X posts) ──
+  // ── <svg class="ic"><use href="#ic-news"/></svg> News group (X posts) ──
   const dirBadge = {
     bull:    { t: '▲ ขึ้น',  c: 'var(--green)', bg: 'rgba(38,166,91,0.16)' },
     bear:    { t: '▼ ลง',    c: 'var(--red)',   bg: 'rgba(232,59,59,0.16)' },
@@ -7104,7 +7108,7 @@ function renderVerdict(bs) {
        : m15.direction === 'DOWN' && mk.trend === 'BEARISH' ? 'SELL' : null)
     : null;
   const rideEl = document.getElementById('verdict-ride');
-  rideEl.textContent = rideDir ? `⚡ RIDE ${rideDir}` : 'off';
+  rideEl.textContent = rideDir ? `<svg class="ic"><use href="#ic-zap"/></svg> RIDE ${rideDir}` : 'off';
   rideEl.style.color = rideDir ? 'var(--gold)' : 'var(--muted)';
 }
 
@@ -7150,7 +7154,7 @@ function renderVolume(bs) {
     imb = `<span style="margin-left:10px">flow <span style="color:var(--green)">${bp}%</span>/<span style="color:var(--red)">${vp.sell_pct}%</span> <b style="color:${tcol}">${vp.tilt}</b></span>`;
   }
   el.innerHTML =
-    `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0">📊 TAPE / VOLUME (H1 · ${vp.basis || 'tick-vol'})</div>` +
+    `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0"><svg class="ic"><use href="#ic-chart"/></svg> TAPE / VOLUME (H1 · ${vp.basis || 'tick-vol'})</div>` +
     `<div style="font-size:10px">${wallStr}${imb}</div>`;
 }
 
@@ -7177,7 +7181,7 @@ function renderSignals(bs) {
   const s = bs.signals || {}, ms = s.market_structure, re = s.retrace_entry, rc = s.reversal_confirm, fvg = s.fvg || [], dp = s.double_pattern;
   if (!ms && !re && !rc && !fvg.length && !dp) { el.innerHTML = ''; if (card) card.style.display = 'none'; return; }
   if (card) card.style.display = '';
-  let html = `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0">⚡ TAPE SETUPS · ref only</div>`;
+  let html = `<div style="font-size:9px;color:var(--muted);letter-spacing:1px;margin:2px 0"><svg class="ic"><use href="#ic-zap"/></svg> TAPE SETUPS · ref only</div>`;
   if (ms) {
     const col = ms.state === 'UPTREND' ? 'var(--green)' : ms.state === 'DOWNTREND' ? 'var(--red)'
               : (ms.state === 'ACCUMULATION' || ms.state === 'DISTRIBUTION') ? '#cf9835' : 'var(--muted)';
@@ -7218,7 +7222,7 @@ async function toggleSrDetail(id, sym, lv, kind) {
     const sess = Object.entries(d.by_session || {})
       .map(([s, v]) => `${s} <b>${v.hold_pct}%</b>(${v.n})`).join(' · ');
     el.innerHTML =
-      `<div>📊 แตะ <b>${d.n_touches}</b> ครั้ง · <b style="color:var(--green)">เด้ง ${d.held}</b> / <b style="color:var(--red)">ทะลุ ${d.broke}</b></div>
+      `<div><svg class="ic"><use href="#ic-chart"/></svg> แตะ <b>${d.n_touches}</b> ครั้ง · <b style="color:var(--green)">เด้ง ${d.held}</b> / <b style="color:var(--red)">ทะลุ ${d.broke}</b></div>
        <div>เด้งแล้วไปเฉลี่ย <b>$${d.bounce_avg ?? '—'}</b> (สูงสุด $${d.bounce_max ?? '—'}) · ทะลุไปต่อเฉลี่ย <b>$${d.break_avg ?? '—'}</b></div>
        <div>แตะ 5 ครั้งล่าสุด: ${rec || '—'}</div>
        <div>ตามช่วง (hold%): ${sess || '—'}</div>
@@ -7243,7 +7247,7 @@ function _srLadderHTML(z, px, pipDiv, sym) {     // ladder HTML ใช้ร่�
     if (!pct && !isPoc) return '';
     const col = isPoc ? 'var(--gold)' : (inVa ? '#cf9835' : 'var(--muted)');
     const lbl = isPoc ? ' VPOC' : (inVa ? ' VA' : '');
-    return ` <span title="volume-share ณ ราคานี้ = proxy สัญญาถือ/กิจกรรม (VPOC=หนาสุด · VA=โซน 70%)" style="color:${col};font-size:9px;font-weight:700">📊${pct}%${lbl}</span>`;
+    return ` <span title="volume-share ณ ราคานี้ = proxy สัญญาถือ/กิจกรรม (VPOC=หนาสุด · VA=โซน 70%)" style="color:${col};font-size:9px;font-weight:700"><svg class="ic"><use href="#ic-chart"/></svg> ${pct}%${lbl}</span>`;
   };
   // options OI wall (gold only — GLD = proxy ทอง): put-heavy=support(เขียว) call-heavy=resistance(แดง)
   const oi = sym === 'XAUUSD' ? ((window._optionsOi || {}).XAUUSD || null) : null;
@@ -7276,11 +7280,11 @@ function _srLadderHTML(z, px, pipDiv, sym) {     // ladder HTML ใช้ร่�
     const st = Math.max(sc || 0, (m && m.strength) || 0) || null;
     const bar = st ? `<div style="height:4px;width:${Math.min(st, 100)}%;background:${color};border-radius:2px;opacity:.7"></div>` : '';
     const htfTag = (htf && htf.level && Math.abs(htf.level - lv) / lv < 0.003)
-      ? ` <span style="color:var(--gold);font-size:9px;font-weight:700">★${htf.tf}</span>` : '';
+      ? ` <span style="color:var(--gold);font-size:9px;font-weight:700"><svg class="ic"><use href="#ic-star"/></svg> ${htf.tf}</span>` : '';
     // C (คลิป): confluence — แนวโครงสร้างชนกันหลายที่ = โซนแข็ง
     const cf = m && m.confluence;
     const confTag = cf
-      ? ` <span title="${cf.with.join(' + ')}" style="color:var(--gold);font-size:9px;font-weight:800">⚡×${cf.count}</span>` : '';
+      ? ` <span title="${cf.with.join(' + ')}" style="color:var(--gold);font-size:9px;font-weight:800"><svg class="ic"><use href="#ic-zap"/></svg> ×${cf.count}</span>` : '';
     // B (คลิป): ยืนยันเบรก — ปิดยืนข้ามแนว vs แค่ไส้เทียน
     const bh = m && m.break_hold;
     const holdTag = bh
@@ -7331,7 +7335,7 @@ function _volProfileHeader(sym) {
   const vp = window._volProfile[sym];
   if (!vp || !vp.ok) return '';
   return `<div style="font-size:10px;color:var(--muted);margin-bottom:6px;border-bottom:1px dashed var(--border);padding-bottom:5px">
-    📊 Volume Profile (${vp.tf} ×${vp.n_bars} แท่ง) · VPOC <b style="color:var(--gold)">${vp.vpoc.toFixed(2)}</b>
+    <svg class="ic"><use href="#ic-chart"/></svg> Volume Profile (${vp.tf} ×${vp.n_bars} แท่ง) · VPOC <b style="color:var(--gold)">${vp.vpoc.toFixed(2)}</b>
     · Value Area ${vp.va_low.toFixed(2)}–${vp.va_high.toFixed(2)}
     <span style="opacity:.7">— %ข้างเส้น = สัดส่วนกิจกรรมที่ราคานั้น (proxy สัญญาถือ)</span></div>`;
 }
@@ -7354,7 +7358,7 @@ function _optionsOiHeader() {
   const r = oi.top_resistance, s = oi.top_support;
   const kfmt = v => v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v;
   return `<div style="font-size:10px;color:var(--muted);margin-bottom:6px;border-bottom:1px dashed var(--border);padding-bottom:5px">
-    🎯 Options OI (GLD→XAU · ≤${oi.front_days}วัน · ${oi.asof})
+    <svg class="ic"><use href="#ic-target"/></svg> Options OI (GLD→XAU · ≤${oi.front_days}วัน · ${oi.asof})
     · max-pain <b style="color:var(--gold)">${oi.max_pain_xau ? oi.max_pain_xau.toFixed(0) : '—'}</b>
     ${r ? `· ต้าน <b style="color:var(--red)">${r.xau.toFixed(0)}</b> (call ${kfmt(r.call_oi)})` : ''}
     ${s ? `· รับ <b style="color:var(--green)">${s.xau.toFixed(0)}</b> (put ${kfmt(s.put_oi)})` : ''}
@@ -7527,7 +7531,7 @@ function drawZoneLines(bs) {
   if (kl.pdh) add(kl.pdh, 'rgba(245,158,11,0.85)', 'PDH', 1, LightweightCharts.LineStyle.Dotted, true);
   if (kl.pdl) add(kl.pdl, 'rgba(245,158,11,0.85)', 'PDL', 1, LightweightCharts.LineStyle.Dotted, true);
   const htf = z.htf_zone;
-  if (htf && htf.level) add(htf.level, '#4ade80', '★' + htf.tf, 3, LightweightCharts.LineStyle.Solid, true);
+  if (htf && htf.level) add(htf.level, '#4ade80', '<svg class="ic"><use href="#ic-star"/></svg> ' + htf.tf, 3, LightweightCharts.LineStyle.Solid, true);
 }
 
 /* ── Why No Entry — gate blocks สด (07-03) ── */
@@ -7736,7 +7740,7 @@ async function loadPairs() {
   try {
     const r = await fetch('/api/pairs'); const d = await r.json();
     const mode = document.getElementById('pairs-mode');
-    if (mode) mode.textContent = d.live ? '🔴 LIVE' : '👁 OFF';
+    if (mode) mode.textContent = d.live ? '<svg class="ic" style="color:var(--red)"><use href="#ic-dot"/></svg> LIVE' : '<svg class="ic"><use href="#ic-eye"/></svg> OFF';
     const b = document.getElementById('pairs-body'); if (!b) return;
     if (!d.ok) { b.innerHTML = '<span style="color:var(--muted)">ไม่มีข้อมูล (pairs engine ปิด/ยังไม่รัน)</span>'; return; }
     const z = d.z, zc = Math.abs(z) >= 3.5 ? 'var(--red)' : Math.abs(z) >= 2 ? 'var(--amber)' : 'var(--muted)';
@@ -7753,17 +7757,17 @@ async function loadEventEngine() {
   try {
     const r = await fetch('/api/event-engine'); const d = await r.json();
     const mode = document.getElementById('ee-mode');
-    if (mode) mode.textContent = d.live ? '🔴 LIVE (bias/gate)' : '👁 SHADOW (log-only, เก็บ data)';
+    if (mode) mode.textContent = d.live ? '<svg class="ic" style="color:var(--red)"><use href="#ic-dot"/></svg> LIVE (bias/gate)' : '<svg class="ic"><use href="#ic-eye"/></svg> SHADOW (log-only, เก็บ data)';
     const st = d.state || {}, now = document.getElementById('ee-now');
     if (now) {
       if (st.phase === 'PRE') now.innerHTML = '<span style="color:var(--amber);font-weight:700">⚠️ PRE-EVENT: ' + st.key + ' อีก ' + st.in_min + ' นาที → ' + st.action + '</span>';
-      else if (st.phase === 'POST') now.innerHTML = '<span style="color:' + (st.bias_dir === 'BUY' ? 'var(--green)' : 'var(--red)') + ';font-weight:700">📊 POST ' + st.key + ': ' + st.surprise + ' (actual ' + st.actual + ' vs ' + st.forecast + ') → bias ทอง ' + st.bias_dir + (st.magnitude_pct ? ' ~' + st.magnitude_pct + '%' : '') + '</span>';
+      else if (st.phase === 'POST') now.innerHTML = '<span style="color:' + (st.bias_dir === 'BUY' ? 'var(--green)' : 'var(--red)') + ';font-weight:700"><svg class="ic"><use href="#ic-chart"/></svg> POST ' + st.key + ': ' + st.surprise + ' (actual ' + st.actual + ' vs ' + st.forecast + ') → bias ทอง ' + st.bias_dir + (st.magnitude_pct ? ' ~' + st.magnitude_pct + '%' : '') + '</span>';
       else now.innerHTML = '<span style="color:var(--muted)">ไม่มีข่าวแรงในช่วง window — ปกติ</span>';
     }
     const body = document.getElementById('ee-upcoming'), sc = d.scenarios || {}, up = d.upcoming || [];
     if (!body) return;
     if (!up.length) { body.innerHTML = '<tr><td colspan="6" style="color:var(--muted)">ไม่มีข่าวแรง USD ใน 72 ชม.</td></tr>'; return; }
-    const dir = (k, leg) => { const s = sc[k]; if (!s || !s[leg]) return '—'; const dd = s[leg].dir; return (dd === 'up' ? '🟢 ขึ้น' : '🔴 ลง') + (s[leg].magnitude_pct ? ' ' + s[leg].magnitude_pct + '%' : ''); };
+    const dir = (k, leg) => { const s = sc[k]; if (!s || !s[leg]) return '—'; const dd = s[leg].dir; return (dd === 'up' ? '<svg class="ic" style="color:var(--green)"><use href="#ic-dot"/></svg> ขึ้น' : '<svg class="ic" style="color:var(--red)"><use href="#ic-dot"/></svg> ลง') + (s[leg].magnitude_pct ? ' ' + s[leg].magnitude_pct + '%' : ''); };
     body.innerHTML = up.map(e => '<tr style="border-top:1px solid var(--border)">'
       + '<td style="padding:3px 6px;font-weight:700">' + e.key + '</td><td>' + e.in_hours + 'ชม</td><td>' + (e.forecast || '—') + '</td>'
       + '<td style="color:' + (e.impact === 'high' ? 'var(--red)' : 'var(--amber)') + '">' + e.impact + '</td>'
@@ -7822,7 +7826,7 @@ function renderBtr() {
 // validation badge (SAT ch3/16): deflated-t ~2.95 (77 combo). t>2.95 ผ่านจริง · >2 ก้ำกึ่ง · else noise
 function tBadge(t) {
   if (t == null) return '';
-  if (t >= 2.95) return '<span style="color:var(--green)" title="ผ่าน deflated-t (multiple-testing)">✅</span>';
+  if (t >= 2.95) return '<span style="color:var(--green)" title="ผ่าน deflated-t (multiple-testing)"><svg class="ic" style="color:var(--green)"><use href="#ic-check"/></svg> </span>';
   if (t >= 2.0)  return '<span style="color:var(--gold)" title="t>2 แต่ยังไม่ถึง deflated 2.95">◐</span>';
   return '<span style="color:var(--red)" title="t<2 = noise (ไม่นัยสำคัญ)">⚠</span>';
 }
@@ -7888,7 +7892,7 @@ async function loadCointegration() {
         + '<td style="text-align:right">' + (r.hurst || 0).toFixed(2) + '</td>'
         + '<td style="text-align:right">' + hl + '</td>'
         + '<td style="text-align:right;color:var(--muted)">' + (r.corr == null ? '—' : r.corr.toFixed(2)) + '</td>'
-        + '<td>' + (r.tradeable ? '<span style="color:var(--green);font-weight:700">✅ YES</span>' : '<span style="color:var(--muted)">—</span>') + '</td></tr>';
+        + '<td>' + (r.tradeable ? '<span style="color:var(--green);font-weight:700"><svg class="ic" style="color:var(--green)"><use href="#ic-check"/></svg> YES</span>' : '<span style="color:var(--muted)">—</span>') + '</td></tr>';
     }).join('');
   } catch (e) { body.innerHTML = '<tr><td colspan="6" style="color:var(--red)">เชื่อมต่อ /api/cointegration ไม่ได้</td></tr>'; }
 }
@@ -8322,7 +8326,7 @@ async function openSpeechModal(el) {
     if (ph.ok && _spPrevSeries) {
       _spPrevChart.applyOptions({ width: pEl.clientWidth });
       _spPrevSeries.setData(ph.candles);
-      _spPrevSeries.setMarkers([{ time: ph.speech_ts, position: 'aboveBar', color: '#ef4444', shape: 'arrowDown', text: '🎤' }]);
+      _spPrevSeries.setMarkers([{ time: ph.speech_ts, position: 'aboveBar', color: '#ef4444', shape: 'arrowDown', text: '<svg class="ic"><use href="#ic-mic"/></svg> ' }]);
       _spPrevChart.timeScale().fitContent();
       const mv = ph.move_pct, tm = new Date(ph.speech_ts * 1000).toISOString().slice(0, 16).replace('T', ' ');
       if (note) note.innerHTML = `ครั้งก่อน ${tm} UTC` + (mv != null ? ` · ทองขยับ <b style="color:${mv >= 0 ? '#4ade80' : '#ef4444'}">${mv > 0 ? '+' : ''}${mv}%</b> ใน ~5 ชม.` : '');
@@ -8375,12 +8379,12 @@ function closeSpeechModal() {
         <div id="sp-chart" style="width:100%;height:220px"></div>
       </div>
       <div style="margin-top:14px">
-        <div id="sp-prev-hd" style="font-size:11px;color:var(--muted);margin-bottom:5px">🕐 ปฏิกิริยา XAU รอบ speech <b>ครั้งก่อน</b> (🎤 = เวลา speech)</div>
+        <div id="sp-prev-hd" style="font-size:11px;color:var(--muted);margin-bottom:5px">🕐 ปฏิกิริยา XAU รอบ speech <b>ครั้งก่อน</b> (<svg class="ic"><use href="#ic-mic"/></svg> = เวลา speech)</div>
         <div id="sp-prev-chart" style="width:100%;height:200px"></div>
         <div id="sp-prev-note" style="font-size:10px;color:var(--muted);margin-top:4px;font-family:var(--mono)"></div>
       </div>
       <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:7px">🎯 Gold Bias — จาก keyword ในข่าว (อัปเดตทุก ~30 วิ · ตามข่าว ช้ากว่าราคาจริง)
+        <div style="font-size:11px;color:var(--muted);margin-bottom:7px"><svg class="ic"><use href="#ic-target"/></svg> Gold Bias — จาก keyword ในข่าว (อัปเดตทุก ~30 วิ · ตามข่าว ช้ากว่าราคาจริง)
           <span id="sp-bias-num" style="float:right;font-family:var(--mono);font-weight:800;font-size:14px">—</span></div>
         <div style="display:flex;align-items:center;gap:7px;font-size:9px;color:var(--muted)">
           <span style="white-space:nowrap;color:var(--red)">▼ ทองลง</span>
