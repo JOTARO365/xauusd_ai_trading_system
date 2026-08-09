@@ -2055,7 +2055,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
           <thead><tr style="color:var(--muted);text-align:left">
             <th style="padding:4px 8px">กลยุทธ์</th><th style="padding:4px 8px">คู่</th>
             <th style="padding:4px 8px">regime</th><th style="padding:4px 8px">n</th><th style="padding:4px 8px">open</th>
-            <th style="padding:4px 8px">WR%</th><th style="padding:4px 8px">exp_R (fwd)</th><th style="padding:4px 8px">ΣR</th>
+            <th style="padding:4px 8px" title="Win Rate % ไม้กำไร">WR%</th><th style="padding:4px 8px" title="Expected R forward (shadow สด) — กำไรคาดหวังต่อไม้">exp_R (fwd)</th><th style="padding:4px 8px" title="ผลรวม R ทั้งหมด (Σ = sum)">ΣR</th>
             <th style="padding:4px 8px">backtest (managed)</th><th style="padding:4px 8px">เงินจริง</th><th style="padding:4px 8px">badge</th>
             <th style="padding:4px 8px">เทรดจริง</th><th style="padding:4px 8px">switch</th>
           </tr></thead>
@@ -2071,7 +2071,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
         <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px">
           <thead><tr style="color:var(--muted);text-align:left">
             <th style="padding:4px 8px">กลยุทธ์</th><th style="padding:4px 8px">คู่</th><th style="padding:4px 8px">n</th>
-            <th style="padding:4px 8px">WR%</th><th style="padding:4px 8px">exp_R</th><th style="padding:4px 8px">ΣR</th>
+            <th style="padding:4px 8px" title="Win Rate % ไม้กำไร">WR%</th><th style="padding:4px 8px" title="Expected R — กำไรคาดหวังต่อไม้ (หน่วย R)">exp_R</th><th style="padding:4px 8px" title="ผลรวม R (Σ=sum)">ΣR</th>
             <th style="padding:4px 8px">P&amp;L</th><th style="padding:4px 8px">edge ต่อ regime</th>
           </tr></thead>
           <tbody id="re-body"><tr><td colspan="8" style="color:var(--muted);padding:4px 8px">—</td></tr></tbody>
@@ -2093,7 +2093,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
         <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px">
           <thead><tr style="color:var(--muted);text-align:left">
             <th style="padding:4px 8px">กลยุทธ์</th><th style="padding:4px 8px">คู่</th><th style="padding:4px 8px">regime</th>
-            <th style="padding:4px 8px">n</th><th style="padding:4px 8px">ESS</th><th style="padding:4px 8px">WR ดิบ</th>
+            <th style="padding:4px 8px" title="จำนวนไม้">n</th><th style="padding:4px 8px" title="Effective Sample Size — ขนาดตัวอย่างที่ใช้ได้จริง (หลังถ่วงน้ำหนัก)">ESS</th><th style="padding:4px 8px" title="Win Rate ดิบ (ยังไม่ปรับ)">WR ดิบ</th>
             <th style="padding:4px 8px">WR shrunk</th><th style="padding:4px 8px">pull</th><th style="padding:4px 8px">exp_R shrunk</th>
             <th style="padding:4px 8px">edge p</th><th style="padding:4px 8px">gate</th>
           </tr></thead>
@@ -2110,7 +2110,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
           <thead><tr style="color:var(--muted);text-align:left">
             <th style="text-align:left;padding:4px 8px">สินทรัพย์</th><th style="padding:4px 8px">pos</th>
             <th style="padding:4px 8px">D1 days</th><th style="padding:4px 8px">Sharpe</th>
-            <th style="padding:4px 8px">IS</th><th style="padding:4px 8px">OOS</th>
+            <th style="padding:4px 8px" title="In-Sample — ผลบนข้อมูลที่ใช้ fit">IS</th><th style="padding:4px 8px" title="Out-of-Sample — ผลบนข้อมูลนอก fit (เชื่อถือกว่า)">OOS</th>
             <th style="padding:4px 8px">equity</th><th style="padding:4px 8px">maxDD%</th><th style="padding:4px 8px">since</th>
           </tr></thead>
           <tbody id="stm-body"><tr><td colspan="9" style="color:var(--muted);padding:4px 8px">—</td></tr></tbody>
@@ -2543,12 +2543,21 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
           <button class="btr-tab" data-g="all" onclick="filterBtr('all')">ทั้งหมด</button>
         </span>
       </div>
+      <div style="font-size:10px;color:var(--muted);margin:2px 0 6px;line-height:1.5">
+        <b>exp_R</b>=กำไรคาดหวัง/ไม้ (หน่วย R) · <b>t</b>=ความมั่นใจว่า edge จริง (&gt;2 นัยสำคัญ, &lt;1 noise) ·
+        <b>OOS</b>=ผลนอกข้อมูล fit (&gt;0 ไม่ overfit) · <b>WR%</b>=ไม้กำไร · <b>n</b>=จำนวนไม้ (&lt;80 น้อยเกิน) ·
+        <span style="color:var(--green)">✅</span>ผ่าน deflated-t · <span style="color:var(--gold)">◐</span>t&gt;2 · <span style="color:var(--red)">⚠</span>noise
+      </div>
       <div style="overflow-x:auto">
         <table id="btr-table" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
           <thead><tr style="color:var(--muted);text-align:left">
-            <th>algo</th><th>คู่</th><th>TF</th><th style="text-align:right">exp_R</th>
-            <th style="text-align:right">t</th><th style="text-align:right">OOS</th><th style="text-align:right">WR%</th>
-            <th style="text-align:right">n</th><th>สถานะ</th><th>หมายเหตุ</th>
+            <th title="ชื่อกลยุทธ์">algo</th><th title="คู่เงิน/สินทรัพย์">คู่</th><th title="Timeframe กรอบเวลา">TF</th>
+            <th style="text-align:right" title="Expected R — กำไรคาดหวังต่อไม้ (หน่วย R = เท่าของความเสี่ยง SL). >0 = คุ้ม">exp_R</th>
+            <th style="text-align:right" title="t-statistic — มั่นใจแค่ไหนว่า edge จริงไม่ใช่ฟลุ๊ค. >2 = นัยสำคัญ · <1 = noise">t</th>
+            <th style="text-align:right" title="Out-of-Sample — exp_R บนข้อมูล 30% ท้ายที่ไม่ได้ fit. >0 = ไม่ overfit">OOS</th>
+            <th style="text-align:right" title="Win Rate — เปอร์เซ็นต์ไม้ที่กำไร">WR%</th>
+            <th style="text-align:right" title="จำนวนไม้ (sample size) — ยิ่งเยอะยิ่งเชื่อถือ; <80 = น้อยเกิน">n</th>
+            <th title="สถานะเทรด (SHADOW/LIVE/OFF)">สถานะ</th><th>หมายเหตุ</th>
           </tr></thead>
           <tbody id="btr-body"><tr><td colspan="10" style="color:var(--muted)">Loading…</td></tr></tbody>
         </table>
@@ -2572,8 +2581,12 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       <div style="overflow-x:auto">
         <table id="coint-table" style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)">
           <thead><tr style="color:var(--muted);text-align:left">
-            <th>คู่</th><th style="text-align:right">ADF t</th><th style="text-align:right">Hurst</th>
-            <th style="text-align:right">half-life</th><th style="text-align:right">corr</th><th>tradeable</th>
+            <th title="คู่สินทรัพย์ (2 ขา)">คู่</th>
+            <th style="text-align:right" title="Augmented Dickey-Fuller test — <−2.86 = spread คืนสู่ค่าเฉลี่ย (เทรด stat-arb ได้)">ADF t</th>
+            <th style="text-align:right" title="Hurst exponent — <0.5 คืนค่าเฉลี่ย · ~0.5 สุ่ม · >0.5 เทรนด์">Hurst</th>
+            <th style="text-align:right" title="ครึ่งชีวิต (จำนวน bar) ที่ spread กลับสู่ mean ครึ่งทาง">half-life</th>
+            <th style="text-align:right" title="correlation สหสัมพันธ์ 2 ขา">corr</th>
+            <th title="เทรด stat-arb ได้ไหม (ผ่าน ADF+Hurst+split-half)">tradeable</th>
           </tr></thead>
           <tbody id="coint-body"><tr><td colspan="6" style="color:var(--muted)">Loading… (scan หนัก, cache 1ชม.)</td></tr></tbody>
         </table>
