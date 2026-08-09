@@ -341,7 +341,12 @@ class MacroMomAlgo(Algo):
         atr = R.atr(high, low, close); av = float(atr[i]) if atr[i] == atr[i] else 0.0
         if av <= 0:
             return None
-        px = float(close[i]); hh = float(high[i - self.BRK:i].max()); ll = float(low[i - self.BRK:i].min())
+        from agents import algo_pair_config as _apc         # per-pair tune (default=global)
+        brk = int(_apc.get(self.algo_id, symbol, "BRK", self.BRK))
+        mlb = int(_apc.get(self.algo_id, symbol, "MLB", self.MLB))
+        sl_atr = float(_apc.get(self.algo_id, symbol, "SL_ATR", self.SL_ATR))
+        rr = float(_apc.get(self.algo_id, symbol, "RR", self.RR))
+        px = float(close[i]); hh = float(high[i - brk:i].max()); ll = float(low[i - brk:i].min())
         d = "BUY" if px > hh else ("SELL" if px < ll else None)   # Donchian breakout = จุดสำคัญ
         if d is None:
             return None
@@ -349,9 +354,9 @@ class MacroMomAlgo(Algo):
         macro = (ctx or {}).get("macro_close")
         if macro is None:
             macro = self._fetch_macro(times, macro_logical)   # live fetch (per-pair)
-        if macro is None or len(macro) <= i or macro[i] != macro[i] or macro[i - self.MLB] != macro[i - self.MLB]:
+        if macro is None or len(macro) <= i or macro[i] != macro[i] or macro[i - mlb] != macro[i - mlb]:
             return None
-        md = "BUY" if msign * (macro[i] - macro[i - self.MLB]) > 0 else "SELL"   # USD-factor direction ต่อคู่
+        md = "BUY" if msign * (macro[i] - macro[i - mlb]) > 0 else "SELL"   # USD-factor direction ต่อคู่
         if d != md:                                        # breakout สวน macro → stand-down (ไม่สวน sentiment โครงสร้าง)
             return None
         try:                                               # ข่าว/econ sentiment (gold) — ไม่สวน sentiment สด
@@ -430,9 +435,14 @@ class ConfluenceVol15m(Algo):
         i = n - 2
         # session filter (gold-only): เทรดเฉพาะ NY/London (ทองวิ่ง) ตัด Asian chop → exp_R ~1.7× + OOS ดีขึ้น (backtest 08-07).
         # BTC/crypto = 24/7 ไม่กรอง. config CONF15M_SESSION="13-21" (UTC); ว่าง=ทุกชม.
+        from agents import algo_pair_config as _apc            # per-pair tune (default=global)
+        brk = int(_apc.get(self.algo_id, symbol, "BRK", self.BRK))
+        sl_atr = float(_apc.get(self.algo_id, symbol, "SL_ATR", self.SL_ATR))
+        rr = float(_apc.get(self.algo_id, symbol, "RR", self.RR))
         if symbol and symbol.upper().startswith("XAU"):
             import config as _cfg
-            sess = str(getattr(_cfg, "CONF15M_SESSION", "13-21") or "").strip()
+            sess = str(_apc.get(self.algo_id, symbol, "session",
+                                getattr(_cfg, "CONF15M_SESSION", "13-21")) or "").strip()
             if sess and "-" in sess:
                 try:
                     lo_h, hi_h = (int(x) for x in sess.split("-"))
@@ -445,7 +455,7 @@ class ConfluenceVol15m(Algo):
         atr = R.atr(high, low, close); av = float(atr[i]) if atr[i] == atr[i] else 0.0
         if av <= 0:
             return None
-        px = float(close[i]); hh = float(high[i - self.BRK:i].max()); ll = float(low[i - self.BRK:i].min())
+        px = float(close[i]); hh = float(high[i - brk:i].max()); ll = float(low[i - brk:i].min())
         d = "BUY" if px > hh else ("SELL" if px < ll else None)     # 15m breakout = จุดสำคัญ
         if d is None:
             return None
@@ -460,9 +470,9 @@ class ConfluenceVol15m(Algo):
             bar_ts = datetime.fromtimestamp(int(times[i]), timezone.utc).isoformat()
         except Exception:
             return None
-        slp = round(self.SL_ATR * av / point)
+        slp = round(sl_atr * av / point)
         return {"algo_id": self.algo_id, "symbol": symbol, "dir": d, "entry": px,
-                "sl_pips": slp, "tp_pips": round(slp * self.RR), "regime": "CONF15M",
+                "sl_pips": slp, "tp_pips": round(slp * rr), "regime": "CONF15M",
                 "bar_ts": bar_ts, "klass": self.klass}
 
 

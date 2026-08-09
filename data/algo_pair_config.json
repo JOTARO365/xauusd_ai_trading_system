@@ -1,0 +1,8 @@
+{
+  "_doc": "per-(algo × คู่) override. ว่าง = ใช้ global default. tune ได้: SL_ATR, RR, BRK, MLB, VK, session, lookbacks. DISCIPLINE: structural หรือ OOS-validated เท่านั้น (ไม่ไล่ backtest = curve-fit). ตัวอย่าง: \"confluence_15m\":{\"XAUUSD\":{\"session\":\"13-17\"}}",
+  "confluence_15m": {},
+  "macro_momentum": {},
+  "tsmom_d1": {},
+  "regime_momentum": {},
+  "sweep_reversal": {}
+}
