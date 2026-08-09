@@ -22,3 +22,23 @@ Tradeable ⇔ ADF < −2.86 (5%) AND Hurst<0.5 AND half-life 5–500 bars AND bo
 **Action:** treat the XAU-XAG pairs sleeve like the WTI/BTC edges — not validated; shadow or cut
 (`PAIRS_LIVE`), don't add capital to it. Stat-arb is not a real alpha source here. The CADF scanner
 did its job: it refuted a strategy that was running live.
+
+## Full universe (55 pairs, log-price) — update
+
+Extended to the full collected universe (11 symbols → 55 pairs) and switched to **log-price**
+(raw-price OLS produced scale artifacts, e.g. XAUJPY-USDCHF ADF −295 / β −3.8M — spurious).
+
+Nominal 5% passers (log-price): **GBPUSD-USDJPY** (ADF −3.70, halves −3.01/−3.78, HL 195),
+**GBPUSD-WTIUSD** (−3.68, −3.08/−3.00, HL 186), **AUDUSD-WTIUSD** (−3.00, −3.15/−3.15, HL 287).
+
+**Multiple-testing verdict — indistinguishable from noise:**
+- 55 pairs tested → ~2.8 false positives expected at 5% by chance. We found exactly 3 → the
+  passing count equals the noise rate; it is NOT evidence of real cointegration.
+- Bonferroni (α = 0.05/55 → ADF crit ≈ −4.0+): none of the three clear it (best is −3.70).
+- Gold-complex pairs (XAU-XAG, XAU-XAUEUR, …) all fail regardless — no gold stat-arb.
+- Half-lives 186–287 H1 bars (8–12 days) — slow enough that two-leg cost erodes any thin edge.
+
+**Conclusion:** no pair survives a multiple-testing-honest bar. Only **AUDUSD-WTIUSD** has an
+economic rationale (AUD is a commodity currency co-moving with oil) and is worth a *shadow* test
+to collect forward OOS — not a live deployment. Stat-arb is not a validated alpha source in this
+universe; the live XAU-XAG pairs should be shadowed/cut.

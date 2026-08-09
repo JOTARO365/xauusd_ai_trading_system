@@ -20,7 +20,12 @@ import numpy as np
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 
-SYMBOLS = ["XAUUSD", "XAUEUR", "XAGUSD", "BTCUSD", "WTIUSD"]
+try:                                     # universe เต็ม (รวมคู่ที่เก็บ data แต่ไม่ได้ live) — user 08-09
+    from agents import algo_registry as _reg
+    SYMBOLS = list(_reg.UNIVERSE)
+except Exception:
+    SYMBOLS = ["XAUUSD", "XAGUSD", "XAUEUR", "XAUJPY", "AUDUSD", "EURUSD",
+               "GBPUSD", "USDCHF", "USDJPY", "BTCUSD", "WTIUSD"]
 # ADF critical values (constant, no trend, large-n; MacKinnon approx)
 ADF_CRIT = {"1%": -3.43, "5%": -2.86, "10%": -2.57}
 HL_MIN, HL_MAX = 5, 500          # half-life สมเหตุผล (bar): เร็วพอเทรด, ไม่ช้าจนไม่กลับ
@@ -134,6 +139,7 @@ def run(tf_name="H1", count=8000):
         if y is None:
             print("%-16s  (data ไม่พอ/ไม่ align)" % f"{a_lg}-{b_lg}")
             continue
+        y, x = np.log(y), np.log(x)          # log-price: scale-invariant (กัน artifact สเกลราคา เช่น XAUJPY)
         r = _test_pair(y, x)
         r["pair"] = f"{a_lg}-{b_lg}"
         rows.append(r)
@@ -144,6 +150,9 @@ def run(tf_name="H1", count=8000):
     mt5.shutdown()
     print("=" * 92)
     good = [r for r in rows if r["tradeable"]]
+    n_tested = len(rows)
+    exp_fp = round(n_tested * 0.05, 1)       # multiple-testing: จำนวน false-positive คาดหวังที่ 5%
+    print("multiple-testing: เทส %d คู่ → คาด false-positive ~%.1f คู่ ที่ 5%% โดยบังเอิญ" % (n_tested, exp_fp))
     if good:
         print("คู่ที่ cointegrated จริง (stat-arb ได้):")
         for r in sorted(good, key=lambda z: z["adf"]):
