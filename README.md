@@ -1263,3 +1263,27 @@ feather-style, theme-aware via `currentColor`) — reference an icon with
 news, lock/unlock, target, eye, mic, bank, shield, rocket, crystal). Inline (not external CDN) so it
 loads instantly, works if any CDN is blocked, and adapts to light/dark. Text symbols (arrows →↑↓,
 ✓✗⚠, status dots 🟢🔴) stay as text — they are inline indicators, not decorative icons.
+
+## Config reference (2026-08 additions)
+
+Risk & sizing (all in `.env` / editable in dashboard Settings):
+
+| key | default | what |
+|-----|---------|------|
+| `FORCE_CLOSE_MIN_CAPITAL` | 20000 | force-close locks each +100% only while equity < this (compounds small→viable) |
+| `CAPITAL_GATE_ENABLE` | false | block entries risking > MAX% of equity while under the floor |
+| `CAPITAL_GATE_FLOOR` | 20000 | capital gate + FF + ATR-SL apply below this equity |
+| `CAPITAL_GATE_MAX_RISK_PCT` | 15 | gate blocks a trade if its THB risk exceeds this % of equity |
+| `FF_SIZING_ENABLE` | false | fixed-fractional sizing (risk % of equity) below the floor — per-symbol via order_calc_profit |
+| `FF_RISK_PCT` | 1.0 | risk % per trade for FF sizing |
+| `ATR_SL_SMALL_CAP` | false | below the floor use the algo's native ATR SL instead of the wide structural SL (lets FF cut risk) |
+| `SEASONALITY_GATE` | false | gold: don't fight validated monthly seasonality (no shorts Jan/Dec, no longs Jun/Sep/Nov) |
+| `CUSTOM_LOT_ENABLE` | false | use per-pair lot from `data/pair_lots.json` (dashboard-editable) instead of global FIXED_LOT/FF |
+
+Lot precedence in `open_order`: algo-override → NNLB → custom-lot → FF (below floor) → global.
+**MICRO account**: 1 micro lot = 0.01 standard, so scale ×100 — `FIXED_LOT=0.3 MIN_LOT=0.01 MAX_LOT=3.0`
+(a 1,000 THB micro account sizes gold to ~1-2% risk). Config lots are account-type specific; the
+pre-flight check warns on a micro/standard mismatch before the first cycle.
+
+Research/validation scripts: `survival_sim.py` (Monte-Carlo survival), `cointegration_scan.py`,
+`algo_tune*.py` (anti-overfit param sweep), `event_edge_test.py`, `algo_config_matrix.py`.
