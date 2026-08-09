@@ -527,6 +527,21 @@ async def main():
         console.print(f"  [yellow]⚠[/yellow]  HTF startup check error: {_htf_e}\n")
         logger.warning(f"[HTF] Startup check error: {_htf_e}")
 
+    # ── Pre-flight safety check (ก่อน cycle แรก) — เตือน config/account mismatch (micro/standard, risk/ไม้) ──
+    try:
+        from agents.preflight import check as _preflight
+        _pf = _preflight()
+        _icon = {"CRIT": "[red]⛔[/red]", "WARN": "[yellow]⚠[/yellow]", "OK": "[green]✓[/green]", "INFO": "[cyan]ℹ[/cyan]"}
+        console.print("  [bold]── Pre-flight check ──[/bold]")
+        for _lvl, _msg in _pf:
+            console.print(f"    {_icon.get(_lvl, '·')}  {_msg}")
+            (logger.error if _lvl == "CRIT" else logger.warning if _lvl == "WARN" else logger.info)(f"[PREFLIGHT] {_msg}")
+        if any(_lvl == "CRIT" for _lvl, _ in _pf):
+            console.print("  [red]⛔ พบปัญหา CRITICAL — ตรวจ config/บัญชีก่อนเทรด (บอทยังรันต่อ แต่ควรหยุดแก้)[/red]")
+        console.print()
+    except Exception as _pfe:
+        console.print(f"  [yellow]⚠[/yellow]  preflight error: {_pfe}\n")
+
     # รอบแรกใช้ DEFAULT เพราะยังไม่มีข้อมูล
     interval = DEFAULT_INTERVAL
     reason   = "เริ่มต้นระบบ"
