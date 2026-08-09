@@ -1457,8 +1457,21 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       <button class="tab-sub-item" onclick="goSection('algo-journal-section')">Trade Score</button>
       <button class="tab-sub-item" onclick="goSection('gold-regime-section')">Regime</button>
       <button class="tab-sub-item" onclick="goSection('econ-calendar-section')">Calendar</button>
+      <button class="tab-sub-item" onclick="goSection('pairlots-section')">🎚️ Lot ต่อคู่</button>
+      <button class="tab-sub-item" onclick="goSection('pairs-section')">⚖️ Pairs</button>
+      <button class="tab-sub-item" onclick="goSection('event-engine-section')">Event Engine</button>
+      <button class="tab-sub-item" onclick="goSection('comex-section')">COMEX</button>
     </div>
     <button class="tab-btn"        data-tab="backtest"    onclick="switchTab('backtest')">Analytics</button>
+    <div class="tab-sub" id="backtest-submenu" style="display:none">
+      <button class="tab-sub-item" onclick="goSection('backtest-research-section')">Backtest +EV/−EV</button>
+      <button class="tab-sub-item" onclick="goSection('sat-risk-section')">SAT Risk</button>
+      <button class="tab-sub-item" onclick="goSection('equity-curve-section')">Equity/Underwater</button>
+      <button class="tab-sub-item" onclick="goSection('cointegration-section')">Cointegration</button>
+      <button class="tab-sub-item" onclick="goSection('regime-analytics-section')">Regime Analytics</button>
+      <button class="tab-sub-item" onclick="goSection('owner-edge-section')">Owner Edge</button>
+      <button class="tab-sub-item" onclick="goSection('daily-summary-section')">สรุปรายวัน</button>
+    </div>
     <button class="tab-btn"        data-tab="accounting"  onclick="switchTab('accounting')">Costs</button>
     <button class="tab-btn"        data-tab="settings"    onclick="switchTab('settings')">Settings</button>
   </div>
@@ -4011,6 +4024,8 @@ function switchTab(name) {
     c.classList.toggle('active', c.id === 'tab-' + name));
   const _sub = document.getElementById('live-submenu');       // submenu โชว์เฉพาะตอนอยู่ Live
   if (_sub) _sub.style.display = (name === 'monitor') ? 'flex' : 'none';
+  const _bsub = document.getElementById('backtest-submenu');  // Analytics submenu
+  if (_bsub) _bsub.style.display = (name === 'backtest') ? 'flex' : 'none';
   if (name === 'settings')   { loadConfig(); loadModeAdvice(); }
   if (name === 'accounting') loadAccounting();
   if (name === 'monitor')    { loadMonitor(); loadEventEngine(); loadPairs(); loadComex(); loadPairLots(); }
@@ -4021,11 +4036,14 @@ function jumpTo(id) {
   const el = document.getElementById(id);
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
-// submenu ใน sidebar → สลับไป Live (ถ้ายังไม่อยู่) แล้วเลื่อนไป section
+// submenu → สลับไป tab ที่ section นั้นอยู่ (monitor/backtest) แล้วเลื่อนไป section
 function goSection(id) {
-  const onLive = document.getElementById('tab-monitor') && document.getElementById('tab-monitor').classList.contains('active');
-  if (!onLive) switchTab('monitor');
-  setTimeout(() => jumpTo(id), onLive ? 0 : 90);
+  const el = document.getElementById(id);
+  const tabContent = el && el.closest('.tab-content');            // section อยู่ tab ไหน
+  const targetTab = tabContent ? tabContent.id.replace('tab-', '') : 'monitor';
+  const already = tabContent && tabContent.classList.contains('active');
+  if (!already) switchTab(targetTab);
+  setTimeout(() => jumpTo(id), already ? 0 : 90);
 }
 
 /* ════════════════════════════════════════════════════════════
