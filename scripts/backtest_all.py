@@ -89,22 +89,31 @@ def bt_momentum_fvg(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, mh=120, fvg_l
     return tr
 
 
-def bt_tsmom(c, cost_price, lbs=(21, 63, 126), confirm=21):
-    tr = []; pos = 0; entry = 0.0; start = max(max(lbs), confirm or 0) + 2
+def bt_tsmom(h, l, c, cost_price, lbs=(21, 63, 126), confirm=21, sl_atr=3.0):
+    """R-multiple (norm 3×ATR-D1 = disaster SL ของ live) + disaster stop → เทียบ algo อื่นได้.
+    (เดิมคืน %ของราคาสุดท้าย = magnitude เทียบไม่ได้; live มี SL_ATR=3.0 ที่ backtest เดิมไม่มี)."""
+    atr = R.atr(h, l, c)
+    tr = []; pos = 0; entry = 0.0; risk = 0.0
+    start = max(max(lbs), confirm or 0, R.VOL_LOOKBACK) + 2
     for i in range(start, len(c)):
+        if pos != 0 and risk > 0:                              # disaster SL (close-based) ก่อนเช็ค flip
+            adverse = pos * (c[i] - entry)
+            if adverse <= -risk:
+                tr.append(-1.0 - cost_price / risk); pos = 0
         v = sum(int(np.sign(c[i] - c[i - L])) for L in lbs if i - L >= 0)
         d = 1 if v > 0 else -1 if v < 0 else 0
-        if d and confirm and i - confirm >= 0:
+        if d and confirm and i - confirm >= 0:                 # confirm = entry filter
             s = np.sign(c[i] - c[i - confirm])
             if (s > 0 and d < 0) or (s < 0 and d > 0):
                 d = 0
         if d == 0:
             d = pos
         if d != pos:
-            if pos != 0:
-                trades = pos * (c[i] - entry) - cost_price
-                tr.append(trades / (c[-1]) * 100)
+            if pos != 0 and risk > 0:
+                tr.append((pos * (c[i] - entry) - cost_price) / risk)   # R = pnl/risk_unit
             pos = d; entry = c[i]
+            av = float(atr[i]) if atr[i] == atr[i] else 0.0
+            risk = sl_atr * av if av > 0 else 0.0
     return tr
 
 
@@ -177,7 +186,8 @@ def _htf_slope_map(m15_time, htf_time, htf_close, ema_n=50):
     for i in range(1, len(htf_close)):
         e[i] = htf_close[i] * k + e[i - 1] * (1 - k)
     slope = np.sign(e - np.concatenate([e[:3], e[:-3]]))
-    idx = np.clip(np.searchsorted(htf_time, m15_time, side="right") - 1, 0, len(slope) - 1)
+    # -2: แท่ง HTF ที่ "ปิดแล้ว" ก่อน m15 bar (−1=แท่งที่ยัง forming → look-ahead). ตรง live es[-2]
+    idx = np.clip(np.searchsorted(htf_time, m15_time, side="right") - 2, 0, len(slope) - 1)
     return slope[idx]
 
 
@@ -201,9 +211,21 @@ def bt_conf15m(mt5, sym, e_broker, cost, pt, brk=12, rr=2.0, sl_atr=1.0, vk=1.5,
     volmed = np.zeros(n)
     for kk in range(200, n):
         volmed[kk] = np.median(vol[kk - 200:kk]) or 1
+    # live gate: gold เทรดเฉพาะ CONF15M_SESSION (default 13-21 UTC, XAU only) — เหมือน ConfluenceVol15m
+    _sess = None
+    if str(sym).upper().startswith("XAU"):
+        try:
+            import config as _cfg
+            _a, _b = str(getattr(_cfg, "CONF15M_SESSION", "13-21")).split("-")
+            _sess = (int(_a), int(_b))
+        except Exception:
+            _sess = (13, 21)
+    hours = np.array([datetime.fromtimestamp(int(t), timezone.utc).hour for t in tm]) if _sess else None
     while i < n - 1:
         av = float(atr[i]) if atr[i] == atr[i] else 0.0
         if av <= 0 or volmed[i] <= 0 or vol[i] > 2.0 * volmed[i]:
+            i += 1; continue
+        if _sess and not (_sess[0] <= hours[i] < _sess[1]):   # นอก session ทอง → skip (เหมือน live)
             i += 1; continue
         px = float(c[i]); hh = float(h[i - brk:i].max()); ll = float(l[i - brk:i].min())
         d = 1 if px > hh else -1 if px < ll else 0
@@ -215,6 +237,40 @@ def bt_conf15m(mt5, sym, e_broker, cost, pt, brk=12, rr=2.0, sl_atr=1.0, vk=1.5,
             i += 1; continue
         r, ei = _resolve(h, l, c, i, d, px, sl_atr * av / pt, rr, pt, cost, mh)
         tr.append(r); i = ei + 1
+    return tr
+
+
+def bt_pairs(mt5, xau_sym, xag_sym, cost_price, win=120, z_in=2.0, z_out=0.5, z_stop=3.5):
+    """causal stat-arb XAU-XAG: rolling-β z-fade (เหมือน pairs_executor). R = pnl_spread/risk − cost. คืน list R."""
+    a = mt5.copy_rates_from_pos(xau_sym, mt5.TIMEFRAME_H1, 0, 20000)
+    b = mt5.copy_rates_from_pos(xag_sym, mt5.TIMEFRAME_H1, 0, 20000)
+    if a is None or b is None:
+        return []
+    mb = {int(t): float(c) for t, c in zip(b["time"], b["close"])}
+    y = []; x = []
+    for t, c in zip(a["time"], a["close"]):
+        if int(t) in mb:
+            y.append(float(c)); x.append(mb[int(t)])
+    if len(y) < win + 200:
+        return []
+    y = np.array(y); x = np.array(x); n = len(y)
+    tr = []; pos = 0; entry_sp = 0.0; risk = 0.0; cost2 = cost_price * 2   # 2 ขา
+    for i in range(win, n):
+        beta = np.polyfit(x[i - win:i], y[i - win:i], 1)[0]
+        sp = y[i - win:i] - beta * x[i - win:i]
+        m, sd = float(sp.mean()), float(sp.std())
+        if sd <= 0:
+            continue
+        cur = float(y[i] - beta * x[i]); z = (cur - m) / sd
+        if pos == 0:
+            if abs(z) >= z_in:
+                pos = 1 if z < 0 else -1                       # z<0 long-spread · z>0 short-spread
+                entry_sp = cur; risk = (z_stop - z_in) * sd
+        else:
+            if abs(z) <= z_out or abs(z) >= z_stop:
+                if risk > 0:
+                    tr.append((pos * (cur - entry_sp) - cost2) / risk)
+                pos = 0
     return tr
 
 
@@ -275,8 +331,9 @@ def main():
         rows.append(_row("sweep_reversal", lg, "H1", _stats(bt_sweep(h, l, c, tm, cost, pt)), "prior-day sweep fade"))
         # tsmom (D1)
         if rd is not None and len(rd) >= 300:
-            dc = rd["close"].astype(float)
-            rows.append(_row("tsmom_d1", lg, "D1", _stats(bt_tsmom(dc, cost * pt)), "ensemble 21/63/126 + confirm21"))
+            dc = rd["close"].astype(float); dh = rd["high"].astype(float); dl = rd["low"].astype(float)
+            rows.append(_row("tsmom_d1", lg, "D1", _stats(bt_tsmom(dh, dl, dc, cost * pt)),
+                             "ensemble 21/63/126 + confirm21 · R-norm 3×ATR + disaster SL"))
         # macro_momentum (ทุกคู่เพื่อ matrix ครบ; DXY driver ตรงเฉพาะ gold-complex → non-gold คาด −EV = data จริง)
         rh4 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H4, 0, 30000)
         if rh4 is not None and len(rh4) > 500:
@@ -292,10 +349,17 @@ def main():
         except Exception:
             pass
         print(f"  {lg}: done")
-    # pairs (คง entry ที่ verify แล้ว — stat-arb เฉพาะ XAU~XAG)
-    rows.append({"group": "+EV", "algo": "xau_xag_pairs", "pair": "XAU~XAG", "tf": "H1", "exp_R": 1.64,
-                 "t": 1.89, "oos": 2.45, "wr": 57.0, "n": 568, "live": "LIVE",
-                 "note": "stat-arb 2-leg (pairs_executor) rolling-β z-fade"})
+    # pairs — causal rolling-β z-fade จริง (ไม่ hardcode แล้ว; audit 08-09: เลขเดิม static + auto-LIVE = อันตราย)
+    try:
+        _xau = bm.get("XAUUSD", "XAUUSD"); _xag = bm.get("XAGUSD", "XAGUSD")
+        mt5.symbol_select(_xau, True); mt5.symbol_select(_xag, True)
+        _ptr = bt_pairs(mt5, _xau, _xag, cost_of("XAUUSD"))
+        _ps = _stats(_ptr)
+        if _ps:
+            rows.append(_row("xau_xag_pairs", "XAU~XAG", "H1", _ps,
+                             "stat-arb 2-leg rolling-β z-fade (causal) · ⚠️ cointegration-scan: ไม่ผ่าน split-half"))
+    except Exception:
+        pass
 
     out = {"updated": _today(), "note": "backtest matrix ทุก algo × คู่ (causal · SL-first · cost-adj · OOS70/30). +EV=exp_R>0+OOS≥0+n≥%d" % MIN_N,
            "results": rows}

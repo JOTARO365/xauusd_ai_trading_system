@@ -24,3 +24,26 @@ After the fix, the variants diverge and reveal:
 **The FVG filter ("IMPROVED momentum") mostly hurts** — it drops trades without adding edge on the
 pairs that matter (gold, BTC). `regime_momentum_fvg XAUUSD` is LIVE but is strictly worse than plain
 `regime_momentum XAUUSD` (same breakout, FVG subtracts). Recommend shadowing it (redundant + worse).
+
+## Audit fixes applied (backtest-vs-live parity) — big honesty corrections
+
+Fixed 4 backtest bugs found by the parity audit; re-ran the matrix. Effect on LIVE combos:
+
+| combo | before | after | cause |
+|-------|--------|-------|-------|
+| confluence_15m XAUUSD | exp_R 0.162, OOS 0.072 | 0.158, **OOS 0.006** | removed H1/H4 slope **look-ahead** (map to closed HTF bar) + added live **session gate** → OOS collapses; real edge thinner |
+| tsmom_d1 XAUUSD | 0.214 | 0.148 | P&L was %-of-final-price, now **R-multiple** (÷3×ATR) + disaster SL |
+| tsmom_d1 BTCUSD | 2.064 (+EV) | 0.860, t2.07, **−EV** | units fix; t crosses 2 but n=79 < MIN_N → not trusted |
+| tsmom_d1 WTIUSD | 1.023 | 0.141 | units fix → honest thin |
+| **xau_xag_pairs** | **+1.64, t1.89, +EV, auto-LIVE** | **−1.813, t−0.89, −EV** | the row was a **hardcoded literal**; a real causal rolling-β z-fade backtest is NEGATIVE |
+
+Fixes: `_htf_slope_map` uses the last *closed* HTF bar (−2 not −1); `bt_conf15m` applies the
+`CONF15M_SESSION` gate for XAU; `bt_tsmom` returns R-multiples with a 3×ATR disaster stop; the
+pairs row is now computed by a real `bt_pairs` (causal) instead of a static literal.
+
+**Key correction:** the pairs "+1.64 +EV" that was auto-marking itself LIVE was fabricated — the
+real causal edge is −1.81. Combined with the cointegration scan (fails split-half), **PAIRS_LIVE
+should be set false**. confluence_15m gold, our best combo, has OOS ≈ 0 once the look-ahead is
+removed — genuinely marginal, not the 0.16 it appeared. Remaining backtest simplifications
+(managed BE/trail exits, macro/tsmom sentiment gates, mean_reversion/sweep divergences) are noted
+in the audit for later.
