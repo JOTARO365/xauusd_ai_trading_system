@@ -21,6 +21,19 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT); sys.path.insert(0, os.path.join(_ROOT, "scripts"))
 import regime_lib as R                                   # noqa: E402
 
+
+def _pc(algo, lg, param, default):
+    """per-pair config override (algo_pair_config) → backtest สะท้อน config live จริง (parity)."""
+    try:
+        from agents import algo_pair_config as _apc
+        v = _apc.get(algo, lg, param, None)
+        if v is None:
+            return default
+        return type(default)(v) if default is not None else v
+    except Exception:
+        return default
+
+
 MIN_N = 80
 OUT = os.path.join(_ROOT, "data", "backtest_results.json")
 
@@ -374,14 +387,18 @@ def main():
         pt = float(info.point); cost = cost_of(lg)
         h = rh["high"].astype(float); l = rh["low"].astype(float); c = rh["close"].astype(float); tm = rh["time"]
         # momentum (H1) — regime_momentum = breakout · fvg = breakout + FVG filter (แยกจริง, ไม่ก๊อป)
-        rows.append(_row("regime_momentum", lg, "H1", _stats(bt_momentum(h, l, c, cost, pt, tm=tm, sym=lg)),
-                         "Donchian breakout TREND-gate"))
+        rows.append(_row("regime_momentum", lg, "H1", _stats(bt_momentum(
+            h, l, c, cost, pt, brk=_pc("regime_momentum", lg, "BRK", 20),
+            sl_atr=_pc("regime_momentum", lg, "SL_ATR", 1.5), rr=_pc("regime_momentum", lg, "RR", 2.0),
+            tm=tm, sym=lg)), "Donchian breakout TREND-gate"))
         rows.append(_row("regime_momentum_fvg", lg, "H1", _stats(bt_momentum_fvg(h, l, c, cost, pt, tm=tm, sym=lg)),
                          "Donchian breakout + FVG confluence filter"))
         # mean_reversion (H1)
         rows.append(_row("mean_reversion", lg, "H1", _stats(bt_meanrev(h, l, c, cost, pt)), "z-fade RANGE"))
         # sweep_reversal (H1)
-        rows.append(_row("sweep_reversal", lg, "H1", _stats(bt_sweep(h, l, c, tm, cost, pt)), "prior-day sweep fade"))
+        rows.append(_row("sweep_reversal", lg, "H1", _stats(bt_sweep(
+            h, l, c, tm, cost, pt, rr=_pc("sweep_reversal", lg, "RR", 1.5),
+            buf_atr=_pc("sweep_reversal", lg, "BUF_ATR", 0.5))), "prior-day sweep fade"))
         # tsmom (D1)
         if rd is not None and len(rd) >= 300:
             dc = rd["close"].astype(float); dh = rd["high"].astype(float); dl = rd["low"].astype(float)
@@ -395,11 +412,18 @@ def main():
             if mac is not None:
                 _mlg, _ = R.macro_for(lg)
                 note = "breakout + %s confirm (structural, sign %+d)" % (_mlg, msign)
-                rows.append(_row("macro_momentum", lg, "H4", _stats(bt_macro(h4, l4, c4, mac, cost, pt, msign=msign, tm=rh4["time"], sym=lg)), note))
+                rows.append(_row("macro_momentum", lg, "H4", _stats(bt_macro(
+                    h4, l4, c4, mac, cost, pt, brk=_pc("macro_momentum", lg, "BRK", 20),
+                    mlb=_pc("macro_momentum", lg, "MLB", 24), sl_atr=_pc("macro_momentum", lg, "SL_ATR", 1.5),
+                    rr=_pc("macro_momentum", lg, "RR", 2.0), msign=msign, tm=rh4["time"], sym=lg)), note))
         # confluence_15m (ทุกคู่ — backtest ก่อนเปิด eligible; DXY driver ตรงเฉพาะ gold-complex)
         try:
             n15 = "15m confluence + volume surge" + ("" if lg in ("XAUUSD", "XAGUSD", "XAUEUR") else " (DXY ไม่ตรงคู่นี้)")
-            rows.append(_row("confluence_15m", lg, "M15", _stats(bt_conf15m(mt5, sym, bm.get("EURUSD", "EURUSD"), cost, pt, season_sym=lg)), n15))
+            rows.append(_row("confluence_15m", lg, "M15", _stats(bt_conf15m(
+                mt5, sym, bm.get("EURUSD", "EURUSD"), cost, pt, brk=_pc("confluence_15m", lg, "BRK", 12),
+                rr=_pc("confluence_15m", lg, "RR", 2.0), sl_atr=_pc("confluence_15m", lg, "SL_ATR", 1.0),
+                vk=_pc("confluence_15m", lg, "VK", 1.5), session=_pc("confluence_15m", lg, "session", None),
+                season_sym=lg)), n15))
         except Exception:
             pass
         print(f"  {lg}: done")

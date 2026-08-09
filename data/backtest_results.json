@@ -841,9 +841,9 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.1248,
-      "t": -5.86,
-      "oos": -0.0713,
+      "exp_R": -0.125,
+      "t": -5.87,
+      "oos": -0.0718,
       "wr": 46.0,
       "n": 1413
     },
@@ -854,11 +854,11 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "prior-day sweep fade",
-      "exp_R": 0.0173,
-      "t": 0.48,
-      "oos": 0.0604,
-      "wr": 43.7,
-      "n": 1179
+      "exp_R": 0.0319,
+      "t": 0.93,
+      "oos": 0.1037,
+      "wr": 44.9,
+      "n": 1328
     },
     {
       "group": "-EV",
@@ -880,11 +880,11 @@
       "tf": "H4",
       "live": "SHADOW",
       "note": "breakout + EURUSD confirm (structural, sign +1)",
-      "exp_R": 0.0526,
-      "t": 0.73,
-      "oos": 0.046,
-      "wr": 39.2,
-      "n": 408
+      "exp_R": 0.0738,
+      "t": 0.82,
+      "oos": 0.1974,
+      "wr": 36.5,
+      "n": 362
     },
     {
       "group": "+EV",
