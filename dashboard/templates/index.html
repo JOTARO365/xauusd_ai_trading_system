@@ -4834,6 +4834,7 @@ function _wmLandPath(rings) {
 }
 
 // marker เดียว (WM style: dark ring lift-off + glow/pulse). opt: {title,label,labelCol,glow,pulse,ring}
+let _wmLabelBoxes = [];   // de-clutter: กล่อง label ที่วางแล้วต่อ render (reset ใน renderAllLayers) → กัน label ทับกัน
 function _mk(lat, lng, r, fill, opt) {
   opt = opt || {};
   const x = wmX(lng), y = wmY(lat);
@@ -4849,8 +4850,15 @@ function _mk(lat, lng, r, fill, opt) {
   }
   s += `<circle cx="${xs}" cy="${ys}" r="${rs}" fill="${fill}" stroke="${cssVar('--map-ocean')}" stroke-width="${opt.ring === false ? 0 : 0.7}">`
     + `<title>${_wmEsc(opt.title || '')}</title></circle>`;
-  if (opt.label) s += `<text x="${(x + r + 2.3).toFixed(1)}" y="${(y + 3).toFixed(1)}" fill="${opt.labelCol || fill}" `
-    + `font-size="8.5" font-family="var(--mono),monospace" opacity="0.92" style="text-shadow:0 0 3px ${cssVar('--map-ocean')}">${_wmEsc(opt.label)}</text>`;
+  if (opt.label) {
+    const lx = x + r + 2.3, ly = y + 3, lw = String(opt.label).length * 4.6;   // de-clutter: ข้าม label ที่จะทับตัวที่วางแล้ว (จุดยังวาด)
+    const clash = _wmLabelBoxes.some(b => Math.abs(b.y - ly) < 8 && !(lx > b.x2 || lx + lw < b.x));
+    if (!clash) {
+      _wmLabelBoxes.push({ x: lx, x2: lx + lw, y: ly });
+      s += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" fill="${opt.labelCol || fill}" `
+        + `font-size="8.5" font-family="var(--mono),monospace" opacity="0.92" style="text-shadow:0 0 3px ${cssVar('--map-ocean')}">${_wmEsc(opt.label)}</text>`;
+    }
+  }
   return s;
 }
 
@@ -4860,6 +4868,7 @@ function renderAllLayers() {
   if (!g) return;
   const L = _wmLayers || {};
   let s = '';
+  _wmLabelBoxes = [];                              // reset label-collision registry ต่อ render
   (L.gold_mines || []).forEach(m => s += _mk(m.lat, m.lng, 1.7,
     m.mineral === 'Silver' ? '#c0c0c0' : '#ffd700', { ring: false, title: `${m.name} · ${m.mineral} mine` }));
   (L.waterways || []).forEach(w => s += _mk(w.lat, w.lng, 2.1, '#f59e0b',
