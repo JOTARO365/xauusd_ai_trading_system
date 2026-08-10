@@ -1,0 +1,89 @@
+{
+ "ok": true,
+ "updated": "2026-08-10T19:43:08Z",
+ "window_min": 180,
+ "aggregate": {
+  "score": 81,
+  "label": "bullish gold",
+  "n_scored": 5,
+  "provenance": "rubric",
+  "n": 5
+ },
+ "filter_stats": {
+  "raw": 83,
+  "kept": 35,
+  "filter_rate_pct": 57.8
+ },
+ "posts": [
+  {
+   "post_id": "a6558b66",
+   "source": "twitter",
+   "author": "cnnbrk",
+   "text": "Saudi Arabia, Pakistan and Turkey agree to NATO-style mutual defense pact amid escalating Iran conflict. https://cnn.it/4q6nF2v Saudi Arabia, Pakistan and Turke",
+   "ts_utc": "Fri, 07 Aug 2026 12:28:01 GMT",
+   "age_min": 0,
+   "direction": "bull",
+   "confidence": 85,
+   "magnitude_tier": 2,
+   "half_life_min": 480,
+   "reason": "Iran conflict escalation drives safe-haven demand",
+   "provenance": "rubric"
+  },
+  {
+   "post_id": "6fa63828",
+   "source": "twitter",
+   "author": "cnnbrk",
+   "text": "Netanyahu says Israel ​rejects a Trump-backed Gaza peace plan and will not withdraw from the territory without Hamas disarming. https://cnn.it/4wObUQG Netanyahu",
+   "ts_utc": "Sun, 09 Aug 2026 11:50:21 GMT",
+   "age_min": 0,
+   "direction": "bull",
+   "confidence": 80,
+   "magnitude_tier": 2,
+   "half_life_min": 480,
+   "reason": "Middle East geopolitical risk supports gold safe-haven flows",
+   "provenance": "rubric"
+  },
+  {
+   "post_id": "4c4216e4",
+   "source": "twitter",
+   "author": "ZeroHedge",
+   "text": "TRUMP: STRAIT IS A LITTLE COMPLEX BECAUSE OF OCCASIONAL MINES Lol TRUMP: STRAIT IS A LITTLE COMPLEX BECAUSE OF OCCASIONAL MINES Lol",
+   "ts_utc": "Mon, 10 Aug 2026 19:38:41 GMT",
+   "age_min": 0,
+   "direction": "bull",
+   "confidence": 65,
+   "magnitude_tier": 1,
+   "half_life_min": 120,
+   "reason": "Strait security concerns could impact USD weakness sentiment",
+   "provenance": "rubric"
+  },
+  {
+   "post_id": "f7134e49",
+   "source": "twitter",
+   "author": "cnnbrk",
+   "text": "Todd Blanche was sworn in as attorney general in an Oval Office ceremony led by former Trump defense-team colleague, Judge Emil Bove. https://cnn.it/3UoBU6Q Tod",
+   "ts_utc": "Mon, 10 Aug 2026 19:10:27 GMT",
+   "age_min": 0,
+   "direction": "neutral",
+   "confidence": 50,
+   "magnitude_tier": 1,
+   "half_life_min": 30,
+   "reason": "Cabinet appointment has limited direct gold market impact",
+   "provenance": "rubric"
+  },
+  {
+   "post_id": "d8964632",
+   "source": "twitter",
+   "author": "cnnbrk",
+   "text": "President Donald Trump has signed an executive order aimed at reshaping the federal government’s approach toward childhood vaccines. https://cnn.it/3UawaO1 Pres",
+   "ts_utc": "Mon, 10 Aug 2026 19:35:38 GMT",
+   "age_min": 0,
+   "direction": "neutral",
+   "confidence": 45,
+   "magnitude_tier": 1,
+   "half_life_min": 120,
+   "reason": "Vaccine policy uncertainty creates noise, minimal gold effect",
+   "provenance": "rubric"
+  }
+ ]
+}

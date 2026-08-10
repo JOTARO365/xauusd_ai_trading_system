@@ -1,0 +1,12 @@
+{
+ "generated": "2026-08-09T23:30:06.132119+00:00",
+ "strategy": "momentum_breakout (TREND)",
+ "sigma_R": 1.41,
+ "n": 0,
+ "verdict": "ยังไม่มีไม้ ALGO — เปิด REGIME_LIVE แล้วรอเก็บ",
+ "needed": {
+  "δ=0.15": 692,
+  "δ=0.2": 389,
+  "δ=0.3": 173
+ }
+}

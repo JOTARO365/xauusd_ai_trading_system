@@ -1,0 +1,187 @@
+{
+ "ok": true,
+ "generated": "2026-08-10T20:43Z",
+ "rows": [
+  {
+   "algo_id": "confluence_15m",
+   "symbol": "BTCUSD",
+   "n": 1,
+   "wr": 0.0,
+   "exp_R": -2.073,
+   "sum_R": -2.07,
+   "n_R": 1,
+   "by_regime": {},
+   "by_session": {}
+  },
+  {
+   "algo_id": "confluence_15m",
+   "symbol": "XAUUSD",
+   "n": 1,
+   "wr": 100.0,
+   "exp_R": 0.379,
+   "sum_R": 0.38,
+   "n_R": 1,
+   "by_regime": {},
+   "by_session": {}
+  },
+  {
+   "algo_id": "macro_momentum",
+   "symbol": "XAUUSD",
+   "n": 1,
+   "wr": 100.0,
+   "exp_R": 0.052,
+   "sum_R": 0.05,
+   "n_R": 1,
+   "by_regime": {},
+   "by_session": {}
+  },
+  {
+   "algo_id": "mean_reversion",
+   "symbol": "USDJPY",
+   "n": 2,
+   "wr": 0.0,
+   "exp_R": -1.035,
+   "sum_R": -2.07,
+   "n_R": 2,
+   "by_regime": {},
+   "by_session": {}
+  },
+  {
+   "algo_id": "regime_momentum",
+   "symbol": "WTIUSD",
+   "n": 2,
+   "wr": 0.0,
+   "exp_R": -0.758,
+   "sum_R": -1.52,
+   "n_R": 2,
+   "by_regime": {},
+   "by_session": {}
+  },
+  {
+   "algo_id": "sweep_reversal",
+   "symbol": "BTCUSD",
+   "n": 3,
+   "wr": 66.7,
+   "exp_R": 0.184,
+   "sum_R": 0.55,
+   "n_R": 3,
+   "by_regime": {},
+   "by_session": {}
+  },
+  {
+   "algo_id": "sweep_reversal",
+   "symbol": "XAUUSD",
+   "n": 1,
+   "wr": 0.0,
+   "exp_R": -0.848,
+   "sum_R": -0.85,
+   "n_R": 1,
+   "by_regime": {},
+   "by_session": {}
+  },
+  {
+   "algo_id": "tsmom_d1",
+   "symbol": "BTCUSD",
+   "n": 9,
+   "wr": 22.2,
+   "exp_R": -0.065,
+   "sum_R": -0.58,
+   "n_R": 9,
+   "by_regime": {
+    "—": {
+     "n": 9,
+     "exp_R": -0.065,
+     "wr": 44.4
+    }
+   },
+   "by_session": {
+    "—": {
+     "n": 9,
+     "exp_R": -0.065,
+     "wr": 44.4
+    }
+   }
+  },
+  {
+   "algo_id": "tsmom_d1",
+   "symbol": "EURUSD",
+   "n": 8,
+   "wr": 12.5,
+   "exp_R": -0.052,
+   "sum_R": -0.41,
+   "n_R": 8,
+   "by_regime": {
+    "—": {
+     "n": 8,
+     "exp_R": -0.052,
+     "wr": 25.0
+    }
+   },
+   "by_session": {
+    "—": {
+     "n": 8,
+     "exp_R": -0.052,
+     "wr": 25.0
+    }
+   }
+  },
+  {
+   "algo_id": "tsmom_d1",
+   "symbol": "XAUUSD",
+   "n": 26,
+   "wr": 30.8,
+   "exp_R": -0.023,
+   "sum_R": -0.6,
+   "n_R": 26,
+   "by_regime": {
+    "—": {
+     "n": 26,
+     "exp_R": -0.023,
+     "wr": 38.5
+    }
+   },
+   "by_session": {
+    "—": {
+     "n": 26,
+     "exp_R": -0.023,
+     "wr": 38.5
+    }
+   }
+  },
+  {
+   "algo_id": "tsmom_d1",
+   "symbol": "USDJPY",
+   "n": 10,
+   "wr": 20.0,
+   "exp_R": -0.225,
+   "sum_R": -2.25,
+   "n_R": 10,
+   "by_regime": {
+    "—": {
+     "n": 10,
+     "exp_R": -0.225,
+     "wr": 40.0
+    }
+   },
+   "by_session": {
+    "—": {
+     "n": 10,
+     "exp_R": -0.225,
+     "wr": 40.0
+    }
+   }
+  },
+  {
+   "algo_id": "tsmom_d1",
+   "symbol": "XAGUSD",
+   "n": 2,
+   "wr": 0.0,
+   "exp_R": -0.083,
+   "sum_R": -0.17,
+   "n_R": 2,
+   "by_regime": {},
+   "by_session": {}
+  }
+ ],
+ "note": "real closed-money edge (net จริง). n น้อย = ยังไม่พอตัดสิน (validated-or-off: n≥100 + gauntlet). ไม่กรอง entry — display เทียบ shadow paper."
+}

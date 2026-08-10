@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XAUUSD Algo — Edge & Backtest (public)</title>
+<style>
+  :root{--bg:#050505;--surface:#131210;--surface2:#1b1917;--border:#262320;--gold:#e8b04b;
+    --green:#4ade80;--red:#ef4444;--cyan:#60a5fa;--text:#f3f4f6;--dim:#b4bcc8;--muted:#9ca3af;
+    --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;--sans:'Space Grotesk','Inter',system-ui,sans-serif;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5}
+  a{color:var(--gold)}
+  header{padding:20px 22px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#151310,#0a0908)}
+  h1{margin:0;font-size:19px;letter-spacing:.5px}
+  h1 .u{color:var(--gold)}
+  .sub{color:var(--muted);font-size:11px;margin-top:5px;font-family:var(--mono)}
+  .warn{color:var(--dim);font-size:11px;margin-top:8px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);display:inline-block}
+  nav{position:sticky;top:0;background:#0a0908ee;backdrop-filter:blur(6px);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;gap:6px;flex-wrap:wrap;z-index:5}
+  nav a{font-size:11px;color:var(--dim);text-decoration:none;padding:4px 10px;border:1px solid var(--border);border-radius:14px}
+  nav a:hover{color:var(--gold);border-color:var(--gold)}
+  main{padding:16px 22px;max-width:1200px;margin:0 auto}
+  section{margin:22px 0}
+  .st{font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);border-left:3px solid var(--gold);padding-left:9px;margin-bottom:10px;font-weight:700}
+  .st small{color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none;margin-left:8px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px;white-space:nowrap}
+  th{text-align:right;color:var(--muted);font-weight:500;padding:5px 9px;border-bottom:1px solid var(--border);position:sticky;top:0}
+  th:first-child,td:first-child{text-align:left}
+  td{padding:4px 9px;border-bottom:1px solid #1c1a17}
+  tr:hover td{background:rgba(255,255,255,.03)}
+  .pos{color:var(--green)}.neg{color:var(--red)}.b{font-weight:700}
+  .pill{font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px}
+  .pev{background:rgba(74,222,128,.14);color:var(--green)}.nev{background:rgba(239,68,68,.14);color:var(--red)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .tile{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 11px}
+  .tile .k{font-size:10px;color:var(--muted);letter-spacing:.4px}
+  .tile .v{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--gold);margin-top:2px}
+  .tile .s{font-size:10px;color:var(--dim)}
+  footer{padding:20px 22px;border-top:1px solid var(--border);color:var(--muted);font-size:11px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>XAUUSD <span class="u">Algo</span> — Edge &amp; Backtest</h1>
+  <div class="sub" id="gen">public snapshot · loading…</div>
+  <div class="warn">📊 Display-only research snapshot — ไม่มีข้อมูลบัญชี เงินทุน สถานะพอร์ต หรือคำสั่งเทรด · ตัวเลข edge เป็น R-multiple/สถิติ ไม่ใช่ผลตอบแทนจริง · อดีตไม่รับประกันอนาคต</div>
+</header>
+<nav>
+  <a href="#backtest">Backtest</a><a href="#edge">Real Edge</a><a href="#coint">Cointegration</a>
+  <a href="#calib">Calibration</a><a href="#risk">Risk (SAT)</a><a href="#regime">Regime</a>
+  <a href="#macro">Macro/COT</a><a href="#events">Events</a><a href="#news">News</a>
+</nav>
+<main>
+  <section id="backtest"><div class="st">Backtest Results <small>exp_R · t-stat · OOS · win% · n (ต่อ algo×คู่)</small></div><div class="card" id="c-backtest">—</div></section>
+  <section id="edge"><div class="st">Real Edge <small>เทรดจริง · R-multiple/win% เท่านั้น (ไม่มีเงิน)</small></div><div class="card" id="c-edge">—</div></section>
+  <section id="coint"><div class="st">Cointegration <small>ADF · Hurst · half-life (stat-arb pairs)</small></div><div class="card" id="c-coint">—</div></section>
+  <section id="calib"><div class="st">Confidence Calibration <small>conf-bin → win-rate จริง</small></div><div class="card" id="c-calib">—</div></section>
+  <section id="risk"><div class="st">Risk Metrics (SAT) <small>Sharpe · maxDD% · VaR (ratio, ไม่ใช่เงิน)</small></div><div class="card" id="c-risk">—</div></section>
+  <section id="regime"><div class="st">Regime Analytics</div><div class="card" id="c-regime">—</div></section>
+  <section id="macro"><div class="st">Macro Strip &amp; COT</div><div class="card" id="c-macro">—</div></section>
+  <section id="events"><div class="st">Event Reaction Stats <small>ปฏิกิริยาทองต่อข่าว (ประวัติ)</small></div><div class="card" id="c-events">—</div></section>
+  <section id="news"><div class="st">News Impact <small>aggregate sentiment</small></div><div class="card" id="c-news">—</div></section>
+</main>
+<footer>generated by <code>scripts/export_static.py</code> · refresh = re-run + git commit · not financial advice</footer>
+<script>
+const $=id=>document.getElementById(id);
+const J=async f=>{try{const r=await fetch('./data/'+f);return r.ok?await r.json():null}catch(e){return null}};
+const num=(x,d=2)=>x==null||isNaN(x)?'—':(+x).toFixed(d);
+const sgn=x=>x==null?'':(x>0?'pos':(x<0?'neg':''));
+const esc=s=>String(s==null?'':s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+function tbl(cols,rows){return '<table><thead><tr>'+cols.map(c=>`<th>${c.h}</th>`).join('')+'</tr></thead><tbody>'+
+  rows.map(r=>'<tr>'+cols.map(c=>`<td class="${c.cls?c.cls(r):''}">${c.f?c.f(r):esc(r[c.k])}</td>`).join('')+'</tr>').join('')+'</tbody></table>';}
+function msg(el,t){$(el).innerHTML=`<span style="color:var(--muted)">${t}</span>`;}
+
+(async()=>{
+  const man=await J('_manifest.json');
+  $('gen').textContent='public snapshot · generated '+(man?man.generated_utc:'?')+' UTC';
+
+  // Backtest
+  const bt=await J('backtest_results.json');
+  if(bt&&bt.results){const rs=bt.results.slice().sort((a,b)=>(b.exp_R||-9)-(a.exp_R||-9));
+    $('c-backtest').innerHTML=tbl([
+      {h:'algo·คู่',f:r=>`<span class="b">${esc(r.algo)}</span> · ${esc(r.pair)} <span style="color:var(--muted)">${esc(r.tf||'')}</span>`},
+      {h:'group',f:r=>`<span class="pill ${r.group==='+EV'?'pev':'nev'}">${esc(r.group)}</span>`},
+      {h:'exp_R',k:'exp_R',cls:r=>sgn(r.exp_R),f:r=>num(r.exp_R,3)},
+      {h:'t',k:'t',f:r=>num(r.t,2)},{h:'OOS',k:'oos',cls:r=>sgn(r.oos),f:r=>num(r.oos,3)},
+      {h:'win%',k:'wr',f:r=>num(r.wr,1)},{h:'n',k:'n',f:r=>r.n}],rs);
+  } else msg('c-backtest','no data');
+
+  // Real edge
+  const re=await J('real_edge.json');
+  if(re&&re.rows&&re.rows.length){const rs=re.rows.slice().sort((a,b)=>(b.exp_R||-9)-(a.exp_R||-9));
+    $('c-edge').innerHTML=tbl([
+      {h:'algo·คู่',f:r=>`<span class="b">${esc(r.algo_id)}</span> · ${esc(r.symbol)}`},
+      {h:'exp_R',k:'exp_R',cls:r=>sgn(r.exp_R),f:r=>num(r.exp_R,3)},
+      {h:'sum_R',k:'sum_R',cls:r=>sgn(r.sum_R),f:r=>num(r.sum_R,2)},
+      {h:'win%',f:r=>num(r.wr*100,0)},{h:'n',k:'n'}],rs);
+  } else msg('c-edge','ยังไม่มีเทรดจริงพอ (เก็บ forward data)');
+
+  // Cointegration
+  const co=await J('cointegration.json');
+  if(Array.isArray(co)&&co.length){const rs=co.slice().sort((a,b)=>(a.adf||9)-(b.adf||9));
+    $('c-coint').innerHTML=tbl([
+      {h:'pair',k:'pair',f:r=>`<span class="b">${esc(r.pair)}</span>`},
+      {h:'ADF',k:'adf',cls:r=>r.tradeable?'pos':'',f:r=>num(r.adf,2)},
+      {h:'Hurst',k:'hurst',f:r=>num(r.hurst,2)},{h:'half-life',k:'hl',f:r=>num(r.hl,0)},
+      {h:'β',k:'beta',f:r=>num(r.beta,2)},{h:'corr',k:'corr',f:r=>num(r.corr,2)},
+      {h:'',f:r=>r.tradeable?'<span class="pill pev">tradeable</span>':''}],rs);
+  } else msg('c-coint','no data');
+
+  // Calibration
+  const ca=await J('calibration.json');
+  if(ca&&ca.bins&&ca.bins.length){
+    $('c-calib').innerHTML=tbl([
+      {h:'conf bin',f:r=>`${r.conf_lo}–${r.conf_hi}`},{h:'win%',k:'wr',f:r=>num(r.wr,1)},{h:'n',k:'n'}],ca.bins)
+      +(ca.suggestion?`<div style="color:var(--dim);font-size:10px;margin-top:6px">${esc(ca.suggestion)}</div>`:'');
+  } else msg('c-calib','no data');
+
+  // Risk SAT
+  const rk=await J('risk_sat.json');
+  if(rk&&rk.ok!==false){
+    $('c-risk').innerHTML='<div class="grid">'+[
+      ['Sharpe',num(rk.sharpe,2),''],['Max DD %',num(rk.max_dd_pct,1)+'%',rk.max_dd_days!=null?rk.max_dd_days+' วัน':''],
+      ['VaR 95%',num(rk.var95_hist,3),'hist'],['Trades/yr',num(rk.trades_per_year,0),'n='+(rk.n??'?')]
+    ].map(t=>`<div class="tile"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="s">${t[2]}</div></div>`).join('')+'</div>'
+    +(rk.collecting?'<div style="color:var(--muted);font-size:10px;margin-top:6px">ยังเก็บ data (n น้อย)</div>':'');
+  } else msg('c-risk','ยังไม่มี data พอ');
+
+  // Regime
+  const ra=await J('regime_analytics.json');
+  if(ra){let h=`<div style="font-size:12px">instrument <b>${esc(ra.instrument||'XAUUSD')}</b>`;
+    if(ra.verdict)h+=` · verdict: <span style="color:var(--gold)">${esc(typeof ra.verdict==='string'?ra.verdict:JSON.stringify(ra.verdict))}</span>`;
+    h+='</div>';
+    const rg=ra.historical&&ra.historical.regimes;
+    if(rg&&typeof rg==='object'){h+=tbl([{h:'regime',k:'k'},{h:'algo',k:'algo'},{h:'freq%',k:'freq'},{h:'exp_R',k:'exp_R',cls:r=>sgn(r.exp_R),f:r=>num(r.exp_R,3)},{h:'win%',k:'wr',f:r=>num(r.wr,1)},{h:'n',k:'n'}],
+      Object.entries(rg).map(([k,v])=>({k,algo:v.algo,freq:num(v.freq_pct||v.freq,1),exp_R:v.exp_R,wr:v.wr,n:v.n})));}
+    $('c-regime').innerHTML=h;
+  } else msg('c-regime','no data');
+
+  // Macro + COT
+  const [ms,ct]=[await J('macro_strip.json'),await J('cot.json')];
+  let mh='<div class="grid">';
+  if(ms&&ms.ok!==false){const g=(k,l)=>ms[k]?`<div class="tile"><div class="k">${l}</div><div class="v">${num(ms[k].val,2)}</div><div class="s ${sgn(ms[k].chg)}">${ms[k].chg>0?'+':''}${num(ms[k].chg,2)}</div></div>`:'';
+    mh+=g('dxy','DXY')+g('y10','US 10Y')+g('real_yield','Real Yield');}
+  if(ct&&ct.ok!==false){mh+=`<div class="tile"><div class="k">COT net (non-comm)</div><div class="v ${sgn(ct.net)}">${esc(ct.net)}</div><div class="s">Δ ${esc(ct.net_chg)} · ${esc(ct.report_date)}</div></div>`;}
+  mh+='</div>'; $('c-macro').innerHTML=(mh==='<div class="grid"></div>')?'<span style="color:var(--muted)">no data</span>':mh;
+
+  // Events
+  const ev=await J('event_stats.json');
+  if(ev&&ev.events){const evs=Object.entries(ev.events).map(([k,v])=>({name:k,...v}));
+    $('c-events').innerHTML=tbl([
+      {h:'event',f:r=>`<span class="b">${esc(r.name)}</span>`},{h:'n',k:'n'},
+      {h:'up%',k:'up_pct',f:r=>num(r.up_pct,0)},{h:'down%',k:'down_pct',f:r=>num(r.down_pct,0)},
+      {h:'avg |move|%',k:'avg_abs_d0_pct',f:r=>num(r.avg_abs_d0_pct,2)},
+      {h:'d2 ext%',k:'d2_extends_pct',f:r=>num(r.d2_extends_pct,0)}],evs);
+  } else msg('c-events','no data');
+
+  // News
+  const ni=await J('news_impact.json');
+  if(ni&&ni.aggregate){const a=ni.aggregate;
+    $('c-news').innerHTML=`<div class="grid"><div class="tile"><div class="k">Aggregate score</div><div class="v ${sgn(a.score)}">${esc(a.score)}</div><div class="s">${esc(a.label||'')} · n=${esc(a.n_scored||0)}</div></div></div>`
+      +(ni.updated?`<div style="color:var(--muted);font-size:10px;margin-top:6px">updated ${esc(ni.updated)}</div>`:'');
+  } else msg('c-news','no data');
+})();
+</script>
+</body>
+</html>
