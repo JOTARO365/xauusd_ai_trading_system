@@ -2275,8 +2275,9 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
 
     <!-- UHAS-style: Scenario plan cards ก/ข/พัก (slice 3) — สังเคราะห์จากแนว S/R + trend, display-only -->
     <section>
-      <div class="section-title">SCENARIO PLAN &mdash; แผน ก/ข/พัก
-        <span style="font-size:9px;color:var(--muted);font-weight:400;margin-left:6px">(สังเคราะห์จากแนว S/R + เทรนด์ · display เฉยๆ ไม่ใช่คำสั่งเทรด)</span></div>
+      <div class="section-title" style="display:flex;align-items:center">SCENARIO PLAN &mdash; แผน ก/ข/พัก
+        <span style="font-size:9px;color:var(--muted);font-weight:400;margin-left:6px">(สังเคราะห์จากแนว S/R + เทรนด์ · display เฉยๆ ไม่ใช่คำสั่งเทรด)</span>
+        <span id="scenario-validity" style="margin-left:auto;font-size:10px;color:var(--muted);font-weight:400;font-family:var(--mono)"></span></div>
       <div id="scenario-cards" style="display:flex;gap:8px;flex-wrap:wrap">
         <div class="card" style="flex:1;min-width:240px;color:var(--muted);padding:10px">รอข้อมูลแนว S/R…</div>
       </div>
@@ -7719,6 +7720,13 @@ function _scCard(p) {
 }
 function renderScenarioCards(bs) {
   const el = document.getElementById('scenario-cards'); if (!el || !bs) return;
+  const va = document.getElementById('scenario-validity');   // UHAS-style validity window (วางแผน → หมดอายุ +4h)
+  if (va) {
+    const u = bs.updated_at ? new Date(bs.updated_at) : null;
+    if (u && !isNaN(u)) { const f = d => ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+      va.textContent = 'วางแผน ' + f(u) + ' · หมดอายุ ' + f(new Date(u.getTime() + 4 * 3600e3)); }
+    else va.textContent = '';
+  }
   const z = bs.zones || {}, px = (bs.price_info && bs.price_info.bid) || null;
   const trend = String((bs.market && bs.market.trend) || bs.trend || '').toUpperCase();
   if (!px || (!z.support && !z.resistance)) { el.innerHTML = '<div class="card" style="flex:1;color:var(--muted);padding:10px">รอข้อมูลแนว S/R…</div>'; return; }
