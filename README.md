@@ -328,6 +328,31 @@ Then open `.env` and fill in the required secrets (see [Environment Variables](#
 > real BTC/oil CFD above look-alike stocks, Brent, and futures; anything it can't match, you set by
 > hand. `data/universe_probe.json` is a per-broker detection cache (gitignored) — `.env` is what
 > actually drives symbol resolution.
+>
+> **Micro/cent accounts:** `_broker_map()` re-resolves at runtime and skips any symbol that is
+> `trade_mode=DISABLED`, so on an **XM micro** account it automatically maps `EURUSD → EURUSDmicro`,
+> `XAUUSD → GOLDmicro`, `XAGUSD → SILVERmicro`, etc. — even if a stale `universe_probe.json` from a
+> standard account still lists the plain (feed-only) symbols. You don't set the `*micro` names by hand.
+
+### 3b. Account type — standard / micro / cent (set `FIXED_LOT` / `MIN_LOT` to match)
+
+⚠️ **Lot size is per-account-type — setting the wrong one risks 100× too much.** A micro lot has a
+100× smaller contract than a standard lot, so the same `0.1` means very different real exposure.
+
+| Account | 1 lot | Gold `contract_size` | `.env` lots | Who it's for |
+|---|---|---|---|---|
+| **Standard** | 100,000 units | 100 | `FIXED_LOT=0.01 MIN_LOT=0.01 MAX_LOT=0.03` | ≥ ~20,000 THB (gold min-lot ≈ 1,300 THB risk) |
+| **Micro** | 1,000 units | 1 | `FIXED_LOT=0.1 MIN_LOT=0.1 MAX_LOT=3.0` | small capital — ~1,000 THB trades **every** pair incl. gold at low risk% (0.1 micro ≈ 0.001 standard) |
+
+- **`FF_SIZING_ENABLE=true` ramps the lot up with equity** from the `MIN_LOT` floor (risk `FF_RISK_PCT`
+  % of equity, clamped `[MIN_LOT, MAX_LOT]`) while equity < `CAPITAL_GATE_FLOOR` — so "start at the
+  floor, grow with the account" is automatic; no lot ladder to hand-tune.
+- **Preflight** (startup, `agents/preflight.py`) prints the detected account type (gold `contract_size ≤ 10`
+  ⇒ MICRO) and per-pair min-lot risk %, and flags a `FIXED_LOT` vs account-type mismatch as CRITICAL.
+- **Cent accounts that display the balance ×100** (1,000 THB shown as 100,000): also multiply the
+  absolute-currency thresholds ×100 — `FORCE_CLOSE_MIN_CAPITAL`, `CAPITAL_GATE_FLOOR`, `MIN_AI_EQUITY` —
+  otherwise the small-account protections switch off because the bot thinks the account is large.
+  (Percent-based knobs — `FF_RISK_PCT`, `CAPITAL_GATE_MAX_RISK_PCT`, `MAX_DAILY_LOSS` — adapt on their own.)
 
 ### 4. Set up the database (Supabase)
 
