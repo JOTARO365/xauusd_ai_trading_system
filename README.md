@@ -1272,6 +1272,7 @@ Risk & sizing (all in `.env` / editable in dashboard Settings):
 | key | default | what |
 |-----|---------|------|
 | `FORCE_CLOSE_MIN_CAPITAL` | 20000 | force-close locks each +100% only while equity < this (compounds small→viable) |
+| `EOD_PROFIT_CLOSE_HOUR_BKK` | 2 | Small-capital no-overnight-carry: while equity < `FORCE_CLOSE_MIN_CAPITAL`, the first cycle past this hour (BKK, UTC+7) each day force-closes **all system positions in floating profit**, once per day (losers ride their SL). Locks overnight winners before the day rolls. `-1` disables. |
 | `CAPITAL_GATE_ENABLE` | false | block entries risking > MAX% of equity while under the floor |
 | `CAPITAL_GATE_FLOOR` | 20000 | capital gate + FF + ATR-SL apply below this equity |
 | `CAPITAL_GATE_MAX_RISK_PCT` | 15 | gate blocks a trade if its THB risk exceeds this % of equity |
