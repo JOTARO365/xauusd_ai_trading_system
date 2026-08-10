@@ -1569,6 +1569,16 @@ def api_cluster_map():
     return jsonify(_cached(f"cluster-map:{sym or 'gold'}", _c, ttl=20))
 
 
+@app.route("/api/candle-patterns")
+def api_candle_patterns():
+    """Candle-pattern probability (UHAS-style): แพทเทิร์นแท่ง H1 ปิดล่าสุด + hist win-rate. display-only, 0 token."""
+    sym = (request.args.get("symbol", "") or "XAUUSD").strip() or "XAUUSD"
+    def _c():
+        from agents.candle_patterns import detect
+        return detect(sym)
+    return jsonify(_cached(f"candle-patterns:{sym}", _c, ttl=60))
+
+
 @app.route("/api/sr-ladder")
 def api_sr_ladder():
     """S/R ladder เต็ม (bounce/break% · grade · ยืน/ไส้เทียน) ต่อคู่ — เหมือน gold zone-ladder. 0 token."""

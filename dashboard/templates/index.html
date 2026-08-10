@@ -2265,6 +2265,11 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
           <div id="bias-val" style="font-family:var(--mono);font-size:15px;font-weight:700">&mdash;</div>
           <div id="bias-sub" style="font-size:10px;color:var(--text-dim)">&mdash;</div>
         </div>
+        <div class="card" style="flex:1;min-width:200px;padding:8px 11px">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:.6px">CANDLE PATTERN &middot; H1</div>
+          <div id="pattern-val" style="font-family:var(--mono);font-size:15px;font-weight:700">&mdash;</div>
+          <div id="pattern-sub" style="font-size:10px;color:var(--text-dim)">&mdash;</div>
+        </div>
       </div>
     </section>
 
@@ -7639,6 +7644,18 @@ async function loadExpMoveBias() {
       const s = mq.score, up = Math.round(50 + s / 2), col = s > 15 ? 'var(--green)' : s < -15 ? 'var(--red)' : 'var(--muted)';
       set('bias-val', (mq.bias || 'NEUTRAL') + ' · ' + up + '% up', col);
       set('bias-sub', 'score ' + (s > 0 ? '+' : '') + s + ' (−100..+100)' + (mq.stance ? ' · ' + mq.stance : ''));
+    }
+  } catch (e) {}
+  try {                                                   // candle pattern + hist win-rate (slice: pattern-prob)
+    const cp = await (await fetch('/api/candle-patterns' + (_chartSym ? '?symbol=' + encodeURIComponent(_chartSym) : ''))).json();
+    if (cp && cp.ok) {
+      const ps = cp.patterns || [];
+      if (!ps.length) { set('pattern-val', 'ไม่มีแพทเทิร์น', 'var(--muted)'); set('pattern-sub', 'แท่ง H1 ปิดล่าสุด'); }
+      else {
+        const p = ps[0], dcol = p.dir === 'BUY' ? 'var(--green)' : 'var(--red)';
+        set('pattern-val', p.name.replace(/_/g, ' ') + ' · ' + p.dir, dcol);
+        set('pattern-sub', (p.winrate != null ? 'ไปทางนี้ ' + p.winrate + '% (n=' + p.n + ', ' + p.fwd + ' แท่ง)' : 'n=' + p.n) + (ps.length > 1 ? ' · +' + (ps.length - 1) : ''));
+      }
     }
   } catch (e) {}
 }
