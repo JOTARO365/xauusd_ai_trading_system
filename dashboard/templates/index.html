@@ -4041,7 +4041,7 @@ function renderTable(trades) {
    PORTFOLIO
    ════════════════════════════════════════════════════════════ */
 function updatePortfolio(account, usd_thb) {
-  if (!account || !account.balance) {
+  if (!account || !(account.currency || account.login)) {   // connected = มี currency/login (balance=0 บัญชียังไม่เติม ≠ disconnect)
     document.getElementById('port-balance-thb').textContent = 'MT5 not connected';
     return;
   }
@@ -4136,7 +4136,8 @@ async function fetchData() {
 
   document.getElementById('last-update').textContent =
     'Updated ' + new Date().toLocaleTimeString('en-US', { hour12: false }) +
-    (data.account && data.account.balance ? '' : '  (MT5 offline)');
+    // connected = มี account.currency (login สำเร็จ) — ไม่เช็ค balance เพราะ balance=0 (บัญชียังไม่เติม) ≠ offline
+    ((data.account && (data.account.currency || data.account.login)) ? '' : '  (MT5 offline)');
 }
 
 document.getElementById('filter-symbol').addEventListener('change', onSymbolChange);
