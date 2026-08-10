@@ -96,9 +96,12 @@ def _broker_map():
     # 3) verify + auto-resolve: symbol ที่ยังขาด หรือ map ไว้แต่ไม่มีจริงในโบรก → probe สด
     try:
         import MetaTrader5 as mt5
-        avail = {s.name for s in (mt5.symbols_get() or [])}
+        _all = mt5.symbols_get() or []
+        avail = {s.name for s in _all}
+        tradeable = {s.name for s in _all if getattr(s, "trade_mode", 0) != 0}   # trade_mode 0 = DISABLED
         if avail:                                      # (ถ้า MT5 ไม่ต่อ ข้าม verify — ใช้ค่าที่มี)
-            missing = [k for k in COLLECT if k not in out or out.get(k) not in avail]
+            # re-resolve ถ้า: ไม่มีจริง | map ไปตัว trade ไม่ได้ (เช่น probe.json เก่า EURUSD standard disabled บน micro → EURUSDmicro)
+            missing = [k for k in COLLECT if k not in out or out.get(k) not in avail or out.get(k) not in tradeable]
             if missing:
                 out.update(_auto_resolve(missing))
     except Exception:
