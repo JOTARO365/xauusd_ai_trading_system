@@ -7440,6 +7440,7 @@ function setChartSym(s) {                       // เลือกคู่ (ว
   if (_chartSym) { _zoneLines.forEach(l => { try { _candleSeries.removePriceLine(l); } catch(e){} }); _zoneLines = []; _srZoneBands = []; if (typeof _drawSRZoneBands === 'function') _drawSRZoneBands(); }  // ซ่อน AI-zone + band (gold-only)
   _clusterLast = 0;                             // force reload cluster S/R ของคู่ใหม่
   loadCandles(true); loadClusterMap();
+  if (typeof loadExpMoveBias === 'function') loadExpMoveBias();   // tiles (expected-move/pattern) ตามคู่ใหม่
 }
 async function populateChartSymbols() {
   const sel = document.getElementById('chart-sym'); if (!sel) return;
@@ -7533,6 +7534,9 @@ function _drawSRZoneBands() {
       ctx.lineTo(xB - 8 * Math.cos(ang - 0.4), yT - 8 * Math.sin(ang - 0.4));
       ctx.lineTo(xB - 8 * Math.cos(ang + 0.4), yT - 8 * Math.sin(ang + 0.4));
       ctx.closePath(); ctx.fill();
+      ctx.font = '9px JetBrains Mono, monospace'; ctx.fillStyle = `rgba(${col},0.95)`; ctx.textAlign = 'right';   // ราคาเป้าที่ปลายลูกศร (UHAS)
+      ctx.fillText(_srProjection.to.toFixed(2), xB - 3, yT + (yT > yF ? 12 : -6));
+      ctx.textAlign = 'left';
     }
   }
 }
