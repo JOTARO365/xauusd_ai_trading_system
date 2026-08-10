@@ -4886,7 +4886,7 @@ function renderAllLayers() {
     if (n.sched) {                                  // ข่าวการประกาศ (calendar) → <svg class="ic"><use href="#ic-calendar"/></svg> pin + countdown
       const col = n.impact === 'high' ? '#ef4444' : '#ffaa00', cd = _wmCountdown(n.ev_ts);
       s += _mk(n.lat + 3, n.lng, 2.3, col, { glow: true, labelCol: col,
-        label: `<svg class="ic"><use href="#ic-calendar"/></svg> ${n.ccy || ''}${cd ? ' ' + cd : ''}`, title: n.title });
+        label: `${n.ccy || ''}${cd ? ' ' + cd : ''}`.trim(), title: n.title });   // SVG <text> render literal → ไม่ยัด svg-icon string (จุด glow = pin อยู่แล้ว)
     } else {
       const col = n.tier >= 3 ? '#ef4444' : (n.tier >= 2 ? '#f59e0b' : '#e8b04b');
       s += _mk(n.lat, n.lng, 2.4 + 1.0 * n.tier, col, { pulse: n.tier >= 2, title: n.title || '' });
@@ -5013,7 +5013,7 @@ function renderUnifiedNews(wm, ni) {
     });
   }
   (_wmCtx.events || []).forEach(e => {                // ข่าวการประกาศ (economic calendar)
-    items.push({ tier: e.impact === 'high' ? 3 : 2, title: `<svg class="ic"><use href="#ic-calendar"/></svg> ${e.name}`,
+    items.push({ tier: e.impact === 'high' ? 3 : 2, title: e.name,   // title ถูก _wmEsc (news list + map tooltip) → ห้ามยัด svg-icon; ไอคอน calendar อยู่คอลัมน์ trend แล้ว
       source: `${e.ccy} · ${e.impact}${e.forecast ? ` f:${e.forecast}` : ''}`,
       ts: e.ts ? Date.parse(e.ts) / 1000 : 0, tag: 'announce', sched: true, us: e.ccy === 'USD',
       cats: _catsOf(e.name, true, 'announce'), ccy: e.ccy, impact: e.impact, ev_ts: e.ts, lat: e.lat, lng: e.lng });
