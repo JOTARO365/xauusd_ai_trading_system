@@ -179,7 +179,7 @@ def calculate_lot_size(account_balance: float, sl_pips: float,
         lot = round(risk_amount / (sl_pips * pip_value_lot), 2)
 
     lot = _apply_regime_sizing(lot)   # regime-aware vol-target sizing (flag REGIME_SIZING)
-    clamped = max(_cfg.MIN_LOT, min(lot, _cfg.MAX_LOT))
+    clamped = max(_lot_floor(), min(lot, _cfg.MAX_LOT))
     actual_risk = clamped * sl_pips * pip_value_lot if _cfg.LOT_MODE != "fixed" else 0
     if _cfg.LOT_MODE != "fixed":
         scale_note  = f" scale={confidence_scale:.2f}" if confidence_scale < 1.0 else ""
@@ -211,7 +211,19 @@ def _calc_pip_value(symbol: str) -> float:
     return round(profit / 100, 4)  # value per 1 pip per 1 lot ใน account currency
 
 
-def _nnlb_lot_and_check(equity: float, sl_pips: float) -> tuple[float, str]:
+def _lot_floor(symbol=None):
+    """floor lot ต่อ symbol = max(MIN_LOT global, volume_min ของ broker symbol นั้น).
+    กัน MIN_LOT global (micro-gold=0.1) บังคับ BTC/WTI (volume_min=0.01) เป็น 0.1 = ใหญ่เกิน 10×.
+    ตั้ง MIN_LOT=0.01 → แต่ละ symbol floor ที่ volume_min ของตัวเอง (gold 0.1, BTC/WTI 0.01)."""
+    try:
+        si = mt5.symbol_info(symbol or SYMBOL)
+        vmin = float(si.volume_min) if si and si.volume_min else _cfg.MIN_LOT
+    except Exception:
+        vmin = _cfg.MIN_LOT
+    return max(_cfg.MIN_LOT, vmin)
+
+
+def _nnlb_lot_and_check(equity: float, sl_pips: float, symbol=None) -> tuple[float, str]:
     """
     NNLB lot calculation + equity gate
     คืน (lot, error_msg)  — error_msg ว่าง = ผ่าน
@@ -233,7 +245,9 @@ def _nnlb_lot_and_check(equity: float, sl_pips: float) -> tuple[float, str]:
     """
     # ── USD → account currency (rate = pip value ของทอง = $1/pip) ──────
     # ใช้ค่าเดียวกันทั้งแปลง config และ max-loss calc → MT5 จัดการ conversion ให้
-    rate         = _calc_pip_value(_cfg.SYMBOL)          # account-ccy ต่อ 1 USD (per pip per lot)
+    symbol       = symbol or _cfg.SYMBOL
+    floor        = _lot_floor(symbol)                    # per-symbol min-lot (BTC/WTI 0.01, micro-gold 0.1)
+    rate         = _calc_pip_value(_cfg.SYMBOL)          # account-ccy ต่อ 1 USD (gold = USD conversion)
     base_acct    = _cfg.NNLB_BASE_EQUITY * rate
     per_step     = max(1e-9, _cfg.NNLB_EQUITY_PER_LOT * rate)   # guard against div/0
     acct         = mt5.account_info()
@@ -249,32 +263,32 @@ def _nnlb_lot_and_check(equity: float, sl_pips: float) -> tuple[float, str]:
     # ── Profit-based tier: เพิ่ม 0.01 lot ทุก per_step กำไร ──
     profit       = max(0.0, equity - base_acct)
     profit_steps = int(profit / per_step)
-    lot          = round(min(_cfg.MIN_LOT + profit_steps * 0.01, _cfg.MAX_LOT), 2)
-    lot          = max(_cfg.MIN_LOT, lot)
+    lot          = round(min(floor + profit_steps * 0.01, _cfg.MAX_LOT), 2)
+    lot          = max(floor, lot)
 
     # ── NNLB_MAX_LOSS_PCT: cap lot ให้ max_loss ไม่เกิน X% ของ equity ──
-    # pv_1lot = rate (เป็นค่าเดียวกัน: per pip per 1 lot ใน account ccy)
-    pv_1lot      = rate
-    max_loss         = round(lot * sl_pips * pv_1lot, 2)
+    # ⚠️ ใช้ risk จริงต่อ symbol (order_calc_profit) ไม่ใช่ gold-rate — ไม่งั้น BTC/WTI (contract ต่าง) คิด risk ผิด → oversize
+    _tick    = mt5.symbol_info_tick(symbol); _si = mt5.symbol_info(symbol)
+    _pt      = _si.point if (_si and _si.point) else 0.01
+    _lstep   = (_si.volume_step if (_si and _si.volume_step) else 0.01)
+    _px      = (_tick.ask if _tick else 0.0) or 0.0
+    risk_1lot = abs(mt5.order_calc_profit(mt5.ORDER_TYPE_BUY, symbol, 1.0, _px, _px - sl_pips * _pt) or 0.0) \
+                if (_px and sl_pips > 0) else 0.0
     max_loss_allowed = round(equity * (_cfg.NNLB_MAX_LOSS_PCT / 100), 2)
+    max_loss         = round(lot * risk_1lot, 2)
 
-    if sl_pips > 0 and max_loss > max_loss_allowed:
-        budget_lot = round(max_loss_allowed / (sl_pips * pv_1lot), 2) if pv_1lot > 0 else _cfg.MIN_LOT
-        if budget_lot >= _cfg.MIN_LOT:
-            lot      = budget_lot
-            max_loss = round(lot * sl_pips * pv_1lot, 2)
-            logger.warning(
-                f"[NNLB] lot ลดจาก profit-tier → {budget_lot} "
-                f"เพื่อให้ max_loss {max_loss:.0f} {ccy} ≤ {_cfg.NNLB_MAX_LOSS_PCT:.0f}% ของ equity"
-            )
+    if risk_1lot > 0 and max_loss > max_loss_allowed:
+        budget_lot = max(0.0, round(round((max_loss_allowed / risk_1lot) / _lstep) * _lstep, 2))
+        if budget_lot >= floor:
+            lot = budget_lot
+            logger.warning(f"[NNLB] {symbol} lot ลด profit-tier → {lot} ให้ max_loss ≤ {_cfg.NNLB_MAX_LOSS_PCT:.0f}% equity")
         else:
-            lot      = _cfg.MIN_LOT
-            max_loss = round(lot * sl_pips * pv_1lot, 2)
+            lot = floor
             logger.warning(
-                f"[NNLB] MIN_LOT={lot} ยังให้ max_loss {max_loss:.0f} {ccy} "
-                f">{_cfg.NNLB_MAX_LOSS_PCT:.0f}% equity ({max_loss_allowed:.0f} {ccy}) "
-                f"— เงินทุนน้อยเกินกว่า SL แต่ NNLB ยังคงเข้าออเดอร์"
+                f"[NNLB] {symbol} floor {lot} ยังเสี่ยง >{_cfg.NNLB_MAX_LOSS_PCT:.0f}% "
+                f"({max_loss_allowed:.0f} {ccy}) — ทุนน้อยเกิน SL แต่ NNLB ยังเข้า"
             )
+        max_loss = round(lot * risk_1lot, 2)
 
     loss_pct = round(max_loss / equity * 100, 1) if equity > 0 else 0
     logger.warning(
@@ -642,15 +656,15 @@ def _order_setup(direction, sl_pips, tp_pips, comment, min_rr, confidence_scale,
     stops_min  = sym_info.trade_stops_level * point   # ระยะ SL/TP ขั้นต่ำจากราคาปัจจุบัน
 
     if lot is not None and lot > 0:                   # P-E: algo risk-based lot override (ยังผ่าน clamp+guards ด้านล่าง)
-        lot = max(_cfg.MIN_LOT, min(float(lot), _cfg.MAX_LOT))
+        lot = max(_lot_floor(symbol), min(float(lot), _cfg.MAX_LOT))
         logger.info(f"Lot override (algo sizing เหมาะสมกับเงินทุน): {lot}")
     elif _cfg.NNLB_MODE:
-        lot, err = _nnlb_lot_and_check(account.equity, sl_pips)
+        lot, err = _nnlb_lot_and_check(account.equity, sl_pips, symbol)
         if err:
             return None, {"success": False, "error": err}
     elif getattr(_cfg, "CUSTOM_LOT_ENABLE", False) and _pair_lot_for(symbol) is not None:
         # mode custom lot: lot ต่อคู่ (dashboard) — user เลือกเอง → override FF/global (แต่ยังผ่าน clamp/guards)
-        lot = max(_cfg.MIN_LOT, min(_pair_lot_for(symbol), _cfg.MAX_LOT))
+        lot = max(_lot_floor(symbol), min(_pair_lot_for(symbol), _cfg.MAX_LOT))
         logger.info(f"[CUSTOM-LOT] {symbol} → lot {lot} (กำหนดต่อคู่ dashboard)")
     elif getattr(_cfg, "FF_SIZING_ENABLE", False) and account.equity < float(getattr(_cfg, "CAPITAL_GATE_FLOOR", 20000)):
         # fixed-fractional sizing (ทุก​ algo, ทุนเล็ก): risk %คงที่ของ equity → size ∝ 1/SL → ลด DD (A2 08-09)
@@ -662,7 +676,7 @@ def _order_setup(direction, sl_pips, tp_pips, comment, min_rr, confidence_scale,
         if _risk1 > 0:
             _step = sym_info.volume_step or 0.01
             _ff = (float(getattr(_cfg, "FF_RISK_PCT", 1.0)) / 100.0 * account.equity) / _risk1
-            lot = max(_cfg.MIN_LOT, min(round(_ff / _step) * _step, _cfg.MAX_LOT))
+            lot = max(_lot_floor(symbol), min(round(_ff / _step) * _step, _cfg.MAX_LOT))
             logger.info("[FF-SIZING] equity %.0f < %.0f → fixed-fractional %.1f%% → lot %.2f (risk %.0f฿)" % (
                 account.equity, float(getattr(_cfg, "CAPITAL_GATE_FLOOR", 20000)),
                 float(getattr(_cfg, "FF_RISK_PCT", 1.0)), lot, lot * _risk1))
@@ -736,8 +750,8 @@ def _order_setup(direction, sl_pips, tp_pips, comment, min_rr, confidence_scale,
         if margin_needed is not None and account.equity < margin_needed:
             logger.warning(f"Margin ไม่เพียงพอ: ต้องการ {margin_needed:.2f}, equity {account.equity:.2f}")
             safe_lot = round((account.equity * 0.9) / (margin_needed / lot), 2) if lot > 0 else 0
-            safe_lot = max(_cfg.MIN_LOT, min(safe_lot, lot))
-            if safe_lot < _cfg.MIN_LOT:
+            safe_lot = max(_lot_floor(symbol), min(safe_lot, lot))
+            if safe_lot < _lot_floor(symbol):
                 return None, {"success": False, "error": f"Margin ไม่เพียงพอแม้ใช้ lot ขั้นต่ำ (equity={account.equity:.2f})"}
             logger.info(f"ลด lot จาก {lot} → {safe_lot} เนื่องจาก margin จำกัด")
             lot = safe_lot
@@ -1013,9 +1027,9 @@ def place_pending_order(pending_type: str, price: float, sl_pips: float, tp_pips
     stops_min = info.trade_stops_level * point
 
     if lot is not None and lot > 0:                   # P-E: algo risk-based lot override
-        lot = max(_cfg.MIN_LOT, min(float(lot), _cfg.MAX_LOT))
+        lot = max(_lot_floor(SYMBOL), min(float(lot), _cfg.MAX_LOT))
     elif _cfg.NNLB_MODE:
-        lot, err = _nnlb_lot_and_check(account.equity, sl_pips)
+        lot, err = _nnlb_lot_and_check(account.equity, sl_pips, SYMBOL)
         if err:
             return {"success": False, "error": err}
     else:
