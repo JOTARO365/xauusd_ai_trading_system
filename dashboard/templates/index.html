@@ -2247,7 +2247,10 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
         </span>
       </div>
       <div class="chart-card" style="padding:8px 8px 4px">
-        <div id="price-chart" style="width:100%;min-height:380px"></div>
+        <div id="price-chart-wrap" style="position:relative;width:100%">
+          <div id="price-chart" style="width:100%;min-height:380px"></div>
+          <canvas id="sr-zone-canvas" style="position:absolute;left:0;top:0;pointer-events:none;z-index:2"></canvas>
+        </div>
         <div id="price-chart-msg" style="display:none;color:var(--red);font-family:var(--mono);font-size:12px;padding:8px 4px"></div>
       </div>
     </section>
@@ -7392,7 +7395,7 @@ let _chart = null, _candleSeries = null, _zoneLines = [], _clusterLines = [], _c
 
 function setChartSym(s) {                       // เลือกคู่ (ว่าง=ทอง). non-gold → ซ่อน overlay AI zones (gold-specific)
   _chartSym = s || '';
-  if (_chartSym) { _zoneLines.forEach(l => { try { _candleSeries.removePriceLine(l); } catch(e){} }); _zoneLines = []; }  // ซ่อน AI-zone (gold-only)
+  if (_chartSym) { _zoneLines.forEach(l => { try { _candleSeries.removePriceLine(l); } catch(e){} }); _zoneLines = []; _srZoneBands = []; if (typeof _drawSRZoneBands === 'function') _drawSRZoneBands(); }  // ซ่อน AI-zone + band (gold-only)
   _clusterLast = 0;                             // force reload cluster S/R ของคู่ใหม่
   loadCandles(true); loadClusterMap();
 }
@@ -7423,7 +7426,50 @@ function initChart() {
     upColor: '#22c55e', downColor: '#ef4444',
     wickUpColor: '#22c55e', wickDownColor: '#ef4444', borderVisible: false,
   });
-  new ResizeObserver(() => { if (el.clientWidth) _chart.applyOptions({ width: el.clientWidth }); }).observe(el);
+  new ResizeObserver(() => { if (el.clientWidth) _chart.applyOptions({ width: el.clientWidth }); _resizeSRZoneCanvas(); }).observe(el);
+  _initSRZoneBands(el);
+}
+
+/* ── UHAS-style S/R zone bands (additive overlay, gold-only; ไม่แตะ price-line เดิม) ── */
+let _srZoneCanvas = null, _srZoneBands = [], _srZoneTimer = null;
+function _resizeSRZoneCanvas() {
+  const el = document.getElementById('price-chart');
+  if (!el || !_srZoneCanvas) return;
+  const w = el.clientWidth, h = el.clientHeight, dpr = window.devicePixelRatio || 1;
+  _srZoneCanvas.style.width = w + 'px'; _srZoneCanvas.style.height = h + 'px';
+  _srZoneCanvas.width = Math.round(w * dpr); _srZoneCanvas.height = Math.round(h * dpr);
+  const ctx = _srZoneCanvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  _drawSRZoneBands();
+}
+function _initSRZoneBands(el) {
+  _srZoneCanvas = document.getElementById('sr-zone-canvas');
+  if (!_srZoneCanvas) return;
+  _resizeSRZoneCanvas();
+  try { _chart.timeScale().subscribeVisibleTimeRangeChange(() => _drawSRZoneBands()); } catch (e) {}
+  if (!_srZoneTimer) _srZoneTimer = setInterval(() => {   // ให้แถบตามราคาเมื่อ autoscale/zoom แนวตั้ง (ราคาถูก, 3 rect)
+    if (document.hidden || !_srZoneBands.length) return;
+    _drawSRZoneBands();
+  }, 1200);
+}
+function _drawSRZoneBands() {
+  if (!_srZoneCanvas || !_candleSeries) return;
+  const el = document.getElementById('price-chart');
+  const w = el ? el.clientWidth : _srZoneCanvas.clientWidth, h = el ? el.clientHeight : 0;
+  const ctx = _srZoneCanvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  if (_chartSym || !_srZoneBands.length) return;                 // gold-only (เหมือน overlay เดิม)
+  let scaleW = 64; try { scaleW = _chart.priceScale('right').width() || 64; } catch (e) {}
+  const x1 = Math.max(0, w - scaleW);
+  for (const b of _srZoneBands) {
+    const yTop = _candleSeries.priceToCoordinate(b.hi);
+    const yBot = _candleSeries.priceToCoordinate(b.lo);
+    if (yTop == null || yBot == null) continue;
+    const y = Math.min(yTop, yBot), hh = Math.max(1, Math.abs(yBot - yTop));
+    ctx.fillStyle = `rgba(${b.rgb},${b.alpha})`;
+    ctx.fillRect(0, y, x1, hh);
+    ctx.fillStyle = `rgba(${b.rgb},${Math.min(1, b.alpha + 0.5)})`;   // ขอบบน/ล่างเข้มกว่า = อ่านโซนง่าย
+    ctx.fillRect(0, y, x1, 1); ctx.fillRect(0, y + hh - 1, x1, 1);
+  }
 }
 
 function _setChartMsg(msg) {
@@ -7446,7 +7492,7 @@ async function loadCandles(force) {
     const r = await fetch('/api/candles?tf=' + _chartTf + '&count=250' + (_chartSym ? '&symbol=' + encodeURIComponent(_chartSym) : ''));
     const d = await r.json();
     if (d.ok && d.candles && d.candles.length) {
-      _candleSeries.setData(d.candles); _setChartMsg('');
+      _candleSeries.setData(d.candles); _setChartMsg(''); _resizeSRZoneCanvas();
     } else {
       _setChartMsg('แท่งเทียนไม่มา: ' + (d.error || 'ไม่มีข้อมูล') + ' · SYMBOL=' + (d.symbol || '?'));
     }
@@ -7532,6 +7578,18 @@ function drawZoneLines(bs) {
   if (kl.pdl) add(kl.pdl, 'rgba(245,158,11,0.85)', 'PDL', 1, LightweightCharts.LineStyle.Dotted, true);
   const htf = z.htf_zone;
   if (htf && htf.level) add(htf.level, '#4ade80', '<svg class="ic"><use href="#ic-star"/></svg> ' + htf.tf, 3, LightweightCharts.LineStyle.Solid, true);
+  // UHAS-style: สร้างแถบ zone (band) จาก level เดิม — ±0.06% เป็นความหนาโซน, alpha ∝ strength% (additive, ไม่แตะเส้น)
+  const bands = [];
+  const mkBand = (lv, rgb) => {
+    const sc = scoreFor(lv), m = metaFor(lv);
+    const st = Math.max(sc || 0, (m && m.strength) || 0) || 0;
+    const hb = lv * 0.0006;                                   // half-band ~2.6 ที่ 4300 (คล้าย range โซน UHAS)
+    bands.push({ lo: lv - hb, hi: lv + hb, rgb, alpha: st >= 65 ? 0.15 : 0.08 });
+  };
+  (z.resistance || []).forEach(lv => mkBand(lv, '239,68,68'));
+  (z.support || []).forEach(lv => mkBand(lv, '34,197,94'));
+  _srZoneBands = bands;
+  _drawSRZoneBands();
 }
 
 /* ── Why No Entry — gate blocks สด (07-03) ── */
