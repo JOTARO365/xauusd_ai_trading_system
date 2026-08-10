@@ -7665,7 +7665,9 @@ function drawZoneLines(bs) {
   if (_px) {
     const up = (z.resistance || []).filter(x => x > _px).sort((a, b) => a - b);
     const dn = (z.support || []).filter(x => x < _px).sort((a, b) => b - a);
-    _tgt = (_tr.includes('BEAR') || _tr.includes('DOWN')) ? (dn[0] || null) : (up[0] || null);
+    const arr = (_tr.includes('BEAR') || _tr.includes('DOWN')) ? dn : up;
+    _tgt = arr[0] || null;
+    if (_tgt && Math.abs(_tgt - _px) / _px < 0.001 && arr[1]) _tgt = arr[1];   // zone แรกใกล้เกิน (<0.1%) → ใช้ zone ที่ 2 (arrow ชัดขึ้น)
   }
   _srProjection = (_px && _tgt) ? { from: _px, to: _tgt } : null;
   _drawSRZoneBands();
