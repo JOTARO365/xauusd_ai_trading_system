@@ -7463,7 +7463,7 @@ function initChart() {
 }
 
 /* ── UHAS-style S/R zone bands (additive overlay, gold-only; ไม่แตะ price-line เดิม) ── */
-let _srZoneCanvas = null, _srZoneBands = [], _srZoneTimer = null;
+let _srZoneCanvas = null, _srZoneBands = [], _srZoneTimer = null, _srProjection = null;
 function _resizeSRZoneCanvas() {
   const el = document.getElementById('price-chart');
   if (!el || !_srZoneCanvas) return;
@@ -7501,6 +7501,22 @@ function _drawSRZoneBands() {
     ctx.fillRect(0, y, x1, hh);
     ctx.fillStyle = `rgba(${b.rgb},${Math.min(1, b.alpha + 0.5)})`;   // ขอบบน/ล่างเข้มกว่า = อ่านโซนง่าย
     ctx.fillRect(0, y, x1, 1); ctx.fillRect(0, y + hh - 1, x1, 1);
+  }
+  // UHAS-style projected path: เส้นประ+หัวลูกศร จากราคาปัจจุบัน → zone ถัดไปตามเทรนด์ (display)
+  if (_srProjection) {
+    const yF = _candleSeries.priceToCoordinate(_srProjection.from), yT = _candleSeries.priceToCoordinate(_srProjection.to);
+    if (yF != null && yT != null) {
+      const xA = Math.max(0, x1 - Math.min(x1 * 0.35, 220)), xB = x1;
+      const col = _srProjection.to > _srProjection.from ? '34,197,94' : '239,68,68';
+      ctx.strokeStyle = `rgba(${col},0.8)`; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(xA, yF); ctx.lineTo(xB, yT); ctx.stroke(); ctx.setLineDash([]);
+      const ang = Math.atan2(yT - yF, xB - xA);                         // หัวลูกศรที่ปลาย
+      ctx.fillStyle = `rgba(${col},0.9)`;
+      ctx.beginPath(); ctx.moveTo(xB, yT);
+      ctx.lineTo(xB - 8 * Math.cos(ang - 0.4), yT - 8 * Math.sin(ang - 0.4));
+      ctx.lineTo(xB - 8 * Math.cos(ang + 0.4), yT - 8 * Math.sin(ang + 0.4));
+      ctx.closePath(); ctx.fill();
+    }
   }
 }
 
@@ -7621,6 +7637,16 @@ function drawZoneLines(bs) {
   (z.resistance || []).forEach(lv => mkBand(lv, '239,68,68'));
   (z.support || []).forEach(lv => mkBand(lv, '34,197,94'));
   _srZoneBands = bands;
+  // projected path: ราคาปัจจุบัน → zone ถัดไปตามเทรนด์ (bull→แนวต้านเหนือ · bear→แนวรับใต้)
+  const _px = (bs.price_info && bs.price_info.bid) || null;
+  const _tr = String((bs.market && bs.market.trend) || bs.trend || '').toUpperCase();
+  let _tgt = null;
+  if (_px) {
+    const up = (z.resistance || []).filter(x => x > _px).sort((a, b) => a - b);
+    const dn = (z.support || []).filter(x => x < _px).sort((a, b) => b - a);
+    _tgt = (_tr.includes('BEAR') || _tr.includes('DOWN')) ? (dn[0] || null) : (up[0] || null);
+  }
+  _srProjection = (_px && _tgt) ? { from: _px, to: _tgt } : null;
   _drawSRZoneBands();
 }
 
