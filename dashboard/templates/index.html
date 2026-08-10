@@ -7433,7 +7433,7 @@ async function loadSentimentScore() {
 }
 
 /* ── Price Chart + AI Zones overlay (07-03) — lightweight-charts, data จาก MT5 ── */
-let _chart = null, _candleSeries = null, _zoneLines = [], _clusterLines = [], _chartTf = 'M15', _lastCandleLoad = 0, _chartSym = '', _lastCandle = null;
+let _chart = null, _candleSeries = null, _zoneLines = [], _clusterLines = [], _chartTf = 'M15', _lastCandleLoad = 0, _chartSym = '', _lastCandle = null, _candleTrend = '';
 
 function setChartSym(s) {                       // เลือกคู่ (ว่าง=ทอง). non-gold → ซ่อน overlay AI zones (gold-specific)
   _chartSym = s || '';
@@ -7441,6 +7441,7 @@ function setChartSym(s) {                       // เลือกคู่ (ว
   _clusterLast = 0;                             // force reload cluster S/R ของคู่ใหม่
   loadCandles(true); loadClusterMap();
   if (typeof loadExpMoveBias === 'function') loadExpMoveBias();   // tiles (expected-move/pattern) ตามคู่ใหม่
+  if (typeof renderScenarioCards === 'function') renderScenarioCards();   // scenario ตามคู่ใหม่ (non-gold ดึง sr-ladder เอง)
 }
 async function populateChartSymbols() {
   const sel = document.getElementById('chart-sym'); if (!sel) return;
@@ -7562,6 +7563,10 @@ async function loadCandles(force) {
     const d = await r.json();
     if (d.ok && d.candles && d.candles.length) {
       _candleSeries.setData(d.candles); _lastCandle = d.candles[d.candles.length - 1]; _setChartMsg(''); _resizeSRZoneCanvas();
+      if (d.candles.length > 21) {                       // trend ต่อคู่ (สำหรับ scenario per-symbol) = close ล่าสุด vs 20 แท่งก่อน
+        const a = d.candles[d.candles.length - 21].close, b = _lastCandle.close;
+        _candleTrend = b > a * 1.0005 ? 'BULLISH' : (b < a * 0.9995 ? 'BEARISH' : 'NEUTRAL');
+      }
     } else {
       _setChartMsg('แท่งเทียนไม่มา: ' + (d.error || 'ไม่มีข้อมูล') + ' · SYMBOL=' + (d.symbol || '?'));
     }
@@ -7710,8 +7715,8 @@ async function loadExpMoveBias() {
 }
 
 /* ── UHAS-style Scenario cards ก/ข/พัก (slice 3) — สังเคราะห์จาก S/R+trend, display-only (ไม่ใช่คำสั่ง) ── */
-function _scMeta(bs, lvl) {
-  const m = (bs.zones && bs.zones.sr_meta) || [];
+function _scMeta(sm, lvl) {
+  const m = sm || [];
   const hits = m.filter(x => x.level && Math.abs(x.level - lvl) / lvl < 0.001);
   return hits.length ? hits.reduce((a, b) => (((b.score || b.strength || 0) > (a.score || a.strength || 0)) ? b : a)) : null;
 }
@@ -7741,26 +7746,37 @@ function _scCard(p) {
     <div style="font-size:10px;color:var(--text-dim);margin-top:7px">${p.trig || ''}</div>
   </div>`;
 }
-function renderScenarioCards(bs) {
-  const el = document.getElementById('scenario-cards'); if (!el || !bs) return;
-  const va = document.getElementById('scenario-validity');   // UHAS-style validity window (วางแผน → หมดอายุ +4h)
-  if (va) {
-    const u = bs.updated_at ? new Date(bs.updated_at) : null;
-    if (u && !isNaN(u)) { const f = d => ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
-      va.textContent = 'วางแผน ' + f(u) + ' · หมดอายุ ' + f(new Date(u.getTime() + 4 * 3600e3)); }
-    else va.textContent = '';
+async function renderScenarioCards(bs) {
+  const el = document.getElementById('scenario-cards'); if (!el) return;
+  const va = document.getElementById('scenario-validity');
+  let z, px, trend;
+  if (_chartSym) {                                  // คู่อื่น (ไม่ใช่ทอง) → ดึง S/R ของคู่นั้น + trend จาก candles
+    if (va) va.textContent = '';                    // ไม่มี timestamp ต่อคู่
+    try { const d = await (await fetch('/api/sr-ladder?symbol=' + encodeURIComponent(_chartSym))).json();
+      if (d && d.ok !== false && d.zones) { z = d.zones; px = d.price; } } catch (e) {}
+    if (!z || !px) { el.innerHTML = '<div class="card" style="flex:1;color:var(--muted);padding:10px">รอข้อมูล S/R ' + _chartSym + '…</div>'; return; }
+    trend = _candleTrend || 'BULLISH';
+  } else {                                          // ทอง → ใช้ bot_status (มี trend + updated_at authoritative)
+    if (!bs) return;
+    if (va) {
+      const u = bs.updated_at ? new Date(bs.updated_at) : null;
+      if (u && !isNaN(u)) { const f = d => ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+        va.textContent = 'วางแผน ' + f(u) + ' · หมดอายุ ' + f(new Date(u.getTime() + 4 * 3600e3)); }
+      else va.textContent = '';
+    }
+    z = bs.zones || {}; px = (bs.price_info && bs.price_info.bid) || null;
+    trend = String((bs.market && bs.market.trend) || bs.trend || '').toUpperCase();
   }
-  const z = bs.zones || {}, px = (bs.price_info && bs.price_info.bid) || null;
-  const trend = String((bs.market && bs.market.trend) || bs.trend || '').toUpperCase();
   if (!px || (!z.support && !z.resistance)) { el.innerHTML = '<div class="card" style="flex:1;color:var(--muted);padding:10px">รอข้อมูลแนว S/R…</div>'; return; }
+  const _sm = z.sr_meta || [];
   const sups = (z.support || []).filter(x => x < px).sort((a, b) => b - a);   // ใกล้ราคาก่อน
   const ress = (z.resistance || []).filter(x => x > px).sort((a, b) => a - b);
   const band = lv => lv * 0.0006, slBuf = lv => lv * 0.0014;
-  const mkBuy = (s, title) => { if (s == null) return null; const mm = _scMeta(bs, s);
+  const mkBuy = (s, title) => { if (s == null) return null; const mm = _scMeta(_sm, s);
     return { title, dir: 'BUY', entryLo: s, entryHi: s + band(s), sl: s - slBuf(s), tp: ress[0] || null,
       score: mm && (mm.score || mm.strength), grade: mm && mm.grade,
       trig: 'รอราคาแตะโซน ' + s.toFixed(2) + ' แล้วแท่ง 15m ปิดกลับเหนือ ' + (s + band(s)).toFixed(2) }; };
-  const mkSell = (r, title) => { if (r == null) return null; const mm = _scMeta(bs, r);
+  const mkSell = (r, title) => { if (r == null) return null; const mm = _scMeta(_sm, r);
     return { title, dir: 'SELL', entryLo: r - band(r), entryHi: r, sl: r + slBuf(r), tp: sups[0] || null,
       score: mm && (mm.score || mm.strength), grade: mm && mm.grade,
       trig: 'รอราคาแตะโซน ' + r.toFixed(2) + ' แล้วแท่ง 15m ปิดกลับใต้ ' + (r - band(r)).toFixed(2) }; };
