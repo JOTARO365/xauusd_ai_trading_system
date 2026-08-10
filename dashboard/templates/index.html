@@ -7713,9 +7713,17 @@ function _scCard(p) {
     <div style="font-family:var(--mono);font-size:11px;margin-top:6px;line-height:1.7">
       <div>โซนเข้า <b style="color:var(--gold)">${ez}</b></div>
       <div>คัท <b style="color:var(--red)">${p.sl != null ? p.sl.toFixed(2) : '—'}</b> · เป้า <b style="color:var(--green)">${p.tp != null ? p.tp.toFixed(2) : '—'}</b></div>
-      <div>RR <b>${rr != null ? rr.toFixed(2) : '—'}</b>${p.score != null ? ' · score ' + p.score + (p.grade ? ' (' + p.grade + ')' : '') : ''}</div>
+      <div>RR <b>${rr != null ? rr.toFixed(2) : '—'}</b>${p.grade ? ' · เกรด ' + p.grade : ''}</div>
     </div>
-    <div style="font-size:10px;color:var(--text-dim);margin-top:6px">${p.trig || ''}</div>
+    <div style="margin-top:7px">
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted)"><span>โอกาส (สัมพัทธ์)</span><span>${p.prob != null ? p.prob + '%' : '—'}</span></div>
+      <div style="height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin-top:2px"><div style="height:100%;width:${p.prob || 0}%;background:${dcol}"></div></div>
+    </div>
+    <div style="margin-top:4px">
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted)"><span>ความมั่นใจ</span><span>${p.score != null ? p.score + '/100' : '—'}</span></div>
+      <div style="height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin-top:2px"><div style="height:100%;width:${p.score || 0}%;background:var(--gold)"></div></div>
+    </div>
+    <div style="font-size:10px;color:var(--text-dim);margin-top:7px">${p.trig || ''}</div>
   </div>`;
 }
 function renderScenarioCards(bs) {
