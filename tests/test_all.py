@@ -486,6 +486,109 @@ class TestSafeComment(unittest.TestCase):
         self.assertLessEqual(len(result), 31)
 
 
+# ── B11: open_order fine-grained lock (sleep ไม่อยู่ใต้ _mt5_lock) ────────────
+class TestOpenOrderFineLock(unittest.TestCase):
+    """พิสูจน์ fine mode ปล่อย _mt5_lock ระหว่าง retry-backoff sleep (guardian รันได้);
+    default mode ถือ lock ตลอด (พฤติกรรมเดิม). ใช้ probe thread acquire(blocking=False) ตอน sleep."""
+
+    class _R:
+        def __init__(self, rc, cm="ok", o=1):
+            self.retcode = rc; self.comment = cm; self.order = o
+
+    class _Obj:
+        def __init__(self, **k): self.__dict__.update(k)
+
+    def _wire(self, mc):
+        m = mc.mt5
+        if not hasattr(m, "ORDER_FILLING_FOK"):
+            m.ORDER_FILLING_FOK = 2   # global mock ไม่มี attr นี้ (เติมให้ _filling_modes)
+        if not hasattr(m, "TRADE_RETCODE_INVALID_FILL"):
+            m.TRADE_RETCODE_INVALID_FILL = 10030
+        m.account_info    = lambda: TestOpenOrderFineLock._Obj(equity=50000.0, balance=50000.0)
+        m.symbol_info     = lambda s: TestOpenOrderFineLock._Obj(point=0.01, trade_stops_level=0, volume_step=0.01, filling_mode=1)
+        m.symbol_info_tick = lambda s: TestOpenOrderFineLock._Obj(ask=2000.0, bid=1999.5)
+        m.order_calc_profit = lambda *a, **k: -100.0
+        m.order_calc_margin = lambda *a, **k: 10.0
+        m.positions_get   = lambda **k: []
+        # attempt0 = REQUOTE (retryable) → 1 sleep → attempt1 = DONE
+        seq = [TestOpenOrderFineLock._R(10004, "requote"),
+               TestOpenOrderFineLock._R(m.TRADE_RETCODE_DONE, "ok", 111)]
+        m.order_send = lambda req: seq.pop(0) if seq else TestOpenOrderFineLock._R(m.TRADE_RETCODE_DONE, "ok", 111)
+
+    def _run(self, fine):
+        import connectors.mt5_connector as mc, config, threading
+        self._wire(mc)
+        probe = []
+        def fake_sleep(_):
+            def _p():
+                got = mc._mt5_lock.acquire(blocking=False)   # thread อื่น: จะได้ lock ไหมตอน main กำลัง sleep?
+                if got: mc._mt5_lock.release()
+                probe.append(got)
+            t = threading.Thread(target=_p); t.start(); t.join()
+        with patch.object(mc, "daily_trade_cap_reached", lambda s: (False, "")), \
+             patch.object(mc._time, "sleep", fake_sleep):
+            _old = getattr(config, "OPEN_ORDER_FINE_LOCK", False)
+            config.OPEN_ORDER_FINE_LOCK = fine
+            try:
+                r = mc.open_order("BUY", 500, 1000, comment="t", lot=0.01)
+            finally:
+                config.OPEN_ORDER_FINE_LOCK = _old
+        return r, probe
+
+    def test_fine_mode_releases_lock_during_sleep(self):
+        r, probe = self._run(fine=True)
+        self.assertTrue(r.get("success"), r)
+        self.assertEqual(probe, [True], "fine mode: lock ต้องว่างระหว่าง sleep")
+
+    def test_default_mode_holds_lock_during_sleep(self):
+        r, probe = self._run(fine=False)
+        self.assertTrue(r.get("success"), r)
+        self.assertEqual(probe, [False], "default mode: lock ต้องถูกถือตลอด (เดิม)")
+
+
+# ── B9: cycle deadline → protective fallback (LLM ค้าง ไม้ยังถูกดูแล) ─────────
+class TestProtectiveFallback(unittest.TestCase):
+    def test_calls_all_managers_failsoft(self):
+        import connectors.mt5_connector as mc
+        from agents import trading_graph as tg
+        names = ["ensure_sl_protection", "manage_momentum_exit", "manage_zone_break_close",
+                 "manage_breakeven", "manage_trailing_stop"]
+        saved = {n: getattr(mc, n) for n in names}
+        calls = []
+        try:
+            for n in names:
+                def mk(nm):
+                    def f(*a, **k):
+                        calls.append(nm)
+                        if nm == "manage_momentum_exit":
+                            raise RuntimeError("boom")   # fail-soft: ต้องไม่หยุดตัวที่เหลือ
+                    return f
+                setattr(mc, n, mk(n))
+            tg.run_protective_fallback({})
+        finally:
+            for n, v in saved.items():
+                setattr(mc, n, v)
+        self.assertEqual(calls, names)   # ครบทุกตัว ตามลำดับ แม้ momentum_exit raise
+
+
+class TestCycleDeadline(unittest.IsolatedAsyncioTestCase):
+    async def test_hang_triggers_fallback(self):
+        import asyncio
+        called = []
+        async def hang():
+            await asyncio.sleep(5)                        # จำลอง LLM ค้าง
+        async def branch():
+            try:
+                await asyncio.wait_for(hang(), timeout=0.05)
+            except asyncio.TimeoutError:
+                await asyncio.to_thread(called.append, "fallback")
+                return {}
+            return {"ok": 1}
+        r = await branch()
+        self.assertEqual(called, ["fallback"])           # ค้าง → timeout → fallback รัน
+        self.assertEqual(r, {})                           # cycle จบด้วย state ว่าง (ใช้ chart ล่าสุด)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":

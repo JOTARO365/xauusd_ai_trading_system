@@ -164,6 +164,12 @@ MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)   # ทุ�
 # *** DEFAULT OFF *** — เปิดบน VM หลังทดสอบกับ MT5 จริงแล้วเท่านั้น (concurrency + เงินจริง)
 GUARDIAN_ENABLED      = os.getenv("GUARDIAN_ENABLED", "false").lower() == "true"
 GUARDIAN_INTERVAL_SEC = int(os.getenv("GUARDIAN_INTERVAL_SEC") or 4)     # poll ทุกกี่วินาที
+# B11: open_order ปล่อย _mt5_lock ระหว่าง retry-backoff sleep (fine-grained) แทนถือ lock ทั้งก้อน
+#   → guardian ไม่ถูก starve ตอน retry. false = พฤติกรรมเดิม (ถือ lock ตลอด รวม sleep). เปิดคู่ guardian
+OPEN_ORDER_FINE_LOCK  = os.getenv("OPEN_ORDER_FINE_LOCK", "false").lower() == "true"
+# B9: เพดานเวลาต่อ cycle (วินาที). >0 = ครอบ ainvoke ด้วย asyncio.wait_for; timeout → รัน protective
+#   fallback (SL/BE/trailing) แล้วจบ cycle. 0 = ปิด (พฤติกรรมเดิม: ไม่มีเพดาน แค่ log เตือน)
+CYCLE_DEADLINE_SEC    = float(os.getenv("CYCLE_DEADLINE_SEC") or 0)
 
 # ── Specialist agents (multi-TF entries, Layer-A) ─────────────
 # *** DEFAULT OFF *** — ships flag-off จน replay-validator ผ่าน. ดู docs/DESIGN_specialist_agents.md
@@ -484,6 +490,9 @@ def reload_config():
     TREND_CONT_MAX_DIST_PCT  = float(os.getenv("TREND_CONT_MAX_DIST_PCT") or 0.3)
     NNLB_FASTPATH            = os.getenv("NNLB_FASTPATH", "true").lower() != "false"
     MIN_AI_EQUITY            = float(os.getenv("MIN_AI_EQUITY") or 150)
+    global OPEN_ORDER_FINE_LOCK, CYCLE_DEADLINE_SEC
+    OPEN_ORDER_FINE_LOCK     = os.getenv("OPEN_ORDER_FINE_LOCK", "false").lower() == "true"   # B11: ปล่อย lock ระหว่าง retry sleep
+    CYCLE_DEADLINE_SEC       = float(os.getenv("CYCLE_DEADLINE_SEC") or 0)                    # B9: เพดานเวลา/cycle (0=ปิด)
     global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT, REGIME_SHADOW
     global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING, REGIME_SR_ENTRY, REGIME_PENDING_FADE, REGIME_SR_EXIT
     global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK, ALGO_MAX_SAME_DIR, ALGO_ENTRY_HOURS, MULTI_SYMBOL_LIVE, ALGO_SL_MULT, MSE_MAX_POSITIONS, MSE_MAX_TOTAL, MSE_SL_MIN_ATR, MSE_SL_MAX_ATR, MSE_RR_SPREAD_TOL, WEEKEND_RUN, WEEKEND_INTERVAL_SECS, AUTO_SL_PCT_OTHER

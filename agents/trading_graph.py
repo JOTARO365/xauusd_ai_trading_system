@@ -585,6 +585,24 @@ def node_regime_shadow(state: TradingState) -> dict:
 
 # ── Routing ────────────────────────────────────────────────────────────────────
 
+def run_protective_fallback(chart_data: dict | None = None) -> None:
+    """B9: protective management เฉพาะ SL/exit — เรียกจาก main เมื่อ cycle เกิน CYCLE_DEADLINE_SEC (LLM ค้าง)
+    เพื่อให้ position ที่เปิดอยู่ยังถูกดูแลแม้ graph (position_mgmt อยู่ท้ายสาย LLM) ไม่ได้รัน. sync, fail-soft,
+    ทุก mt5.* serialize ด้วย _mt5_lock อยู่แล้ว. ลำดับเดียวกับ node_position_mgmt (protective subset)."""
+    from connectors.mt5_connector import (
+        ensure_sl_protection, manage_momentum_exit, manage_zone_break_close,
+        manage_breakeven, manage_trailing_stop,
+    )
+    chart = chart_data or {}
+    for fn, args in ((ensure_sl_protection, ()), (manage_momentum_exit, ()),
+                     (manage_zone_break_close, (chart,)), (manage_breakeven, ()),
+                     (manage_trailing_stop, ())):
+        try:
+            fn(*args)
+        except Exception as e:
+            logger.error(f"[DEADLINE-FALLBACK] {fn.__name__}: {e}")
+
+
 def route_entry(state: TradingState) -> str:
     if state.get("skip_ai"):
         return "position_mgmt"

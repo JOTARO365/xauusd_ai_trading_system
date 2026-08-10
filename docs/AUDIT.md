@@ -399,3 +399,70 @@ a regime day** (recommend sentiment default-off until then, above).
 3. Re-run `scripts/setup_vm_regime.ps1` on the VM to register the DAILY schedule (J1 ops half).
 4. After the first enriched live run: measure analyst tokens before/after via `get_accounting`
    (H1 acceptance #3) and run the R1 shadow comparison on the next CPI/NFP/FOMC day.
+
+---
+
+## Re-verification — 2026-08-10 (B9/B10/B11 concurrency + deadline closeout)
+
+> Re-read the full functions today (not just the audit's line refs — those are from
+> 2026-07-12 and mostly stale). Evidence below is current file:line.
+
+**B10 — FIXED & fully serialized (was: swing MT5 calls bypass `_mt5_lock`).**
+`manage_swing_campaign` is wrapped `@_locked` (swing_manager.py:205). grep across the
+repo confirms `_swing_positions` / `_place_leg` / `_close_all_legs` are called **only**
+from inside `manage_swing_campaign` (swing_manager.py:106/234/255/281/328), and
+`manage_swing_campaign` itself is invoked only from `node_position_mgmt`
+(trading_graph.py:296). No un-serialized MT5 write path remains. `_is_swing_comment`
+(mt5_connector.py:57) is a read-only comment check, not an MT5 access. → **stale, no action.**
+
+**B11 — half FIXED.** The retry path now re-clamps to the broker stops-level at the new
+price (mt5_connector.py:790) and re-reads the tick (781-784), so the "hard reject on
+retry" half is closed. **Still open:** `open_order` is wrapped `@_locked` (auto-wrap list
+mt5_connector.py:2198-2205) and its retry loop sleeps `_RETRY_DELAY_SEC` **under the lock**
+(mt5_connector.py:780; `_MAX_ORDER_RETRIES=2`, `_RETRY_DELAY_SEC=0.5` → up to ~1s sleep +
+3 `order_send` round-trips holding `_mt5_lock`). Guardian + all `manage_*` are blocked for
+that window. → sleep-under-lock is the remaining work.
+
+**B9 — half FIXED.** All four LLM clients now set `timeout=40, max_retries=1`
+(decision_maker.py:18-19, market_advisor.py:14-15, analyst.py:16-17, chart_watcher.py:15),
+so a single hung call caps at ~80s instead of ~600s×2. **Still open:** worst-case
+4 calls × 80s ≈ 320s > `DEFAULT_INTERVAL=300`; `run_cycle` calls `TRADING_APP.ainvoke`
+with no `asyncio.wait_for` (main.py:438) — `[CYCLE_TIME]` only warns *after* the fact
+(main.py:459-461); and `node_position_mgmt` sits **downstream** of the LLM chain in the
+full path (`decision → position_mgmt`, trading_graph.py:642; skip-AI path routes straight
+to it, route_entry:589-591). With `GUARDIAN_ENABLED=false` (config.py:165) nothing manages
+open positions while the LLM chain stalls. → per-cycle deadline + a protection path that
+does not queue behind the LLM chain is the remaining work.
+
+**B1/B2 — out of scope (owner decision).** `RISK_PER_TRADE`/`max_daily_loss` survive only
+because `MIN_LOT=MAX_LOT=0.01` pins the lot. Not an agent fix. Flagged for the day `MAX_LOT`
+moves (single-trade risk ~32%).
+
+### Resolved — 2026-08-10 (B9/B11 remaining halves closed, flag-gated)
+
+**B11 — CLOSED.** `open_order` refactored into `_order_setup` (locked) + `_order_resend`
+(locked) + `_open_order_fine` (locks only MT5 regions, `_time.sleep` **outside** the
+`with _mt5_lock`) + a dispatcher. `OPEN_ORDER_FINE_LOCK=true` → lock released during
+retry-backoff (Guardian runs in the gap); `false` (default) → dispatcher wraps the whole
+call in one lock so the RLock re-enters and behavior is byte-for-byte the old one (sleep
+still under lock). `open_order` removed from the auto-wrap list (mt5_connector.py:2198+).
+Correctness of releasing the lock: retry request is recomputed from a fresh tick each
+attempt (independent of position state); `_force_breakeven_opposing` re-reads positions
+fresh and is idempotent; only the main cycle thread ever calls `open_order` (Guardian only
+manages existing positions). Proven by `tests/test_all.py::TestOpenOrderFineLock`
+(probe thread acquires the lock during the backoff in fine mode → True; blocked in default
+mode → False).
+
+**B9 — CLOSED.** `CYCLE_DEADLINE_SEC>0` wraps `ainvoke` in `asyncio.wait_for`
+(main.py); on `TimeoutError` it runs `trading_graph.run_protective_fallback(last_chart)`
+(ensure_sl → momentum-exit → zone-break → breakeven → trailing, each fail-soft) so open
+positions are managed during an LLM stall regardless of graph position. `0` = disabled
+(old behavior). Recommended live config also sets `GUARDIAN_ENABLED=true` (B9-C) as the
+continuous safety net — enabled only after B11's fine-lock so the Guardian isn't starved.
+Proven by `TestCycleDeadline` (hang → timeout → fallback) + `TestProtectiveFallback`
+(all 5 managers invoked in order, fail-soft when one raises).
+
+**B10 — CLOSED** (verified above; no code change needed).
+
+All three flag-gated; every default reproduces the prior behavior. `.env` (live) enables
+all three; `.env.example` keeps them off (fresh-clone-safe).

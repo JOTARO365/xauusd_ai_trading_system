@@ -435,7 +435,24 @@ async def run_cycle() -> tuple[dict, dict]:
         "chart_data":     _last_chart_data or {},
         "sentiment_data": _last_sentiment_data or EMPTY_STATE["sentiment_data"],
     }
-    result = await TRADING_APP.ainvoke(initial, config=GRAPH_CONFIG)
+    # B9: เพดานเวลาต่อ cycle — CYCLE_DEADLINE_SEC>0 ครอบ ainvoke ด้วย wait_for; timeout (LLM ค้าง) →
+    # ยกเลิก graph + รัน protective fallback (SL/BE/trailing) เพื่อไม่ให้ position ค้างไร้การดูแล. 0 = ปิด (เดิม)
+    _deadline = float(getattr(config, "CYCLE_DEADLINE_SEC", 0) or 0)
+    if _deadline > 0:
+        try:
+            result = await asyncio.wait_for(
+                TRADING_APP.ainvoke(initial, config=GRAPH_CONFIG), timeout=_deadline)
+        except asyncio.TimeoutError:
+            logger.error(f"[CYCLE_DEADLINE] cycle เกิน {_deadline:.0f}s (LLM ค้าง) — ยกเลิก + รัน protective fallback")
+            print_warning(f"CYCLE DEADLINE {_deadline:.0f}s — LLM ค้าง, รัน protective fallback (ดูแล SL/ไม้เปิด)")
+            try:
+                from agents.trading_graph import run_protective_fallback
+                await asyncio.to_thread(run_protective_fallback, _last_chart_data)
+            except Exception as _fe:
+                logger.error(f"[CYCLE_DEADLINE] fallback error: {_fe}")
+            result = {}
+    else:
+        result = await TRADING_APP.ainvoke(initial, config=GRAPH_CONFIG)
 
     chart_data     = result.get("chart_data")     or _last_chart_data or {}
     sentiment_data = result.get("sentiment_data") or _last_sentiment_data or EMPTY_STATE["sentiment_data"]

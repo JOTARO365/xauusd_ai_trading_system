@@ -615,38 +615,27 @@ def _clamp_stops_level(price, sl, tp, is_buy, no_tp, stops_min, point):
     return sl, tp
 
 
-def open_order(direction: str, sl_pips: float, tp_pips: float,
-               comment: str = "", min_rr: float | None = None,
-               confidence_scale: float = 1.0, lot: float | None = None,
-               shadow: bool = False, symbol: str | None = None,
-               max_open_override: int | None = None,
-               magic: int | None = None) -> dict:
-    symbol = symbol or SYMBOL                          # multi-symbol: ระบุ symbol อื่นได้ (default = ทอง; caller เดิมไม่กระทบ)
-    if _cfg.DRY_RUN or shadow:                        # shadow = algo paper-fill (ไม่ใช้ทุน, ไม่วางจริง)
-        tick = mt5.symbol_info_tick(symbol)
-        price = (tick.ask if direction.upper() == "BUY" else tick.bid) if tick else 0.0
-        tag = "SHADOW" if shadow and not _cfg.DRY_RUN else "DRY_RUN"
-        logger.info(f"[{tag}] paper | {symbol} | algo={_algo_label(comment)} | {direction} @ {price:.2f} SL={sl_pips}p TP={tp_pips}p (ไม่วางจริง)")
-        return {"success": True, "ticket": 0, "direction": direction,
-                "lot": 0.0, "price": price, "sl": 0.0, "tp": 0.0, "dry_run": True, "shadow": bool(shadow)}
-
+def _order_setup(direction, sl_pips, tp_pips, comment, min_rr, confidence_scale,
+                 lot, symbol, max_open_override, magic):
+    """[เรียกภายใต้ _mt5_lock] validate + size + สร้าง request. คืน (request, meta) | (None, err_dict).
+    meta = ค่าที่ retry-loop ต้องใช้คำนวณราคาใหม่ (point/stops_min/sl_pips/tp_pips/no_tp/is_buy/symbol/fill_modes)."""
     # Daily trade cap — safety net จุดเดียวคุมทุก market entry รวม path ที่ข้าม gates
     # (zone-break re-entry เรียก open_order ตรง) — gate ใน _run_gates ตัดก่อนถึงนี่อยู่แล้ว
     # per-symbol: cap ของคู่นี้เท่านั้น (ทองเต็ม ไม่ block MSE · MSE เต็ม ไม่ block ทอง)
     _capped, _cap_reason = daily_trade_cap_reached(symbol)
     if _capped:
         logger.warning(f"[TRADE_CAP] {_cap_reason} — block {direction}")
-        return {"success": False, "error": _cap_reason}
+        return None, {"success": False, "error": _cap_reason}
 
     account = mt5.account_info()
     if account is None:
         logger.error("Cannot get account info")
-        return {"success": False, "error": "No account info"}
+        return None, {"success": False, "error": "No account info"}
 
     tick = mt5.symbol_info_tick(symbol)
     if tick is None:
         logger.error(f"Cannot get tick for {symbol}")
-        return {"success": False, "error": "No tick data"}
+        return None, {"success": False, "error": "No tick data"}
 
     sym_info = mt5.symbol_info(symbol)
     point      = sym_info.point
@@ -658,7 +647,7 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
     elif _cfg.NNLB_MODE:
         lot, err = _nnlb_lot_and_check(account.equity, sl_pips)
         if err:
-            return {"success": False, "error": err}
+            return None, {"success": False, "error": err}
     elif getattr(_cfg, "CUSTOM_LOT_ENABLE", False) and _pair_lot_for(symbol) is not None:
         # mode custom lot: lot ต่อคู่ (dashboard) — user เลือกเอง → override FF/global (แต่ยังผ่าน clamp/guards)
         lot = max(_cfg.MIN_LOT, min(_pair_lot_for(symbol), _cfg.MAX_LOT))
@@ -697,7 +686,7 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         tp = 0.0 if no_tp else price - tp_pips * point
         sl, tp = _clamp_stops_level(price, sl, tp, False, no_tp, stops_min, point)
     else:
-        return {"success": False, "error": f"Invalid direction: {direction}"}
+        return None, {"success": False, "error": f"Invalid direction: {direction}"}
 
     if no_tp:
         logger.info("No-TP mode: เปิดออเดอร์โดยไม่ตั้ง TP — รอตั้งภายหลังเมื่อ momentum สงบ")
@@ -713,7 +702,7 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
     base_limit = max_open_override if max_open_override is not None else MONEY_MANAGEMENT["max_open_trades"]
     effective_limit = base_limit + count_protected_slots(symbol)   # ไม้ protected คืน slot (trailing → เข้าเพิ่ม)
     if same_dir_count >= effective_limit:
-        return {"success": False, "error": "Max open trades reached"}
+        return None, {"success": False, "error": "Max open trades reached"}
 
     # ── Capital affordability gate (small-account ruin-guard · sim-derived 08-09) ──
     # ทุน < FLOOR: บล็อกไม้ที่ risk (บาท) > MAX% ของ equity. min-lot ทอง/XAUEUR/pairs กว้าง
@@ -729,7 +718,7 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
                        f"({getattr(_cfg,'CAPITAL_GATE_MAX_RISK_PCT',15):.0f}% ของ equity {account.equity:.0f}) "
                        f"— block ไม้เสี่ยงเกินสำหรับทุนเล็ก")
                 logger.warning(msg)
-                return {"success": False, "error": msg}
+                return None, {"success": False, "error": msg}
 
     if not _cfg.NNLB_MODE:
         # ตรวจ Risk/Reward ratio — ข้ามถ้า no_tp (ไม่มี TP ให้คำนวณ)
@@ -740,7 +729,7 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
             rr = actual_tp_pips / actual_sl_pips if actual_sl_pips > 0 else 0
             if rr < effective_min_rr:
                 logger.warning(f"RR ratio {rr:.2f} ต่ำกว่าขั้นต่ำ {effective_min_rr:.1f} (dynamic)")
-                return {"success": False, "error": f"RR ratio too low: {rr:.2f} (min={effective_min_rr:.1f})"}
+                return None, {"success": False, "error": f"RR ratio too low: {rr:.2f} (min={effective_min_rr:.1f})"}
 
         # ตรวจ margin ก่อนส่ง — คำนวณ margin ที่ต้องการสำหรับ lot นี้
         margin_needed = mt5.order_calc_margin(order_type, symbol, lot, price)
@@ -749,7 +738,7 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
             safe_lot = round((account.equity * 0.9) / (margin_needed / lot), 2) if lot > 0 else 0
             safe_lot = max(_cfg.MIN_LOT, min(safe_lot, lot))
             if safe_lot < _cfg.MIN_LOT:
-                return {"success": False, "error": f"Margin ไม่เพียงพอแม้ใช้ lot ขั้นต่ำ (equity={account.equity:.2f})"}
+                return None, {"success": False, "error": f"Margin ไม่เพียงพอแม้ใช้ lot ขั้นต่ำ (equity={account.equity:.2f})"}
             logger.info(f"ลด lot จาก {lot} → {safe_lot} เนื่องจาก margin จำกัด")
             lot = safe_lot
 
@@ -767,33 +756,66 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         "type_time": mt5.ORDER_TIME_GTC,
         "type_filling": _pick_filling(symbol),
     }
+    meta = {
+        "point": point, "stops_min": stops_min, "sl_pips": sl_pips, "tp_pips": tp_pips,
+        "no_tp": no_tp, "is_buy": direction.upper() == "BUY", "symbol": symbol,
+        "comment": comment, "fill_modes": _filling_modes(symbol),   # broker-supported, best-first
+    }
+    return request, meta
 
-    # ── Send order — retry สำหรับ requote / price_changed ───────────────
-    result    = None
-    last_err  = ""
-    is_buy    = direction.upper() == "BUY"
-    _fill_modes = _filling_modes(symbol)          # broker-supported, best-first; request ตั้ง [0] ไว้แล้ว (_pick_filling)
-    _fill_idx   = 0
 
+def _order_resend(request, meta):
+    """[เรียกภายใต้ _mt5_lock] คำนวณ price/sl/tp ใหม่ที่ราคาสด + re-clamp stops-level → อัปเดต request in-place.
+    คืน request หรือ None ถ้า tick fail. (retry path — B11: sleep อยู่นอก lock ใน caller)."""
+    tick = mt5.symbol_info_tick(meta["symbol"])
+    if tick is None:
+        return None
+    is_buy = meta["is_buy"]; point = meta["point"]
+    sl_pips = meta["sl_pips"]; tp_pips = meta["tp_pips"]; no_tp = meta["no_tp"]
+    price = tick.ask if is_buy else tick.bid
+    sl    = (price - sl_pips * point) if is_buy else (price + sl_pips * point)
+    tp    = (0.0 if no_tp else price + tp_pips * point) if is_buy \
+            else (0.0 if no_tp else price - tp_pips * point)
+    sl, tp = _clamp_stops_level(price, sl, tp, is_buy, no_tp, meta["stops_min"], point)
+    request["price"] = price
+    request["sl"]    = round(sl, 2)
+    request["tp"]    = round(tp, 2)
+    return request
+
+
+def _open_order_fine(direction, sl_pips, tp_pips, comment, min_rr, confidence_scale,
+                     lot, shadow, symbol, max_open_override, magic):
+    """core ของ open_order. lock เฉพาะช่วง mt5.* (setup / ต่อ attempt); _time.sleep อยู่นอก lock.
+    default mode: ถูกครอบด้วย _mt5_lock ก้อนเดียวใน open_order → inner with re-enter (RLock) → ถือ lock
+    ตลอดรวม sleep = พฤติกรรมเดิม 100%. fine mode: ไม่มี outer lock → ปล่อย lock ระหว่าง backoff (guardian รันได้)."""
+    symbol = symbol or SYMBOL                          # multi-symbol: ระบุ symbol อื่นได้ (default = ทอง)
+    if _cfg.DRY_RUN or shadow:                        # shadow = algo paper-fill (ไม่ใช้ทุน, ไม่วางจริง)
+        with _mt5_lock:
+            tick = mt5.symbol_info_tick(symbol)
+        price = (tick.ask if direction.upper() == "BUY" else tick.bid) if tick else 0.0
+        tag = "SHADOW" if shadow and not _cfg.DRY_RUN else "DRY_RUN"
+        logger.info(f"[{tag}] paper | {symbol} | algo={_algo_label(comment)} | {direction} @ {price:.2f} SL={sl_pips}p TP={tp_pips}p (ไม่วางจริง)")
+        return {"success": True, "ticket": 0, "direction": direction,
+                "lot": 0.0, "price": price, "sl": 0.0, "tp": 0.0, "dry_run": True, "shadow": bool(shadow)}
+
+    with _mt5_lock:                                    # setup = atomic (reads/gates/lot/build request)
+        request, meta = _order_setup(direction, sl_pips, tp_pips, comment, min_rr,
+                                     confidence_scale, lot, symbol, max_open_override, magic)
+    if request is None:
+        return meta                                   # meta = err dict
+
+    result = None
+    last_err = ""
+    _fill_idx = 0
     for attempt in range(_MAX_ORDER_RETRIES + 1):
         if attempt > 0:
-            _time.sleep(_RETRY_DELAY_SEC)
-            tick = mt5.symbol_info_tick(symbol)
-            if tick is None:
-                break
-            price = tick.ask if is_buy else tick.bid
-            sl    = (price - sl_pips * point) if is_buy else (price + sl_pips * point)
-            tp    = (0.0 if no_tp else price + tp_pips * point) if is_buy \
-                    else (0.0 if no_tp else price - tp_pips * point)
-            # re-clamp to the broker stops-level at the new price (was skipped before → retry
-            # could submit SL/TP inside the minimum distance and get a hard reject)
-            sl, tp = _clamp_stops_level(price, sl, tp, is_buy, no_tp, stops_min, point)
-            request["price"] = price
-            request["sl"]    = round(sl, 2)
-            request["tp"]    = round(tp, 2)
-            logger.info(f"Order retry {attempt}/{_MAX_ORDER_RETRIES} @ {price:.2f}")
-
-        result = mt5.order_send(request)
+            _time.sleep(_RETRY_DELAY_SEC)             # ← นอก lock (fine mode): guardian รันได้ระหว่าง backoff
+        with _mt5_lock:
+            if attempt > 0:
+                if _order_resend(request, meta) is None:
+                    break                             # tick fail → เลิก retry
+                logger.info(f"Order retry {attempt}/{_MAX_ORDER_RETRIES} @ {request['price']:.2f}")
+            result = mt5.order_send(request)
         if result is None:
             last_err = f"order_send None: {mt5.last_error()}"
             logger.warning(f"order_send returned None (attempt {attempt+1}): {last_err}")
@@ -801,13 +823,13 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         if result.retcode == mt5.TRADE_RETCODE_DONE:
             break
         last_err = f"{result.retcode} — {result.comment}"
-        if result.retcode == mt5.TRADE_RETCODE_INVALID_FILL and _fill_idx + 1 < len(_fill_modes):
-            _fill_idx += 1                          # broker ไม่รับ filling mode นี้ (10030) → ไล่โหมดถัดไปที่รองรับ
-            request["type_filling"] = _fill_modes[_fill_idx]
-            logger.warning(f"[FILL] broker ไม่รับ filling mode (10030) → ลองโหมด {_fill_modes[_fill_idx]}")
+        if result.retcode == mt5.TRADE_RETCODE_INVALID_FILL and _fill_idx + 1 < len(meta["fill_modes"]):
+            _fill_idx += 1                            # broker ไม่รับ filling mode นี้ (10030) → ไล่โหมดถัดไป
+            request["type_filling"] = meta["fill_modes"][_fill_idx]
+            logger.warning(f"[FILL] broker ไม่รับ filling mode (10030) → ลองโหมด {meta['fill_modes'][_fill_idx]}")
             continue
         if result.retcode not in _RETRYABLE_RETCODES:
-            break   # error ถาวร ไม่ต้อง retry
+            break                                     # error ถาวร ไม่ต้อง retry
         logger.warning(f"Order retryable error (attempt {attempt+1}): {last_err}")
 
     if result is None:
@@ -817,10 +839,10 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         logger.error(f"🔴 เข้าไม้ล้มเหลว | {symbol} | algo={_algo_label(comment)} | {direction}: {last_err}")
         return {"success": False, "error": result.comment, "retcode": result.retcode}
 
-    logger.success(f"🟢 เข้าไม้จริง | {symbol} | algo={_algo_label(comment)} | {direction} {lot} lot "
-                   f"@ {price} | SL={sl:.2f} TP={tp:.2f} | ticket={result.order}")
+    logger.success(f"🟢 เข้าไม้จริง | {symbol} | algo={_algo_label(comment)} | {direction} {request['volume']} lot "
+                   f"@ {request['price']} | SL={request['sl']:.2f} TP={request['tp']:.2f} | ticket={result.order}")
 
-    # ขยับ SL ฝั่งตรงข้ามทุก order มาหน้าทุนทันที (ไม่รอ 1000 pips)
+    # ขยับ SL ฝั่งตรงข้ามทุก order มาหน้าทุนทันที (ไม่รอ 1000 pips). self-locked (auto-wrap).
     n = _force_breakeven_opposing(direction, symbol)
     logger.info(f"Force-BE result: {n} opposing position(s) protected after opening {direction}")
 
@@ -828,11 +850,28 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
         "success": True,
         "ticket": result.order,
         "direction": direction,
-        "lot": lot,
-        "price": price,
-        "sl": round(sl, 2),
-        "tp": round(tp, 2),
+        "lot": request["volume"],
+        "price": request["price"],
+        "sl": request["sl"],
+        "tp": request["tp"],
     }
+
+
+def open_order(direction: str, sl_pips: float, tp_pips: float,
+               comment: str = "", min_rr: float | None = None,
+               confidence_scale: float = 1.0, lot: float | None = None,
+               shadow: bool = False, symbol: str | None = None,
+               max_open_override: int | None = None,
+               magic: int | None = None) -> dict:
+    """วาง market order. B11: OPEN_ORDER_FINE_LOCK=true → ปล่อย _mt5_lock ระหว่าง retry-backoff sleep
+    (guardian ไม่ถูก starve). default (false) → ครอบ _mt5_lock ก้อนเดียว = พฤติกรรมเดิม (sleep ใต้ lock).
+    NOTE: open_order ถูกถอดออกจาก auto-wrap list ด้านล่าง — lock จัดการที่นี่/ใน _open_order_fine."""
+    _args = (direction, sl_pips, tp_pips, comment, min_rr, confidence_scale,
+             lot, shadow, symbol, max_open_override, magic)
+    if getattr(_cfg, "OPEN_ORDER_FINE_LOCK", False):
+        return _open_order_fine(*_args)
+    with _mt5_lock:                                   # default: wholesale lock (inner with re-enter → ถือตลอด)
+        return _open_order_fine(*_args)
 
 
 SYSTEM_MAGIC = 20260429   # magic number ที่ระบบ AI ใช้
@@ -2196,7 +2235,8 @@ def get_closed_deal_pnl(order_ticket: int) -> float | None:
 # ปลอดภัยแม้ guardian ปิด: single-thread → lock ว่างเสมอ, overhead ละเลยได้.
 # RLock → ฟังก์ชันที่ถูก wrap เรียกกันเองข้ามชั้นได้ ไม่ deadlock.
 for _fn_name in (
-    "open_order", "_close_position", "get_open_positions", "get_pending_orders",
+    # NOTE: open_order จัดการ lock เอง (B11 fine-grained: sleep นอก lock) — อย่าใส่ที่นี่
+    "_close_position", "get_open_positions", "get_pending_orders",
     "place_pending_order", "cancel_pending_order", "manage_trailing_stop",
     "manage_breakeven", "manage_partial_close", "manage_momentum_exit",
     "manage_zone_break_close", "manage_dynamic_tp", "manage_post_event_tp",
