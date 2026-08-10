@@ -2268,6 +2268,15 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       </div>
     </section>
 
+    <!-- UHAS-style: Scenario plan cards ก/ข/พัก (slice 3) — สังเคราะห์จากแนว S/R + trend, display-only -->
+    <section>
+      <div class="section-title">SCENARIO PLAN &mdash; แผน ก/ข/พัก
+        <span style="font-size:9px;color:var(--muted);font-weight:400;margin-left:6px">(สังเคราะห์จากแนว S/R + เทรนด์ · display เฉยๆ ไม่ใช่คำสั่งเทรด)</span></div>
+      <div id="scenario-cards" style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="card" style="flex:1;min-width:240px;color:var(--muted);padding:10px">รอข้อมูลแนว S/R…</div>
+      </div>
+    </section>
+
     <!-- RIDE COHORT — หน้าปัดการทดลอง MOMENTUM_RIDE (07-03) -->
     <section>
       <div class="section-title">System Trades Cohort &mdash; ไม้ระบบจริง (magic) closed WR/PnL + ล่าสุด</div>
@@ -7045,6 +7054,7 @@ async function loadMonitor() {
     await loadCandles();    // init/refresh กราฟ (throttle ในตัว) — await กัน race ตอนวาดเส้นโซนครั้งแรก
     drawZoneLines(bs);      // ทับโซน AI ลงบนกราฟ
     loadExpMoveBias();      // UHAS-style: expected-move (ATR D1) + macro bias tiles (slice 4)
+    renderScenarioCards(bs); // UHAS-style: scenario cards ก/ข/พัก (slice 3, display จาก S/R+trend)
     loadGateBlocks();
     loadRideStats();
 
@@ -7628,6 +7638,55 @@ async function loadExpMoveBias() {
       set('bias-sub', 'score ' + (s > 0 ? '+' : '') + s + ' (−100..+100)' + (mq.stance ? ' · ' + mq.stance : ''));
     }
   } catch (e) {}
+}
+
+/* ── UHAS-style Scenario cards ก/ข/พัก (slice 3) — สังเคราะห์จาก S/R+trend, display-only (ไม่ใช่คำสั่ง) ── */
+function _scMeta(bs, lvl) {
+  const m = (bs.zones && bs.zones.sr_meta) || [];
+  const hits = m.filter(x => x.level && Math.abs(x.level - lvl) / lvl < 0.001);
+  return hits.length ? hits.reduce((a, b) => (((b.score || b.strength || 0) > (a.score || a.strength || 0)) ? b : a)) : null;
+}
+function _scCard(p) {
+  const dcol = p.dir === 'BUY' ? 'var(--green)' : p.dir === 'SELL' ? 'var(--red)' : 'var(--muted)';
+  const mid = (p.entryLo + p.entryHi) / 2;
+  const rr = (p.sl != null && p.tp != null) ? (Math.abs(p.tp - mid) / Math.max(1e-9, Math.abs(mid - p.sl))) : null;
+  const ez = p.entryLo.toFixed(2) + (p.entryHi && p.entryHi !== p.entryLo ? '–' + p.entryHi.toFixed(2) : '');
+  return `<div class="card" style="flex:1;min-width:240px;padding:10px 12px;border-top:2px solid ${dcol}">
+    <div style="display:flex;align-items:center;gap:6px">
+      <b style="font-size:13px">${p.title}</b>
+      <span style="margin-left:auto;font-family:var(--mono);font-size:12px;color:${dcol};font-weight:700">${p.dir}${p.prob != null ? ' · ' + p.prob + '%' : ''}</span>
+    </div>
+    <div style="font-family:var(--mono);font-size:11px;margin-top:6px;line-height:1.7">
+      <div>โซนเข้า <b style="color:var(--gold)">${ez}</b></div>
+      <div>คัท <b style="color:var(--red)">${p.sl != null ? p.sl.toFixed(2) : '—'}</b> · เป้า <b style="color:var(--green)">${p.tp != null ? p.tp.toFixed(2) : '—'}</b></div>
+      <div>RR <b>${rr != null ? rr.toFixed(2) : '—'}</b>${p.score != null ? ' · score ' + p.score + (p.grade ? ' (' + p.grade + ')' : '') : ''}</div>
+    </div>
+    <div style="font-size:10px;color:var(--text-dim);margin-top:6px">${p.trig || ''}</div>
+  </div>`;
+}
+function renderScenarioCards(bs) {
+  const el = document.getElementById('scenario-cards'); if (!el || !bs) return;
+  const z = bs.zones || {}, px = (bs.price_info && bs.price_info.bid) || null;
+  const trend = String((bs.market && bs.market.trend) || bs.trend || '').toUpperCase();
+  if (!px || (!z.support && !z.resistance)) { el.innerHTML = '<div class="card" style="flex:1;color:var(--muted);padding:10px">รอข้อมูลแนว S/R…</div>'; return; }
+  const sups = (z.support || []).filter(x => x < px).sort((a, b) => b - a);   // ใกล้ราคาก่อน
+  const ress = (z.resistance || []).filter(x => x > px).sort((a, b) => a - b);
+  const band = lv => lv * 0.0006, slBuf = lv => lv * 0.0014;
+  const mkBuy = (s, title) => { if (s == null) return null; const mm = _scMeta(bs, s);
+    return { title, dir: 'BUY', entryLo: s, entryHi: s + band(s), sl: s - slBuf(s), tp: ress[0] || null,
+      score: mm && (mm.score || mm.strength), grade: mm && mm.grade,
+      trig: 'รอราคาแตะโซน ' + s.toFixed(2) + ' แล้วแท่ง 15m ปิดกลับเหนือ ' + (s + band(s)).toFixed(2) }; };
+  const mkSell = (r, title) => { if (r == null) return null; const mm = _scMeta(bs, r);
+    return { title, dir: 'SELL', entryLo: r - band(r), entryHi: r, sl: r + slBuf(r), tp: sups[0] || null,
+      score: mm && (mm.score || mm.strength), grade: mm && mm.grade,
+      trig: 'รอราคาแตะโซน ' + r.toFixed(2) + ' แล้วแท่ง 15m ปิดกลับใต้ ' + (r - band(r)).toFixed(2) }; };
+  let plans = (trend.includes('BEAR') || trend.includes('DOWN'))
+    ? [mkSell(ress[0], 'แผน ก'), mkSell(ress[1], 'แผน ข'), mkBuy(sups[0], 'แผนพัก (สวนทาง)')]
+    : [mkBuy(sups[0], 'แผน ก'), mkBuy(sups[1], 'แผน ข'), mkSell(ress[0], 'แผนพัก (สวนทาง)')];
+  plans = plans.filter(Boolean);
+  const tot = plans.reduce((a, p) => a + (p.score || 0), 0);   // prob สัมพัทธ์จาก score (display เท่านั้น)
+  if (tot > 0) plans.forEach(p => p.prob = Math.round((p.score || 0) / tot * 100));
+  el.innerHTML = plans.length ? plans.map(_scCard).join('') : '<div class="card" style="flex:1;color:var(--muted);padding:10px">ไม่มี setup ชัด — พัก</div>';
 }
 
 /* ── Why No Entry — gate blocks สด (07-03) ── */
