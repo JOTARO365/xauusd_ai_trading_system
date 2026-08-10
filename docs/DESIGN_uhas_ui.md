@@ -77,3 +77,23 @@ UHAS = dark theme + gold accent — **ตรงกับ theme เราอย�
 
 **กติกา:** ทุก slice = additive (element/ฟังก์ชัน/CSS ใหม่), ไม่ลบ/แก้ data flow เดิม,
 ไม่เพิ่ม AI call (compute-in-code จาก data ที่มี), test ว่า dashboard เดิมไม่พัง ก่อนไป slice ถัดไป.
+
+---
+
+## 5. สถานะ (2026-08-10 — ครบทุก slice)
+
+| slice | สถานะ | commit |
+|---|---|---|
+| 1. Chart S/R zone bands | ✅ | 4b93293 |
+| 4. Expected-move + macro-bias tiles | ✅ | 1505fd5 |
+| 3. Scenario cards ก/ข/พัก | ✅ | 4bc69a0 |
+| 2. S/R age + role-flip (sr-level-stats) | ✅ | (sr_stats + expand UI) |
+| pattern-probability (candle_patterns.py + /api/candle-patterns) | ✅ | candle-pattern tile |
+| projected path (dashed arrow → zone ถัดไป) | ✅ | 2bcfb46 |
+
+ทั้งหมด: additive · display-only · 0 AI call · 0 endpoint ที่กระทบของเดิม · CORE INVARIANT ไม่แตะ
+(entry ยังคำนวณจาก data เดิม; ของใหม่ = viz/สถิติให้คนดู). data source ใหม่ที่เพิ่ม:
+`agents/candle_patterns.py` (pattern hit-rate) + age/role-flip ใน `agents/sr_stats.py`.
+
+**ปรับแต่งได้ (ยังไม่ทำ):** band ±% / alpha, prob สัมพัทธ์ของ scenario (ตอนนี้ normalize score ตรงๆ),
+projected path จุดปลาย (ตอนนี้ = zone ถัดไป), pattern เพิ่ม (doji/inside/three-bar).
