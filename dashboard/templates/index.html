@@ -7423,7 +7423,7 @@ async function loadSentimentScore() {
 }
 
 /* ── Price Chart + AI Zones overlay (07-03) — lightweight-charts, data จาก MT5 ── */
-let _chart = null, _candleSeries = null, _zoneLines = [], _clusterLines = [], _chartTf = 'M15', _lastCandleLoad = 0, _chartSym = '';
+let _chart = null, _candleSeries = null, _zoneLines = [], _clusterLines = [], _chartTf = 'M15', _lastCandleLoad = 0, _chartSym = '', _lastCandle = null;
 
 function setChartSym(s) {                       // เลือกคู่ (ว่าง=ทอง). non-gold → ซ่อน overlay AI zones (gold-specific)
   _chartSym = s || '';
@@ -7502,12 +7502,19 @@ function _drawSRZoneBands() {
     ctx.fillStyle = `rgba(${b.rgb},${Math.min(1, b.alpha + 0.5)})`;   // ขอบบน/ล่างเข้มกว่า = อ่านโซนง่าย
     ctx.fillRect(0, y, x1, 1); ctx.fillRect(0, y + hh - 1, x1, 1);
   }
-  // UHAS-style projected path: เส้นประ+หัวลูกศร จากราคาปัจจุบัน → zone ถัดไปตามเทรนด์ (display)
+  // UHAS-style projected path: เส้นประ+หัวลูกศร จาก "แท่งล่าสุดจริง" → zone ถัดไปตามเทรนด์ (display)
   if (_srProjection) {
-    const yF = _candleSeries.priceToCoordinate(_srProjection.from), yT = _candleSeries.priceToCoordinate(_srProjection.to);
+    // anchor ที่ close ของแท่งล่าสุด + x ของแท่งนั้น (ตรงกับแท่งเทียน) — fallback = ราคาปัจจุบันขอบขวา
+    let xA = null, fromPx = _srProjection.from;
+    if (_lastCandle) {
+      try { const xc = _chart.timeScale().timeToCoordinate(_lastCandle.time); if (xc != null) { xA = xc; fromPx = _lastCandle.close; } } catch (e) {}
+    }
+    const yF = _candleSeries.priceToCoordinate(fromPx), yT = _candleSeries.priceToCoordinate(_srProjection.to);
     if (yF != null && yT != null) {
-      const xA = Math.max(0, x1 - Math.min(x1 * 0.35, 220)), xB = x1;
-      const col = _srProjection.to > _srProjection.from ? '34,197,94' : '239,68,68';
+      const xB = x1;
+      if (xA == null) xA = xB - Math.min(x1 * 0.35, 220);
+      xA = Math.max(0, Math.min(xA, xB - 90));           // ยาว ≥90px เสมอ (กันแท่งชิดขอบขวา = arrow สั้นมองไม่เห็น)
+      const col = _srProjection.to > fromPx ? '34,197,94' : '239,68,68';
       ctx.strokeStyle = `rgba(${col},0.8)`; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
       ctx.beginPath(); ctx.moveTo(xA, yF); ctx.lineTo(xB, yT); ctx.stroke(); ctx.setLineDash([]);
       const ang = Math.atan2(yT - yF, xB - xA);                         // หัวลูกศรที่ปลาย
@@ -7540,7 +7547,7 @@ async function loadCandles(force) {
     const r = await fetch('/api/candles?tf=' + _chartTf + '&count=250' + (_chartSym ? '&symbol=' + encodeURIComponent(_chartSym) : ''));
     const d = await r.json();
     if (d.ok && d.candles && d.candles.length) {
-      _candleSeries.setData(d.candles); _setChartMsg(''); _resizeSRZoneCanvas();
+      _candleSeries.setData(d.candles); _lastCandle = d.candles[d.candles.length - 1]; _setChartMsg(''); _resizeSRZoneCanvas();
     } else {
       _setChartMsg('แท่งเทียนไม่มา: ' + (d.error || 'ไม่มีข้อมูล') + ' · SYMBOL=' + (d.symbol || '?'));
     }
