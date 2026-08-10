@@ -1274,7 +1274,7 @@ Risk & sizing (all in `.env` / editable in dashboard Settings):
 | key | default | what |
 |-----|---------|------|
 | `FORCE_CLOSE_MIN_CAPITAL` | 20000 | force-close locks each +100% only while equity < this (compounds small→viable) |
-| `EOD_PROFIT_CLOSE_HOUR_BKK` | 2 | Small-capital no-overnight-carry: while equity < `FORCE_CLOSE_MIN_CAPITAL`, once the clock is past this hour (BKK, UTC+7), the first cycle where the **basket floating PnL (all system positions summed, incl. swap) is > 0** force-closes **every system position** — flat, locking the net gain — once per day. While the basket is ≤ 0 it waits (positions ride their SLs). `-1` disables. |
+| `EOD_PROFIT_CLOSE_HOUR_BKK` | 2 | Small-capital no-overnight-carry: while equity < `FORCE_CLOSE_MIN_CAPITAL`, **during this exact hour** (BKK/UTC+7 — `2` = 02:00–02:59, i.e. 2 AM Thai, **not** 2 PM), the first cycle where the **basket floating PnL (all system positions summed, incl. swap) is > 0** force-closes **every system position** — flat, locking the net gain — once per day. While the basket is ≤ 0 it waits (positions ride their SLs); if never net-positive during that hour it skips the day. `-1` disables. |
 | `CAPITAL_GATE_ENABLE` | false | block entries risking > MAX% of equity while under the floor |
 | `CAPITAL_GATE_FLOOR` | 20000 | capital gate + FF + ATR-SL apply below this equity |
 | `CAPITAL_GATE_MAX_RISK_PCT` | 15 | gate blocks a trade if its THB risk exceeds this % of equity |

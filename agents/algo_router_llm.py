@@ -39,8 +39,9 @@ def _schema():
         reason: str = Field(description="เหตุผลสั้น ภาษาไทย")
 
     class Decision(BaseModel):
-        swaps: List[Swap] = Field(description="รายการ algo:pair ที่ควรเปลี่ยนสถานะ (เฉพาะที่ควรเปลี่ยน ไม่ต้องลิสต์ทั้งหมด)")
-        summary: str = Field(description="สรุปเหตุผลรวม 1-2 ประโยค ภาษาไทย")
+        # default → ถ้า output ถูก truncate (max_tokens) tool-args ที่ไม่ครบจะได้ empty Decision แทน ValidationError crash
+        swaps: List[Swap] = Field(default_factory=list, description="รายการ algo:pair ที่ควรเปลี่ยนสถานะ (เฉพาะที่ควรเปลี่ยน ไม่ต้องลิสต์ทั้งหมด)")
+        summary: str = Field(default="", description="สรุปเหตุผลรวม 1-2 ประโยค ภาษาไทย")
     return Decision
 
 
@@ -51,7 +52,9 @@ def _get_llm():
         from langchain_anthropic import ChatAnthropic
         from config import ANTHROPIC_API_KEY
         _llm = ChatAnthropic(model=getattr(_cfg, "ALGO_ROUTER_MODEL", "claude-sonnet-4-6"),
-                             api_key=ANTHROPIC_API_KEY, max_tokens=700, temperature=0, timeout=60, max_retries=2
+                             api_key=ANTHROPIC_API_KEY,
+                             max_tokens=int(getattr(_cfg, "ALGO_ROUTER_MAX_TOKENS", 1500)),   # 700 เดิม → truncate หลาย swap+summary → parse fail
+                             temperature=0, timeout=60, max_retries=2
                              ).with_structured_output(_schema(), include_raw=True)
     return _llm
 

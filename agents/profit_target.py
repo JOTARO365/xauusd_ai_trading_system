@@ -50,17 +50,17 @@ def _close_pos(mt5, pos, comment="PROFIT-TARGET"):
 
 
 def _eod_flush(mt5, system_magic, st):
-    """ทุนน้อยไม่ถือข้ามวัน: หลังชั่วโมง cutoff (BKK, UTC+7) ของแต่ละวัน ถ้า **basket floating PnL รวม > 0**
-    → ปิดไม้ระบบ **ทุกไม้** (flat, lock กำไรสุทธิ) ครั้งเดียว/วัน. basket ≤ 0 = ยังไม่ปิด (รอ SL / รอบวก).
-    stamp เฉพาะเมื่อ flush จริง → เลย cutoff แล้วยังลบก็คอยเช็คต่อจนบวกครั้งแรกค่อยปิด.
-    คืน dict เมื่อปิดจริง (short-circuit tick), None เมื่อยังไม่ถึง/flush แล้ว/basket ยังไม่บวก."""
+    """ทุนน้อยไม่ถือข้ามวัน: **ในชั่วโมง cutoff** (BKK=UTC+7 เช่น 02:00–02:59 = ตี 2 ไทย) ของแต่ละวัน
+    ถ้า **basket floating PnL รวม > 0** → ปิดไม้ระบบ **ทุกไม้** (flat, lock กำไรสุทธิ) ครั้งเดียว/วัน.
+    basket ≤ 0 = ยังไม่ปิด (รอ SL / รอบวกในชั่วโมงนั้น). stamp เฉพาะเมื่อ flush จริง (กัน repeat วันนั้น).
+    คืน dict เมื่อปิดจริง (short-circuit tick), None เมื่อไม่ใช่ชั่วโมง cutoff/flush แล้ว/basket ยังไม่บวก."""
     hour = int(_cfg("EOD_PROFIT_CLOSE_HOUR_BKK", 2))
     if hour < 0:
         return None                                          # ปิดฟีเจอร์
     from datetime import timedelta
     now_bkk = datetime.now(timezone.utc) + timedelta(hours=7)
-    if now_bkk.hour < hour:
-        return None                                          # ยังไม่ถึงเวลา cutoff ของวันนี้
+    if now_bkk.hour != hour:
+        return None                                          # ยิงเฉพาะ"ชั่วโมง" cutoff (เช่น 02:00–02:59 = ตี 2 ไทย) — ไม่ใช่ทั้งวันหลังจากนั้น
     day = now_bkk.date().isoformat()
     if st.get("last_eod_flush") == day:
         return None                                          # flush วันนี้ไปแล้ว
