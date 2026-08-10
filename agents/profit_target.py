@@ -50,9 +50,10 @@ def _close_pos(mt5, pos, comment="PROFIT-TARGET"):
 
 
 def _eod_flush(mt5, system_magic, st):
-    """ทุนน้อยไม่ถือกำไรข้ามวัน: รอบแรกที่เลยชั่วโมง cutoff (BKK, UTC+7) ของแต่ละวัน → ปิดไม้ระบบที่กำไร
-    ทั้งหมดครั้งเดียว (lock carry ข้ามคืน). stamp วันที่กัน repeat + กันปิดกำไร intraday ที่เกิดหลัง flush.
-    คืน dict เมื่อปิดจริง (short-circuit tick), None เมื่อยังไม่ถึง/flush แล้ว/ไม่มีไม้กำไร (แต่ stamp แล้ว)."""
+    """ทุนน้อยไม่ถือข้ามวัน: หลังชั่วโมง cutoff (BKK, UTC+7) ของแต่ละวัน ถ้า **basket floating PnL รวม > 0**
+    → ปิดไม้ระบบ **ทุกไม้** (flat, lock กำไรสุทธิ) ครั้งเดียว/วัน. basket ≤ 0 = ยังไม่ปิด (รอ SL / รอบวก).
+    stamp เฉพาะเมื่อ flush จริง → เลย cutoff แล้วยังลบก็คอยเช็คต่อจนบวกครั้งแรกค่อยปิด.
+    คืน dict เมื่อปิดจริง (short-circuit tick), None เมื่อยังไม่ถึง/flush แล้ว/basket ยังไม่บวก."""
     hour = int(_cfg("EOD_PROFIT_CLOSE_HOUR_BKK", 2))
     if hour < 0:
         return None                                          # ปิดฟีเจอร์
@@ -63,17 +64,20 @@ def _eod_flush(mt5, system_magic, st):
     day = now_bkk.date().isoformat()
     if st.get("last_eod_flush") == day:
         return None                                          # flush วันนี้ไปแล้ว
-    winners = [p for p in (mt5.positions_get() or [])
-               if system_magic <= p.magic <= system_magic + 9999 and float(p.profit) > 0]
-    closed = sum(1 for p in winners if _close_pos(mt5, p, comment="EOD-PROFIT"))
-    st["last_eod_flush"] = day                               # stamp เสมอ (แม้ 0 ไม้) กัน re-scan + ปิด intraday หลัง flush
-    st["last_eod"] = {"at": now_bkk.isoformat(), "hour_bkk": hour, "winners": len(winners), "closed": closed}
+    ps = [p for p in (mt5.positions_get() or []) if system_magic <= p.magic <= system_magic + 9999]
+    if not ps:
+        return None                                          # ไม่มีไม้ระบบ → ไม่ stamp (รอไม้ + basket บวกค่อยปิด)
+    basket = sum(float(p.profit) + float(p.swap) for p in ps)
+    if basket <= 0:
+        return None                                          # basket ยังไม่บวก → ไม่ปิด/ไม่ stamp (คอยเช็คจนบวกครั้งแรก)
+    closed = sum(1 for p in ps if _close_pos(mt5, p, comment="EOD-PROFIT"))
+    st["last_eod_flush"] = day                               # stamp เมื่อ flush จริง (basket บวก) → กัน repeat วันนี้
+    st["last_eod"] = {"at": now_bkk.isoformat(), "hour_bkk": hour, "positions": len(ps),
+                      "closed": closed, "basket_pnl": round(basket, 2)}
     _save(st)
-    if closed:
-        logger.warning("[EOD-PROFIT] 🌙 %02d:00 BKK — ทุนน้อยไม่ถือกำไรข้ามวัน → ปิด %d/%d ไม้กำไร" % (
-            hour, closed, len(winners)))
-        return {"ok": True, "eod_flush": True, "closed": closed, "winners": len(winners)}
-    return None                                              # ไม่มีไม้กำไร → stamp แล้ว ปล่อย tick ทำ lock-100% ต่อ
+    logger.warning("[EOD-PROFIT] 🌙 %02d:00 BKK — ทุนน้อยไม่ถือข้ามวัน · basket +%.2f → ปิดทุกไม้ %d/%d" % (
+        hour, basket, closed, len(ps)))
+    return {"ok": True, "eod_flush": True, "closed": closed, "positions": len(ps), "basket_pnl": round(basket, 2)}
 
 
 def tick():
