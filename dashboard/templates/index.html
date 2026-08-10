@@ -2253,6 +2253,19 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
         </div>
         <div id="price-chart-msg" style="display:none;color:var(--red);font-family:var(--mono);font-size:12px;padding:8px 4px"></div>
       </div>
+      <!-- UHAS-style: Expected-move + Macro-bias tiles (slice 4, compute-in-code จาก /api/candles ATR + /api/macro-quant) -->
+      <div id="expmove-strip" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <div class="card" style="flex:1;min-width:200px;padding:8px 11px">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:.6px">EXPECTED MOVE &middot; ATR(14) D1</div>
+          <div id="expmove-val" style="font-family:var(--mono);font-size:15px;color:var(--gold);font-weight:700">&mdash;</div>
+          <div id="expmove-sub" style="font-size:10px;color:var(--text-dim)">&mdash;</div>
+        </div>
+        <div class="card" style="flex:1;min-width:200px;padding:8px 11px">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:.6px">MACRO BIAS &middot; gold</div>
+          <div id="bias-val" style="font-family:var(--mono);font-size:15px;font-weight:700">&mdash;</div>
+          <div id="bias-sub" style="font-size:10px;color:var(--text-dim)">&mdash;</div>
+        </div>
+      </div>
     </section>
 
     <!-- RIDE COHORT — หน้าปัดการทดลอง MOMENTUM_RIDE (07-03) -->
@@ -7031,6 +7044,7 @@ async function loadMonitor() {
     populateChartSymbols();  // อัปเดตรายการคู่ที่เปิด live/open (dropdown)
     await loadCandles();    // init/refresh กราฟ (throttle ในตัว) — await กัน race ตอนวาดเส้นโซนครั้งแรก
     drawZoneLines(bs);      // ทับโซน AI ลงบนกราฟ
+    loadExpMoveBias();      // UHAS-style: expected-move (ATR D1) + macro bias tiles (slice 4)
     loadGateBlocks();
     loadRideStats();
 
@@ -7590,6 +7604,30 @@ function drawZoneLines(bs) {
   (z.support || []).forEach(lv => mkBand(lv, '34,197,94'));
   _srZoneBands = bands;
   _drawSRZoneBands();
+}
+
+/* ── UHAS-style Expected-move + Macro-bias tiles (slice 4) — compute-in-code, 0 endpoint ใหม่ ── */
+async function loadExpMoveBias() {
+  const set = (id, t, col) => { const e = document.getElementById(id); if (e) { e.textContent = t; if (col) e.style.color = col; } };
+  try {                                                   // expected daily move = ATR(14) จาก D1 candles ที่มีอยู่
+    const cr = await (await fetch('/api/candles?tf=D1&count=20' + (_chartSym ? '&symbol=' + encodeURIComponent(_chartSym) : ''))).json();
+    if (cr.ok && cr.candles && cr.candles.length > 15) {
+      const c = cr.candles, trs = [];
+      for (let i = 1; i < c.length; i++) trs.push(Math.max(c[i].high - c[i].low, Math.abs(c[i].high - c[i-1].close), Math.abs(c[i].low - c[i-1].close)));
+      const n = 14, atr = trs.slice(-n).reduce((a, b) => a + b, 0) / n;
+      const close = c[c.length-1].close, pts = Math.round(atr * 100), pct = atr / close * 100;
+      set('expmove-val', '$' + atr.toFixed(2) + ' · ' + pts.toLocaleString() + ' จุด');
+      set('expmove-sub', '~' + pct.toFixed(2) + '% ต่อวัน · close ' + close.toFixed(2));
+    }
+  } catch (e) {}
+  try {                                                   // macro bias จาก /api/macro-quant (มีอยู่แล้ว)
+    const mq = await (await fetch('/api/macro-quant')).json();
+    if (mq && mq.ok !== false && typeof mq.score === 'number') {
+      const s = mq.score, up = Math.round(50 + s / 2), col = s > 15 ? 'var(--green)' : s < -15 ? 'var(--red)' : 'var(--muted)';
+      set('bias-val', (mq.bias || 'NEUTRAL') + ' · ' + up + '% up', col);
+      set('bias-sub', 'score ' + (s > 0 ? '+' : '') + s + ' (−100..+100)' + (mq.stance ? ' · ' + mq.stance : ''));
+    }
+  } catch (e) {}
 }
 
 /* ── Why No Entry — gate blocks สด (07-03) ── */
