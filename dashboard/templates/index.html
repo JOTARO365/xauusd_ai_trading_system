@@ -7253,7 +7253,10 @@ async function toggleSrDetail(id, sym, lv, kind) {
        <div>เด้งแล้วไปเฉลี่ย <b>$${d.bounce_avg ?? '—'}</b> (สูงสุด $${d.bounce_max ?? '—'}) · ทะลุไปต่อเฉลี่ย <b>$${d.break_avg ?? '—'}</b></div>
        <div>แตะ 5 ครั้งล่าสุด: ${rec || '—'}</div>
        <div>ตามช่วง (hold%): ${sess || '—'}</div>
-       <div style="opacity:.65">แตะล่าสุด ${d.bars_since_touch} แท่ง H1 ก่อน</div>`;
+       <div style="opacity:.65">อายุแนว <b>${d.age_bars ?? '—'}</b> แท่ง · แตะล่าสุด ${d.bars_since_touch} แท่ง H1 ก่อน</div>
+       <div style="opacity:.75">${d.role_flip
+         ? `<b style="color:var(--gold)">⇄ พลิกบทบาท</b> — เคยเป็น${d.role_was === 'S' ? 'แนวรับ' : 'แนวต้าน'} → ตอนนี้${d.role_now === 'S' ? 'แนวรับ' : 'แนวต้าน'}`
+         : `บทบาทคงที่ (${d.role_now === 'S' ? 'แนวรับ' : 'แนวต้าน'})`}</div>`;
   } catch (_e) { el.innerHTML = '<span style="color:var(--muted)">โหลดสถิติไม่ได้</span>'; }
 }
 

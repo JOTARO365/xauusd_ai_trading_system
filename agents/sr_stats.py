@@ -86,6 +86,14 @@ def level_touch_stats(symbol, level, side, count=2000, zone_pct=0.003,
                 for s, d in by_sess.items()}
         last_ts = max(t["ts"] for t in touches)
         bars_since = sum(1 for x in times if int(x) > last_ts)
+        # age = จำนวนบาร์ตั้งแต่แตะครั้งแรก (อายุแนว) · role-flip = บทบาทเปลี่ยน (เคยรับ→ต้าน / ต้าน→รับ)
+        first_ts = min(t["ts"] for t in touches)
+        age_bars = sum(1 for x in times if int(x) >= first_ts)
+        cur = float(closes[-1])
+        role_now = "S" if cur > level else "R"           # ราคาอยู่เหนือแนว = แนวรับ · ใต้ = แนวต้าน
+        half = max(1, n // 2)
+        past_above = int((closes[:half] > level).sum())
+        role_was = "S" if past_above > (half - past_above) else "R"
         return {
             "ok": True, "symbol": symbol, "level": round(level, 3), "side": side, "n_touches": nt,
             "held": len(bounces), "broke": len(breaks),
@@ -94,6 +102,7 @@ def level_touch_stats(symbol, level, side, count=2000, zone_pct=0.003,
             "bounce_avg_pips": round(_avg(bounce_moves) / point) if bounce_moves else None,
             "break_avg_pips": round(_avg(break_moves) / point) if break_moves else None,
             "recent": recent, "by_session": sess, "bars_since_touch": bars_since,
+            "age_bars": age_bars, "role_now": role_now, "role_was": role_was, "role_flip": role_was != role_now,
         }
     except Exception as e:
         return {"error": str(e)[:120]}
