@@ -5649,11 +5649,12 @@ function renderFeed() {
    MANUAL RANGE
    ════════════════════════════════════════════════════════════ */
 async function loadManualRange() {
+  const wrap = document.getElementById('range-bar-wrap');
+  const statusEl = document.getElementById('range-status');
+  if (!wrap || !statusEl) return;   // public: manual-range section ถูกตัด → no-op (กัน 404 + null.style)
   try {
     const res  = await fetch('/api/manual-range');
     const data = await res.json();
-    const wrap = document.getElementById('range-bar-wrap');
-    const statusEl = document.getElementById('range-status');
     if (data.active && data.high && data.low) {
       document.getElementById('range-high').value = data.high;
       document.getElementById('range-low').value  = data.low;
@@ -6253,7 +6254,7 @@ function drawZoneLines(bs) {
   if (kl.pdh) add(kl.pdh, 'rgba(245,158,11,0.85)', 'PDH', 1, LightweightCharts.LineStyle.Dotted, true);
   if (kl.pdl) add(kl.pdl, 'rgba(245,158,11,0.85)', 'PDL', 1, LightweightCharts.LineStyle.Dotted, true);
   const htf = z.htf_zone;
-  if (htf && htf.level) add(htf.level, '#4ade80', '<svg class="ic"><use href="#ic-star"/></svg> ' + htf.tf, 3, LightweightCharts.LineStyle.Solid, true);
+  if (htf && htf.level) add(htf.level, '#4ade80', '★ ' + htf.tf, 3, LightweightCharts.LineStyle.Solid, true);  // chart price-line label = plain text → ใช้ ★ ไม่ยัด svg-icon (render literal)
   // UHAS-style: สร้างแถบ zone (band) จาก level เดิม — ±0.06% เป็นความหนาโซน, alpha ∝ strength% (additive, ไม่แตะเส้น)
   const bands = [];
   const mkBand = (lv, rgb) => {
