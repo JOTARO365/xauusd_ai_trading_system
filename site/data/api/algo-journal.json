@@ -1,0 +1,73 @@
+{
+ "combined": {
+  "avg_mae_R": -1.33,
+  "avg_mfe_R": 0.37,
+  "by_result": {
+   "SL": 2104,
+   "TIMEOUT": 0,
+   "TP": 31
+  },
+  "exp_R": -0.983,
+  "n_closed": 2135,
+  "n_open": 1,
+  "sigma_R": 0.357,
+  "sum_R": -2099.18,
+  "win_rate": 0.015
+ },
+ "fade": {
+  "avg_mae_R": -1.33,
+  "avg_mfe_R": 0.36,
+  "by_result": {
+   "SL": 2098,
+   "TIMEOUT": 0,
+   "TP": 28
+  },
+  "exp_R": -0.987,
+  "n_closed": 2126,
+  "n_open": 0,
+  "sigma_R": 0.34,
+  "sum_R": -2099.06,
+  "win_rate": 0.013
+ },
+ "momentum": {
+  "avg_mae_R": -0.83,
+  "avg_mfe_R": 1.13,
+  "by_result": {
+   "SL": 6,
+   "TIMEOUT": 0,
+   "TP": 3
+  },
+  "exp_R": -0.013,
+  "n_closed": 9,
+  "n_open": 1,
+  "sigma_R": 1.501,
+  "sum_R": -0.11,
+  "win_rate": 0.333
+ },
+ "needed_n": {
+  "δ=0.2": 389,
+  "δ=0.3": 173
+ },
+ "note": "counterfactual (signal) + pending (lifecycle จริง placed→fill→TP/SL) net cost 30p",
+ "ok": true,
+ "pending": {
+  "avg_mae_R": -1.34,
+  "avg_mfe_R": 0.69,
+  "by_mode": {
+   "FADE": 5,
+   "STOP": 0
+  },
+  "by_result": {
+   "SL": 5,
+   "TIMEOUT": 0,
+   "TP": 0
+  },
+  "exp_R": -1.036,
+  "expired": 5,
+  "n_closed": 5,
+  "n_open": 0,
+  "sigma_R": 0.003,
+  "sum_R": -5.18,
+  "win_rate": 0.0
+ }
+}

@@ -1,0 +1,38 @@
+{
+ "moves": {
+  "AUDUSD": {
+   "last": 0.706,
+   "pct": 0.08
+  },
+  "EURUSD": {
+   "last": 1.154,
+   "pct": 0.04
+  },
+  "USDCHF": {
+   "last": 0.81,
+   "pct": -0.01
+  },
+  "USDJPY": {
+   "last": 159.213,
+   "pct": -0.04
+  },
+  "XAGUSD": {
+   "last": 65.754,
+   "pct": 0.07
+  },
+  "XAUEUR": {
+   "last": 3809.05,
+   "pct": 0.15
+  },
+  "XAUJPY": {
+   "last": 700194.0,
+   "pct": 0.12
+  },
+  "XAUUSD": {
+   "last": 4397.67,
+   "pct": 0.17
+  }
+ },
+ "ok": true,
+ "stale_s": -771
+}

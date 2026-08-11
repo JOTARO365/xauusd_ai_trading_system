@@ -1,0 +1,29 @@
+{
+ "cb_stance": {
+  "USD": {
+   "dir": "on hold",
+   "rate": 3.63
+  }
+ },
+ "events": [
+  {
+   "ccy": "USD",
+   "forecast": "0.2%",
+   "impact": "high",
+   "lat": 38.8928,
+   "lng": -77.0455,
+   "name": "Core CPI m/m",
+   "ts": "2026-08-12T08:30:00-04:00"
+  },
+  {
+   "ccy": "GBP",
+   "forecast": "-0.1%",
+   "impact": "high",
+   "lat": 51.5142,
+   "lng": -0.0882,
+   "name": "GDP m/m",
+   "ts": "2026-08-13T02:00:00-04:00"
+  }
+ ],
+ "ok": true
+}

@@ -1,0 +1,18 @@
+{
+ "stats": {
+  "avg_loss": 0,
+  "avg_win": 0,
+  "entry_type_stats": {},
+  "losing_streak": 0,
+  "losses": 0,
+  "manual_count": 0,
+  "manual_winrate": 0,
+  "system_count": 0,
+  "system_winrate": 0,
+  "today_trades": 0,
+  "total": 0,
+  "win_rate": 0,
+  "wins": 0
+ },
+ "trades": []
+}

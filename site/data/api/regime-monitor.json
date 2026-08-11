@@ -1,0 +1,13 @@
+{
+ "generated": "2026-08-10T23:47:14.357674+00:00",
+ "n": 0,
+ "needed": {
+  "δ=0.15": 692,
+  "δ=0.2": 389,
+  "δ=0.3": 173
+ },
+ "ok": true,
+ "sigma_R": 1.41,
+ "strategy": "momentum_breakout (TREND)",
+ "verdict": "ยังไม่มีไม้ ALGO — เปิด REGIME_LIVE แล้วรอเก็บ"
+}

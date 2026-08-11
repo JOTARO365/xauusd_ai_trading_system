@@ -1,0 +1,25 @@
+{
+ "cpi_yoy": 3.53,
+ "fed_dir": "on hold",
+ "fed_funds": 3.63,
+ "history": [
+  {
+   "date": "2026-07-23",
+   "kind": [
+    "sentiment_tilt_flip"
+   ]
+  }
+ ],
+ "ok": true,
+ "real_rate": 0.1,
+ "real_rate_sign": "positive",
+ "sentiment_tilt": "neutral",
+ "shift": {
+  "active": false,
+  "from": null,
+  "kind": [],
+  "since": null,
+  "to": null
+ },
+ "updated": "2026-07-24T01:51:02Z"
+}

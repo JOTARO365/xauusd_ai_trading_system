@@ -1,0 +1,21 @@
+{
+ "ok": true,
+ "symbols": [
+  {
+   "label": "XAUUSD · LIVE",
+   "logical": "XAUUSD"
+  },
+  {
+   "label": "EURUSD · LIVE",
+   "logical": "EURUSD"
+  },
+  {
+   "label": "BTCUSD · LIVE",
+   "logical": "BTCUSD"
+  },
+  {
+   "label": "WTIUSD · LIVE",
+   "logical": "WTIUSD"
+  }
+ ]
+}

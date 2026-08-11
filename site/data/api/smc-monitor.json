@@ -1,0 +1,137 @@
+{
+ "fvg": [
+  {
+   "age_bars": 0,
+   "bot": 4349.85,
+   "dir": "bull",
+   "mid": 4350.68,
+   "size_pips": 165,
+   "tf": "H4",
+   "top": 4351.5
+  },
+  {
+   "age_bars": 8,
+   "bot": 4268.87,
+   "dir": "bull",
+   "mid": 4284.9,
+   "size_pips": 3206,
+   "tf": "H4",
+   "top": 4300.93
+  },
+  {
+   "age_bars": 9,
+   "bot": 4252.98,
+   "dir": "bull",
+   "mid": 4257.36,
+   "size_pips": 876,
+   "tf": "H4",
+   "top": 4261.74
+  },
+  {
+   "age_bars": 19,
+   "bot": 4179.34,
+   "dir": "bull",
+   "mid": 4181.45,
+   "size_pips": 423,
+   "tf": "H4",
+   "top": 4183.57
+  },
+  {
+   "age_bars": 1,
+   "bot": 4382.81,
+   "dir": "bull",
+   "mid": 4384.17,
+   "size_pips": 272,
+   "tf": "H1",
+   "top": 4385.53
+  },
+  {
+   "age_bars": 2,
+   "bot": 4365.34,
+   "dir": "bull",
+   "mid": 4371.91,
+   "size_pips": 1314,
+   "tf": "H1",
+   "top": 4378.48
+  },
+  {
+   "age_bars": 6,
+   "bot": 4339.64,
+   "dir": "bull",
+   "mid": 4341.41,
+   "size_pips": 353,
+   "tf": "H1",
+   "top": 4343.17
+  },
+  {
+   "age_bars": 37,
+   "bot": 4280.31,
+   "dir": "bull",
+   "mid": 4281.52,
+   "size_pips": 243,
+   "tf": "H1",
+   "top": 4282.74
+  }
+ ],
+ "liquidity": [
+  {
+   "dist_pips": 143,
+   "level": 4400.0,
+   "name": "R4400",
+   "side": "above"
+  },
+  {
+   "dist_pips": 352,
+   "level": 4395.05,
+   "name": "PDH",
+   "side": "below"
+  },
+  {
+   "dist_pips": 857,
+   "level": 4390.0,
+   "name": "R4390",
+   "side": "below"
+  },
+  {
+   "dist_pips": 1143,
+   "level": 4410.0,
+   "name": "R4410",
+   "side": "above"
+  },
+  {
+   "dist_pips": 1857,
+   "level": 4380.0,
+   "name": "R4380",
+   "side": "below"
+  },
+  {
+   "dist_pips": 2143,
+   "level": 4420.0,
+   "name": "R4420",
+   "side": "above"
+  },
+  {
+   "dist_pips": 4857,
+   "level": 4350.0,
+   "name": "R4350",
+   "side": "below"
+  },
+  {
+   "dist_pips": 5143,
+   "level": 4450.0,
+   "name": "R4450",
+   "side": "above"
+  },
+  {
+   "dist_pips": 8530,
+   "level": 4313.27,
+   "name": "PDL",
+   "side": "below"
+  }
+ ],
+ "note": "SMC = บริบท/เฝ้าดูเท่านั้น ไม่ป้อน entry (backtest: ไม่มี edge หลัง cost)",
+ "ok": true,
+ "price": 4398.57,
+ "regime": "TREND",
+ "sweep": null
+}

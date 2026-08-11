@@ -1,0 +1,57 @@
+{
+ "generated": "2026-08-10T23:47:14.343488+00:00",
+ "historical": {
+  "bars": 70000,
+  "cost_pips": 30,
+  "regimes": [
+   {
+    "algo": "momentum_breakout",
+    "breakeven_wr": 0.349,
+    "exp_R": -0.054,
+    "freq_pct": 12.7,
+    "grade": "C",
+    "n": 1575,
+    "note": "ยังไม่มี edge (−EV หลัง cost)",
+    "psr0": 0.067,
+    "regime": "TREND",
+    "score": 39,
+    "sharpe": -0.038,
+    "wr": 0.331
+   },
+   {
+    "algo": "STAND-DOWN",
+    "freq_pct": 18.6,
+    "grade": "—",
+    "n": 0,
+    "note": "ยืนดู (ไม่เทรด) — ทอง high-vol/ไร้ทิศ = −EV",
+    "regime": "RANGE",
+    "score": null
+   },
+   {
+    "algo": "STAND-DOWN",
+    "freq_pct": 20.5,
+    "grade": "—",
+    "n": 0,
+    "note": "ยืนดู (ไม่เทรด) — ทอง high-vol/ไร้ทิศ = −EV",
+    "regime": "RISK-OFF",
+    "score": null
+   },
+   {
+    "algo": "STAND-DOWN",
+    "freq_pct": 48.2,
+    "grade": "—",
+    "n": 0,
+    "note": "ยืนดู (ไม่เทรด) — ทอง high-vol/ไร้ทิศ = −EV",
+    "regime": "NEUTRAL",
+    "score": null
+   }
+  ]
+ },
+ "instrument": "XAUUSD H1",
+ "ok": true,
+ "verdict": "ยังไม่มี regime ไหนมี edge (ทุกตัว −EV หลัง cost) — เก็บ shadow ต่อก่อน flip live",
+ "weekly": {
+  "note": "ยังไม่มีไม้ ALGO ปิดจริง (หรือ MT5 ไม่พร้อม)",
+  "weeks": []
+ }
+}

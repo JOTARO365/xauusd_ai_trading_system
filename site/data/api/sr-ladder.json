@@ -1,0 +1,298 @@
+{
+ "ok": true,
+ "point": 0.01,
+ "price": 4398.17,
+ "symbol": "XAUUSD",
+ "zones": {
+  "htf_zone": null,
+  "resistance": [
+   4595.04,
+   4580.05,
+   4570.65,
+   4541.29,
+   4515.2
+  ],
+  "setups": [],
+  "sr_meta": [
+   {
+    "avg_bounce": 93.3,
+    "bars_since_touch": 283,
+    "bounce_pct": 9,
+    "break_hold": null,
+    "break_pct": 91,
+    "grade": "C",
+    "level": 4515.2,
+    "n_tests": 11,
+    "score": 54,
+    "side": "R",
+    "strength": 50,
+    "tf": "H4",
+    "touches": 11,
+    "why": "H4 swing · แตะ 11 ครั้ง — ใกล้สึก/เสี่ยงทะลุ"
+   },
+   {
+    "avg_bounce": 117.1,
+    "bars_since_touch": 296,
+    "bounce_pct": 56,
+    "break_hold": null,
+    "break_pct": 44,
+    "grade": "B",
+    "level": 4541.29,
+    "n_tests": 9,
+    "score": 59,
+    "side": "R",
+    "strength": 50,
+    "tf": "H4",
+    "touches": 9,
+    "why": "H4 swing · แตะ 9 ครั้ง — ใกล้สึก/เสี่ยงทะลุ"
+   },
+   {
+    "avg_bounce": 92.3,
+    "bars_since_touch": 306,
+    "bounce_pct": 100,
+    "break_hold": null,
+    "break_pct": 0,
+    "grade": "A",
+    "level": 4570.65,
+    "n_tests": 6,
+    "score": 79,
+    "side": "R",
+    "strength": 68,
+    "tf": "H4",
+    "touches": 6,
+    "why": "H4 swing · แตะ 6 ครั้ง (proven)"
+   },
+   {
+    "avg_bounce": 105.7,
+    "bars_since_touch": 306,
+    "bounce_pct": 100,
+    "break_hold": null,
+    "break_pct": 0,
+    "grade": "A",
+    "level": 4580.05,
+    "n_tests": 6,
+    "score": 79,
+    "side": "R",
+    "strength": 68,
+    "tf": "H4",
+    "touches": 6,
+    "why": "H4 swing · แตะ 6 ครั้ง (proven)"
+   },
+   {
+    "avg_bounce": 136.4,
+    "bars_since_touch": 306,
+    "bounce_pct": 100,
+    "break_hold": null,
+    "break_pct": 0,
+    "grade": "A",
+    "level": 4595.04,
+    "n_tests": 4,
+    "score": 84,
+    "side": "R",
+    "strength": 75,
+    "tf": "H4",
+    "touches": 4,
+    "why": "H4 swing · แตะ 4 ครั้ง (proven)"
+   },
+   {
+    "avg_bounce": 27.6,
+    "bars_since_touch": 2,
+    "bounce_pct": 22,
+    "break_hold": {
+     "closes": 1,
+     "status": "wick"
+    },
+    "break_pct": 78,
+    "grade": "B",
+    "level": 4366.27,
+    "n_tests": 9,
+    "score": 64,
+    "side": "S",
+    "strength": 55,
+    "tf": "H4",
+    "touches": 9,
+    "why": "H4 swing · แตะ 9 ครั้ง — ใกล้สึก/เสี่ยงทะลุ · ≈PDH"
+   },
+   {
+    "avg_bounce": 68.9,
+    "bars_since_touch": 11,
+    "bounce_pct": 29,
+    "break_hold": null,
+    "break_pct": 71,
+    "grade": "B",
+    "level": 4268.45,
+    "n_tests": 7,
+    "score": 55,
+    "side": "S",
+    "strength": 50,
+    "tf": "H4",
+    "touches": 7,
+    "why": "H4 swing · แตะ 7 ครั้ง — ใกล้สึก/เสี่ยงทะลุ"
+   },
+   {
+    "avg_bounce": 79.6,
+    "bars_since_touch": 14,
+    "bounce_pct": 25,
+    "break_hold": null,
+    "break_pct": 75,
+    "confluence": {
+     "count": 1,
+     "with": [
+      "H1 S"
+     ]
+    },
+    "grade": "B",
+    "level": 4223.22,
+    "n_tests": 8,
+    "score": 68,
+    "side": "S",
+    "strength": 55,
+    "tf": "H4",
+    "touches": 8,
+    "why": "H4 swing · แตะ 8 ครั้ง — ใกล้สึก/เสี่ยงทะลุ · ≈PDL"
+   },
+   {
+    "avg_bounce": 113.4,
+    "bars_since_touch": 23,
+    "bounce_pct": 25,
+    "break_hold": null,
+    "break_pct": 75,
+    "confluence": {
+     "count": 1,
+     "with": [
+      "H1 S"
+     ]
+    },
+    "grade": "B",
+    "level": 4121.48,
+    "n_tests": 16,
+    "score": 64,
+    "side": "S",
+    "strength": 50,
+    "tf": "H4",
+    "touches": 16,
+    "why": "H4 swing · แตะ 16 ครั้ง — ใกล้สึก/เสี่ยงทะลุ"
+   },
+   {
+    "avg_bounce": 99.0,
+    "bars_since_touch": 32,
+    "bounce_pct": 42,
+    "break_hold": null,
+    "break_pct": 58,
+    "grade": "B",
+    "level": 4023.73,
+    "n_tests": 19,
+    "score": 57,
+    "side": "S",
+    "strength": 50,
+    "tf": "H4",
+    "touches": 19,
+    "why": "H4 swing · แตะ 19 ครั้ง — ใกล้สึก/เสี่ยงทะลุ"
+   },
+   {
+    "avg_bounce": 52.1,
+    "bars_since_touch": 11,
+    "bounce_pct": 83,
+    "break_hold": null,
+    "break_pct": 17,
+    "grade": "B",
+    "level": 4316.53,
+    "n_tests": 6,
+    "score": 67,
+    "side": "S",
+    "strength": 58,
+    "tf": "H1",
+    "touches": 6,
+    "why": "H1 swing · แตะ 6 ครั้ง (proven)"
+   },
+   {
+    "avg_bounce": 34.0,
+    "bars_since_touch": 53,
+    "bounce_pct": 25,
+    "break_hold": null,
+    "break_pct": 75,
+    "grade": "B",
+    "level": 4246.94,
+    "n_tests": 4,
+    "score": 70,
+    "side": "S",
+    "strength": 68,
+    "tf": "H1",
+    "touches": 4,
+    "why": "H1 swing · แตะ 4 ครั้ง (proven) · เลขกลม"
+   },
+   {
+    "avg_bounce": 50.2,
+    "bars_since_touch": 53,
+    "bounce_pct": 100,
+    "break_hold": null,
+    "break_pct": 0,
+    "confluence": {
+     "count": 1,
+     "with": [
+      "H4 S"
+     ]
+    },
+    "grade": "A",
+    "level": 4229.51,
+    "n_tests": 3,
+    "score": 86,
+    "side": "S",
+    "strength": 70,
+    "tf": "H1",
+    "touches": 3,
+    "why": "H1 swing · แตะ 3 ครั้ง (proven) · ≈PDL"
+   },
+   {
+    "avg_bounce": 85.0,
+    "bars_since_touch": 89,
+    "bounce_pct": 25,
+    "break_hold": null,
+    "break_pct": 75,
+    "grade": "C",
+    "level": 4128.24,
+    "n_tests": 16,
+    "score": 46,
+    "side": "S",
+    "strength": 40,
+    "tf": "H1",
+    "touches": 16,
+    "why": "H1 swing · แตะ 16 ครั้ง — ใกล้สึก/เสี่ยงทะลุ"
+   },
+   {
+    "avg_bounce": 41.7,
+    "bars_since_touch": 89,
+    "bounce_pct": 36,
+    "break_hold": null,
+    "break_pct": 64,
+    "confluence": {
+     "count": 1,
+     "with": [
+      "H4 S"
+     ]
+    },
+    "grade": "B",
+    "level": 4116.54,
+    "n_tests": 14,
+    "score": 55,
+    "side": "S",
+    "strength": 40,
+    "tf": "H1",
+    "touches": 14,
+    "why": "H1 swing · แตะ 14 ครั้ง — ใกล้สึก/เสี่ยงทะลุ"
+   }
+  ],
+  "support": [
+   4366.27,
+   4316.53,
+   4268.45,
+   4246.94,
+   4229.51,
+   4223.22,
+   4128.24,
+   4121.48,
+   4116.54,
+   4023.73
+  ]
+ }
+}

@@ -1,0 +1,70 @@
+{
+ "by_dir": [
+  {
+   "avg": 312.08,
+   "avg_loss": -1035.79,
+   "avg_win": 1671.0,
+   "key": "BUY",
+   "n": 245,
+   "net": 76459.57,
+   "pf": 1.6,
+   "top3_pct": 119,
+   "win_rate": 0.498,
+   "wins": 122
+  },
+  {
+   "avg": -237.79,
+   "avg_loss": -1164.54,
+   "avg_win": 1010.49,
+   "key": "SELL",
+   "n": 230,
+   "net": -54691.15,
+   "pf": 0.64,
+   "top3_pct": null,
+   "win_rate": 0.426,
+   "wins": 98
+  }
+ ],
+ "by_regime": [
+  {
+   "avg": 45.83,
+   "avg_loss": -1102.44,
+   "avg_win": 1376.77,
+   "key": "RANGE",
+   "n": 475,
+   "net": 21768.42,
+   "pf": 1.08,
+   "top3_pct": 439,
+   "win_rate": 0.463,
+   "wins": 220
+  }
+ ],
+ "by_vol": [
+  {
+   "avg": 45.83,
+   "avg_loss": -1102.44,
+   "avg_win": 1376.77,
+   "key": "mid-vol",
+   "n": 475,
+   "net": 21768.42,
+   "pf": 1.08,
+   "top3_pct": 439,
+   "win_rate": 0.463,
+   "wins": 220
+  }
+ ],
+ "n_manual": 475,
+ "n_mapped": 475,
+ "ok": true,
+ "overall": {
+  "avg": 45.83,
+  "avg_loss": -1102.44,
+  "avg_win": 1376.77,
+  "n": 475,
+  "net": 21768.42,
+  "pf": 1.08,
+  "top3_pct": 439,
+  "win_rate": 0.463,
+  "wins": 220
+ }
+}

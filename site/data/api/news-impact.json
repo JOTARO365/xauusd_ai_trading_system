@@ -1,0 +1,89 @@
+{
+ "aggregate": {
+  "label": "bullish gold",
+  "n": 5,
+  "n_scored": 5,
+  "provenance": "rubric",
+  "score": 40
+ },
+ "filter_stats": {
+  "filter_rate_pct": 58.5,
+  "kept": 34,
+  "raw": 82
+ },
+ "ok": true,
+ "posts": [
+  {
+   "age_min": 0,
+   "author": "cnnbrk",
+   "confidence": 85,
+   "direction": "bull",
+   "half_life_min": 480,
+   "magnitude_tier": 2,
+   "post_id": "a6558b66",
+   "provenance": "rubric",
+   "reason": "Saudi-Pakistan-Turkey defense pact escalates Iran tensions, boosts safe-haven de",
+   "source": "twitter",
+   "text": "Saudi Arabia, Pakistan and Turkey agree to NATO-style mutual defense pact amid escalating Iran conflict. https://cnn.it/4q6nF2v Saudi Arabia, Pakistan and Turke",
+   "ts_utc": "Fri, 07 Aug 2026 12:28:01 GMT"
+  },
+  {
+   "age_min": 0,
+   "author": "cnnbrk",
+   "confidence": 80,
+   "direction": "bull",
+   "half_life_min": 480,
+   "magnitude_tier": 2,
+   "post_id": "6fa63828",
+   "provenance": "rubric",
+   "reason": "Gaza rejection deepens Middle East uncertainty, increases geopolitical risk prem",
+   "source": "twitter",
+   "text": "Netanyahu says Israel ​rejects a Trump-backed Gaza peace plan and will not withdraw from the territory without Hamas disarming. https://cnn.it/4wObUQG Netanyahu",
+   "ts_utc": "Sun, 09 Aug 2026 11:50:21 GMT"
+  },
+  {
+   "age_min": 0,
+   "author": "BBCBreaking",
+   "confidence": 78,
+   "direction": "bull",
+   "half_life_min": 480,
+   "magnitude_tier": 2,
+   "post_id": "cffa5ef0",
+   "provenance": "rubric",
+   "reason": "Israel rejects Trump peace plan, prolongs regional instability supporting gold",
+   "source": "twitter",
+   "text": "Israel rejects US President Donald Trump's peace plan for Gaza https://bbc.in/4wQI0LR Israel rejects US President Donald Trump's peace plan for Gaza bbc.in/4wQI",
+   "ts_utc": "Sun, 09 Aug 2026 12:16:52 GMT"
+  },
+  {
+   "age_min": 0,
+   "author": "markets",
+   "confidence": 72,
+   "direction": "bear",
+   "half_life_min": 120,
+   "magnitude_tier": 2,
+   "post_id": "077c41ca",
+   "provenance": "rubric",
+   "reason": "Strong job creation indicates economic resilience, reduces gold's defensive appe",
+   "source": "twitter",
+   "text": "RT by @markets: “Healthcare and social services basically accounted for all the job creation in the relatively strong number that we got earlier this week,” not",
+   "ts_utc": "Fri, 13 Feb 2026 13:51:52 GMT"
+  },
+  {
+   "age_min": 0,
+   "author": "markets",
+   "confidence": 65,
+   "direction": "bear",
+   "half_life_min": 120,
+   "magnitude_tier": 1,
+   "post_id": "8539ea5d",
+   "provenance": "rubric",
+   "reason": "Robust discretionary spending signals risk-on sentiment, pressures safe-haven fl",
+   "source": "twitter",
+   "text": "RT by @markets: “[Airline fares are] a great story because it shows us that we have discretionary spending going on. That is a good story if airlines have prici",
+   "ts_utc": "Fri, 13 Feb 2026 13:45:38 GMT"
+  }
+ ],
+ "updated": "2026-08-10T22:47:26Z",
+ "window_min": 180
+}

@@ -1,0 +1,151 @@
+{
+ "gold": {
+  "move": -0.03,
+  "price": 4398.57,
+  "rsi": 72.0,
+  "rsi_flag": "OB",
+  "symbol": "GOLDmicro"
+ },
+ "n_against": 3,
+ "n_reversal": 2,
+ "n_with": 5,
+ "ok": true,
+ "rows": [
+  {
+   "diverge": true,
+   "key": "DXY",
+   "label": "USD Index",
+   "move": -0.01,
+   "price": 99.665,
+   "rel": "WITH",
+   "role": "usd",
+   "rsi": 57.8,
+   "rsi_flag": null,
+   "symbol": "USDX-SEP26",
+   "typ_corr": -0.56
+  },
+  {
+   "diverge": false,
+   "key": "SPX",
+   "label": "S&P 500",
+   "move": -0.0,
+   "price": 7749.12,
+   "rel": "FLAT",
+   "role": "risk",
+   "rsi": 47.3,
+   "rsi_flag": null,
+   "symbol": "US500Cash",
+   "typ_corr": 0.27
+  },
+  {
+   "diverge": false,
+   "key": "NDX",
+   "label": "Nasdaq 100",
+   "move": -0.03,
+   "price": 29612.0,
+   "rel": "WITH",
+   "role": "risk",
+   "rsi": 43.1,
+   "rsi_flag": null,
+   "symbol": "US100Cash",
+   "typ_corr": 0.3
+  },
+  {
+   "diverge": false,
+   "key": "VIX",
+   "label": "VIX",
+   "move": 0.0,
+   "price": 16.92,
+   "rel": "FLAT",
+   "role": "fear",
+   "rsi": 51.2,
+   "rsi_flag": null,
+   "symbol": "VIX-AUG26",
+   "typ_corr": -0.11
+  },
+  {
+   "diverge": false,
+   "key": "XAG",
+   "label": "Silver",
+   "move": -0.06,
+   "price": 65.776,
+   "rel": "WITH",
+   "role": "metal",
+   "rsi": 73.1,
+   "rsi_flag": "OB",
+   "symbol": "SILVERmicro",
+   "typ_corr": 0.8
+  },
+  {
+   "diverge": false,
+   "key": "WTI",
+   "label": "Oil (WTI)",
+   "move": 0.02,
+   "price": 82.43,
+   "rel": "AGAINST",
+   "role": "commodity",
+   "rsi": 76.0,
+   "rsi_flag": "OB",
+   "symbol": "OILCash",
+   "typ_corr": -0.39
+  },
+  {
+   "diverge": true,
+   "key": "EUR",
+   "label": "EURUSD",
+   "move": 0.01,
+   "price": 1.15435,
+   "rel": "AGAINST",
+   "role": "usd_inv",
+   "rsi": 46.1,
+   "rsi_flag": null,
+   "symbol": "EURUSD",
+   "typ_corr": 0.56
+  },
+  {
+   "diverge": true,
+   "key": "JPY",
+   "label": "USDJPY",
+   "move": -0.02,
+   "price": 159.204,
+   "rel": "WITH",
+   "role": "usd",
+   "rsi": 69.0,
+   "rsi_flag": null,
+   "symbol": "USDJPY",
+   "typ_corr": -0.47
+  },
+  {
+   "diverge": true,
+   "key": "AUD",
+   "label": "AUDUSD",
+   "move": 0.01,
+   "price": 0.70557,
+   "rel": "AGAINST",
+   "role": "risk_fx",
+   "rsi": 48.6,
+   "rsi_flag": null,
+   "symbol": "AUDUSD",
+   "typ_corr": 0.61
+  },
+  {
+   "diverge": false,
+   "key": "BTC",
+   "label": "BTC",
+   "move": -0.08,
+   "price": 63943.95,
+   "rel": "WITH",
+   "role": "risk",
+   "rsi": 33.0,
+   "rsi_flag": null,
+   "symbol": "BTCUSD",
+   "typ_corr": 0.33
+  }
+ ],
+ "sentiment": {
+  "detail": "ทองลงแต่สัญญาณ cross-asset ผสม",
+  "emoji": "⚪",
+  "label": "Mixed (ทอง↓)"
+ },
+ "window": "1h"
+}

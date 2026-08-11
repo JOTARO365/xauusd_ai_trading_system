@@ -1,0 +1,11 @@
+{
+ "disabled": [
+  "momentum-intraday",
+  "fade-pending"
+ ],
+ "mode": "TSMOM-D1 (daily)",
+ "ok": true,
+ "regime": "TREND",
+ "regime_live": true,
+ "signal": null
+}

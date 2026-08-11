@@ -1,0 +1,55 @@
+{
+ "cells": [
+  {
+   "algo": "tsmom_d1",
+   "confident": false,
+   "edge_p": 0.7547,
+   "edge_z": -0.69,
+   "eligible": false,
+   "ess": 5.5,
+   "exp_R": 15.92,
+   "gate_reason": "ESS<30 · ไม่ผ่าน FDR (noise/multiple-testing)",
+   "n": 30,
+   "raw_wr": 30.0,
+   "regime": "NEUTRAL",
+   "shrink_pull": 5.3,
+   "shrunk_exp_R": 15.92,
+   "shrunk_wr": 35.3,
+   "symbol": "XAUUSD",
+   "wins": 9
+  }
+ ],
+ "gate": {
+  "alpha": 0.05,
+  "min_ess": 30.0,
+  "n_eligible": 0,
+  "n_tests": 1
+ },
+ "generated": "2026-08-10T23:47Z",
+ "note": "P3-D: validation gate (min-ESS + WR-significance + FDR Benjamini-Hochberg) ยาม winner's curse · P2 Thompson vote · P1.5 cross-user DB+ESS+regime · exp_R=avg pnl (ยังไม่ R-normalize) · shadow-only ไม่แตะ entry (eligible ≠ auto-trade; order-control=P3b)",
+ "ok": true,
+ "prior": {
+  "a0": 1.0,
+  "b0": 1.0,
+  "global_exp_R": 15.92,
+  "global_wr": 50.0,
+  "prior_strength_k": 2.0,
+  "rho": 0.5
+ },
+ "recommendations": [
+  {
+   "eligible": false,
+   "gate_reason": "ESS<30 · ไม่ผ่าน FDR (noise/multiple-testing)",
+   "n_algos": 1,
+   "p_best": {
+    "tsmom_d1": 1.0
+   },
+   "recommend": "tsmom_d1",
+   "regime": "NEUTRAL",
+   "symbol": "XAUUSD",
+   "total_ess": 5.5,
+   "trust": false
+  }
+ ],
+ "source": "db(cross-user)"
+}

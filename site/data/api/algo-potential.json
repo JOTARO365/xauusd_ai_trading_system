@@ -1,0 +1,55 @@
+{
+ "algos": [
+  {
+   "algo": "regime_momentum",
+   "buy": 4400.7,
+   "dir_mode": "both",
+   "name": "Momentum Breakout",
+   "note": "Donchian breakout",
+   "regime": "TREND",
+   "sell": 4316.53
+  },
+  {
+   "algo": "regime_momentum_fvg",
+   "buy": 4400.7,
+   "dir_mode": "both",
+   "name": "Momentum + FVG",
+   "note": "breakout + FVG confirm",
+   "regime": "TREND",
+   "sell": 4316.53
+  },
+  {
+   "algo": "mean_reversion",
+   "buy": 4323.41,
+   "dir_mode": "both",
+   "name": "Mean-Reversion (z-fade)",
+   "note": "fade z±1.25 · TREND→standby (เข้าเฉพาะ RANGE/NEUTRAL)",
+   "regime": "TREND",
+   "sell": 4379.62
+  },
+  {
+   "algo": "sweep_reversal",
+   "buy": 4313.27,
+   "dir_mode": "both",
+   "name": "Sweep Reversal",
+   "note": "fade prior-day H/L · TREND→standby (เข้าเฉพาะ RANGE/NEUTRAL)",
+   "regime": "TREND",
+   "sell": 4395.05
+  },
+  {
+   "algo": "tsmom_d1",
+   "buy": null,
+   "dir_mode": "long",
+   "flip_buy": 4689.0,
+   "flip_sell": 3333.0,
+   "kind": "flip",
+   "name": "TSMOM-D1",
+   "note": "เข้า market เมื่อ D1 vote พลิก (vote ตอนนี้ SELL)",
+   "regime": "D1",
+   "sell": null,
+   "tsmom_vote": "SELL"
+  }
+ ],
+ "ok": true,
+ "price": 4398.57
+}

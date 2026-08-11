@@ -1,0 +1,130 @@
+{
+ "attention": 0.6,
+ "events": [
+  {
+   "count": 7,
+   "lat": 38.9,
+   "lng": -77.0,
+   "name": "United States",
+   "sev": 1.0
+  },
+  {
+   "count": 2,
+   "lat": 29.0,
+   "lng": 47.0,
+   "name": "Middle East",
+   "sev": 0.2857142857142857
+  },
+  {
+   "count": 2,
+   "lat": 35.7,
+   "lng": 51.4,
+   "name": "Iran",
+   "sev": 0.2857142857142857
+  },
+  {
+   "count": 1,
+   "lat": 39.9,
+   "lng": 116.4,
+   "name": "China",
+   "sev": 0.14285714285714285
+  },
+  {
+   "count": 1,
+   "lat": 26.57,
+   "lng": 56.25,
+   "name": "Strait of Hormuz",
+   "sev": 0.14285714285714285
+  }
+ ],
+ "headlines": [
+  {
+   "country": "",
+   "domain": "Fox News",
+   "seen": "20260810T100011Z",
+   "title": "A quiet rush for gold is sweeping the globe — here's why countries are stockpiling it",
+   "url": "https://news.google.com/rss/articles/CBMikwFBVV95cUxPT0JYN3BFbWVRSnI5UVRhOExvdm5WcUhKdEVJQlI0dHM3QlZWTjVrZFR0VlpBS3FnRnh1WGdIWmhUb0RUUXp2LXBhQ0VPY1dIdVphVmo1S2JueWZBaEszZXlSU3UyWXFiUlozOHRLWEFWa2p3U1hmWV9udjZSMm5oOWE1YVFCczJoSWxlZW5fYzVaUVk?oc=5"
+  },
+  {
+   "country": "",
+   "domain": "Seeking Alpha",
+   "seen": "20260810T132054Z",
+   "title": "Gold At The $4,000 Wedge: Central Banks, Real Rates And The Next Breakout (Commodity:XAUUSD:CUR)",
+   "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxQdFd0el9aYUFjdU0wWFRKdk1iQ2VSS1BjTVQwdS1GeHZiNVNlNEVPaDFWMWNTX2hSLWg1SVQzUThMTkNwcXFMUVB0M3h0NmhwaUJNRklnZHVyMWNjanVVUUYwa2lZcW5EVVJrZnJIWWhkZW9fSkRYaXc3am5leXRhVzN1Tl9JSnNmM3JvdzBQMU5vVjMxeF9QQ0RqUHIyR1JsNWgta2lSWnZMMVE0NDBB?oc=5"
+  },
+  {
+   "country": "Middle East",
+   "domain": "finance.biggo.com",
+   "seen": "20260810T165500Z",
+   "title": "Gold Slumps Despite Middle East War; Central Banks Step In to 'Buy the Dip'",
+   "url": "https://news.google.com/rss/articles/CBMidkFVX3lxTE4yY2xkOHV0UWpDaXY4eXVZbjFrazczZ24xT2dWUmFCRTFyMTQySVc1UjJuZlNGbnh5dDk0RWtfZ1dTV2FxSURmcjVWREcycEJKWkJ5M0pYVEZPQ1NmWFkyM3J2WmhHQVdERy1tMUJTWkJ6c2lHMWc?oc=5"
+  },
+  {
+   "country": "United States",
+   "domain": "CryptoRank",
+   "seen": "20260810T074625Z",
+   "title": "Swiss Franc Slips as Safe-Haven Demand Bolsters US Dollar",
+   "url": "https://news.google.com/rss/articles/CBMijwFBVV95cUxNV2FndHNJTklPN1BqeHdGMGpjcGxUVUtqUi03U09jbHZMcEZPTnY2YmxTWlpQbE1yMElfVFd3QmNPVVQ1U2NzNkhNYW5vYU10MFpuTzJBS05RZjVJanFwTVZ4bGlNYkRoUjREY3lLZXhjZjJKb285OENKYWVrT2pjeGluaXRMWlYtQ0Z0N0NkOA?oc=5"
+  },
+  {
+   "country": "",
+   "domain": "BFSI News",
+   "seen": "20260810T051229Z",
+   "title": "Gold looks beyond war as inflation, monetary policy steer prices: Report",
+   "url": "https://news.google.com/rss/articles/CBMi0AFBVV95cUxPV0ZObjJhUkxEcFpaZk9fUUZCZHd2by1WNmNhNkxiMDR4LTRWNEhDbWNkaTBQRnR1ZlU4elhsLTB1dWVRTmZZamVZLXl2Q1pfdEs2ZlBMX1ZCTlc4SEtKOTM0Nk5LTnBpZVZFOGttS1NzbzhrcmZEVjRmLWc3T0lqVVRhUUlwTmZFTWRJX2UxWlE0YzlzclNNWmZEcmVnN2dhdHpLUlN3clljX1BLdEpWZjlqYTcwRDlmaHRfeXJrZGU3eS1sMl9wSHNMY3g0OXh60gHQAUFVX3lxTE9XRk5uMmFSTERwWlpmT19RRkJkd3ZvLVY2Y2E2TGIwNHgtNFY0SENtY2RpMFBGdHVmVTh6WGwtMHV1ZVFOZllqZVkteXZDWl90SzZmUExfVkJOVzhIS0o5MzQ2TktOcGllVkU4a21LU3NvOGtyZkRWNGYtZzdPSWpVVGFRSXBOZkVNZElfZTFaUTRjOXNyU01aZkRyZWc3Z2F0ektSU3dyWWNfUEt0SlZmOWphNzBEOWZodF95cmtkZTd5LWwyX3BIc0xjeDQ5eHo?oc=5"
+  },
+  {
+   "country": "",
+   "domain": "Rediff",
+   "seen": "20260810T051315Z",
+   "title": "Gold prices increasingly driven by inflation, monetary policy, not just war: Report",
+   "url": "https://news.google.com/rss/articles/CBMi2AFBVV95cUxNU19vdmlwTlRnMFRCckpZeE40anlOYnlRU1AtR0NyOXQ3ZmNCSDZoa09yUGR4enU3cExBa1JoYmVCYW9BRGt1RGE5dVZpd1FqcEVBS1hQVlpNN2lncmVDcWpfTEQyVlV4MWtDUXRESXEycFZNbElqaE9lNl96RnVmWGQ3dWRuY0FIajB0YmNGcllnWG1DeWVleXdObUxNVDJhSEJMazA2SnlVZWFsTlFZNVhSZzJfZHpDeHFpRFZ2Nk1XNTNzQkhtS0wyUkJUTkthN2R1d19RTi3SAdsBQVVfeXFMT09wT3NzaXVSQzExVlBkV0o4cmw1QkVLeUhzRndpQ3RrRERqakpNcnhIUnBJeWdTQ1NkWWktS3g1WkwwM1hvVzk2dmFjcFY5dmg5R3lLczlMZ0hBWUJVY3RQQ3diR0FJX2E4Z1YydlpESGxuYlUzQmNkbFZ4VmRhTDlvM1hjeUJnZ2Uzejc0OVVtWlU1VlNZNUc5QlhuSF8zNEV4QkRhZUNXVUFRMVhraFZFd2FGVUVaUEZ4Ykh4aTJidWdhS19jVFNMejdxc01jcUxuQjczRjZaMEg0?oc=5"
+  },
+  {
+   "country": "",
+   "domain": "IndexBox",
+   "seen": "20260810T220100Z",
+   "title": "Sprott: Gold and Silver Correction Cyclical, Long-Term Bull Market Intact | 2026 Outlook - News and Statistics",
+   "url": "https://news.google.com/rss/articles/CBMiuAFBVV95cUxOVUM3TlN1WHplZWMwbHNjczJFM01BRXRfNVdub21mSEhzc2xoUHU5QlFSNjBJdm1uTGk3TFJWNUYwamw5Nkwzc3c0dnVicDRDeXhJdDk0ZHM2OHdaWktOMjFQYzZPMllvTzluUHJXNTdZdkRmSzV1SXZvTDlpUGNMYzNMS0ppSFhCc0V6ODZaYU54aTdJdE5iUVRFQTNiZTMyeGcwU0FUd2NjRWx5ZDY2ZURidWxKUnNI?oc=5"
+  },
+  {
+   "country": "",
+   "domain": "tmgm.com",
+   "seen": "20260810T030247Z",
+   "title": "Gold retreats from June 17 highest amid USD uptick; holds above $4,300 pivotal support",
+   "url": "https://news.google.com/rss/articles/CBMi5AFBVV95cUxQOWVvTUYxY0IxVWVWT1lId1BLOFpfcExjSTVMUkxoWkdyaER6T2l1YVFXWG1ldDZmN3lCRGNYRFJ0QVpsOFY0MEJ4TnBaLWhmUmRidFZhQWNsR1pyT2dQM3gzTW5RQnRmNVdvNF94Rk1BNWgwLWRQSG9uY3kwaEZhREZhWnVfUU9Hc2NGMVpPMXhQNm5lNDNPYkhmUE0ta0lqTmZSd3N1NXZrVF9pTmxzaDhXbGZjdTFWV1NtNWg4LWd5Z1hPVlZXSm51eVlaR3ZLY09JY014UFhzcGE0Vi1Qa0NZdHQ?oc=5"
+  },
+  {
+   "country": "",
+   "domain": "CryptoRank",
+   "seen": "20260810T054715Z",
+   "title": "Weak US Jobs Data Drives $2.5 Billion Gold Futures Surge on Binance",
+   "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTE1NRnluc0szcE1GYi1PTUp5NVdOUXY2WWpJdzZMenphYzBaTFRGemprT0VtMWI3UlowZWpXREsteE1YSkU0d0pXa0k3RkRoTEp3X0k0b3hJbUVscGUtZGRndEVjTG1ZRGl3SmlaenJOSUxDeWhBXy1JQw?oc=5"
+  },
+  {
+   "country": "",
+   "domain": "CryptoRank",
+   "seen": "20260810T072203Z",
+   "title": "Clarity Act Delay: An Unexpected Opening for US Crypto Regulation",
+   "url": "https://news.google.com/rss/articles/CBMipAFBVV95cUxPTmpXZWxUVU9JSWw4dnYxeUc3b1lVV3ZKOFRpWFplQWFfSDNFM1RTaEwzZzB3MlRZNHI3V19RakVVUkVKV2hTSmF4cTVDc3VkdGVlRlFPT210eG9iX0dnX1k2d3g4Mk1ya0pZXy1IcDlxN1BNM0RoY0lsVGFwX1FFcFpiNlF6Q0duU3RoOGtoYW4xUlpaeWZ5SHdNcEp0UFk0V0MySg?oc=5"
+  },
+  {
+   "country": "",
+   "domain": "CryptoRank",
+   "seen": "20260810T095158Z",
+   "title": "Brazil Imposes 24-Hour Delay on Crypto Transfers to Curb Fraud",
+   "url": "https://news.google.com/rss/articles/CBMiogFBVV95cUxOQ3ptTHJCRGsxTlk4Q0FUT1UyUXlSWnVCd2N1aHhsUlpqRkxreE5uWDE0Uzk3SkFOVEU2QUJxUGtBc0x5NjFCSWZsblQ3ZTBGTGtOVmgxSUtlNEVYTXN1dUQzNGQ0a1dxYlAwWjk1N1RWak5LSEtEeTJQQmkxa1VnNU1UZF95cnpfLVlZMG8zWUtXYTdoRWxDWXppeFBCRWNTNWc?oc=5"
+  },
+  {
+   "country": "China",
+   "domain": "CryptoRank",
+   "seen": "20260809T095455Z",
+   "title": "China Makes Largest Gold Purchase Since 2023 as Bullion’s Price Surges 8%",
+   "url": "https://news.google.com/rss/articles/CBMirgFBVV95cUxPaXlQV1BxUlhNUURvYkNMaFpwYUlIWERoSWY4RnNXS01uUWZvNURRaDA3MlpwTmtRalFhbERXMWltZFZlaUVzUE0yYWVkX2dkdWV2TnJkOTlPenJUVHVBVVllSTdsSllja2VPRU16dlVycm1Ya1BEWVJiNHpyV2VRTjMtU2JzM2JjUVdvSERmV0xwVko2RkRDbGxNS0ExcnJqZWRqRHJkOXQ4RXFWQ3c?oc=5"
+  }
+ ],
+ "n_articles": 36,
+ "ok": true,
+ "source": "GoogleNews",
+ "ts": 1786403005
+}
