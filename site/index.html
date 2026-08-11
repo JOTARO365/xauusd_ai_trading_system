@@ -28,7 +28,10 @@
       }
       if (u.indexOf('/api/') === 0) {
         var name = u.slice(5).split('?')[0].replace(/\/+$/, '').replace(/\//g, '_');
-        return _f('./data/api/' + name + '.json').then(function (r) {
+        // cache-bust ต่อนาที: gh-pages ตั้ง Cache-Control max-age=600 → ไม่งั้น viewer เห็น snapshot
+        // เก่าถึง 10 นาทีหลัง hourly refresh. per-minute = สดเร็ว แต่ poll ในนาทีเดียวกันยังใช้ cache
+        var cb = '?cb=' + Math.floor(Date.now() / 60000);
+        return _f('./data/api/' + name + '.json' + cb).then(function (r) {
           return r.ok ? r : new Response('{}',
             { status: 200, headers: { 'Content-Type': 'application/json' } });
         }).catch(function () {
