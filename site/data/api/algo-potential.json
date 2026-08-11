@@ -2,7 +2,7 @@
  "algos": [
   {
    "algo": "regime_momentum",
-   "buy": 4400.7,
+   "buy": 4402.55,
    "dir_mode": "both",
    "name": "Momentum Breakout",
    "note": "Donchian breakout",
@@ -11,7 +11,7 @@
   },
   {
    "algo": "regime_momentum_fvg",
-   "buy": 4400.7,
+   "buy": 4402.55,
    "dir_mode": "both",
    "name": "Momentum + FVG",
    "note": "breakout + FVG confirm",
@@ -20,12 +20,12 @@
   },
   {
    "algo": "mean_reversion",
-   "buy": 4323.41,
+   "buy": 4325.91,
    "dir_mode": "both",
    "name": "Mean-Reversion (z-fade)",
    "note": "fade z±1.25 · TREND→standby (เข้าเฉพาะ RANGE/NEUTRAL)",
    "regime": "TREND",
-   "sell": 4379.62
+   "sell": 4385.38
   },
   {
    "algo": "sweep_reversal",
@@ -51,5 +51,5 @@
   }
  ],
  "ok": true,
- "price": 4398.57
+ "price": 4409.07
 }

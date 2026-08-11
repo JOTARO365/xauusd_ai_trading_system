@@ -635,28 +635,28 @@
   {
    "forecast": "0.2%",
    "impact": "high",
-   "in_hours": 36.7,
+   "in_hours": 36.1,
    "key": "CORE_CPI",
    "title": "Core CPI m/m"
   },
   {
    "forecast": "2.5%",
    "impact": "high",
-   "in_hours": 36.7,
+   "in_hours": 36.1,
    "key": "CORE_CPI",
    "title": "Core CPI y/y"
   },
   {
    "forecast": "0.1%",
    "impact": "high",
-   "in_hours": 36.7,
+   "in_hours": 36.1,
    "key": "CPI",
    "title": "CPI m/m"
   },
   {
    "forecast": "3.4%",
    "impact": "high",
-   "in_hours": 36.7,
+   "in_hours": 36.1,
    "key": "CPI",
    "title": "CPI y/y"
   }

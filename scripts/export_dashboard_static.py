@@ -22,19 +22,27 @@ _OUT = os.path.join(_BASE, "site", "data", "api")
 _BLOCK = ("profit", "pnl", "balance", "equity", "margin", "free_margin", "login",
           "account", "deposit", "withdraw", "ticket", "price_open", "volume", "usd_thb",
           "baht", "thb", "money", "capital", "new_baseline", "baseline", "lots", "lot",
-          "swap", "commission")
+          "swap", "commission", "gross")
+
+# per-endpoint EXACT-key blocks — สำหรับ key เงิน (THB P&L) ที่ชื่อ generic ชนกับ
+# data ที่ต้องเก็บ (เช่น "net" = COT positioning ต้องเก็บ, แต่ owner-edge "net" = เงินจริง).
+_EXTRA_EXACT = {
+    "owner-edge": {"net", "avg", "avg_win", "avg_loss"},
+    "daily-summary": {"net", "avg", "avg_win", "avg_loss", "gross_win", "gross_loss"},
+}
 
 
-def _sanitize(obj):
+def _sanitize(obj, extra=frozenset()):
     if isinstance(obj, dict):
         out = {}
         for k, v in obj.items():
-            if any(b in str(k).lower() for b in _BLOCK):
+            kl = str(k).lower()
+            if kl in extra or any(b in kl for b in _BLOCK):
                 continue
-            out[k] = _sanitize(v)
+            out[k] = _sanitize(v, extra)
         return out
     if isinstance(obj, list):
-        return [_sanitize(x) for x in obj]
+        return [_sanitize(x, extra) for x in obj]
     return obj
 
 
@@ -134,7 +142,7 @@ def main():
             if r.status_code != 200:
                 print(f"  --  {name}: HTTP {r.status_code}")
                 continue
-            obj = _sanitize(r.get_json(force=True, silent=True) or {})
+            obj = _sanitize(r.get_json(force=True, silent=True) or {}, _EXTRA_EXACT.get(name, frozenset()))
             with open(os.path.join(_OUT, name + ".json"), "w", encoding="utf-8") as f:
                 json.dump(obj, f, ensure_ascii=False, indent=1, default=str)
             print(f"  ok  {name}")

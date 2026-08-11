@@ -9,7 +9,7 @@
   },
   "exp_R": -0.983,
   "n_closed": 2135,
-  "n_open": 1,
+  "n_open": 2,
   "sigma_R": 0.357,
   "sum_R": -2099.18,
   "win_rate": 0.015
@@ -39,7 +39,7 @@
   },
   "exp_R": -0.013,
   "n_closed": 9,
-  "n_open": 1,
+  "n_open": 2,
   "sigma_R": 1.501,
   "sum_R": -0.11,
   "win_rate": 0.333

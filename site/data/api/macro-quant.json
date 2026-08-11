@@ -1,12 +1,12 @@
 {
- "as_of": "2026-08-10T23:47:08.880899+00:00",
+ "as_of": "2026-08-11T00:23:00.456169+00:00",
  "bias": "NEUTRAL",
  "components": {
   "cot": 0.0652,
   "dxy": -0.0527,
   "fed": 0.0,
   "gsr": -0.0084,
-  "news": 0.0718,
+  "news": 0.0588,
   "real_yield": -0.111,
   "real_yield_chg": -0.0711,
   "risk_regime": 0.03,
@@ -17,7 +17,7 @@
  "coverage": "10/11",
  "driver": "real_yield",
  "ok": true,
- "score": -7,
+ "score": -8,
  "stale": [
   "macro"
  ],

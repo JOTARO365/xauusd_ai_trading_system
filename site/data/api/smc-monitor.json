@@ -37,7 +37,16 @@
    "top": 4183.57
   },
   {
-   "age_bars": 1,
+   "age_bars": 0,
+   "bot": 4391.91,
+   "dir": "bull",
+   "mid": 4393.26,
+   "size_pips": 271,
+   "tf": "H1",
+   "top": 4394.62
+  },
+  {
+   "age_bars": 2,
    "bot": 4382.81,
    "dir": "bull",
    "mid": 4384.17,
@@ -46,7 +55,7 @@
    "top": 4385.53
   },
   {
-   "age_bars": 2,
+   "age_bars": 3,
    "bot": 4365.34,
    "dir": "bull",
    "mid": 4371.91,
@@ -55,75 +64,66 @@
    "top": 4378.48
   },
   {
-   "age_bars": 6,
+   "age_bars": 7,
    "bot": 4339.64,
    "dir": "bull",
    "mid": 4341.41,
    "size_pips": 353,
    "tf": "H1",
    "top": 4343.17
-  },
-  {
-   "age_bars": 37,
-   "bot": 4280.31,
-   "dir": "bull",
-   "mid": 4281.52,
-   "size_pips": 243,
-   "tf": "H1",
-   "top": 4282.74
   }
  ],
  "liquidity": [
   {
-   "dist_pips": 143,
-   "level": 4400.0,
-   "name": "R4400",
-   "side": "above"
-  },
-  {
-   "dist_pips": 352,
-   "level": 4395.05,
-   "name": "PDH",
-   "side": "below"
-  },
-  {
-   "dist_pips": 857,
-   "level": 4390.0,
-   "name": "R4390",
-   "side": "below"
-  },
-  {
-   "dist_pips": 1143,
+   "dist_pips": 93,
    "level": 4410.0,
    "name": "R4410",
    "side": "above"
   },
   {
-   "dist_pips": 1857,
-   "level": 4380.0,
-   "name": "R4380",
+   "dist_pips": 907,
+   "level": 4400.0,
+   "name": "R4400",
    "side": "below"
   },
   {
-   "dist_pips": 2143,
+   "dist_pips": 1093,
    "level": 4420.0,
    "name": "R4420",
    "side": "above"
   },
   {
-   "dist_pips": 4857,
-   "level": 4350.0,
-   "name": "R4350",
+   "dist_pips": 1402,
+   "level": 4395.05,
+   "name": "PDH",
    "side": "below"
   },
   {
-   "dist_pips": 5143,
+   "dist_pips": 1907,
+   "level": 4390.0,
+   "name": "R4390",
+   "side": "below"
+  },
+  {
+   "dist_pips": 2093,
+   "level": 4430.0,
+   "name": "R4430",
+   "side": "above"
+  },
+  {
+   "dist_pips": 4093,
    "level": 4450.0,
    "name": "R4450",
    "side": "above"
   },
   {
-   "dist_pips": 8530,
+   "dist_pips": 5907,
+   "level": 4350.0,
+   "name": "R4350",
+   "side": "below"
+  },
+  {
+   "dist_pips": 9580,
    "level": 4313.27,
    "name": "PDL",
    "side": "below"
@@ -131,7 +131,7 @@
  ],
  "note": "SMC = บริบท/เฝ้าดูเท่านั้น ไม่ป้อน entry (backtest: ไม่มี edge หลัง cost)",
  "ok": true,
- "price": 4398.57,
+ "price": 4409.07,
  "regime": "TREND",
  "sweep": null
 }

@@ -1,6 +1,6 @@
 {
  "bot_status": {
-  "cycle": 1049,
+  "cycle": 1376,
   "decision": "SKIP",
   "last_signal": {
    "action": "SKIP",
@@ -9,7 +9,7 @@
    "entry_type": "NONE",
    "reason": "",
    "sr_zone": "NONE",
-   "time": "2026-08-11T06:47:03",
+   "time": "2026-08-11T07:22:57",
    "trend": "BULLISH"
   },
   "liquidity_pools": {
@@ -17,19 +17,19 @@
    "sell_side": [
     {
      "count": 2,
-     "dist_pct": 1.83,
+     "dist_pct": 2.07,
      "level": 4314.9
     },
     {
      "count": 2,
-     "dist_pct": 3.84,
+     "dist_pct": 4.08,
      "level": 4226.36
     }
    ]
   },
   "market": {
    "d1_trend": "BULLISH",
-   "fast_move_pips": -447.0,
+   "fast_move_pips": 748.0,
    "momentum_tf": {
     "h1": {
      "direction": "UP",
@@ -40,11 +40,11 @@
      "strength": "STRONG"
     },
     "m15": {
-     "direction": "DOWN",
+     "direction": "UP",
      "strength": "MODERATE"
     }
    },
-   "rsi": 69.9729,
+   "rsi": 74.2858,
    "trend": "BULLISH"
   },
   "plan": {
@@ -53,19 +53,24 @@
    "tp_pips": 1500
   },
   "price_info": {
-   "ask": 4398.91,
-   "bid": 4398.35,
-   "change_pct": -0.03,
-   "spread": 0.56
+   "ask": 4409.6,
+   "bid": 4409.05,
+   "change_pct": 0.155,
+   "spread": 0.55
   },
   "ready_mode": {
-   "active": false,
-   "set_at": null,
-   "zone": null
+   "active": true,
+   "set_at": "2026-08-11T07:22:50.825912",
+   "zone": {
+    "dist_pct": 0.071,
+    "level": 4402.99,
+    "tf": "W1",
+    "zone_type": "SUPPORT"
+   }
   },
   "sent_bias": "BUY",
-  "sent_conf": 52,
-  "sent_summary": "DXY double top breakdown + cool Core CPI 2.5%",
+  "sent_conf": 62,
+  "sent_summary": "Core CPI 2.5% cool + USD double-top breakdown",
   "sent_tweets": 75,
   "sentiment": "BULLISH",
   "signals": {
@@ -78,8 +83,16 @@
    },
    "fvg": [
     {
+     "bottom": 4402.55,
+     "dist_pct": -0.06,
+     "mid": 4403.45,
+     "size_pips": 180,
+     "top": 4404.35,
+     "type": "bull"
+    },
+    {
      "bottom": 4390.46,
-     "dist_pct": -0.1,
+     "dist_pct": -0.35,
      "mid": 4390.72,
      "size_pips": 52,
      "top": 4390.98,
@@ -87,7 +100,7 @@
     },
     {
      "bottom": 4382.63,
-     "dist_pct": -0.27,
+     "dist_pct": -0.51,
      "mid": 4383.45,
      "size_pips": 165,
      "top": 4384.28,
@@ -95,18 +108,10 @@
     },
     {
      "bottom": 4379.66,
-     "dist_pct": -0.34,
+     "dist_pct": -0.58,
      "mid": 4380.36,
      "size_pips": 140,
      "top": 4381.06,
-     "type": "bull"
-    },
-    {
-     "bottom": 4367.0,
-     "dist_pct": -0.57,
-     "mid": 4370.15,
-     "size_pips": 629,
-     "top": 4373.29,
      "type": "bull"
     }
    ],
@@ -116,20 +121,18 @@
     "state": "RANGE",
     "why": "H:UP L:EQ"
    },
-   "retrace_entry": {
-    "close_sl_pips": 82,
-    "direction": "SELL",
-    "sl_tighter_pct": 48,
-    "suggested_entry": 4395.59,
-    "tight_sl": 4396.02,
-    "wick_sl_pips": 43
-   },
+   "retrace_entry": null,
    "reversal_confirm": null
   },
   "skip_ai": true,
-  "updated_at": "2026-08-11T06:47:03",
+  "updated_at": "2026-08-11T07:22:57",
   "zones": {
-   "htf_zone": null,
+   "htf_zone": {
+    "dist_pct": 0.071,
+    "level": 4402.99,
+    "tf": "W1",
+    "zone_type": "SUPPORT"
+   },
    "key_levels": {
     "pdh": 4120.09,
     "pdl": 4018.85,
@@ -146,9 +149,9 @@
    "resistance": [],
    "setups": [
     {
-     "direction": "SELL",
+     "direction": "BUY",
      "level": 4400,
-     "score": 65,
+     "score": 100,
      "tf": "H4",
      "type": "SR_ZONE"
     }
@@ -242,7 +245,7 @@
     },
     {
      "avg_bounce": 52.1,
-     "bars_since_touch": 11,
+     "bars_since_touch": 12,
      "bounce_pct": 83,
      "break_hold": null,
      "break_pct": 17,
@@ -264,7 +267,7 @@
     },
     {
      "avg_bounce": 50.4,
-     "bars_since_touch": 21,
+     "bars_since_touch": 22,
      "bounce_pct": 50,
      "break_hold": null,
      "break_pct": 50,
@@ -280,7 +283,7 @@
     },
     {
      "avg_bounce": 34.0,
-     "bars_since_touch": 53,
+     "bars_since_touch": 54,
      "bounce_pct": 25,
      "break_hold": null,
      "break_pct": 75,
@@ -302,7 +305,7 @@
     },
     {
      "avg_bounce": 50.2,
-     "bars_since_touch": 53,
+     "bars_since_touch": 54,
      "bounce_pct": 100,
      "break_hold": null,
      "break_pct": 0,
@@ -324,7 +327,7 @@
     },
     {
      "avg_bounce": 97.4,
-     "bars_since_touch": 87,
+     "bars_since_touch": 88,
      "bounce_pct": null,
      "break_hold": null,
      "break_pct": null,

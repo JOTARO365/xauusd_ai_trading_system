@@ -4,29 +4,29 @@
    "algo_id": "regime_momentum",
    "best": [
     "XAUJPY",
-    1.222
+    1.28
    ],
    "dir_key": "regime_momentum",
    "dir_mode": "both",
-   "exp_R": 0.522,
+   "exp_R": 0.559,
    "live": true,
    "live_symbol": "XAUUSD",
    "live_syms": [
     "XAUUSD"
    ],
-   "n": 36,
+   "n": 37,
    "name": "Momentum Breakout",
    "note": "= algo ที่เทรดจริงบน XAUUSD (intraday · signal momentum_breakout · tag ALGO-mom)",
    "pairs_pos": 6,
    "pairs_traded": 9,
    "regime": "TREND",
-   "sum_R": 18.8,
-   "wins": 19,
+   "sum_R": 20.7,
+   "wins": 20,
    "worst": [
     "GBPUSD",
     -1.261
    ],
-   "wr": 52.8
+   "wr": 54.1
   },
   {
    "algo_id": "mean_reversion",
@@ -93,25 +93,25 @@
    ],
    "dir_key": "regime_momentum_fvg",
    "dir_mode": "both",
-   "exp_R": 0.923,
+   "exp_R": 0.963,
    "live": true,
    "live_symbol": null,
    "live_syms": [
     "XAUUSD"
    ],
-   "n": 26,
+   "n": 27,
    "name": "regime_momentum_fvg",
    "note": null,
    "pairs_pos": 5,
    "pairs_traded": 7,
    "regime": "—",
-   "sum_R": 24.0,
-   "wins": 17,
+   "sum_R": 26.0,
+   "wins": 18,
    "worst": [
     "GBPUSD",
     -1.261
    ],
-   "wr": 65.4
+   "wr": 66.7
   },
   {
    "algo_id": "sweep_reversal",
@@ -226,7 +226,7 @@
   "ready": 0
  },
  "engine_on": true,
- "generated": "2026-08-10T23:47Z",
+ "generated": "2026-08-11T00:23Z",
  "min_span_days": 60,
  "n_ready": {
   "scalp": 100,
@@ -325,12 +325,12 @@
    "max_dd_R": -1.0,
    "mfe_R": 1.29,
    "n": 4,
-   "n_open": 2,
+   "n_open": 3,
    "real_exp_R": null,
    "real_n": 0,
    "real_regime": {},
    "real_wr": null,
-   "span_days": 14.9,
+   "span_days": 15.0,
    "state": "SHADOW",
    "sum_R": 0.0,
    "switch_kind": "combo",
@@ -340,7 +340,7 @@
   },
   {
    "algo_id": "regime_momentum",
-   "avg_hold": 7.8,
+   "avg_hold": 7.7,
    "backtest_exp_R": 0.238,
    "backtest_managed": false,
    "backtest_n": 57,
@@ -349,28 +349,28 @@
    "by_result": {
     "SL": 3,
     "TIMEOUT": 0,
-    "TP": 9
+    "TP": 10
    },
    "exec_mode": "SHADOW",
-   "exp_R": 1.222,
+   "exp_R": 1.28,
    "klass": "scalp",
    "live": false,
-   "mae_R": -0.53,
+   "mae_R": -0.49,
    "max_dd_R": -2.0,
-   "mfe_R": 1.71,
-   "n": 12,
-   "n_open": 4,
+   "mfe_R": 1.73,
+   "n": 13,
+   "n_open": 3,
    "real_exp_R": null,
    "real_n": 0,
    "real_regime": {},
    "real_wr": null,
    "span_days": 14.9,
    "state": "SHADOW",
-   "sum_R": 14.7,
+   "sum_R": 16.6,
    "switch_kind": "combo",
    "switch_state": "SHADOW",
    "symbol": "XAUJPY",
-   "wr": 75.0
+   "wr": 76.9
   },
   {
    "algo_id": "regime_momentum",
@@ -1431,12 +1431,12 @@
    "max_dd_R": 0.0,
    "mfe_R": 2.22,
    "n": 4,
-   "n_open": 2,
+   "n_open": 3,
    "real_exp_R": null,
    "real_n": 0,
    "real_regime": {},
    "real_wr": null,
-   "span_days": 5.8,
+   "span_days": 5.9,
    "state": "SHADOW",
    "sum_R": 7.9,
    "switch_kind": "combo",
@@ -1446,7 +1446,7 @@
   },
   {
    "algo_id": "regime_momentum_fvg",
-   "avg_hold": 6.9,
+   "avg_hold": 6.8,
    "backtest_exp_R": 0.277,
    "backtest_managed": false,
    "backtest_n": 53,
@@ -1455,28 +1455,28 @@
    "by_result": {
     "SL": 2,
     "TIMEOUT": 0,
-    "TP": 8
+    "TP": 9
    },
    "exec_mode": "SHADOW",
-   "exp_R": 1.374,
+   "exp_R": 1.429,
    "klass": "scalp",
    "live": false,
-   "mae_R": -0.44,
+   "mae_R": -0.4,
    "max_dd_R": -2.0,
-   "mfe_R": 1.8,
-   "n": 10,
-   "n_open": 4,
+   "mfe_R": 1.82,
+   "n": 11,
+   "n_open": 3,
    "real_exp_R": null,
    "real_n": 0,
    "real_regime": {},
    "real_wr": null,
    "span_days": 5.8,
    "state": "SHADOW",
-   "sum_R": 13.7,
+   "sum_R": 15.7,
    "switch_kind": "combo",
    "switch_state": "SHADOW",
    "symbol": "XAUJPY",
-   "wr": 80.0
+   "wr": 81.8
   },
   {
    "algo_id": "regime_momentum_fvg",

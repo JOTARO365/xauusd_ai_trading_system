@@ -2,7 +2,7 @@
  "attention": 0.6,
  "events": [
   {
-   "count": 7,
+   "count": 8,
    "lat": 38.9,
    "lng": -77.0,
    "name": "United States",
@@ -13,28 +13,28 @@
    "lat": 29.0,
    "lng": 47.0,
    "name": "Middle East",
-   "sev": 0.2857142857142857
+   "sev": 0.25
   },
   {
    "count": 2,
    "lat": 35.7,
    "lng": 51.4,
    "name": "Iran",
-   "sev": 0.2857142857142857
+   "sev": 0.25
   },
   {
    "count": 1,
    "lat": 39.9,
    "lng": 116.4,
    "name": "China",
-   "sev": 0.14285714285714285
+   "sev": 0.125
   },
   {
    "count": 1,
    "lat": 26.57,
    "lng": 56.25,
    "name": "Strait of Hormuz",
-   "sev": 0.14285714285714285
+   "sev": 0.125
   }
  ],
  "headlines": [
@@ -51,6 +51,13 @@
    "seen": "20260810T132054Z",
    "title": "Gold At The $4,000 Wedge: Central Banks, Real Rates And The Next Breakout (Commodity:XAUUSD:CUR)",
    "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxQdFd0el9aYUFjdU0wWFRKdk1iQ2VSS1BjTVQwdS1GeHZiNVNlNEVPaDFWMWNTX2hSLWg1SVQzUThMTkNwcXFMUVB0M3h0NmhwaUJNRklnZHVyMWNjanVVUUYwa2lZcW5EVVJrZnJIWWhkZW9fSkRYaXc3am5leXRhVzN1Tl9JSnNmM3JvdzBQMU5vVjMxeF9QQ0RqUHIyR1JsNWgta2lSWnZMMVE0NDBB?oc=5"
+  },
+  {
+   "country": "United States",
+   "domain": "chosun.com",
+   "seen": "20260810T232206Z",
+   "title": "Gold ETFs Rebound as U.S. Employment Shock Triggers Rate Hike Uncertainty",
+   "url": "https://news.google.com/rss/articles/CBMijgFBVV95cUxNMk5OaW02QXBrdWUwUHZGdURmNTdtd2JqZy1mMUVPcFNsUVRrd1EwSlRTb0ZZanVMVkNzelMwQVJNaDdNS1oxOXBLdE9BZ0N2cXpTZDhOTEV5VTRkei1Ub1RDUEo2dWRzaHRjd01BUWZzakFBbWd6bVMzTVZJSXl3WFBrVVRjd2pNY1hhSmln?oc=5"
   },
   {
    "country": "Middle East",
@@ -89,13 +96,6 @@
   },
   {
    "country": "",
-   "domain": "tmgm.com",
-   "seen": "20260810T030247Z",
-   "title": "Gold retreats from June 17 highest amid USD uptick; holds above $4,300 pivotal support",
-   "url": "https://news.google.com/rss/articles/CBMi5AFBVV95cUxQOWVvTUYxY0IxVWVWT1lId1BLOFpfcExjSTVMUkxoWkdyaER6T2l1YVFXWG1ldDZmN3lCRGNYRFJ0QVpsOFY0MEJ4TnBaLWhmUmRidFZhQWNsR1pyT2dQM3gzTW5RQnRmNVdvNF94Rk1BNWgwLWRQSG9uY3kwaEZhREZhWnVfUU9Hc2NGMVpPMXhQNm5lNDNPYkhmUE0ta0lqTmZSd3N1NXZrVF9pTmxzaDhXbGZjdTFWV1NtNWg4LWd5Z1hPVlZXSm51eVlaR3ZLY09JY014UFhzcGE0Vi1Qa0NZdHQ?oc=5"
-  },
-  {
-   "country": "",
    "domain": "CryptoRank",
    "seen": "20260810T054715Z",
    "title": "Weak US Jobs Data Drives $2.5 Billion Gold Futures Surge on Binance",
@@ -126,5 +126,5 @@
  "n_articles": 36,
  "ok": true,
  "source": "GoogleNews",
- "ts": 1786403005
+ "ts": 1786405643
 }

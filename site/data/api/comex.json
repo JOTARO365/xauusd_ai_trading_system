@@ -1,17 +1,17 @@
 {
- "basis": 58.96,
+ "basis": 55.58,
  "delay": "~15 นาที (Yahoo/COMEX)",
  "gc": {
-  "chg_pct": 0.85,
+  "chg_pct": 1.01,
   "prev": 4419.7,
-  "price": 4457.4,
-  "vol": 3185
+  "price": 4464.5,
+  "vol": 5343
  },
  "si": {
-  "chg_pct": 0.97,
+  "chg_pct": 1.33,
   "prev": 65.272,
-  "price": 65.905,
-  "vol": 411
+  "price": 66.14,
+  "vol": 768
  },
- "spot": 4398.44
+ "spot": 4408.92
 }

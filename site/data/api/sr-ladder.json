@@ -1,7 +1,7 @@
 {
  "ok": true,
  "point": 0.01,
- "price": 4398.17,
+ "price": 4409.43,
  "symbol": "XAUUSD",
  "zones": {
   "htf_zone": null,
@@ -95,7 +95,7 @@
     "why": "H4 swing · แตะ 4 ครั้ง (proven)"
    },
    {
-    "avg_bounce": 27.6,
+    "avg_bounce": 32.2,
     "bars_since_touch": 2,
     "bounce_pct": 22,
     "break_hold": {
@@ -191,7 +191,7 @@
    },
    {
     "avg_bounce": 52.1,
-    "bars_since_touch": 11,
+    "bars_since_touch": 12,
     "bounce_pct": 83,
     "break_hold": null,
     "break_pct": 17,
@@ -207,7 +207,7 @@
    },
    {
     "avg_bounce": 34.0,
-    "bars_since_touch": 53,
+    "bars_since_touch": 54,
     "bounce_pct": 25,
     "break_hold": null,
     "break_pct": 75,
@@ -223,7 +223,7 @@
    },
    {
     "avg_bounce": 50.2,
-    "bars_since_touch": 53,
+    "bars_since_touch": 54,
     "bounce_pct": 100,
     "break_hold": null,
     "break_pct": 0,
@@ -245,7 +245,7 @@
    },
    {
     "avg_bounce": 85.0,
-    "bars_since_touch": 89,
+    "bars_since_touch": 90,
     "bounce_pct": 25,
     "break_hold": null,
     "break_pct": 75,
@@ -261,7 +261,7 @@
    },
    {
     "avg_bounce": 41.7,
-    "bars_since_touch": 89,
+    "bars_since_touch": 90,
     "bounce_pct": 36,
     "break_hold": null,
     "break_pct": 64,

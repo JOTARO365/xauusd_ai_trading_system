@@ -1,12 +1,12 @@
 {
  "breadth": 1.0,
  "breadth_n": 4,
- "eur_ret": 0.0012,
- "gold_silver_ratio": 66.88,
+ "eur_ret": 0.0015,
+ "gold_silver_ratio": 66.73,
  "ok": true,
- "ratio_z": 0.19,
- "stale_s": 51,
- "ts": 1786405586,
+ "ratio_z": 0.15,
+ "stale_s": 30,
+ "ts": 1786407758,
  "usd_story": "USD-driven",
- "xau_ret": 0.0786
+ "xau_ret": 0.0814
 }

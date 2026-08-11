@@ -1,38 +1,38 @@
 {
  "moves": {
   "AUDUSD": {
-   "last": 0.706,
-   "pct": 0.08
+   "last": 0.705,
+   "pct": 0.07
   },
   "EURUSD": {
-   "last": 1.154,
-   "pct": 0.04
+   "last": 1.155,
+   "pct": 0.06
   },
   "USDCHF": {
    "last": 0.81,
-   "pct": -0.01
+   "pct": -0.02
   },
   "USDJPY": {
-   "last": 159.213,
-   "pct": -0.04
+   "last": 159.186,
+   "pct": -0.06
   },
   "XAGUSD": {
-   "last": 65.754,
-   "pct": 0.07
+   "last": 66.068,
+   "pct": 0.55
   },
   "XAUEUR": {
-   "last": 3809.05,
-   "pct": 0.15
+   "last": 3818.08,
+   "pct": 0.39
   },
   "XAUJPY": {
-   "last": 700194.0,
-   "pct": 0.12
+   "last": 701890.0,
+   "pct": 0.36
   },
   "XAUUSD": {
-   "last": 4397.67,
-   "pct": 0.17
+   "last": 4409.04,
+   "pct": 0.43
   }
  },
  "ok": true,
- "stale_s": -771
+ "stale_s": 1379
 }
