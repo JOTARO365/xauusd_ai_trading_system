@@ -6706,17 +6706,22 @@ async function loadEquityCurve() {
     if (pts.length < 2) { svg.innerHTML = ''; return; }
     const W = Math.max(600, svg.clientWidth || 600), H = 220, pad = 30;
     const eqs = pts.map(p => p.equity), dds = pts.map(p => p.dd_pct);
-    const emin = Math.min(...eqs), emax = Math.max(...eqs);
+    // public: equity ($) curve is money → stripped from snapshot; render only underwater/drawdown
+    const hasEq = eqs.some(v => typeof v === 'number' && isFinite(v));
     const x = i => pad + i / (pts.length - 1) * (W - 2 * pad);
-    const yE = v => 10 + (1 - (v - emin) / (emax - emin || 1)) * (H * 0.55);
-    const ddmax = Math.max(...dds, 1);
+    const ddmax = Math.max(...dds.filter(v => typeof v === 'number' && isFinite(v)), 1);
     const yD = v => H * 0.62 + (v / ddmax) * (H * 0.32);
-    const eqPath = eqs.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + yE(v).toFixed(1)).join(' ');
-    const ddPath = dds.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + yD(v).toFixed(1)).join(' ');
-    svg.innerHTML =
-      '<path d="' + eqPath + '" fill="none" stroke="var(--gold)" stroke-width="1.5"/>'
+    let eqSvg = '';
+    if (hasEq) {
+      const emin = Math.min(...eqs), emax = Math.max(...eqs);
+      const yE = v => 10 + (1 - (v - emin) / (emax - emin || 1)) * (H * 0.55);
+      const eqPath = eqs.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + yE(v).toFixed(1)).join(' ');
+      eqSvg = '<path d="' + eqPath + '" fill="none" stroke="var(--gold)" stroke-width="1.5"/>'
+        + '<text x="' + pad + '" y="12" fill="var(--gold)" font-size="10">equity ' + emax.toFixed(0) + '</text>';
+    }
+    const ddPath = dds.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + yD(v || 0).toFixed(1)).join(' ');
+    svg.innerHTML = eqSvg
       + '<path d="' + ddPath + '" fill="none" stroke="var(--red)" stroke-width="1"/>'
-      + '<text x="' + pad + '" y="12" fill="var(--gold)" font-size="10">equity ' + emax.toFixed(0) + '</text>'
       + '<text x="' + pad + '" y="' + (H - 4) + '" fill="var(--red)" font-size="10">underwater max ' + ddmax.toFixed(1) + '%</text>';
   } catch (e) { document.getElementById('equity-note').textContent = 'เชื่อมต่อไม่ได้'; }
 }
