@@ -1,12 +1,12 @@
 {
- "atr_d1": 91.26,
- "d1_close": 4390.2,
+ "atr_d1": 92.01,
+ "d1_close": 4368.02,
  "live": true,
  "ok": true,
  "position": null,
  "shadow": false,
  "signal": "SELL",
- "sl_pips": 27379,
+ "sl_pips": 27604,
  "state": null,
  "vb_years": "all",
  "votes": [

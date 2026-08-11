@@ -1,7 +1,7 @@
 {
  "fvg": [
   {
-   "age_bars": 0,
+   "age_bars": 6,
    "bot": 4349.85,
    "dir": "bull",
    "mid": 4350.68,
@@ -10,7 +10,7 @@
    "top": 4351.5
   },
   {
-   "age_bars": 8,
+   "age_bars": 14,
    "bot": 4268.87,
    "dir": "bull",
    "mid": 4284.9,
@@ -19,7 +19,7 @@
    "top": 4300.93
   },
   {
-   "age_bars": 9,
+   "age_bars": 15,
    "bot": 4252.98,
    "dir": "bull",
    "mid": 4257.36,
@@ -28,7 +28,7 @@
    "top": 4261.74
   },
   {
-   "age_bars": 19,
+   "age_bars": 25,
    "bot": 4179.34,
    "dir": "bull",
    "mid": 4181.45,
@@ -37,101 +37,92 @@
    "top": 4183.57
   },
   {
-   "age_bars": 0,
-   "bot": 4391.91,
-   "dir": "bull",
-   "mid": 4393.26,
-   "size_pips": 271,
+   "age_bars": 16,
+   "bot": 4408.76,
+   "dir": "bear",
+   "mid": 4409.15,
+   "size_pips": 78,
    "tf": "H1",
-   "top": 4394.62
+   "top": 4409.54
   },
   {
-   "age_bars": 2,
-   "bot": 4382.81,
-   "dir": "bull",
-   "mid": 4384.17,
-   "size_pips": 272,
-   "tf": "H1",
-   "top": 4385.53
-  },
-  {
-   "age_bars": 3,
-   "bot": 4365.34,
-   "dir": "bull",
-   "mid": 4371.91,
-   "size_pips": 1314,
-   "tf": "H1",
-   "top": 4378.48
-  },
-  {
-   "age_bars": 7,
+   "age_bars": 29,
    "bot": 4339.64,
    "dir": "bull",
    "mid": 4341.41,
    "size_pips": 353,
    "tf": "H1",
    "top": 4343.17
+  },
+  {
+   "age_bars": 60,
+   "bot": 4280.31,
+   "dir": "bull",
+   "mid": 4281.52,
+   "size_pips": 243,
+   "tf": "H1",
+   "top": 4282.74
   }
  ],
  "liquidity": [
   {
-   "dist_pips": 93,
-   "level": 4410.0,
-   "name": "R4410",
+   "dist_pips": 233,
+   "level": 4370.0,
+   "name": "R4370",
    "side": "above"
   },
   {
-   "dist_pips": 907,
-   "level": 4400.0,
-   "name": "R4400",
+   "dist_pips": 767,
+   "level": 4360.0,
+   "name": "R4360",
    "side": "below"
   },
   {
-   "dist_pips": 1093,
-   "level": 4420.0,
-   "name": "R4420",
-   "side": "above"
-  },
-  {
-   "dist_pips": 1402,
-   "level": 4395.05,
-   "name": "PDH",
+   "dist_pips": 1118,
+   "level": 4356.49,
+   "name": "PDL",
    "side": "below"
   },
   {
-   "dist_pips": 1907,
-   "level": 4390.0,
-   "name": "R4390",
-   "side": "below"
-  },
-  {
-   "dist_pips": 2093,
-   "level": 4430.0,
-   "name": "R4430",
+   "dist_pips": 1233,
+   "level": 4380.0,
+   "name": "R4380",
    "side": "above"
   },
   {
-   "dist_pips": 4093,
-   "level": 4450.0,
-   "name": "R4450",
-   "side": "above"
-  },
-  {
-   "dist_pips": 5907,
+   "dist_pips": 1767,
    "level": 4350.0,
    "name": "R4350",
    "side": "below"
   },
   {
-   "dist_pips": 9580,
-   "level": 4313.27,
-   "name": "PDL",
+   "dist_pips": 2233,
+   "level": 4390.0,
+   "name": "R4390",
+   "side": "above"
+  },
+  {
+   "dist_pips": 3233,
+   "level": 4400.0,
+   "name": "R4400",
+   "side": "above"
+  },
+  {
+   "dist_pips": 6728,
+   "level": 4434.95,
+   "name": "PDH",
+   "side": "above"
+  },
+  {
+   "dist_pips": 6767,
+   "level": 4300.0,
+   "name": "R4300",
    "side": "below"
   }
  ],
  "note": "SMC = บริบท/เฝ้าดูเท่านั้น ไม่ป้อน entry (backtest: ไม่มี edge หลัง cost)",
  "ok": true,
- "price": 4409.07,
- "regime": "TREND",
+ "price": 4367.67,
+ "regime": "NEUTRAL",
  "sweep": null
 }

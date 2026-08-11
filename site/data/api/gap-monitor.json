@@ -3,9 +3,50 @@
  "gap": null,
  "gap_usd": null,
  "ok": true,
- "positions": [],
+ "positions": [
+  {
+   "be": false,
+   "dir": "SELL",
+   "dist_pt": 400405,
+   "entry": 63550.75,
+   "hit": false,
+   "proj_by": "MT5",
+   "sl": 67646.0,
+   "symbol": "BTCUSD"
+  },
+  {
+   "be": false,
+   "dir": "BUY",
+   "dist_pt": 921,
+   "entry": 83.78,
+   "hit": false,
+   "proj_by": "MT5",
+   "sl": 74.54,
+   "symbol": "WTIUSD"
+  },
+  {
+   "be": false,
+   "dir": "BUY",
+   "dist_pt": 714,
+   "entry": 4371.34,
+   "hit": false,
+   "proj_by": "MT5",
+   "sl": 4361.06,
+   "symbol": "XAUUSD"
+  },
+  {
+   "be": false,
+   "dir": "BUY",
+   "dist_pt": 607,
+   "entry": 4372.62,
+   "hit": false,
+   "proj_by": "MT5",
+   "sl": 4362.13,
+   "symbol": "XAUUSD"
+  }
+ ],
  "spot": null,
  "spot_src": null,
  "weekend": false,
- "xm_close": 4409.27
+ "xm_close": 4368.2
 }

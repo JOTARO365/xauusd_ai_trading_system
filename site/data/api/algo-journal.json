@@ -1,48 +1,48 @@
 {
  "combined": {
-  "avg_mae_R": -1.33,
-  "avg_mfe_R": 0.37,
+  "avg_mae_R": -1.35,
+  "avg_mfe_R": 0.35,
   "by_result": {
-   "SL": 2104,
+   "SL": 2407,
    "TIMEOUT": 0,
    "TP": 31
   },
-  "exp_R": -0.983,
-  "n_closed": 2135,
-  "n_open": 2,
-  "sigma_R": 0.357,
-  "sum_R": -2099.18,
-  "win_rate": 0.015
+  "exp_R": -0.988,
+  "n_closed": 2438,
+  "n_open": 1,
+  "sigma_R": 0.334,
+  "sum_R": -2408.37,
+  "win_rate": 0.013
  },
  "fade": {
-  "avg_mae_R": -1.33,
-  "avg_mfe_R": 0.36,
+  "avg_mae_R": -1.35,
+  "avg_mfe_R": 0.35,
   "by_result": {
-   "SL": 2098,
+   "SL": 2397,
    "TIMEOUT": 0,
    "TP": 28
   },
-  "exp_R": -0.987,
-  "n_closed": 2126,
-  "n_open": 0,
-  "sigma_R": 0.34,
-  "sum_R": -2099.06,
-  "win_rate": 0.013
+  "exp_R": -0.991,
+  "n_closed": 2425,
+  "n_open": 1,
+  "sigma_R": 0.318,
+  "sum_R": -2404.2,
+  "win_rate": 0.012
  },
  "momentum": {
-  "avg_mae_R": -0.83,
-  "avg_mfe_R": 1.13,
+  "avg_mae_R": -0.9,
+  "avg_mfe_R": 1.09,
   "by_result": {
-   "SL": 6,
+   "SL": 10,
    "TIMEOUT": 0,
    "TP": 3
   },
-  "exp_R": -0.013,
-  "n_closed": 9,
-  "n_open": 2,
-  "sigma_R": 1.501,
-  "sum_R": -0.11,
-  "win_rate": 0.333
+  "exp_R": -0.32,
+  "n_closed": 13,
+  "n_open": 0,
+  "sigma_R": 1.316,
+  "sum_R": -4.16,
+  "win_rate": 0.231
  },
  "needed_n": {
   "δ=0.2": 389,

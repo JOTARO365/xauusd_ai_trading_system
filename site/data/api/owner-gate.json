@@ -1,7 +1,13 @@
 {
  "manual_shorts": 0,
  "ok": true,
- "vol_pct": 0.29,
- "vol_regime": "low-vol",
- "warnings": []
+ "vol_pct": 0.44,
+ "vol_regime": "mid-vol",
+ "warnings": [
+  {
+   "level": "warn",
+   "msg": "regime MID-VOL — โซนที่พี่เสียต่อเนื่อง (hist −9,672฿ · WR 38% · PF 0.57). ระวัง / ลด size / เลี่ยง",
+   "tag": "MID-VOL"
+  }
+ ]
 }

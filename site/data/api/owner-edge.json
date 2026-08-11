@@ -2,49 +2,41 @@
  "by_dir": [
   {
    "key": "BUY",
-   "n": 245,
-   "pf": 1.6,
-   "top3_pct": 119,
-   "win_rate": 0.498,
-   "wins": 122
-  },
-  {
-   "key": "SELL",
-   "n": 230,
-   "pf": 0.64,
+   "n": 2,
+   "pf": 0.0,
    "top3_pct": null,
-   "win_rate": 0.426,
-   "wins": 98
+   "win_rate": 0.0,
+   "wins": 0
   }
  ],
  "by_regime": [
   {
    "key": "RANGE",
-   "n": 475,
-   "pf": 1.08,
-   "top3_pct": 439,
-   "win_rate": 0.463,
-   "wins": 220
+   "n": 2,
+   "pf": 0.0,
+   "top3_pct": null,
+   "win_rate": 0.0,
+   "wins": 0
   }
  ],
  "by_vol": [
   {
    "key": "mid-vol",
-   "n": 475,
-   "pf": 1.08,
-   "top3_pct": 439,
-   "win_rate": 0.463,
-   "wins": 220
+   "n": 2,
+   "pf": 0.0,
+   "top3_pct": null,
+   "win_rate": 0.0,
+   "wins": 0
   }
  ],
- "n_manual": 475,
- "n_mapped": 475,
+ "n_manual": 2,
+ "n_mapped": 2,
  "ok": true,
  "overall": {
-  "n": 475,
-  "pf": 1.08,
-  "top3_pct": 439,
-  "win_rate": 0.463,
-  "wins": 220
+  "n": 2,
+  "pf": 0.0,
+  "top3_pct": null,
+  "win_rate": 0.0,
+  "wins": 0
  }
 }

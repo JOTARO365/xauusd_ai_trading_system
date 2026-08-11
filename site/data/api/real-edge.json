@@ -1,5 +1,5 @@
 {
- "generated": "2026-08-11T00:23Z",
+ "generated": "2026-08-11T23:41Z",
  "note": "real closed-money edge (net จริง). n น้อย = ยังไม่พอตัดสิน (validated-or-off: n≥100 + gauntlet). ไม่กรอง entry — display เทียบ shadow paper.",
  "ok": true,
  "rows": [
@@ -29,12 +29,12 @@
    "algo_id": "macro_momentum",
    "by_regime": {},
    "by_session": {},
-   "exp_R": 0.052,
-   "n": 1,
-   "n_R": 1,
-   "sum_R": 0.05,
+   "exp_R": -0.475,
+   "n": 2,
+   "n_R": 2,
+   "sum_R": -0.95,
    "symbol": "XAUUSD",
-   "wr": 100.0
+   "wr": 50.0
   },
   {
    "algo_id": "mean_reversion",
@@ -56,6 +56,28 @@
    "n_R": 2,
    "sum_R": -1.52,
    "symbol": "WTIUSD",
+   "wr": 0.0
+  },
+  {
+   "algo_id": "regime_momentum",
+   "by_regime": {},
+   "by_session": {},
+   "exp_R": -1.003,
+   "n": 1,
+   "n_R": 1,
+   "sum_R": -1.0,
+   "symbol": "XAUUSD",
+   "wr": 0.0
+  },
+  {
+   "algo_id": "regime_momentum_fvg",
+   "by_regime": {},
+   "by_session": {},
+   "exp_R": -1.003,
+   "n": 1,
+   "n_R": 1,
+   "sum_R": -1.0,
+   "symbol": "XAUUSD",
    "wr": 0.0
   },
   {
@@ -96,12 +118,12 @@
      "wr": 44.4
     }
    },
-   "exp_R": -0.065,
-   "n": 9,
-   "n_R": 9,
-   "sum_R": -0.58,
+   "exp_R": -0.062,
+   "n": 10,
+   "n_R": 10,
+   "sum_R": -0.62,
    "symbol": "BTCUSD",
-   "wr": 22.2
+   "wr": 20.0
   },
   {
    "algo_id": "tsmom_d1",
@@ -171,6 +193,17 @@
    "sum_R": -2.25,
    "symbol": "USDJPY",
    "wr": 20.0
+  },
+  {
+   "algo_id": "tsmom_d1",
+   "by_regime": {},
+   "by_session": {},
+   "exp_R": 0.142,
+   "n": 1,
+   "n_R": 1,
+   "sum_R": 0.14,
+   "symbol": "WTIUSD",
+   "wr": 100.0
   },
   {
    "algo_id": "tsmom_d1",

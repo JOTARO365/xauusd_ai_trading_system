@@ -1,23 +1,23 @@
 {
- "as_of": "2026-08-11T00:23:00.456169+00:00",
+ "as_of": "2026-08-11T23:41:55.238860+00:00",
  "bias": "NEUTRAL",
  "components": {
   "cot": 0.0652,
   "dxy": -0.0527,
   "fed": 0.0,
-  "gsr": -0.0084,
-  "news": 0.0588,
+  "gsr": 0.0107,
+  "news": 0.1155,
   "real_yield": -0.111,
   "real_yield_chg": -0.0711,
   "risk_regime": 0.03,
-  "vix": -0.0092,
+  "vix": -0.0291,
   "y10": 0.008
  },
- "confidence": 0.71,
+ "confidence": 0.66,
  "coverage": "10/11",
- "driver": "real_yield",
+ "driver": "news",
  "ok": true,
- "score": -8,
+ "score": -3,
  "stale": [
   "macro"
  ],
