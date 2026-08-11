@@ -30,5 +30,15 @@ module.exports = {
       max_restarts: 50,
       restart_delay: 5000,
     },
+    {
+      // public GitHub Pages snapshot — regen+push ทุกชั่วโมง (one-shot; cron_restart รันซ้ำ).
+      // ต้องรันบนเครื่องเทรด (MT5) เท่านั้น. autorestart:false = ไม่วนรัวหลัง exit; cron จุดใหม่ทุกต้นชั่วโมง.
+      name: "public-refresh",
+      script: "pm2_public_refresh.js",
+      cwd: APP_DIR,
+      autorestart: false,
+      cron_restart: "0 * * * *",
+      watch: false,
+    },
   ],
 };

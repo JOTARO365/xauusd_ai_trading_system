@@ -565,6 +565,10 @@ This registers At-LogOn / Interactive scheduled tasks for the bot + dashboard th
 | `scripts/health_check.ps1` | One-shot liveness check: process/PID, `bot_status.json` freshness, MT5 + cycle activity, dashboard `200`, today's token cost vs budget. `exit 0` healthy / `1` problem. |
 | `scripts/apply_vm_config.ps1` | Safely edit the VM `.env` (e.g. `NNLB_EQUITY_PER_LOT`, `CHART_SHADOW`) — backs up first, edits only the target keys (keeps comments), restarts PM2, then verifies. Use `-DryRun` to preview. |
 | `scripts/gen_graph_png.py` | Regenerate the LangGraph diagram (`docs/langgraph_state.png`). |
+| `scripts/export_dashboard_static.py` | Snapshot every display-only `/api` GET into `site/data/api/*.json` (money/account/positions stripped) for the **public GitHub Pages** mirror at `site/index.html`. |
+| `scripts/refresh_public_site.py` (run via `pm2_public_refresh.js`) | One-shot: regenerate the public snapshot, then commit `site/data/api/` and push — GitHub Pages redeploys itself. PM2 app **`public-refresh`** runs it **hourly** (`cron_restart: "0 * * * *"`, `autorestart:false`). |
+
+> **Public page freshness:** the GitHub Pages site is a *static snapshot*, so prices/charts are frozen at the last export — they will not tick live and will lag spot until the next refresh. `public-refresh` keeps it ≤1 h stale. **It must run on the trading machine** (needs MT5); a GitHub Action can't regenerate the data. To refresh manually: `python scripts/refresh_public_site.py`. History stays clean — consecutive snapshots amend one rolling commit (`--force-with-lease`).
 
 > ⚠️ **`.env` is git-ignored** — auto-deploy ships *code* only, never your `.env`. Change runtime config on the VM with `apply_vm_config.ps1` (or edit `.env` + `pm2 restart main`); a `git pull` showing "up-to-date" means code is synced, **not** that `.env` values changed.
 
