@@ -377,6 +377,7 @@ SR_MIN_TOUCHES  = int(os.getenv("SR_MIN_TOUCHES") or 2)      # แนวต้�
 SR_LOOKBACK     = int(os.getenv("SR_LOOKBACK") or 60)        # หา swing pivot กี่แท่งย้อนหลัง
 SR_PIVOT        = int(os.getenv("SR_PIVOT") or 3)            # pivot = local extreme ±กี่แท่ง
 SR_CLUSTER_ATR  = float(os.getenv("SR_CLUSTER_ATR") or 0.3)  # merge แนวห่าง ≤ นี้×ATR เป็นแนวเดียว
+SR_BREAKOUT_ALGOS = os.getenv("SR_BREAKOUT_ALGOS", "regime_momentum,regime_momentum_fvg,macro_momentum,confluence_15m,tsmom_d1")  # algo ยกเว้น gate (คิดตาม breakout ต้องทะลุแนวได้); ที่เหลือ gate ทุกคู่
 CUSTOM_LOT_ENABLE = (os.getenv("CUSTOM_LOT_ENABLE") or "false").lower() == "true"   # ใช้ lot ต่อคู่ (data/pair_lots.json แก้จาก dashboard)
 # trailing หลวมสำหรับ momentum algo (ปล่อยวิ่งถึง TP; replay: trail แน่นตัดกำไร +119%→+12%)
 TRAILING_MOM_MULT = float(os.getenv("TRAILING_MOM_MULT") or 3.0)      # trail กว้าง (×ATR)
@@ -613,6 +614,8 @@ def reload_config():
     SR_LOOKBACK     = int(os.getenv("SR_LOOKBACK") or 60)
     SR_PIVOT        = int(os.getenv("SR_PIVOT") or 3)
     SR_CLUSTER_ATR  = float(os.getenv("SR_CLUSTER_ATR") or 0.3)
+    global SR_BREAKOUT_ALGOS
+    SR_BREAKOUT_ALGOS = os.getenv("SR_BREAKOUT_ALGOS", "regime_momentum,regime_momentum_fvg,macro_momentum,confluence_15m,tsmom_d1")
     global CUSTOM_LOT_ENABLE
     CUSTOM_LOT_ENABLE = (os.getenv("CUSTOM_LOT_ENABLE") or "false").lower() == "true"
     global TRAILING_MOM_MULT, TRAILING_MOM_MIN_R

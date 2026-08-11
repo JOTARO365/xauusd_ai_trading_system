@@ -89,32 +89,31 @@ def params_from_config():
         return DEFAULTS
 
 
-def _combos_allow():
-    """set ของ combo ที่ผ่าน validation (ให้ gate ทำงานเฉพาะตัวที่ backtest พิสูจน์ว่าช่วย).
-    data/sr_gate_combos.json = {"combos": ["algo|SYMBOL", ...]}. ว่าง/ไม่มี = ไม่มีตัวไหน gate."""
-    import json
-    import os
-    p = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "sr_gate_combos.json")
+# breakout/momentum algo = ปล่อยผ่าน gate (edge = ทะลุแนว). ที่เหลือ (fade/reversal) = gate ทุกคู่.
+_BREAKOUT_DEFAULT = "regime_momentum,regime_momentum_fvg,macro_momentum,confluence_15m,tsmom_d1"
+
+
+def _breakout_algos():
+    """set ของ algo ที่ยกเว้น gate (คิดตาม breakout). config.SR_BREAKOUT_ALGOS (comma) override ได้."""
     try:
-        return set(json.load(open(p, encoding="utf-8")).get("combos", []))
+        import config as _c
+        raw = getattr(_c, "SR_BREAKOUT_ALGOS", _BREAKOUT_DEFAULT)
     except Exception:
-        return set()
+        raw = _BREAKOUT_DEFAULT
+    return {a.strip() for a in str(raw).split(",") if a.strip()}
 
 
 def blocks_live(bars, direction, price, atr, algo_id=None, symbol=None):
     """live wrapper: เรียกจาก executor. คืน (block: bool, reason: str).
-    เคารพ flag SR_ENTRY_GATE + allowlist ต่อ combo (เปิดเฉพาะที่ validation ผ่าน)."""
+    เคารพ flag SR_ENTRY_GATE. gate ทุกคู่ ยกเว้น breakout algo (SR_BREAKOUT_ALGOS)."""
     try:
         import config as _c
         if not getattr(_c, "SR_ENTRY_GATE", False):
             return False, ""
     except Exception:
         return False, ""
-    # allowlist: ถ้ามีไฟล์ combos → gate เฉพาะ combo นั้น; ถ้าไม่มีไฟล์ (ว่าง) → gate ทุกตัว (global mode)
-    if algo_id and symbol:
-        allow = _combos_allow()
-        if allow and f"{algo_id}|{symbol}" not in allow:
-            return False, ""
+    if algo_id and algo_id in _breakout_algos():           # breakout algo → ปล่อยผ่าน (ต้องทะลุแนวได้)
+        return False, ""
     try:
         h, l, c = bars[0], bars[1], bars[2]
         if c is None or len(c) < 10:
