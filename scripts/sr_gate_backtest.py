@@ -160,7 +160,26 @@ def main():
             f.write(f"| {'✓' if r['enable'] else ''} | {r['algo']} | {r['pair']} | {r['tf']} | {of} | {onf} | {dd} | {r['why']} |\n")
         f.write(f"\n**เปิด live {len(passing)} combo:** {', '.join(passing) or '(ไม่มี combo ผ่าน)'}\n")
 
-    print(f"\nเปิด live {len(passing)} combo → {COMBOS_OUT}")
+    # aggregate (global gate lens): กี่ combo ดีขึ้น/แย่ลง, Δexp_R เฉลี่ย, ตัวที่ flip +EV
+    ev = [r for r in rows if r["off"] and r["on"]]
+    deltas = [r["on"]["exp_R"] - r["off"]["exp_R"] for r in ev]
+    up = sum(1 for d in deltas if d > 0.0005)
+    dn = sum(1 for d in deltas if d < -0.0005)
+    flat = len(ev) - up - dn
+    avg = sum(deltas) / len(deltas) if deltas else 0.0
+    flip = [f"{r['algo']}|{r['pair']}" for r in ev if r["off"]["exp_R"] <= 0 < r["on"]["exp_R"]]
+    lost = [f"{r['algo']}|{r['pair']}" for r in ev if r["off"]["exp_R"] > 0 >= r["on"]["exp_R"]]
+    with open(REPORT_OUT, "a", encoding="utf-8") as f:
+        f.write(f"\n## Global gate aggregate ({len(ev)} combo มีผล)\n\n")
+        f.write(f"- Δexp_R > 0 (ดีขึ้น): **{up}** · < 0 (แย่ลง): **{dn}** · ~เท่าเดิม: {flat}\n")
+        f.write(f"- Δexp_R เฉลี่ยทั้งพอร์ต: **{avg:+.4f} R**\n")
+        f.write(f"- flip เป็น +EV เพราะ gate: {', '.join(flip) or '(ไม่มี)'}\n")
+        f.write(f"- หลุด +EV เพราะ gate: {', '.join(lost) or '(ไม่มี)'}\n")
+    print(f"\n=== GLOBAL GATE AGGREGATE ({len(ev)} combo) ===")
+    print(f"  ดีขึ้น {up} · แย่ลง {dn} · เท่าเดิม {flat} · Δexp_R เฉลี่ย {avg:+.4f}R")
+    print(f"  flip→+EV: {flip or '(ไม่มี)'}")
+    print(f"  หลุด+EV: {lost or '(ไม่มี)'}")
+    print(f"\nผ่านเกณฑ์ live เข้ม {len(passing)} combo → {COMBOS_OUT}")
     for cc in passing:
         print(f"   ✓ {cc}")
     print(f"report → {REPORT_OUT}")
