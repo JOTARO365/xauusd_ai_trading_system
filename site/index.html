@@ -38,6 +38,9 @@
       return _f(url, opts);
     };
   })();
+  /* public snapshots drop money/account fields → keys absent. _m() degrades a
+     missing money value to an em-dash instead of "undefined฿"/"NaN฿"/a throw. */
+  function _m(v){ return (v==null || (typeof v==='number' && !isFinite(v))) ? '—' : v; }
   </script>
 
   <style>
@@ -2679,9 +2682,9 @@ async function loadGapMonitor() {
         ? (p.be ? '<span style="color:var(--green)">จะชน SL แต่ BE = ปิดกำไร ✓</span>'
                 : '<span style="color:var(--red)">⚠ จะชน SL = ขาดทุน</span>')
         : `<span style="color:var(--muted)">ปลอดภัย (ห่าง ${p.dist_pt}pt)</span>`;
-      const pc = p.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+      const pc = p.pnl == null ? 'var(--muted)' : (p.pnl >= 0 ? 'var(--green)' : 'var(--red)');
       return `<div style="padding:2px 0;font-family:var(--mono);font-size:12px">
-        <b>${p.symbol}</b> TK${p.ticket} ${p.dir} · SL ${p.sl} · <span style="color:${pc}">${p.pnl >= 0 ? '+' : ''}${p.pnl}</span>
+        <b>${p.symbol}</b> TK${p.ticket} ${p.dir} · SL ${p.sl} · <span style="color:${pc}">${_m(p.pnl)}</span>
         <span style="color:var(--muted);font-size:10px">(${p.proj_by})</span> — ${tag}</div>`;
     }).join('') || '<div style="color:var(--muted)">ไม่มีไม้ระบบเปิด</div>';
     body.innerHTML =
@@ -2816,11 +2819,10 @@ function updateStats(stats) {
     etEl.innerHTML = etKeys.map(k => {
       const s   = etStats[k];
       const wr  = s.count ? Math.round(s.wins / s.count * 100) : 0;
-      const pnlColor = s.pnl >= 0 ? 'var(--green)' : 'var(--red)';
-      const pnlSign  = s.pnl >= 0 ? '+' : '';
+      const pnlColor = s.pnl == null ? 'var(--muted)' : (s.pnl >= 0 ? 'var(--green)' : 'var(--red)');
       return `<div style="display:flex;justify-content:space-between;gap:16px;padding:1px 0">
         <span style="color:var(--text)">${k}</span>
-        <span>${s.count} &middot; ${wr}% WR &middot; <span style="color:${pnlColor}">${pnlSign}${s.pnl.toFixed(2)}</span></span>
+        <span>${s.count} &middot; ${wr}% WR &middot; <span style="color:${pnlColor}">${_m(s.pnl)}</span></span>
       </div>`;
     }).join('');
   }
@@ -3568,7 +3570,7 @@ async function loadBurn() {
     const todayEl  = document.getElementById('burn-today');
     const statusEl = document.getElementById('burn-today-status');
     if (todayEl) {
-      todayEl.textContent = todayThb.toFixed(0) + ' ฿';
+      todayEl.textContent = _m(data.today_thb);
       if (todayThb === 0) {
         todayEl.className = 'value';
         if (statusEl) statusEl.textContent = 'target ' + tMin + '–' + tMax + ' ฿';
@@ -3589,14 +3591,14 @@ async function loadBurn() {
     if (histEl && days.length) {
       const recent = days.slice(-14);
       histEl.innerHTML = recent.map(d => {
-        const thb  = (d.thb || 0).toFixed(0);
+        const thb  = _m(d.thb);
         const date = d.date ? d.date.slice(5) : '';
         let col = 'var(--muted)';
         let tag = '';
         if (d.vs_target === 'in')   { col = 'var(--green)'; tag = '●'; }
         else if (d.vs_target === 'over') { col = 'var(--red)';   tag = '▲'; }
         else                         { tag = '○'; }
-        return `<span style="color:${col};margin-right:14px">${tag} ${date} <strong>${thb}฿</strong></span>`;
+        return `<span style="color:${col};margin-right:14px">${tag} ${date} <strong>${thb}</strong></span>`;
       }).join('');
     } else if (histEl) {
       histEl.textContent = 'No data — run scripts/report_burn.py first';
@@ -4037,8 +4039,8 @@ async function loadTsmom() {
     const p = d.position;
     if (p) {
       const pc = p.direction === 'BUY' ? 'var(--green)' : 'var(--red)';
-      set('ts-position', `<b style="color:${pc}">${p.direction}</b> ${p.lot} lot @ ${p.entry} <span style="color:var(--muted)">(${p.days}d)</span>`);
-      set('ts-pnl', (p.profit >= 0 ? '+' : '') + p.profit, p.profit >= 0 ? 'var(--green)' : 'var(--red)');
+      set('ts-position', `<b style="color:${pc}">${p.direction}</b> ${_m(p.lot)} lot @ ${p.entry} <span style="color:var(--muted)">(${p.days}d)</span>`);
+      set('ts-pnl', _m(p.profit), p.profit == null ? 'var(--muted)' : (p.profit >= 0 ? 'var(--green)' : 'var(--red)'));
     } else {
       set('ts-position', '<span style="color:var(--muted)">ไม่มี position</span>'); set('ts-pnl', '—', 'var(--muted)');
     }
@@ -4050,7 +4052,7 @@ async function loadTsmom() {
       if (w) {
         cw.style.display = '';
         cw.innerHTML = `⚠️ CAPITAL WARNING — เสี่ยง <b>${w.risk_pct}%</b>/ไม้ &gt; เพดาน ${w.threshold}% · ` +
-          `ทุน ${w.equity.toLocaleString()}฿ · ควรมี ~<b>${w.needed.toLocaleString()}฿</b> ถึงจะเหมาะ ` +
+          `ทุน ${_m(w.equity)} · ควรมี ~<b>${_m(w.needed)}</b> ถึงจะเหมาะ ` +
           `(เข้า order ต่อ — ระวังพอร์ตหมดเร็ว)`;
       } else { cw.style.display = 'none'; }
     }
@@ -4602,16 +4604,16 @@ async function loadOwnerEdge() {
     const o = d.overall || {};
     const ov = document.getElementById('oe-overall');
     if (ov) ov.innerHTML = `รวม ${o.n} ออเดอร์ · WR ${Math.round((o.win_rate || 0) * 100)}% · net `
-      + `<span style="color:${o.net >= 0 ? 'var(--green)' : 'var(--red)'}">${o.net >= 0 ? '+' : ''}${o.net}฿</span> · PF ${o.pf} `
+      + `<span style="color:${o.net == null ? 'var(--muted)' : (o.net >= 0 ? 'var(--green)' : 'var(--red)')}">${_m(o.net)}</span> · PF ${_m(o.pf)} `
       + `<span style="color:var(--muted)">(map vol ${d.n_mapped}/${d.n_manual})</span>`;
     const tbl = (title, rows) => {
       if (!(rows || []).length) return '';
       const body = rows.map(r => {
-        const nc = r.net >= 0 ? 'var(--green)' : 'var(--red)';
+        const nc = r.net == null ? 'var(--muted)' : (r.net >= 0 ? 'var(--green)' : 'var(--red)');
         const out = (r.top3_pct != null && r.top3_pct > 60) ? ` <span style="color:var(--gold)" title="net ${r.top3_pct}% มาจาก 3 ออเดอร์ใหญ่ = outlier">⚠${r.top3_pct}%</span>` : '';
         return `<tr style="text-align:left"><td style="text-align:left;padding:4px 8px">${r.key}</td>`
           + `<td>${r.n}</td><td>${Math.round(r.win_rate * 100)}%</td>`
-          + `<td style="color:${nc}">${r.net >= 0 ? '+' : ''}${r.net}${out}</td><td>${r.avg}</td><td>${r.pf}</td></tr>`;
+          + `<td style="color:${nc}">${_m(r.net)}${out}</td><td>${_m(r.avg)}</td><td>${_m(r.pf)}</td></tr>`;
       }).join('');
       return `<div style="margin-bottom:8px"><div style="color:var(--gold);font-size:11px;margin:4px 0">${title}</div>`
         + `<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="color:var(--muted);text-align:left">`
@@ -4630,7 +4632,7 @@ async function loadDailySummary() {
     _dsData = d;
     const sel = document.getElementById('ds-day');
     if (sel) sel.innerHTML = (d.days || []).map(x =>
-      `<option value="${x.date}">${x.date} (${x.n} ออเดอร์${x.open ? ' · ' + x.open + ' open' : ''} · net ${x.net_pnl >= 0 ? '+' : ''}${x.net_pnl}฿)</option>`
+      `<option value="${x.date}">${x.date} (${x.n} ออเดอร์${x.open ? ' · ' + x.open + ' open' : ''} · net ${_m(x.net_pnl)})</option>`
     ).join('') || '<option value="">ไม่มีข้อมูล</option>';
     if ((d.days || []).length) renderDay(d.days[0].date);   // default: วันล่าสุด
   } catch (_e) {}
@@ -4643,15 +4645,15 @@ function renderDay(date) {
   const tot = document.getElementById('ds-totals');
   if (!tb) return;
   if (!day) { tb.innerHTML = '<tr><td colspan="6" style="padding:4px 8px;color:var(--muted)">—</td></tr>'; return; }
-  const pc = day.net_pnl >= 0 ? 'var(--green)' : 'var(--red)';
+  const pc = day.net_pnl == null ? 'var(--muted)' : (day.net_pnl >= 0 ? 'var(--green)' : 'var(--red)');
   const techs = Object.entries(day.techniques || {}).map(([k, v]) => `${k}×${v}`).join(', ');
-  const openTxt = (day.open ? ` · <span style="color:var(--gold)">${day.open} open</span> (float ${day.float_pnl >= 0 ? '+' : ''}${day.float_pnl}฿)` : '')
+  const openTxt = (day.open ? ` · <span style="color:var(--gold)">${day.open} open</span> (float ${_m(day.float_pnl)})` : '')
     + (day.pending ? ` · <span style="color:var(--cyan,#4fd1e0)">${day.pending} pending (algo รอ fill)</span>` : '');
   if (tot) tot.innerHTML = `<b>${day.date}</b> · regime <b>${day.regime}</b> · ${day.n} ออเดอร์ ${day.wins}/${day.losses} `
-    + `(WR ${Math.round(day.win_rate * 100)}%) · net <span style="color:${pc}">${day.net_pnl >= 0 ? '+' : ''}${day.net_pnl}฿</span>${openTxt} · ${techs}`;
+    + `(WR ${Math.round(day.win_rate * 100)}%) · net <span style="color:${pc}">${_m(day.net_pnl)}</span>${openTxt} · ${techs}`;
   tb.innerHTML = (day.trades || []).map(t => {
     const isOpen = t.status === 'OPEN', isPend = t.status === 'PENDING';
-    const pnlTxt = isPend ? 'PENDING' : (t.pnl === null || t.pnl === undefined ? 'OPEN' : (t.pnl >= 0 ? '+' : '') + t.pnl);
+    const pnlTxt = isPend ? 'PENDING' : (t.pnl === null || t.pnl === undefined ? 'OPEN' : _m(t.pnl));
     const tp = (isPend || t.pnl === null || t.pnl === undefined) ? 'var(--gold)' : (t.pnl >= 0 ? 'var(--green)' : 'var(--red)');
     const dc = t.dir === 'BUY' ? 'var(--green)' : (t.dir === 'SELL' ? 'var(--red)' : 'var(--muted)');
     const mark = isPend ? ' <span style="color:var(--cyan,#4fd1e0);font-size:9px">◇PEND</span>'
@@ -4697,8 +4699,8 @@ async function loadRegimeAnalytics() {
         wl.textContent = wk.note || 'ยังไม่มี shadow data';
       } else {
         wl.innerHTML = wk.weeks.map(w => {
-          const pc = (w.pnl || 0) >= 0 ? 'var(--green)' : 'var(--red)';
-          return `<div>${w.week} — N=${w.n} · WR ${Math.round((w.wr || 0) * 100)}% · <span style="color:${pc}">PnL ${w.pnl}฿</span></div>`;
+          const pc = w.pnl == null ? 'var(--muted)' : (w.pnl >= 0 ? 'var(--green)' : 'var(--red)');
+          return `<div>${w.week} — N=${w.n} · WR ${Math.round((w.wr || 0) * 100)}% · <span style="color:${pc}">PnL ${_m(w.pnl)}</span></div>`;
         }).join('');
       }
     }
@@ -4716,7 +4718,7 @@ async function loadRegimeAnalytics() {
           const dec = mr.decay && mr.decay.decaying;
           const col = dec ? 'var(--red)' : ((mr.n || 0) >= 389 ? 'var(--green)' : 'var(--muted)');
           mel.innerHTML = `<span style="color:${col};font-weight:600">${mr.verdict || ''}</span>` +
-            ((mr.n || 0) ? `<br>N=${mr.n} · WR=${((mr.wr || 0) * 100).toFixed(0)}% · expR=${mr.exp_R != null ? mr.exp_R : '—'} · PnL=${mr.pnl || 0}฿` : '');
+            ((mr.n || 0) ? `<br>N=${mr.n} · WR=${((mr.wr || 0) * 100).toFixed(0)}% · expR=${mr.exp_R != null ? mr.exp_R : '—'} · PnL=${_m(mr.pnl)}` : '');
         }
       }
     } catch (_e) {}
@@ -4758,8 +4760,8 @@ async function loadCalibration() {
       const barW      = Math.max(1, Math.min(100, Math.round(realPct)));
       const predW     = Math.max(1, Math.min(100, Math.round(predicted)));
       const col       = realPct >= predicted ? 'var(--green)' : 'var(--red)';
-      const pnlCol    = b.pnl >= 0 ? 'var(--green)' : 'var(--red)';
-      const pnlStr    = (b.pnl >= 0 ? '+' : '') + b.pnl.toFixed(0);
+      const pnlCol    = b.pnl == null ? 'var(--muted)' : (b.pnl >= 0 ? 'var(--green)' : 'var(--red)');
+      const pnlStr    = _m(b.pnl);
 
       return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">` +
         `<span style="width:54px;text-align:right;color:var(--muted)">${b.conf_lo}&ndash;${b.conf_hi}</span>` +
@@ -4821,7 +4823,7 @@ async function loadNewsGate() {
     set('ng-wr', wr == null ? '—' : wr + '%');
     set('ng-wl', (d.win || 0) + 'W / ' + (d.loss || 0) + 'L');
     const pnlEl = document.getElementById('ng-pnl');
-    if (pnlEl) { pnlEl.textContent = (pnl > 0 ? '+' : '') + pnl.toFixed(0); pnlEl.className = 'value ' + (pnl > 0 ? 'green' : pnl < 0 ? 'red' : ''); }
+    if (pnlEl) { pnlEl.textContent = _m(d.pnl); pnlEl.className = 'value ' + (d.pnl == null ? '' : (d.pnl > 0 ? 'green' : d.pnl < 0 ? 'red' : '')); }
     // Verdict: honest — n<20 = collecting, else PnL/WR based
     const vEl = document.getElementById('ng-verdict');
     if (vEl) {
@@ -4834,11 +4836,11 @@ async function loadNewsGate() {
     if (t) {
       const rows = (d.trades || []).slice(0, 8);
       t.innerHTML = rows.length ? rows.map(r => {
-        const col = r.pnl > 0 ? 'var(--green)' : r.pnl < 0 ? 'var(--red)' : 'var(--muted)';
+        const col = r.pnl == null ? 'var(--muted)' : (r.pnl > 0 ? 'var(--green)' : r.pnl < 0 ? 'var(--red)' : 'var(--muted)');
         const st  = r.closed ? '' : ' <span style="color:var(--gold)">(open)</span>';
         return '<div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.05);padding:3px 0">' +
           '<span>' + r.time + ' · ' + r.dir + st + '</span>' +
-          '<span style="color:' + col + '">' + (r.pnl > 0 ? '+' : '') + r.pnl.toFixed(0) + '฿</span></div>';
+          '<span style="color:' + col + '">' + _m(r.pnl) + '</span></div>';
       }).join('') : 'ยังไม่มีออเดอร์ที่ relax ตัดสิน (โปรดเปิดใช้งาน NEWS_GATE ก่อน)';
     }
   } catch (e) { console.error('loadNewsGate error:', e); }
@@ -6428,10 +6430,10 @@ async function loadRideStats() {
     wrEl.textContent = d.wr === null ? 'รอออเดอร์แรก' : d.wr + '%';
     wrEl.className = 'value ' + (d.wr === null ? '' : d.wr >= 50 ? 'green' : 'red');
     const pnlEl = document.getElementById('ride-pnl');
-    pnlEl.textContent = (d.pnl >= 0 ? '+' : '') + d.pnl.toFixed(2);
-    pnlEl.className = 'value ' + (d.pnl > 0 ? 'green' : d.pnl < 0 ? 'red' : 'gold');
+    pnlEl.textContent = _m(d.pnl);
+    pnlEl.className = 'value ' + (d.pnl == null ? '' : (d.pnl > 0 ? 'green' : d.pnl < 0 ? 'red' : 'gold'));
     document.getElementById('ride-recent').innerHTML = (d.recent || []).length
-      ? d.recent.map(t => `${t.time.slice(5)} ${t.dir} ${t.pnl >= 0 ? '+' : ''}${t.pnl}${t.closed ? '' : ' (open)'}`).join('<br>')
+      ? d.recent.map(t => `${t.time.slice(5)} ${t.dir} ${_m(t.pnl)}${t.closed ? '' : ' (open)'}`).join('<br>')
       : 'ยังไม่มีออเดอร์ RIDE — รอ setup แรก';
   } catch (e) {}
 }
@@ -6522,14 +6524,13 @@ function renderEventCard(bs) {
    BACKTEST
    ════════════════════════════════════════════════════════════ */
 function _btRow(key, b) {
-  const pnlColor = b.pnl >= 0 ? 'var(--green)' : 'var(--red)';
-  const pnlSign = b.pnl >= 0 ? '+' : '';
+  const pnlColor = b.pnl == null ? 'var(--muted)' : (b.pnl >= 0 ? 'var(--green)' : 'var(--red)');
   const wrColor = b.win_rate >= 55 ? 'var(--green)' : b.win_rate >= 45 ? 'var(--gold)' : 'var(--red)';
   return `<tr>
     <td style="font-weight:600">${key}</td>
     <td class="num">${b.count}</td>
     <td class="num" style="color:${wrColor};font-weight:700;font-size:13px">${b.win_rate}%</td>
-    <td class="num" style="color:${pnlColor};font-weight:700;font-size:13px">${pnlSign}${b.pnl.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿</td>
+    <td class="num" style="color:${pnlColor};font-weight:700;font-size:13px">${_m(b.pnl)}</td>
   </tr>`;
 }
 
@@ -6681,16 +6682,16 @@ async function loadRiskSat() {
     const d = await (await fetch('/api/risk-sat')).json();
     if (d.collecting) { el.innerHTML = '<span style="color:var(--gold)">' + (d.note || 'collecting') + '</span>'; return; }
     if (!d.ok) { el.textContent = 'ไม่มีข้อมูล'; return; }
-    const c = v => (v >= 0 ? 'var(--green)' : 'var(--red)');
+    const c = v => (v == null ? 'var(--muted)' : (v >= 0 ? 'var(--green)' : 'var(--red)'));
     el.innerHTML =
       '<div style="display:flex;gap:18px;flex-wrap:wrap">'
-      + '<div>Sharpe <b style="color:' + c(d.sharpe) + '">' + d.sharpe + '</b></div>'
-      + '<div>Max DD <b style="color:var(--red)">' + d.max_dd_pct + '%</b> (' + d.max_dd_days + ' วัน)</div>'
-      + '<div>WR <b>' + d.wr + '%</b></div>'
-      + '<div>net PnL <b style="color:' + c(d.total_pnl) + '">' + d.total_pnl + '฿</b></div>'
-      + '<div>n <b>' + d.n + '</b> (' + d.span_days + ' วัน)</div></div>'
-      + '<div style="margin-top:8px">VaR95 <b>' + d.var95_hist + '฿</b>(hist)/' + d.var95_param + '(param) · '
-      + 'VaR99 <b>' + d.var99_hist + '฿</b>/' + d.var99_param + '</div>'
+      + '<div>Sharpe <b style="color:' + c(d.sharpe) + '">' + _m(d.sharpe) + '</b></div>'
+      + '<div>Max DD <b style="color:var(--red)">' + _m(d.max_dd_pct) + '%</b> (' + _m(d.max_dd_days) + ' วัน)</div>'
+      + '<div>WR <b>' + _m(d.wr) + '%</b></div>'
+      + '<div>net PnL <b style="color:' + c(d.total_pnl) + '">' + _m(d.total_pnl) + '</b></div>'
+      + '<div>n <b>' + _m(d.n) + '</b> (' + _m(d.span_days) + ' วัน)</div></div>'
+      + '<div style="margin-top:8px">VaR95 <b>' + _m(d.var95_hist) + '</b>(hist)/' + _m(d.var95_param) + '(param) · '
+      + 'VaR99 <b>' + _m(d.var99_hist) + '</b>/' + _m(d.var99_param) + '</div>'
       + '<div style="color:var(--muted);font-size:10px;margin-top:4px">' + (d.note || '') + '</div>';
   } catch (e) { el.textContent = 'เชื่อมต่อ /api/risk-sat ไม่ได้'; }
 }
@@ -6701,7 +6702,7 @@ async function loadEquityCurve() {
     const d = await (await fetch('/api/equity-curve')).json();
     const pts = d.points || [];
     document.getElementById('equity-note').textContent =
-      pts.length ? ('n=' + d.n + ' · เริ่ม ' + d.start_equity + '฿') : 'ยังไม่มีไม้ปิด';
+      pts.length ? ('n=' + _m(d.n) + ' · เริ่ม ' + _m(d.start_equity)) : 'ยังไม่มีไม้ปิด';
     if (pts.length < 2) { svg.innerHTML = ''; return; }
     const W = Math.max(600, svg.clientWidth || 600), H = 220, pad = 30;
     const eqs = pts.map(p => p.equity), dds = pts.map(p => p.dd_pct);
