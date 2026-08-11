@@ -580,6 +580,15 @@ def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max
                     return 0
     except Exception:
         pass
+    try:                                                       # S/R entry gate: BUY ชนแนวต้านแข็งใกล้/SELL ชนแนวรับแข็ง → skip
+        from agents import sr_entry_gate as _srg              # (SR_ENTRY_GATE off หรือ combo ไม่อยู่ allowlist → no-op)
+        _atr_l = _simple_atr(*bars[:3]); _atr_g = _atr_l[-1] if _atr_l else 0.0
+        _blk, _why = _srg.blocks_live(bars, vo.get("dir"), float(vo["entry"]), _atr_g, algo_id, symbol)
+        if _blk:
+            logger.debug(f"[MSE] {algo_id}:{symbol} {vo.get('dir')} skip — {_why}")
+            return 0
+    except Exception:
+        pass
     if vo["bar_ts"] == combo_state.get("last_bar_ts"):
         return 0                                                # เข้าไม้บาร์นี้ **สำเร็จ**ไปแล้ว (dedup ต่อ signal-bar)
     if _signal_stale(vo["bar_ts"], algo):                       # cold-start: บาร์ปิดก่อน engine เริ่ม = stale

@@ -369,6 +369,14 @@ FF_SIZING_ENABLE = (os.getenv("FF_SIZING_ENABLE") or "false").lower() == "true"
 FF_RISK_PCT = float(os.getenv("FF_RISK_PCT") or 1.0)
 ATR_SL_SMALL_CAP = (os.getenv("ATR_SL_SMALL_CAP") or "false").lower() == "true"   # ทุน<FLOOR → ATR SL แทน structural (ให้ FF คุม DD)
 SEASONALITY_GATE = (os.getenv("SEASONALITY_GATE") or "false").lower() == "true"   # ทอง: ไม่สวน seasonal แรง (ม.ค/ธ.ค bull, มิ.ย/ก.ย/พ.ย weak; validated t>2)
+# S/R entry gate (agents/sr_entry_gate.py): BUY ชนแนวต้านแข็งใกล้/SELL ชนแนวรับแข็งใกล้ → block. momentum-aware
+# (แนวที่ทะลุแล้วผ่านเอง). เปิดเฉพาะ combo ที่ผ่าน sr_gate_backtest → data/sr_gate_combos.json (ว่าง=ทุก combo)
+SR_ENTRY_GATE   = (os.getenv("SR_ENTRY_GATE") or "false").lower() == "true"
+SR_BLOCK_ATR    = float(os.getenv("SR_BLOCK_ATR") or 0.5)    # block ถ้าแนวใกล้ ≤ นี้×ATR
+SR_MIN_TOUCHES  = int(os.getenv("SR_MIN_TOUCHES") or 2)      # แนวต้อง touch ≥ นี้ (แข็ง) ถึง block
+SR_LOOKBACK     = int(os.getenv("SR_LOOKBACK") or 60)        # หา swing pivot กี่แท่งย้อนหลัง
+SR_PIVOT        = int(os.getenv("SR_PIVOT") or 3)            # pivot = local extreme ±กี่แท่ง
+SR_CLUSTER_ATR  = float(os.getenv("SR_CLUSTER_ATR") or 0.3)  # merge แนวห่าง ≤ นี้×ATR เป็นแนวเดียว
 CUSTOM_LOT_ENABLE = (os.getenv("CUSTOM_LOT_ENABLE") or "false").lower() == "true"   # ใช้ lot ต่อคู่ (data/pair_lots.json แก้จาก dashboard)
 # trailing หลวมสำหรับ momentum algo (ปล่อยวิ่งถึง TP; replay: trail แน่นตัดกำไร +119%→+12%)
 TRAILING_MOM_MULT = float(os.getenv("TRAILING_MOM_MULT") or 3.0)      # trail กว้าง (×ATR)
@@ -598,6 +606,13 @@ def reload_config():
     ATR_SL_SMALL_CAP = (os.getenv("ATR_SL_SMALL_CAP") or "false").lower() == "true"
     global SEASONALITY_GATE
     SEASONALITY_GATE = (os.getenv("SEASONALITY_GATE") or "false").lower() == "true"
+    global SR_ENTRY_GATE, SR_BLOCK_ATR, SR_MIN_TOUCHES, SR_LOOKBACK, SR_PIVOT, SR_CLUSTER_ATR
+    SR_ENTRY_GATE   = (os.getenv("SR_ENTRY_GATE") or "false").lower() == "true"
+    SR_BLOCK_ATR    = float(os.getenv("SR_BLOCK_ATR") or 0.5)
+    SR_MIN_TOUCHES  = int(os.getenv("SR_MIN_TOUCHES") or 2)
+    SR_LOOKBACK     = int(os.getenv("SR_LOOKBACK") or 60)
+    SR_PIVOT        = int(os.getenv("SR_PIVOT") or 3)
+    SR_CLUSTER_ATR  = float(os.getenv("SR_CLUSTER_ATR") or 0.3)
     global CUSTOM_LOT_ENABLE
     CUSTOM_LOT_ENABLE = (os.getenv("CUSTOM_LOT_ENABLE") or "false").lower() == "true"
     global TRAILING_MOM_MULT, TRAILING_MOM_MIN_R

@@ -75,7 +75,7 @@ def _season_bt(sym, d, tm, i):
         return False
 
 
-def bt_momentum(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, trend=True, mh=120, tm=None, sym=None):
+def bt_momentum(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, trend=True, mh=120, tm=None, sym=None, gate=None):
     atr = R.atr(h, l, c); er = R.efficiency_ratio(c); adx = R.adx(h, l, c); vp = R.vol_percentile(c)
     n = len(c); tr = []; i = max(R.VOL_LOOKBACK, brk) + 2
     while i < n - 1:
@@ -86,12 +86,14 @@ def bt_momentum(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, trend=True, mh=12
         d = 1 if px > hh else -1 if px < ll else 0
         if not d or _season_bt(sym, d, tm, i):
             i += 1; continue
+        if gate and gate(h, l, i, px, d, av):
+            i += 1; continue
         r, ei = _resolve(h, l, c, i, d, px, sl_atr * av / pt, rr, pt, cost, mh)
         tr.append(r); i = ei + 1
     return tr
 
 
-def bt_momentum_fvg(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, mh=120, fvg_lb=6, tm=None, sym=None):
+def bt_momentum_fvg(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, mh=120, fvg_lb=6, tm=None, sym=None, gate=None):
     """regime_momentum_fvg: bt_momentum + FVG confluence filter (ตรงกับ MomentumFVGAlgo live).
     ต้องมี FVG หนุนทิศใน fvg_lb แท่งก่อน entry: bull low[j]>high[j-2] / bear high[j]<low[j-2] ไม่งั้น skip."""
     atr = R.atr(h, l, c); er = R.efficiency_ratio(c); adx = R.adx(h, l, c); vp = R.vol_percentile(c)
@@ -112,6 +114,8 @@ def bt_momentum_fvg(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, mh=120, fvg_l
                 ok = True; break
         if not ok:
             i += 1; continue                                # ไม่มี FVG → skip (filter จริง)
+        if gate and gate(h, l, i, px, d, av):
+            i += 1; continue
         r, ei = _resolve(h, l, c, i, d, px, sl_atr * av / pt, rr, pt, cost, mh)
         tr.append(r); i = ei + 1
     return tr
@@ -145,7 +149,7 @@ def bt_tsmom(h, l, c, cost_price, lbs=(21, 63, 126), confirm=21, sl_atr=3.0):
     return tr
 
 
-def bt_meanrev(h, l, c, cost, pt, win=20, z=1.25, s_stop=2.5, hl_max=10, sl_atr=1.5, tk=3):
+def bt_meanrev(h, l, c, cost, pt, win=20, z=1.25, s_stop=2.5, hl_max=10, sl_atr=1.5, tk=3, gate=None):
     """ตรง algo_mean_reversion live: win20 · RANGE-only · OU half-life gate · zone SL (m∓2.5σ, floor ATR)
     · TP=กลับ mean · time-stop 3×half-life (audit fix 08-09; เดิม win60/NEUTRAL+RANGE/fixed SL/rr1 = คนละ algo)."""
     atr = R.atr(h, l, c); er = R.efficiency_ratio(c); adx = R.adx(h, l, c); vp = R.vol_percentile(c)
@@ -166,6 +170,8 @@ def bt_meanrev(h, l, c, cost, pt, win=20, z=1.25, s_stop=2.5, hl_max=10, sl_atr=
         if not d:
             i += 1; continue
         px = float(c[i])
+        if gate and gate(h, l, i, px, d, av):
+            i += 1; continue
         sl_price = (m - s_stop * sd) if d > 0 else (m + s_stop * sd)         # zone SL เลย band
         sl_dist = max(abs(px - sl_price), sl_atr * av)                       # floor ด้วย ATR
         tp_dist = max(abs(px - m), sl_atr * av)                              # TP = กลับ mean
@@ -184,7 +190,7 @@ def bt_meanrev(h, l, c, cost, pt, win=20, z=1.25, s_stop=2.5, hl_max=10, sl_atr=
     return tr
 
 
-def bt_sweep(h, l, c, tm, cost, pt, rr=1.5, buf_atr=0.5, mh=120):
+def bt_sweep(h, l, c, tm, cost, pt, rr=1.5, buf_atr=0.5, mh=120, gate=None):
     atr = R.atr(h, l, c); er = R.efficiency_ratio(c); adx = R.adx(h, l, c); vp = R.vol_percentile(c)
     day = np.array([datetime.fromtimestamp(int(t), timezone.utc).toordinal() for t in tm])
     n = len(c); pdh = np.full(n, np.nan); pdl = np.full(n, np.nan)
@@ -207,6 +213,8 @@ def bt_sweep(h, l, c, tm, cost, pt, rr=1.5, buf_atr=0.5, mh=120):
             d = -1; swept = float(h[i])                   # SELL: sweep prior-day high
         if not d:
             i += 1; continue
+        if gate and gate(h, l, i, px, d, av):
+            i += 1; continue
         # SL เลยปลาย sweep wick + buf×ATR (ตรง SweepReversalAlgo live; เดิม fixed 1.0×ATR = ผิด)
         sl_price = swept - d * buf_atr * av
         sl_pips = abs(px - sl_price) / pt
@@ -217,7 +225,7 @@ def bt_sweep(h, l, c, tm, cost, pt, rr=1.5, buf_atr=0.5, mh=120):
     return tr
 
 
-def bt_macro(h, l, c, macro, cost, pt, brk=20, mlb=24, rr=2.0, sl_atr=1.5, mh=120, msign=1, tm=None, sym=None):
+def bt_macro(h, l, c, macro, cost, pt, brk=20, mlb=24, rr=2.0, sl_atr=1.5, mh=120, msign=1, tm=None, sym=None, gate=None):
     atr = R.atr(h, l, c); n = len(c); tr = []; i = max(R.VOL_LOOKBACK, brk, mlb) + 2
     while i < n - 1:
         av = float(atr[i]) if atr[i] == atr[i] else 0.0
@@ -230,6 +238,8 @@ def bt_macro(h, l, c, macro, cost, pt, brk=20, mlb=24, rr=2.0, sl_atr=1.5, mh=12
         if d != (1 if msign * (macro[i] - macro[i - mlb]) > 0 else -1):   # USD-factor ต่อคู่ (structural sign)
             i += 1; continue
         if _season_bt(sym, d, tm, i):
+            i += 1; continue
+        if gate and gate(h, l, i, px, d, av):
             i += 1; continue
         r, ei = _resolve(h, l, c, i, d, px, sl_atr * av / pt, rr, pt, cost, mh)
         tr.append(r); i = ei + 1
@@ -246,7 +256,7 @@ def _htf_slope_map(m15_time, htf_time, htf_close, ema_n=50):
     return slope[idx]
 
 
-def bt_conf15m(mt5, sym, e_broker, cost, pt, brk=12, rr=2.0, sl_atr=1.0, vk=1.5, mh=48, session=None, season_sym=None):
+def bt_conf15m(mt5, sym, e_broker, cost, pt, brk=12, rr=2.0, sl_atr=1.0, vk=1.5, mh=48, session=None, season_sym=None, gate=None):
     """confluence_15m ต่อคู่: 15m breakout + H1+H4+macro ตรง + volume surge. คืน list R.
     session: override 'lo-hi' UTC (None → config default สำหรับ XAU)."""
     m = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M15, 0, 40000)
@@ -299,6 +309,8 @@ def bt_conf15m(mt5, sym, e_broker, cost, pt, brk=12, rr=2.0, sl_atr=1.0, vk=1.5,
         m_ = mac[i]; ml = mac[i - 24] if i - 24 >= 0 else np.nan
         if (h1t[i] != d or h4t[i] != d or m_ != m_ or ml != ml
                 or (1 if m_ > ml else -1) != d or vol[i] < vk * volmed[i]):
+            i += 1; continue
+        if gate and gate(h, l, i, px, d, av):
             i += 1; continue
         r, ei = _resolve(h, l, c, i, d, px, sl_atr * av / pt, rr, pt, cost, mh)
         tr.append(r); i = ei + 1

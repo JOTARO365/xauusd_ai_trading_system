@@ -346,10 +346,11 @@ def main():
             connected = False
         if connected:
             print("     regen backtest ต่อโบรกนี้ (~2-3 นาที · read-only 0 order)…")
-            for scr in ("shadow_backtest_managed.py", "tsmom_backtest_pairs.py", "backtest_all.py"):
+            for scr in ("shadow_backtest_managed.py", "tsmom_backtest_pairs.py", "backtest_all.py", "sr_gate_backtest.py"):
                 rc = subprocess.call([sys.executable, os.path.join("scripts", scr)])
                 print((_OK if rc == 0 else _WARN) + f"{scr} " + ("เสร็จ" if rc == 0 else f"exit {rc}"))
             # backtest_all.py → data/backtest_results.json = matrix ทุก algo×คู่ (+EV/−EV) ที่ dashboard tab Analytics อ่าน
+            # sr_gate_backtest.py → data/sr_gate_combos.json = combo ที่ S/R entry gate ผ่าน validation (regen ต่อโบรกนี้)
             # portfolio_replay.py → equity curve รวมทั้งระบบ (ระบบปัจจุบันทำเงินเท่าไรบน history) — โชว์อย่างเดียว
             print("     portfolio replay (system equity บน history)…")
             subprocess.call([sys.executable, os.path.join("scripts", "portfolio_replay.py")])
