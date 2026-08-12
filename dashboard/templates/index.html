@@ -2283,6 +2283,16 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       </div>
     </section>
 
+    <!-- ALGO SIGNALS — โอกาสเข้า order ต่อ algo (จุดเข้า/SL/TP + สถานะ เข้าแล้ว/โดน block) -->
+    <section>
+      <div class="section-title" style="display:flex;align-items:center"><svg class="ic"><use href="#ic-target"/></svg> ALGO SIGNALS &mdash; โอกาสเข้า order ต่อ algo
+        <span style="font-size:9px;color:var(--muted);font-weight:400;margin-left:6px">(จุดเข้า/SL/TP ของทุก algo แม้ไม่เข้าจริง · บอกว่าเข้าไปแล้ว/โดน block เพราะอะไร · display 0 token)</span>
+        <span id="algosig-sym" style="margin-left:auto;font-size:10px;color:var(--muted);font-family:var(--mono)"></span></div>
+      <div id="algosig-cards" style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="card" style="flex:1;min-width:240px;color:var(--muted);padding:10px">รอสัญญาณ…</div>
+      </div>
+    </section>
+
     <!-- RIDE COHORT — หน้าปัดการทดลอง MOMENTUM_RIDE (07-03) -->
     <section>
       <div class="section-title">System Trades Cohort &mdash; ไม้ระบบจริง (magic) closed WR/PnL + ล่าสุด</div>
@@ -7443,6 +7453,7 @@ function setChartSym(s) {                       // เลือกคู่ (ว
   loadCandles(true); loadClusterMap();
   if (typeof loadExpMoveBias === 'function') loadExpMoveBias();   // tiles (expected-move/pattern) ตามคู่ใหม่
   if (typeof renderScenarioCards === 'function') renderScenarioCards();   // scenario ตามคู่ใหม่ (non-gold ดึง sr-ladder เอง)
+  if (typeof loadAlgoSignals === 'function') loadAlgoSignals();           // algo signals ตามคู่ใหม่
 }
 async function populateChartSymbols() {
   const sel = document.getElementById('chart-sym'); if (!sel) return;
@@ -7823,6 +7834,44 @@ if (!window._scTimersOn) {
   setInterval(_scRefreshPrice, 5000);        // ราคา/proximity สด
   setInterval(_scRefreshZones, 300000);      // zone S/R สด ทุก 5 นาที
   setTimeout(_scRefreshZones, 1500);         // เติมครั้งแรกเร็ว (แผนขึ้นแม้บอทยังไม่เขียน bot_status)
+}
+
+/* ── ALGO SIGNALS — โอกาสเข้า order ต่อ algo (จุดเข้า/SL/TP + สถานะ เข้าแล้ว/โดน block), display 0 token ── */
+async function loadAlgoSignals() {
+  const el = document.getElementById('algosig-cards'); if (!el) return;
+  const sym = _chartSym || '';
+  try {
+    const d = await (await fetch('/api/algo-signals' + (sym ? '?symbol=' + encodeURIComponent(sym) : ''))).json();
+    const sy = document.getElementById('algosig-sym'); if (sy) sy.textContent = d.symbol || '';
+    const rows = d.rows || [];
+    if (!rows.length) { el.innerHTML = '<div class="card" style="flex:1;color:var(--muted);padding:10px">ไม่มี algo สำหรับคู่นี้</div>'; return; }
+    const badge = (s) => {
+      const m = { ENTERED: ['var(--green)', 'เข้าแล้ว ●'], BLOCKED: ['var(--red)', 'BLOCK ✗'],
+                  SIGNAL: ['var(--gold)', 'พร้อมเข้า ◆'], SHADOW: ['var(--cyan,#4fd1e0)', 'SHADOW ◇'],
+                  NO_SIGNAL: ['var(--muted)', 'ไม่มีสัญญาณ'] };
+      const [c, t] = m[s] || ['var(--muted)', s];
+      return '<span style="color:' + c + ';font-weight:700;font-size:10px">' + t + '</span>';
+    };
+    el.innerHTML = rows.map(r => {
+      const dc = r.dir === 'BUY' ? 'var(--green)' : (r.dir === 'SELL' ? 'var(--red)' : 'var(--muted)');
+      const dim = r.status === 'NO_SIGNAL' ? 'opacity:.5' : '';
+      const body = r.dir
+        ? ('<div style="font-size:11px;margin-top:4px">เข้า <b>' + r.entry + '</b> · SL <span style="color:var(--red)">' + r.sl +
+           '</span> · TP ' + (r.no_tp ? '<span style="color:var(--gold)">ถือยาว(flip)</span>' : r.tp) + '</div>' +
+           (r.reason ? '<div style="font-size:9px;color:var(--muted);margin-top:2px">' + r.reason + '</div>' : ''))
+        : '<div style="font-size:9px;color:var(--muted);margin-top:4px">' + (r.reason || '') + '</div>';
+      return '<div class="card" style="flex:1;min-width:210px;padding:8px 10px;' + dim + '">' +
+        '<div style="display:flex;align-items:center;gap:6px">' +
+        '<b style="font-size:12px">' + r.algo + '</b><span style="font-size:9px;color:var(--muted)">' + r.tf + '</span>' +
+        (r.dir ? '<span style="color:' + dc + ';font-weight:700;font-size:11px">' + r.dir + '</span>' : '') +
+        '<span style="margin-left:auto">' + badge(r.status) + '</span></div>' + body + '</div>';
+    }).join('');
+  } catch (e) {}
+}
+if (!window._asTimersOn) {
+  window._asTimersOn = 1;
+  setInterval(loadAlgoSignals, 20000);       // signal เปลี่ยนช้า (D1/H1) → 20 วิพอ
+  setTimeout(loadAlgoSignals, 1400);
 }
 
 /* ── Why No Entry — gate blocks สด (07-03) ── */

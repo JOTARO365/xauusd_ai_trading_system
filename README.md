@@ -441,6 +441,7 @@ via `bot_status.json` — these fields are **never sent to the LLM** (no token c
   score + grade (A/B/C)**, break-vs-bounce probability with test count, break-confirmation
   (held *ยืน* / wick *ไส้เทียน*), cross-TF + Fibonacci **confluence ⚡**, HTF-major-zone **★**,
   recency + average bounce ($)
+- **Algo Signals card (โอกาสเข้า order)** — for the selected symbol, runs every eligible registry algo's `evaluate()` on the current bars (`/api/algo-signals`, 0 token) and shows each algo's **entry / SL / TP** *even when no order is placed*, tagged with its status: **ENTERED** (a position with that algo's magic is open), **BLOCKED** + reason (direction filter / S/R gate / cdc risk-cap), **SHADOW** (toggle not LIVE), **SIGNAL** (would enter), or **NO_SIGNAL**. Lets you see exactly where each algo wanted in and why it did or didn't.
 - **Scenario Plan (แผน ก/ข/พัก)** — synthesised in the browser from the S/R ladder + trend
   (display-only, *not* an order). Live: price re-renders every **~5 s** via `/api/tick`
   (`symbol_info_tick`) so entry-proximity/trigger is current, and the S/R zones are refreshed from

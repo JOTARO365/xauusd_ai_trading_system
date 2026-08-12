@@ -451,6 +451,31 @@ def _manage_tsmom(algo_id, symbol, broker, positions, bars, point, digits, combo
     return closed
 
 
+def _cdc_risk_too_high(broker, sl_pips, point):
+    """True = block cdc entry/pyramid: risk ที่ min-lot × SL เกิน CDC_MAX_UNIT_RISK_PCT ของ equity.
+    audit 08-12: ทอง micro min-lot 0.1 × 2N SL = 63%/ไม้ บน 1000฿ → guard กันเปิดตอนทุนน้อยเกิน SL."""
+    import config as _cfg
+    cap = float(getattr(_cfg, "CDC_MAX_UNIT_RISK_PCT", 3.0) or 0.0)
+    if cap <= 0:
+        return False
+    try:
+        import MetaTrader5 as mt5
+        acct = mt5.account_info()
+        eq = float(acct.equity) if acct else 0.0
+        if eq <= 0:
+            return True                                  # unfunded → block (กันเปิดบนบัญชีไม่มีเงิน)
+        from connectors.mt5_connector import _lot_floor
+        floor = _lot_floor(broker)
+        tick = mt5.symbol_info_tick(broker)
+        px = float(tick.ask) if tick else 0.0
+        if px <= 0 or sl_pips <= 0:
+            return False
+        risk = abs(mt5.order_calc_profit(mt5.ORDER_TYPE_BUY, broker, floor, px, px - sl_pips * point) or 0.0)
+        return (risk / eq * 100.0) > cap
+    except Exception:
+        return False
+
+
 def _manage_cdc(algo_id, symbol, broker, positions, bars, point, digits, combo_state, ctx=None):
     """cdc = ถือจน CDC Action Zone พลิก + Turtle pyramid (เติม unit ตามเทรนด์, flag OFF default).
     exit: long ปิดเมื่อ bear (fast<slow) · short ปิดเมื่อ bull. disaster SL (ตั้งตอนเข้า) คงเดิม.
@@ -493,6 +518,8 @@ def _manage_cdc(algo_id, symbol, broker, positions, bars, point, digits, combo_s
     last_add = float(combo_state.get("cdc_last_add") or max(p.price_open for p in longs))
     if (px - last_add) < float(getattr(_cfg, "CDC_ADD_HALF_N", 0.5)) * av:
         return 0                                          # ยังไปไม่ถึง +½N → ยังไม่เติม
+    if _cdc_risk_too_high(broker, (2.0 * av) / point, point):
+        return 0                                          # guard: risk/unit เกิน cap (ทุนน้อยเกิน 2N) → ไม่เติม
     from connectors.mt5_connector import open_order
     res = open_order("BUY", (2.0 * av) / point, 0.0, comment=f"MSE-{algo_id}", symbol=broker,
                      max_open_override=maxu, min_rr=0.1, magic=_magic_of(algo_id))   # open_order คุม margin/cap เอง
@@ -643,6 +670,9 @@ def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max
             return 0
     except Exception:
         pass
+    if algo_id == "cdc_zone" and _cdc_risk_too_high(broker, float(vo.get("sl_pips") or 0), point):
+        logger.debug(f"[MSE] {algo_id}:{symbol} skip — risk/ไม้ > CDC_MAX_UNIT_RISK_PCT% (ทุนน้อยเกิน 2N SL)")
+        return 0
     if vo["bar_ts"] == combo_state.get("last_bar_ts"):
         return 0                                                # เข้าไม้บาร์นี้ **สำเร็จ**ไปแล้ว (dedup ต่อ signal-bar)
     if _signal_stale(vo["bar_ts"], algo):                       # cold-start: บาร์ปิดก่อน engine เริ่ม = stale

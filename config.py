@@ -387,6 +387,8 @@ CDC_PULLBACK_LB  = int(os.getenv("CDC_PULLBACK_LB") or 20)         # lookback hi
 CDC_PYRAMID    = (os.getenv("CDC_PYRAMID") or "false").lower() == "true"
 CDC_MAX_UNITS  = int(os.getenv("CDC_MAX_UNITS") or 4)             # จำนวน unit สูงสุดต่อ campaign (Turtle=4)
 CDC_ADD_HALF_N = float(os.getenv("CDC_ADD_HALF_N") or 0.5)        # เติม unit ทุก +นี้×ATR(N) ที่ราคาไปในทาง
+# safety: block cdc entry/pyramid ถ้า risk/unit (min-lot × 2N SL) > นี้% ของ equity (audit: ทอง micro 2N=63%/ไม้!)
+CDC_MAX_UNIT_RISK_PCT = float(os.getenv("CDC_MAX_UNIT_RISK_PCT") or 3.0)   # 0=ปิด guard
 CUSTOM_LOT_ENABLE = (os.getenv("CUSTOM_LOT_ENABLE") or "false").lower() == "true"   # ใช้ lot ต่อคู่ (data/pair_lots.json แก้จาก dashboard)
 # trailing หลวมสำหรับ momentum algo (ปล่อยวิ่งถึง TP; replay: trail แน่นตัดกำไร +119%→+12%)
 TRAILING_MOM_MULT = float(os.getenv("TRAILING_MOM_MULT") or 3.0)      # trail กว้าง (×ATR)
@@ -631,6 +633,8 @@ def reload_config():
     CDC_PYRAMID    = (os.getenv("CDC_PYRAMID") or "false").lower() == "true"
     CDC_MAX_UNITS  = int(os.getenv("CDC_MAX_UNITS") or 4)
     CDC_ADD_HALF_N = float(os.getenv("CDC_ADD_HALF_N") or 0.5)
+    global CDC_MAX_UNIT_RISK_PCT
+    CDC_MAX_UNIT_RISK_PCT = float(os.getenv("CDC_MAX_UNIT_RISK_PCT") or 3.0)
     global CUSTOM_LOT_ENABLE
     CUSTOM_LOT_ENABLE = (os.getenv("CUSTOM_LOT_ENABLE") or "false").lower() == "true"
     global TRAILING_MOM_MULT, TRAILING_MOM_MIN_R

@@ -1614,6 +1614,86 @@ def api_tick():
     return jsonify(_cached(f"tick:{sym or 'gold'}", _c, ttl=2))
 
 
+@app.route("/api/algo-signals")
+def api_algo_signals():
+    """โอกาสเข้า order ต่อ algo: signal ปัจจุบัน (dir/entry/SL/TP) + สถานะ ENTERED/BLOCKED/SHADOW/SIGNAL/NO_SIGNAL
+    แม้ไม่เข้า order จริง (เห็นว่าจุดนั้นเข้าไปแล้วหรือโดน block เพราะอะไร). display-only, 0 token. ต่อ symbol (default gold)."""
+    sym = (request.args.get("symbol", "") or "").strip()
+
+    def _c():
+        import MetaTrader5 as mt5
+        import regime_lib as _R
+        from agents import algo_registry as reg
+        from connectors.pair_collector import _broker_map
+        logical = sym or "XAUUSD"
+        broker = (_broker_map() or {}).get(logical, sym or SYMBOL)
+        mt5.symbol_select(broker, True)
+        si = mt5.symbol_info(broker); pt = si.point if si else 0.01; dg = si.digits if si else 2
+        tfmap = {"M15": mt5.TIMEFRAME_M15, "H1": mt5.TIMEFRAME_H1, "H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1}
+        bars = {}
+        for tfn, tf in tfmap.items():
+            r = mt5.copy_rates_from_pos(broker, tf, 0, 400)
+            if r is not None and len(r) > 40:
+                bars[tfn] = (r["high"].astype(float), r["low"].astype(float),
+                             r["close"].astype(float), r["time"].astype("int64"))
+        positions = mt5.positions_get(symbol=broker) or []
+
+        def _imp(mod):
+            try:
+                return __import__("agents." + mod, fromlist=["x"])
+            except Exception:
+                return None
+        _adir = _imp("algo_dir"); _srg = _imp("sr_entry_gate"); _sw = _imp("shadow_switches")
+        try:
+            from agents.multi_symbol_executor import _magic_of, _cdc_risk_too_high
+        except Exception:
+            _magic_of = _cdc_risk_too_high = None
+
+        rows = []
+        for aid, algo in reg.ALGO_REGISTRY.items():
+            if logical not in getattr(algo, "eligible_pairs", []):
+                continue
+            tfn = getattr(algo, "timeframe", "H1"); b = bars.get(tfn)
+            if not b:
+                continue
+            try:
+                vo = algo.evaluate(logical, b, point=pt)
+            except Exception:
+                vo = None
+            if not vo or not vo.get("dir"):
+                rows.append({"algo": aid, "tf": tfn, "dir": None, "status": "NO_SIGNAL", "reason": "ยังไม่มีสัญญาณ"})
+                continue
+            d = vo["dir"]; entry = float(vo["entry"]); slp = float(vo.get("sl_pips") or 0); tpp = float(vo.get("tp_pips") or 0)
+            sign = 1 if d == "BUY" else -1
+            sl = entry - sign * slp * pt
+            tp = (entry + sign * tpp * pt) if tpp > 0 else None
+            magic = _magic_of(aid) if _magic_of else None
+            has_pos = any(p.magic == magic for p in positions) if magic is not None else False
+            status = "ENTERED"; reason = ""
+            if not has_pos:
+                status = "SIGNAL"
+                try:
+                    _atr = _R.atr(b[0], b[1], b[2]); av = float(_atr[-1]) if _atr[-1] == _atr[-1] else 0.0
+                    if _adir and not _adir.allowed(aid, d):
+                        status, reason = "BLOCKED", "direction off (algo_dir)"
+                    elif _srg and _srg.blocks_live(b, d, entry, av, aid, logical)[0]:
+                        status, reason = "BLOCKED", "S/R gate (ชนแนว)"
+                    elif aid == "cdc_zone" and _cdc_risk_too_high and _cdc_risk_too_high(broker, slp, pt):
+                        status, reason = "BLOCKED", "risk/ไม้ > cap (ทุนน้อยเกิน SL)"
+                    else:
+                        st = _sw.state_of(aid, logical) if _sw else None
+                        if st and st != "LIVE":
+                            status, reason = "SHADOW", f"toggle {st}"
+                except Exception:
+                    pass
+            rows.append({"algo": aid, "tf": tfn, "dir": d, "entry": round(entry, dg),
+                         "sl": round(sl, dg), "tp": (round(tp, dg) if tp else None),
+                         "sl_pips": round(slp), "no_tp": tpp <= 0, "status": status, "reason": reason})
+        return {"ok": True, "symbol": logical, "rows": rows}
+
+    return jsonify(_cached(f"algo-signals:{sym or 'gold'}", _c, ttl=20))
+
+
 @app.route("/api/sr-level-stats")
 def api_sr_level_stats():
     """touch-outcome stats ต่อเส้น S/R (section C+D ของ dropdown): ราคาไปไกลแค่ไหนหลังแตะ + recency/session.
