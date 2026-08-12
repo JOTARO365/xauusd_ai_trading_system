@@ -551,6 +551,14 @@ class CDCZoneAlgo(Algo):
         direction = "BUY" if fast[i] > slow[i] else ("SELL" if self._dir_mode() == "both" else None)
         if direction is None:
             return None
+        import config as _c                                # โฉลก entry: เข้าตอน "ย่อ" ในเทรนด์ ไม่ไล่ราคา
+        _pb = float(getattr(_c, "CDC_PULLBACK_MIN", 0.005) or 0.0)   # validated: pullback t1.99→2.05, RSI พังของดี
+        _lb = int(getattr(_c, "CDC_PULLBACK_LB", 20) or 20)
+        if _pb > 0 and i >= _lb:
+            if direction == "BUY" and close[i] > float(high[i - _lb:i].max()) * (1 - _pb):
+                return None                                # ยังไม่ย่อพอจาก high ล่าสุด → รอจุดเข้าดีกว่า
+            if direction == "SELL" and close[i] < float(low[i - _lb:i].min()) * (1 + _pb):
+                return None
         if _season_block(symbol, direction, times, i):     # ทอง: ไม่สวน seasonal แรง
             return None
         try:                                               # gold: ไม่เข้าสวน sentiment (ข่าว+econ) แรง

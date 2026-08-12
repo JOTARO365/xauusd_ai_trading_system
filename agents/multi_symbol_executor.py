@@ -452,26 +452,57 @@ def _manage_tsmom(algo_id, symbol, broker, positions, bars, point, digits, combo
 
 
 def _manage_cdc(algo_id, symbol, broker, positions, bars, point, digits, combo_state, ctx=None):
-    """cdc = ถือจน CDC Action Zone พลิก. อ่าน zone ตรงจาก close (ไม่ผ่าน evaluate ที่ long-only คืน None ตอน bear):
-    long ปิดเมื่อ bear (fast<slow) · short ปิดเมื่อ bull. disaster SL (ตั้งตอนเข้า) คงเดิม."""
+    """cdc = ถือจน CDC Action Zone พลิก + Turtle pyramid (เติม unit ตามเทรนด์, flag OFF default).
+    exit: long ปิดเมื่อ bear (fast<slow) · short ปิดเมื่อ bull. disaster SL (ตั้งตอนเข้า) คงเดิม.
+    pyramid: CDC_PYRAMID=on → เติม 1 unit ทุก +½N ที่ราคาไปในทาง จนถึง CDC_MAX_UNITS (long-side)."""
     if not positions:
         return 0
     import MetaTrader5 as mt5
     import regime_lib as _R
-    close = bars[2]
+    import config as _cfg
+    high, low, close = bars[0], bars[1], bars[2]
     if close is None or len(close) < 40:
         return 0
     fast, slow = _R.cdc_zone(close)
     bull = fast[-2] > slow[-2]                            # closed บาร์ (i=n-2 ตรงกับ evaluate)
-    closed = 0
     tickets = combo_state.get("tickets") or {}
+    # 1) exit-on-flip
+    closed = 0
     for p in positions:
         is_buy = (p.type == mt5.ORDER_TYPE_BUY)
         if ((is_buy and not bull) or ((not is_buy) and bull)) and _close_position(broker, p, digits):
             tickets.pop(str(p.ticket), None)
             closed += 1
             logger.info(f"[MSE] cdc zone flip → close {algo_id}:{symbol} #{p.ticket} ({'BUY' if is_buy else 'SELL'})")
-    return closed
+    if closed:
+        combo_state.pop("cdc_last_add", None)             # จบ campaign → reset pyramid state
+        return closed
+    # 2) Turtle pyramid (default OFF) — เติม unit long เมื่อราคาไป +½N (Turtle "big order")
+    if not getattr(_cfg, "CDC_PYRAMID", False) or not bull:
+        return 0
+    longs = [p for p in positions if p.type == mt5.ORDER_TYPE_BUY]
+    maxu = max(1, int(getattr(_cfg, "CDC_MAX_UNITS", 4)))
+    if not longs or len(longs) >= maxu:
+        return 0
+    atr = _R.atr(high, low, close)
+    av = float(atr[-2]) if atr[-2] == atr[-2] else 0.0
+    if av <= 0:
+        return 0
+    tick = mt5.symbol_info_tick(broker)
+    px = float(tick.ask) if tick else float(close[-1])
+    last_add = float(combo_state.get("cdc_last_add") or max(p.price_open for p in longs))
+    if (px - last_add) < float(getattr(_cfg, "CDC_ADD_HALF_N", 0.5)) * av:
+        return 0                                          # ยังไปไม่ถึง +½N → ยังไม่เติม
+    from connectors.mt5_connector import open_order
+    res = open_order("BUY", (2.0 * av) / point, 0.0, comment=f"MSE-{algo_id}", symbol=broker,
+                     max_open_override=maxu, min_rr=0.1, magic=_magic_of(algo_id))   # open_order คุม margin/cap เอง
+    if res and res.get("success") and res.get("ticket"):
+        combo_state["cdc_last_add"] = px
+        combo_state.setdefault("tickets", {})[str(res["ticket"])] = {
+            "sl_dist": 2.0 * av, "dir": "BUY", "entry": float(res.get("price") or px), "opened_ts": _now_iso()}
+        logger.info(f"[MSE] cdc pyramid +unit {algo_id}:{symbol} @ {res.get('price')} (unit {len(longs)+1}/{maxu})")
+        return 1
+    return 0
 
 
 # ── real closed-trade capture (edge จริงจากไม้ที่ปิดแล้ว — leakage-free features) ──────

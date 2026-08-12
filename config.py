@@ -380,6 +380,13 @@ SR_CLUSTER_ATR  = float(os.getenv("SR_CLUSTER_ATR") or 0.3)  # merge แนว�
 SR_BREAKOUT_ALGOS = os.getenv("SR_BREAKOUT_ALGOS", "regime_momentum,regime_momentum_fvg,macro_momentum,confluence_15m,tsmom_d1")  # algo ยกเว้น gate (คิดตาม breakout ต้องทะลุแนวได้); ที่เหลือ gate ทุกคู่
 # CDC Action Zone (อ.โฉลก) — ทิศ cdc_zone algo: long (BUY เท่านั้น, default) / short / both. SELL leg −EV → long
 CDC_DIR_MODE = (os.getenv("CDC_DIR_MODE") or "long").lower()
+# pullback entry (โฉลก wave-2/4: เข้าตอนย่อ ไม่ไล่ราคา) — validated: ดัน XAUUSD t1.99→2.05 (RSI filter พังของดี)
+CDC_PULLBACK_MIN = float(os.getenv("CDC_PULLBACK_MIN") or 0.005)   # ต้องย่อจาก high ล่าสุด ≥ นี้ (0.5%) ถึงเข้า; 0=ปิด
+CDC_PULLBACK_LB  = int(os.getenv("CDC_PULLBACK_LB") or 20)         # lookback high/low สำหรับวัด pullback
+# Turtle pyramiding (big order) — เติม unit ตามเทรนด์. default OFF (money-management sensitive; เปิดเมื่อ live+พร้อม)
+CDC_PYRAMID    = (os.getenv("CDC_PYRAMID") or "false").lower() == "true"
+CDC_MAX_UNITS  = int(os.getenv("CDC_MAX_UNITS") or 4)             # จำนวน unit สูงสุดต่อ campaign (Turtle=4)
+CDC_ADD_HALF_N = float(os.getenv("CDC_ADD_HALF_N") or 0.5)        # เติม unit ทุก +นี้×ATR(N) ที่ราคาไปในทาง
 CUSTOM_LOT_ENABLE = (os.getenv("CUSTOM_LOT_ENABLE") or "false").lower() == "true"   # ใช้ lot ต่อคู่ (data/pair_lots.json แก้จาก dashboard)
 # trailing หลวมสำหรับ momentum algo (ปล่อยวิ่งถึง TP; replay: trail แน่นตัดกำไร +119%→+12%)
 TRAILING_MOM_MULT = float(os.getenv("TRAILING_MOM_MULT") or 3.0)      # trail กว้าง (×ATR)
@@ -616,9 +623,14 @@ def reload_config():
     SR_LOOKBACK     = int(os.getenv("SR_LOOKBACK") or 60)
     SR_PIVOT        = int(os.getenv("SR_PIVOT") or 3)
     SR_CLUSTER_ATR  = float(os.getenv("SR_CLUSTER_ATR") or 0.3)
-    global SR_BREAKOUT_ALGOS, CDC_DIR_MODE
+    global SR_BREAKOUT_ALGOS, CDC_DIR_MODE, CDC_PULLBACK_MIN, CDC_PULLBACK_LB, CDC_PYRAMID, CDC_MAX_UNITS, CDC_ADD_HALF_N
     SR_BREAKOUT_ALGOS = os.getenv("SR_BREAKOUT_ALGOS", "regime_momentum,regime_momentum_fvg,macro_momentum,confluence_15m,tsmom_d1")
     CDC_DIR_MODE = (os.getenv("CDC_DIR_MODE") or "long").lower()
+    CDC_PULLBACK_MIN = float(os.getenv("CDC_PULLBACK_MIN") or 0.005)
+    CDC_PULLBACK_LB  = int(os.getenv("CDC_PULLBACK_LB") or 20)
+    CDC_PYRAMID    = (os.getenv("CDC_PYRAMID") or "false").lower() == "true"
+    CDC_MAX_UNITS  = int(os.getenv("CDC_MAX_UNITS") or 4)
+    CDC_ADD_HALF_N = float(os.getenv("CDC_ADD_HALF_N") or 0.5)
     global CUSTOM_LOT_ENABLE
     CUSTOM_LOT_ENABLE = (os.getenv("CUSTOM_LOT_ENABLE") or "false").lower() == "true"
     global TRAILING_MOM_MULT, TRAILING_MOM_MIN_R

@@ -121,23 +121,38 @@ def bt_momentum_fvg(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, mh=120, fvg_l
     return tr
 
 
-def bt_cdc(h, l, c, cost_price, sl_atr=2.0, mode="long"):
-    """CDC Action Zone (อ.โฉลก) — trend-follow exit-on-flip, R-norm 2N (Turtle). mirror agents.CDCZoneAlgo
-    (close-source cdc_zone) + shadow _resolve_cdc_flip = parity. mode=long (default; SELL leg −EV) / both."""
-    fast, slow = R.cdc_zone(c)
-    atr = R.atr(h, l, c)
-    tr = []; pos = 0; entry = 0.0; risk = 0.0
-    for i in range(30, len(c)):
+def bt_cdc(h, l, c, cost_price, sl_atr=2.0, mode="long", pb_min=None, pb_lb=None):
+    """CDC Action Zone (อ.โฉลก) — trend-follow exit-on-flip + pullback entry (โฉลก wave-2/4: เข้าตอนย่อ),
+    R-norm 2N (Turtle). mirror agents.CDCZoneAlgo + shadow _resolve_cdc_flip = parity. pb จาก config (parity live)."""
+    try:
+        import config as _c
+        if pb_min is None:
+            pb_min = float(getattr(_c, "CDC_PULLBACK_MIN", 0.005) or 0.0)
+        if pb_lb is None:
+            pb_lb = int(getattr(_c, "CDC_PULLBACK_LB", 20) or 20)
+    except Exception:
+        pb_min = pb_min or 0.005; pb_lb = pb_lb or 20
+    fast, slow = R.cdc_zone(c); atr = R.atr(h, l, c)
+    n = len(c); tr = []; pos = 0; entry = 0.0; risk = 0.0
+    for i in range(30, n):
         if pos != 0 and risk > 0 and pos * (c[i] - entry) <= -risk:   # disaster SL 2N
             tr.append(-1.0 - cost_price / risk); pos = 0
         bull = fast[i] > slow[i]
-        want = 1 if bull else (-1 if mode == "both" else 0)
-        if want != pos:
-            if pos != 0 and risk > 0:
-                tr.append((pos * (c[i] - entry) - cost_price) / risk)
+        if pos == 0:                                          # event-driven entry (bull + ย่อพอ)
+            want = 1 if bull else (-1 if mode == "both" else 0)
+            if want == 0:
+                continue
+            if pb_min > 0 and i >= pb_lb:
+                if want > 0 and c[i] > float(h[i - pb_lb:i].max()) * (1 - pb_min):
+                    continue
+                if want < 0 and c[i] < float(l[i - pb_lb:i].min()) * (1 + pb_min):
+                    continue
             pos = want; entry = c[i]
             av = float(atr[i]) if atr[i] == atr[i] else 0.0
             risk = sl_atr * av if av > 0 else 0.0
+        elif (pos > 0 and not bull) or (pos < 0 and bull):    # zone flip → ออก
+            tr.append((pos * (c[i] - entry) - cost_price) / risk if risk > 0 else 0.0)
+            pos = 0
     return tr
 
 
