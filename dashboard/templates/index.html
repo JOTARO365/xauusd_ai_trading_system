@@ -7875,7 +7875,7 @@ function _scRender(z, px, trend) {
   const _sm = z.sr_meta || [];
   const sups = (z.support || []).filter(x => x < px).sort((a, b) => b - a);   // ใกล้ราคาก่อน
   const ress = (z.resistance || []).filter(x => x > px).sort((a, b) => a - b);
-  const band = lv => lv * 0.0006, slBuf = lv => lv * 0.0014;
+  const band = lv => lv * 0.0010, slBuf = lv => lv * 0.0035;   // entry zone 0.10% · SL buffer 0.35% (user 08-12: เดิม SL 0.14% แคบ → โดน wick ก่อนเด้ง; ทอง 0.35%≈15p ให้พ้นไส้เทียน)
   const mkBuy = (s, title) => { if (s == null) return null; const mm = _scMeta(_sm, s);
     return { title, dir: 'BUY', entryLo: s, entryHi: s + band(s), sl: s - slBuf(s), tp: ress[0] || null,
       score: mm && (mm.score || mm.strength), grade: mm && mm.grade,
