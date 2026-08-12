@@ -451,6 +451,29 @@ def _manage_tsmom(algo_id, symbol, broker, positions, bars, point, digits, combo
     return closed
 
 
+def _manage_cdc(algo_id, symbol, broker, positions, bars, point, digits, combo_state, ctx=None):
+    """cdc = ถือจน CDC Action Zone พลิก. อ่าน zone ตรงจาก close (ไม่ผ่าน evaluate ที่ long-only คืน None ตอน bear):
+    long ปิดเมื่อ bear (fast<slow) · short ปิดเมื่อ bull. disaster SL (ตั้งตอนเข้า) คงเดิม."""
+    if not positions:
+        return 0
+    import MetaTrader5 as mt5
+    import regime_lib as _R
+    close = bars[2]
+    if close is None or len(close) < 40:
+        return 0
+    fast, slow = _R.cdc_zone(close)
+    bull = fast[-2] > slow[-2]                            # closed บาร์ (i=n-2 ตรงกับ evaluate)
+    closed = 0
+    tickets = combo_state.get("tickets") or {}
+    for p in positions:
+        is_buy = (p.type == mt5.ORDER_TYPE_BUY)
+        if ((is_buy and not bull) or ((not is_buy) and bull)) and _close_position(broker, p, digits):
+            tickets.pop(str(p.ticket), None)
+            closed += 1
+            logger.info(f"[MSE] cdc zone flip → close {algo_id}:{symbol} #{p.ticket} ({'BUY' if is_buy else 'SELL'})")
+    return closed
+
+
 # ── real closed-trade capture (edge จริงจากไม้ที่ปิดแล้ว — leakage-free features) ──────
 def _now_iso():
     from datetime import datetime, timezone
@@ -716,6 +739,8 @@ def tick(force=False):
             # management ตาม algo: tsmom = exit-on-flip · อื่น = BE+trailing (SL/TP)
             if mgmt == "tsmom_flip":
                 managed += _manage_tsmom(algo_id, symbol, broker, positions, bars, point, digits, cstate, _ctx)
+            elif mgmt == "cdc_flip":
+                managed += _manage_cdc(algo_id, symbol, broker, positions, bars, point, digits, cstate, _ctx)
             else:
                 managed += _manage(broker, positions, bars, point, digits, cstate, algo_id)
             room_total = (max_total <= 0) or (total_open + opened < max_total)   # global cap ยังมีที่ว่าง

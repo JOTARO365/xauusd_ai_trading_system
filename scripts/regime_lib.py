@@ -72,6 +72,21 @@ def atr(high, low, close, n=ATR_WIN):
     return out
 
 
+def _ema(x, n):
+    a = 2.0 / (n + 1.0)
+    e = np.empty_like(np.asarray(x, dtype=float)); e[0] = x[0]
+    for i in range(1, len(x)):
+        e[i] = x[i] * a + e[i - 1] * (1.0 - a)
+    return e
+
+
+def cdc_zone(close, fast_n=12, slow_n=26, smooth=2):
+    """CDC Action Zone (อ.โฉลก) — close-source (bars ของ algo ไม่มี open → parity live↔backtest).
+    คืน (fast, slow). bull = fast>slow (เข้า long) · bear = fast<slow (exit/short). validated: scripts/cdc_backtest.py."""
+    ap = _ema(np.asarray(close, dtype=float), smooth)
+    return _ema(ap, fast_n), _ema(ap, slow_n)
+
+
 def adx(high, low, close, n=ADX_WIN):
     """Wilder ADX (trend strength). คืน array align กับ close."""
     up = high[1:] - high[:-1]; dn = low[:-1] - low[1:]

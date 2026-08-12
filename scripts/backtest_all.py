@@ -121,6 +121,26 @@ def bt_momentum_fvg(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, mh=120, fvg_l
     return tr
 
 
+def bt_cdc(h, l, c, cost_price, sl_atr=2.0, mode="long"):
+    """CDC Action Zone (อ.โฉลก) — trend-follow exit-on-flip, R-norm 2N (Turtle). mirror agents.CDCZoneAlgo
+    (close-source cdc_zone) + shadow _resolve_cdc_flip = parity. mode=long (default; SELL leg −EV) / both."""
+    fast, slow = R.cdc_zone(c)
+    atr = R.atr(h, l, c)
+    tr = []; pos = 0; entry = 0.0; risk = 0.0
+    for i in range(30, len(c)):
+        if pos != 0 and risk > 0 and pos * (c[i] - entry) <= -risk:   # disaster SL 2N
+            tr.append(-1.0 - cost_price / risk); pos = 0
+        bull = fast[i] > slow[i]
+        want = 1 if bull else (-1 if mode == "both" else 0)
+        if want != pos:
+            if pos != 0 and risk > 0:
+                tr.append((pos * (c[i] - entry) - cost_price) / risk)
+            pos = want; entry = c[i]
+            av = float(atr[i]) if atr[i] == atr[i] else 0.0
+            risk = sl_atr * av if av > 0 else 0.0
+    return tr
+
+
 def bt_tsmom(h, l, c, cost_price, lbs=(21, 63, 126), confirm=21, sl_atr=3.0):
     """R-multiple (norm 3×ATR-D1 = disaster SL ของ live) + disaster stop → เทียบ algo อื่นได้.
     (เดิมคืน %ของราคาสุดท้าย = magnitude เทียบไม่ได้; live มี SL_ATR=3.0 ที่ backtest เดิมไม่มี)."""
@@ -416,6 +436,8 @@ def main():
             dc = rd["close"].astype(float); dh = rd["high"].astype(float); dl = rd["low"].astype(float)
             rows.append(_row("tsmom_d1", lg, "D1", _stats(bt_tsmom(dh, dl, dc, cost * pt)),
                              "ensemble 21/63/126 + confirm21 · R-norm 3×ATR + disaster SL"))
+            rows.append(_row("cdc_zone", lg, "D1", _stats(bt_cdc(dh, dl, dc, cost * pt)),
+                             "CDC Action Zone (โฉลก) long-only · exit-on-flip · Turtle 2N SL · ถือยาว"))
         # macro_momentum (ทุกคู่เพื่อ matrix ครบ; DXY driver ตรงเฉพาะ gold-complex → non-gold คาด −EV = data จริง)
         rh4 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H4, 0, 30000)
         if rh4 is not None and len(rh4) > 500:

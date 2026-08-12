@@ -127,6 +127,48 @@ def _resolve_tsmom_flip(rec, high, low, close, times, *, point, cost_pips, digit
     return {"result": "OPEN", "bars_held": n - 1 - i0}        # tail: ยังไม่จบ
 
 
+def _resolve_cdc_flip(rec, high, low, close, times, *, point, cost_pips, digits):
+    """paper resolve สำหรับ cdc_zone = exit-on-flip: ปิดเมื่อ CDC Action Zone กลับข้าง (fast<slow สำหรับ long)
+    หรือ disaster SL (2×ATR ตอนเข้า) โดน. มิเรอร์ _resolve_tsmom_flip แต่ flip = CDC zone (close-source)."""
+    from datetime import datetime, timezone
+    import regime_lib as _R
+    direction = rec["dir"]; entry_px = float(rec["entry"])
+    sl_dist = float(rec.get("sl_pips", 0)) * point
+    if sl_dist <= 0:
+        return None
+    try:
+        entry_ep = int(datetime.fromisoformat(rec["bar_ts"]).timestamp())
+    except Exception:
+        return None
+    i0 = next((k for k in range(len(times) - 1, -1, -1) if int(times[k]) == entry_ep), None)
+    if i0 is None:
+        return None
+    is_buy = direction == "BUY"; sign = 1 if is_buy else -1
+    sl = entry_px - sl_dist if is_buy else entry_px + sl_dist
+    cost = cost_pips * point; n = len(close); mfe = mae = 0.0
+    fast, slow = _R.cdc_zone(close)
+
+    def _out(result, exit_px, j):
+        r = (sign * (exit_px - entry_px) - cost) / sl_dist
+        ts = datetime.fromtimestamp(int(times[j]), timezone.utc).isoformat()
+        return {"result": result, "realized_R": round(r, 3), "realized_R_gross": round(r, 3),
+                "bars_held": int(j - i0), "exit_price": round(float(exit_px), digits), "exit_ts": ts,
+                "mfe_R": round(mfe, 2), "mae_R": round(mae, 2)}
+
+    for j in range(i0 + 1, n):
+        fav = sign * (float(high[j] if is_buy else low[j]) - entry_px) / sl_dist
+        adv = sign * (float(low[j] if is_buy else high[j]) - entry_px) / sl_dist
+        mfe = max(mfe, fav); mae = min(mae, adv)
+        if (is_buy and float(low[j]) <= sl) or ((not is_buy) and float(high[j]) >= sl):
+            return _out("SL", sl, j)                          # disaster SL โดน
+        newdir = "BUY" if fast[j] > slow[j] else "SELL"
+        if newdir != direction:                              # zone พลิก → ปิดที่ close
+            exit_px = float(close[j])
+            r = (sign * (exit_px - entry_px) - cost) / sl_dist
+            return _out("TP" if r >= 0 else "SL", exit_px, j)
+    return {"result": "OPEN", "bars_held": n - 1 - i0}        # tail: ยังไม่จบ
+
+
 def _apply(algo_id, symbol, bars, point, digits, cost_pips, max_hold=_DEFAULT_MAX_HOLD):
     """Pure-ish core (no MT5): capture new signal + resolve open ones for ONE combo. Returns a summary.
     Testable directly with injected bars. Each signal resolves at the cost/point stored on its record."""
@@ -159,6 +201,11 @@ def _apply(algo_id, symbol, bars, point, digits, cost_pips, max_hold=_DEFAULT_MA
                                       point=rec.get("point", point),
                                       cost_pips=rec.get("cost_pips", cost_pips),
                                       digits=rec.get("price_digits", digits))
+        elif mgmt == "cdc_flip":
+            out = _resolve_cdc_flip(rec, high, low, close, times,
+                                    point=rec.get("point", point),
+                                    cost_pips=rec.get("cost_pips", cost_pips),
+                                    digits=rec.get("price_digits", digits))
         else:
             out = resolve_managed(rec, high, low, close, times,
                                   point=rec.get("point", point),

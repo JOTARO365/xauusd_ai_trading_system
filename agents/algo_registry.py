@@ -522,9 +522,65 @@ class ConfluenceVol15m(Algo):
                 "bar_ts": bar_ts, "klass": self.klass}
 
 
+class CDCZoneAlgo(Algo):
+    """CDC Action Zone (อ.โฉลก สัมพันธารักษ์) — trend-follow ถือยาว (let winners run).
+    close→EMA2→Fast EMA12 / Slow EMA26. เข้าตาม zone (bull=BUY), ออกเมื่อ zone พลิก (mgmt=cdc_flip,
+    ไม่มี TP). long-only default (CDC_DIR_MODE; SELL leg −EV เหมือน algo อื่น). D1. disaster SL 2×ATR (Turtle 2N).
+    eligible = gold-complex + BTC (backtest ดีสุด). validated scripts/cdc_backtest.py:
+    XAUUSD exp_R +0.88 t1.99 OOS+2.38 WR38 (ชนะ tsmom ~5×) — แต่ n53 (position algo ไม้น้อย) ยังไม่ผ่าน n≥80
+    → SHADOW จนเก็บ forward พอ. klass=swing (promotion n≥20)."""
+    algo_id = "cdc_zone"
+    version = 1
+    klass = "swing"
+    timeframe = "D1"
+    mgmt = "cdc_flip"
+    eligible_pairs = ["XAUUSD", "XAUEUR", "BTCUSD"]
+    SL_ATR = 2.0
+
+    def _dir_mode(self):
+        import config as _c
+        return str(getattr(_c, "CDC_DIR_MODE", "long")).lower()
+
+    def evaluate(self, symbol, bars, ctx=None, point=None):
+        high, low, close, times = bars
+        n = len(close)
+        if n < 40 or not point:
+            return None
+        i = n - 2                                          # บาร์ปิดล่าสุด (D1)
+        fast, slow = R.cdc_zone(close)
+        direction = "BUY" if fast[i] > slow[i] else ("SELL" if self._dir_mode() == "both" else None)
+        if direction is None:
+            return None
+        if _season_block(symbol, direction, times, i):     # ทอง: ไม่สวน seasonal แรง
+            return None
+        try:                                               # gold: ไม่เข้าสวน sentiment (ข่าว+econ) แรง
+            if symbol and symbol.upper().startswith("XAU"):
+                from agents.sentiment_bias import compute as _sbias
+                from agents.sentiment_score import get_score
+                if _sbias(direction, (get_score() or {}).get("score", 0)).get("block"):
+                    return None
+        except Exception:
+            pass
+        atr = R.atr(high, low, close)
+        av = float(atr[i]) if atr[i] == atr[i] else 0.0
+        if av <= 0:
+            return None
+        try:
+            from datetime import datetime, timezone
+            bar_ts = datetime.fromtimestamp(int(times[i]), timezone.utc).isoformat()
+        except Exception:
+            return None
+        return {
+            "algo_id": self.algo_id, "symbol": symbol, "dir": direction,
+            "entry": float(close[i]), "sl_pips": (self.SL_ATR * av) / point, "tp_pips": 0.0,   # 0 = no-TP (exit-on-flip)
+            "regime": "CDC", "bar_ts": bar_ts, "klass": self.klass,
+        }
+
+
 ALGO_REGISTRY = {a.algo_id: a for a in (
     RegimeMomentumAlgo(), MeanReversionAlgo(), TSMOMDailyAlgo(),
     MomentumFVGAlgo(), SweepReversalAlgo(), MacroMomAlgo(), ConfluenceVol15m(),
+    CDCZoneAlgo(),
 )}
 # sr_fade (S/R Book fade) ถูก CUT 2026-08-07: backtest −EV ทุกคู่/ทุก variant (t−4..−22, OOS ลบ) —
 # naive S/R fade ไม่มี edge (เหมือน mean_reversion). หลักฐาน: scripts/sr_fade_backtest.py
