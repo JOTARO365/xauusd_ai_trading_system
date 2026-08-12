@@ -2350,6 +2350,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
           </select>
           <button class="btr-tab active" data-g="+EV" onclick="filterBtr('+EV')"><svg class="ic" style="color:var(--green)"><use href="#ic-check"/></svg> +EV</button>
           <button class="btr-tab" data-g="-EV" onclick="filterBtr('-EV')"><svg class="ic" style="color:var(--red)"><use href="#ic-x"/></svg> −EV</button>
+          <button class="btr-tab" data-g="promising" onclick="filterBtr('promising')" title="+EV by exp_R + robust (t≥2·OOS≥0) แต่ n<80 — position algo (cdc) ถือยาว ไม้น้อยเป็นธรรมชาติ"><span style="color:var(--gold)">◆</span> น่าสน (n<80)</button>
           <button class="btr-tab" data-g="all" onclick="filterBtr('all')">ทั้งหมด</button>
         </span>
       </div>
@@ -6808,18 +6809,20 @@ function filterBtr(g) {
   document.querySelectorAll('.btr-tab').forEach(b => b.classList.toggle('active', b.dataset.g === g));
   renderBtr();
 }
+// +EV by exp_R + robust (t≥2 · OOS≥0) แต่ n<80 (position algo ไม้น้อย เช่น cdc_zone) — ไม่ใช่ −EV จริง, ไม่แตะ auto-seed
+function _btrProm(r) { return (r.group !== '+EV') && (r.exp_R || 0) > 0 && (r.oos || 0) >= 0 && (r.t || 0) >= 2 && r.n >= 20 && r.n < 80; }
 function renderBtr() {
   const body = document.getElementById('btr-body'); if (!body) return;
   const algoSel = (document.getElementById('btr-algo') || {}).value || 'all';
-  const rows = _btrData.filter(r => (_btrGroup === 'all' || r.group === _btrGroup)
+  const rows = _btrData.filter(r => (_btrGroup === 'all' ? true
+                                     : _btrGroup === 'promising' ? _btrProm(r) : r.group === _btrGroup)
                                  && (algoSel === 'all' || r.algo === algoSel));
   if (!rows.length) { body.innerHTML = '<tr><td colspan="10" style="color:var(--muted)">—</td></tr>'; return; }
   const num = (v, d = 4) => (v == null ? '—' : (v >= 0 ? '+' : '') + Number(v).toFixed(d));
   const liveC = s => s === 'LIVE' ? 'var(--green)' : (s === 'CUT' ? 'var(--red)' : 'var(--muted)');
   body.innerHTML = rows.map(r => {
     const pos = r.group === '+EV';
-    // display-only tag: +EV by exp_R & robust (t≥2) แต่ n<80 (position algo ไม้น้อย) — ไม่ใช่ −EV จริง, ไม่แตะ auto-seed
-    const promising = !pos && (r.exp_R || 0) > 0 && (r.oos || 0) >= 0 && (r.t || 0) >= 2 && r.n >= 20 && r.n < 80;
+    const promising = _btrProm(r);   // display tag: robust (t≥2) แต่ n<80 → ทอง ◆n<80 (ไม่แตะ auto-seed)
     const promBadge = promising
       ? ' <span title="+EV by exp_R + robust (t≥2) แต่ n<80 (position algo ไม้น้อย) — ยังไม่ auto-live" style="color:var(--gold);font-size:9px;font-weight:700">◆n<80</span>' : '';
     return '<tr style="border-top:1px solid var(--border)">'
