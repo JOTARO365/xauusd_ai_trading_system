@@ -488,6 +488,14 @@ def main():
     except Exception:
         pass
 
+    # coverage guard: ทุก algo ใน ALGO_REGISTRY ต้องอยู่ใน matrix (ไม่ hardcode/หายเงียบเมื่อเพิ่ม algo ใหม่)
+    _covered = {r["algo"] for r in rows}
+    for _aid in reg.ALGO_REGISTRY:
+        if _aid not in _covered:
+            print(f"  ⚠️ {_aid}: ยังไม่มีใน backtest matrix — เพิ่ม bt_ ใน backtest_all.main()")
+            rows.append(_row(_aid, "—", getattr(reg.get(_aid), "timeframe", "?"), None,
+                             "⚠️ ยังไม่มี backtest — เพิ่ม bt_ ใน scripts/backtest_all.py"))
+
     out = {"updated": _today(), "note": "backtest matrix ทุก algo × คู่ (causal · SL-first · cost-adj · OOS70/30). +EV=exp_R>0+OOS≥0+n≥%d" % MIN_N,
            "results": rows}
     _with_n = sum(1 for r in rows if r.get("n"))            # combo ที่มีผลจริง (ไม่ใช่ no-data)
