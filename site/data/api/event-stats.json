@@ -15,6 +15,21 @@
    "up_pct": 46.7,
    "window": "2011-06-29 .. 2026-06-03"
   },
+  "CB_CONF": {
+   "avg_abs_d0_pct": 0.615,
+   "avg_d0_pct": -0.054,
+   "avg_down_pct": -0.707,
+   "avg_up_pct": 0.607,
+   "basis": "daily close; วันประกาศจริงจาก rule: อังคารสุดท้ายของเดือน",
+   "d2_extends_pct": 46.4,
+   "down_pct": 47.2,
+   "flat_pct": 6.7,
+   "flat_threshold_pct": 0.05,
+   "median_d0_pct": -0.001,
+   "n": 180,
+   "up_pct": 46.1,
+   "window": "2011-06-28 .. 2026-05-26"
+  },
   "CORE_CPI": {
    "avg_abs_d0_pct": 0.718,
    "avg_d0_pct": 0.151,
@@ -60,6 +75,21 @@
    "up_pct": 53.9,
    "window": "2012-01-25 .. 2026-06-17"
   },
+  "GDP": {
+   "avg_abs_d0_pct": 0.682,
+   "avg_d0_pct": 0.074,
+   "avg_down_pct": -0.649,
+   "avg_up_pct": 0.78,
+   "basis": "daily close; วันประกาศจริงจาก rule: พฤหัสที่ 4 ของ ม.ค./เม.ย./ก.ค./ต.ค. (advance)",
+   "d2_extends_pct": 47.4,
+   "down_pct": 46.7,
+   "flat_pct": 5.0,
+   "flat_threshold_pct": 0.05,
+   "median_d0_pct": 0.033,
+   "n": 60,
+   "up_pct": 48.3,
+   "window": "2011-07-28 .. 2026-04-23"
+  },
   "ISM_MFG": {
    "avg_abs_d0_pct": 0.793,
    "avg_d0_pct": 0.186,
@@ -90,6 +120,21 @@
    "up_pct": 43.6,
    "window": "2011-06-03 .. 2026-06-03"
   },
+  "JOBLESS_CLAIMS": {
+   "avg_abs_d0_pct": 0.716,
+   "avg_d0_pct": 0.024,
+   "avg_down_pct": -0.769,
+   "avg_up_pct": 0.772,
+   "basis": "daily close; วันประกาศจริงจาก rule: ทุกพฤหัส (วันหยุด→พุธ)",
+   "d2_extends_pct": 44.4,
+   "down_pct": 44.9,
+   "flat_pct": 7.4,
+   "flat_threshold_pct": 0.05,
+   "median_d0_pct": 0.028,
+   "n": 787,
+   "up_pct": 47.8,
+   "window": "2011-06-02 .. 2026-06-25"
+  },
   "NFP": {
    "avg_abs_d0_pct": 0.806,
    "avg_d0_pct": 0.012,
@@ -104,6 +149,36 @@
    "n": 179,
    "up_pct": 46.9,
    "window": "2011-08-05 .. 2026-06-05"
+  },
+  "PPI": {
+   "avg_abs_d0_pct": 0.765,
+   "avg_d0_pct": -0.033,
+   "avg_down_pct": -0.85,
+   "avg_up_pct": 0.742,
+   "basis": "daily close; วันประกาศจริงจาก rule: วันทำการที่ 9 (~กลางเดือน ใกล้ CPI)",
+   "d2_extends_pct": 52.9,
+   "down_pct": 47.0,
+   "flat_pct": 3.9,
+   "flat_threshold_pct": 0.05,
+   "median_d0_pct": 0.048,
+   "n": 181,
+   "up_pct": 49.2,
+   "window": "2011-06-13 .. 2026-06-11"
+  },
+  "RETAIL_SALES": {
+   "avg_abs_d0_pct": 0.718,
+   "avg_d0_pct": -0.138,
+   "avg_down_pct": -0.87,
+   "avg_up_pct": 0.616,
+   "basis": "daily close; วันประกาศจริงจาก rule: วันทำการที่ 11 (~กลางเดือน)",
+   "d2_extends_pct": 51.7,
+   "down_pct": 49.2,
+   "flat_pct": 3.9,
+   "flat_threshold_pct": 0.05,
+   "median_d0_pct": -0.029,
+   "n": 181,
+   "up_pct": 47.0,
+   "window": "2011-06-15 .. 2026-06-15"
   },
   "UNEMPLOYMENT": {
    "avg_abs_d0_pct": 0.806,
@@ -123,5 +198,5 @@
  },
  "ok": true,
  "source": "data/xau_daily.json (AlphaVantage daily)",
- "updated": "2026-07-18"
+ "updated": "2026-08-12"
 }

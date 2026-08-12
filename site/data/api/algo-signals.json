@@ -1,0 +1,60 @@
+{
+ "ok": true,
+ "rows": [
+  {
+   "algo": "regime_momentum",
+   "dir": null,
+   "reason": "ยังไม่มีสัญญาณ",
+   "status": "NO_SIGNAL",
+   "tf": "H1"
+  },
+  {
+   "algo": "mean_reversion",
+   "dir": null,
+   "reason": "ยังไม่มีสัญญาณ",
+   "status": "NO_SIGNAL",
+   "tf": "H1"
+  },
+  {
+   "algo": "regime_momentum_fvg",
+   "dir": null,
+   "reason": "ยังไม่มีสัญญาณ",
+   "status": "NO_SIGNAL",
+   "tf": "H1"
+  },
+  {
+   "algo": "sweep_reversal",
+   "dir": null,
+   "reason": "ยังไม่มีสัญญาณ",
+   "status": "NO_SIGNAL",
+   "tf": "H1"
+  },
+  {
+   "algo": "macro_momentum",
+   "dir": null,
+   "reason": "ยังไม่มีสัญญาณ",
+   "status": "NO_SIGNAL",
+   "tf": "H4"
+  },
+  {
+   "algo": "confluence_15m",
+   "dir": null,
+   "reason": "ยังไม่มีสัญญาณ",
+   "status": "NO_SIGNAL",
+   "tf": "M15"
+  },
+  {
+   "algo": "cdc_zone",
+   "dir": "BUY",
+   "entry": 4368.02,
+   "no_tp": true,
+   "reason": "risk/ไม้ > cap (ทุนน้อยเกิน SL)",
+   "sl": 4175.86,
+   "sl_pips": 19216,
+   "status": "BLOCKED",
+   "tf": "D1",
+   "tp": null
+  }
+ ],
+ "symbol": "XAUUSD"
+}

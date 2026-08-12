@@ -1,8 +1,8 @@
 {
  "catalysts": "",
  "drivers": "",
- "filter": "UP on cool CPI/PPI beats, rising jobless claims above 203K, weak retail sales, or soft UoM sentiment. DOWN on hot CPI/PPI surprises, claims below 199K, or hawkish Fed commentary post-print.",
+ "filter": "",
  "ok": true,
- "phase": "Gold is in a high-stakes inflation-data inflection point midweek. The dominant force is tomorrow's US CPI print (Aug 12), where forecasts call for Core CPI at 0.2% m/m / 2.5% y/y and headline CPI at 0.1% m/m / 3.4% y/y — a modest cooling from prior readings. The Fed remains data-dependent and on hold; any upside CPI surprise cements higher-for-longer and pressures gold, while a cool print reopens the rate-cut narrative and is bullish. The tilt is two-sided but with a slight bearish lean into the number given recent hot-surprise reactions (-1.09% to -2.33% on prior hot prints). Key risk: a stagflationary read (hot CPI + weak growth signals) could produce a whipsaw. Geopolitical backdrop remains a secondary support floor.",
- "updated": "2026-08-12 — CPI day live; prior June print was a sharp -2.33% hot reaction,"
+ "phase": "Gold enters midweek in a data-heavy, event-driven phase with the Fed firmly on hold as it waits for clarity on the inflation path. The dominant near-term driver is today's US CPI print (Aug 12): headline CPI forecast at 0.1% m/m / 3.4% y/y and core at 0.2% m/m / 2.5% y/y — both showing modest deceleration from prior readings. The prior month's sharp CPI reversal (-0.4% m/m headline) makes the base effect tricky; a beat to the upside would reinforce Fed hawkishness and pressure gold, while a cool or in-line print keeps rate-cut optionality alive and supports gold. The tilt is two-sided into the print, with a slight bearish lean if inflation re-accelerates. Key risk: a hot CPI surprise that reprices Fed cuts sharply lower.",
+ "updated": ""
 }

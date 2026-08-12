@@ -2,36 +2,122 @@
  "days": [
   {
    "date": "2026-08-12",
-   "losses": 0,
-   "n": 2,
-   "open": 2,
+   "losses": 4,
+   "n": 12,
+   "open": 1,
    "pending": 0,
-   "regime": "—",
+   "regime": "BULLISH",
    "techniques": {
-    "Manual (owner)": 2
+    "Manual (owner)": 12
    },
    "trades": [
     {
      "dir": "BUY",
-     "status": "OPEN",
+     "status": "CLOSED",
      "tech": "Manual (owner)",
      "time": "09:19",
      "why_in": "MANUAL",
-     "why_out": "ยังเปิดอยู่"
+     "why_out": "กำไร (TP algo/manual)"
     },
     {
      "dir": "BUY",
-     "status": "OPEN",
+     "status": "CLOSED",
      "tech": "Manual (owner)",
      "time": "09:20",
+     "why_in": "MANUAL",
+     "why_out": "กำไร (TP algo/manual)"
+    },
+    {
+     "dir": "SELL",
+     "status": "CLOSED",
+     "tech": "Manual (owner)",
+     "time": "14:15",
+     "why_in": "MANUAL",
+     "why_out": "กำไร (TP algo/manual)"
+    },
+    {
+     "dir": "SELL",
+     "status": "CLOSED",
+     "tech": "Manual (owner)",
+     "time": "14:19",
+     "why_in": "MANUAL",
+     "why_out": "กำไร (TP algo/manual)"
+    },
+    {
+     "dir": "SELL",
+     "status": "CLOSED",
+     "tech": "Manual (owner)",
+     "time": "14:23",
+     "why_in": "MANUAL",
+     "why_out": "กำไร (TP algo/manual)"
+    },
+    {
+     "dir": "BUY",
+     "status": "CLOSED",
+     "tech": "Manual (owner)",
+     "time": "15:57",
+     "why_in": "MANUAL",
+     "why_out": "ราคาเคลื่อนสวนทาง (SL)"
+    },
+    {
+     "dir": "SELL",
+     "status": "CLOSED",
+     "tech": "Manual (owner)",
+     "time": "16:05",
+     "why_in": "MANUAL",
+     "why_out": "ราคาเคลื่อนสวนทาง (SL)"
+    },
+    {
+     "dir": "SELL",
+     "status": "CLOSED",
+     "tech": "Manual (owner)",
+     "time": "16:08",
+     "why_in": "MANUAL",
+     "why_out": "ราคาเคลื่อนสวนทาง (SL)"
+    },
+    {
+     "dir": "BUY",
+     "status": "CLOSED",
+     "tech": "Manual (owner)",
+     "time": "16:17",
+     "why_in": "MANUAL",
+     "why_out": "กำไร (TP algo/manual)"
+    },
+    {
+     "dir": "SELL",
+     "status": "CLOSED",
+     "tech": "Manual (owner)",
+     "time": "17:16",
+     "why_in": "MANUAL",
+     "why_out": "ราคาเคลื่อนสวนทาง (SL)"
+    },
+    {
+     "dir": "BUY",
+     "status": "CLOSED",
+     "tech": "Manual (owner)",
+     "time": "17:39",
+     "why_in": "MANUAL",
+     "why_out": "กำไร (TP algo/manual)"
+    },
+    {
+     "dir": "SELL",
+     "status": "OPEN",
+     "tech": "Manual (owner)",
+     "time": "20:34",
      "why_in": "MANUAL",
      "why_out": "ยังเปิดอยู่"
     }
    ],
-   "why_loss": {},
-   "win_rate": 0,
-   "wins": 0,
-   "worst": null
+   "why_loss": {
+    "ราคาเคลื่อนสวนทาง (SL)": 4
+   },
+   "win_rate": 0.636,
+   "wins": 7,
+   "worst": {
+    "dir": "SELL",
+    "technique": "Manual (owner)",
+    "why": "ราคาเคลื่อนสวนทาง (SL)"
+   }
   },
   {
    "date": "2026-08-11",
@@ -99,7 +185,7 @@
   "WK-SELL Core CPI m"
  ],
  "totals": {
-  "n": 6,
-  "win_rate": 0.0
+  "n": 16,
+  "win_rate": 0.438
  }
 }

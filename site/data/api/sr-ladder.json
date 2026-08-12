@@ -1,68 +1,23 @@
 {
  "ok": true,
  "point": 0.01,
- "price": 4368.18,
+ "price": 4413.41,
  "symbol": "XAUUSD",
  "zones": {
   "htf_zone": null,
   "resistance": [
+   4580.05,
+   4570.65,
    4541.29,
    4515.2,
    4434.95,
-   4403.99,
-   4382.08,
-   4371.63
+   4415.81
   ],
   "setups": [],
   "sr_meta": [
    {
-    "avg_bounce": 79.1,
-    "bars_since_touch": 4,
-    "bounce_pct": 44,
-    "break_hold": {
-     "closes": 1,
-     "status": "wick"
-    },
-    "break_pct": 56,
-    "confluence": {
-     "count": 2,
-     "with": [
-      "H4 S",
-      "H1 R"
-     ]
-    },
-    "grade": "B",
-    "level": 4371.63,
-    "n_tests": 9,
-    "score": 69,
-    "side": "R",
-    "strength": 50,
-    "tf": "H4",
-    "touches": 9,
-    "why": "H4 swing · แตะ 9 ครั้ง — ใกล้สึก/เสี่ยงทะลุ"
-   },
-   {
-    "avg_bounce": 109.0,
-    "bars_since_touch": 7,
-    "bounce_pct": 50,
-    "break_hold": {
-     "closes": 0,
-     "status": "wick"
-    },
-    "break_pct": 50,
-    "grade": "B",
-    "level": 4382.08,
-    "n_tests": 6,
-    "score": 74,
-    "side": "R",
-    "strength": 68,
-    "tf": "H4",
-    "touches": 6,
-    "why": "H4 swing · แตะ 6 ครั้ง (proven)"
-   },
-   {
-    "avg_bounce": 68.3,
-    "bars_since_touch": 5,
+    "avg_bounce": 85.4,
+    "bars_since_touch": 0,
     "bounce_pct": 17,
     "break_hold": null,
     "break_pct": 83,
@@ -72,19 +27,19 @@
       "H1 R"
      ]
     },
-    "grade": "A",
+    "grade": "B",
     "level": 4434.95,
     "n_tests": 6,
-    "score": 83,
+    "score": 71,
     "side": "R",
-    "strength": 68,
+    "strength": 55,
     "tf": "H4",
-    "touches": 6,
-    "why": "H4 swing · แตะ 6 ครั้ง (proven)"
+    "touches": 7,
+    "why": "H4 swing · แตะ 7 ครั้ง — ใกล้สึก/เสี่ยงทะลุ · ≈PDH"
    },
    {
     "avg_bounce": 93.3,
-    "bars_since_touch": 289,
+    "bars_since_touch": 292,
     "bounce_pct": 9,
     "break_hold": null,
     "break_pct": 91,
@@ -100,7 +55,7 @@
    },
    {
     "avg_bounce": 117.1,
-    "bars_since_touch": 302,
+    "bars_since_touch": 305,
     "bounce_pct": 56,
     "break_hold": null,
     "break_pct": 44,
@@ -115,25 +70,53 @@
     "why": "H4 swing · แตะ 9 ครั้ง — ใกล้สึก/เสี่ยงทะลุ"
    },
    {
-    "avg_bounce": 51.9,
-    "bars_since_touch": 4,
+    "avg_bounce": 92.3,
+    "bars_since_touch": 315,
+    "bounce_pct": 100,
+    "break_hold": null,
+    "break_pct": 0,
+    "grade": "A",
+    "level": 4570.65,
+    "n_tests": 6,
+    "score": 79,
+    "side": "R",
+    "strength": 68,
+    "tf": "H4",
+    "touches": 6,
+    "why": "H4 swing · แตะ 6 ครั้ง (proven)"
+   },
+   {
+    "avg_bounce": 105.7,
+    "bars_since_touch": 315,
+    "bounce_pct": 100,
+    "break_hold": null,
+    "break_pct": 0,
+    "grade": "A",
+    "level": 4580.05,
+    "n_tests": 6,
+    "score": 79,
+    "side": "R",
+    "strength": 68,
+    "tf": "H4",
+    "touches": 6,
+    "why": "H4 swing · แตะ 6 ครั้ง (proven)"
+   },
+   {
+    "avg_bounce": 55.9,
+    "bars_since_touch": 7,
     "bounce_pct": 30,
-    "break_hold": {
-     "closes": 0,
-     "status": "wick"
-    },
+    "break_hold": null,
     "break_pct": 70,
     "confluence": {
-     "count": 2,
+     "count": 1,
      "with": [
-      "H4 R",
-      "H1 R"
+      "H1 S"
      ]
     },
     "grade": "B",
     "level": 4366.27,
     "n_tests": 10,
-    "score": 68,
+    "score": 64,
     "side": "S",
     "strength": 50,
     "tf": "H4",
@@ -142,7 +125,7 @@
    },
    {
     "avg_bounce": 68.9,
-    "bars_since_touch": 17,
+    "bars_since_touch": 20,
     "bounce_pct": 29,
     "break_hold": null,
     "break_pct": 71,
@@ -158,7 +141,7 @@
    },
    {
     "avg_bounce": 79.6,
-    "bars_since_touch": 20,
+    "bars_since_touch": 23,
     "bounce_pct": 25,
     "break_hold": null,
     "break_pct": 75,
@@ -180,20 +163,14 @@
    },
    {
     "avg_bounce": 113.4,
-    "bars_since_touch": 29,
+    "bars_since_touch": 32,
     "bounce_pct": 25,
     "break_hold": null,
     "break_pct": 75,
-    "confluence": {
-     "count": 1,
-     "with": [
-      "H1 S"
-     ]
-    },
     "grade": "B",
     "level": 4121.48,
     "n_tests": 16,
-    "score": 64,
+    "score": 56,
     "side": "S",
     "strength": 50,
     "tf": "H4",
@@ -202,7 +179,7 @@
    },
    {
     "avg_bounce": 99.0,
-    "bars_since_touch": 38,
+    "bars_since_touch": 41,
     "bounce_pct": 42,
     "break_hold": null,
     "break_pct": 58,
@@ -217,50 +194,27 @@
     "why": "H4 swing · แตะ 19 ครั้ง — ใกล้สึก/เสี่ยงทะลุ"
    },
    {
-    "avg_bounce": 34.2,
-    "bars_since_touch": 17,
-    "bounce_pct": 50,
+    "avg_bounce": 49.0,
+    "bars_since_touch": 9,
+    "bounce_pct": 67,
     "break_hold": {
      "closes": 0,
      "status": "wick"
     },
-    "break_pct": 50,
-    "confluence": {
-     "count": 2,
-     "with": [
-      "H4 R",
-      "H4 S"
-     ]
-    },
-    "grade": "A",
-    "level": 4371.63,
-    "n_tests": 4,
-    "score": 77,
+    "break_pct": 33,
+    "grade": "B",
+    "level": 4415.81,
+    "n_tests": 3,
+    "score": 70,
     "side": "R",
     "strength": 65,
     "tf": "H1",
-    "touches": 4,
-    "why": "H1 swing · แตะ 4 ครั้ง (proven)"
+    "touches": 3,
+    "why": "H1 swing · แตะ 3 ครั้ง (proven)"
    },
    {
-    "avg_bounce": 44.2,
-    "bars_since_touch": 11,
-    "bounce_pct": null,
-    "break_hold": null,
-    "break_pct": null,
-    "grade": "A",
-    "level": 4403.99,
-    "n_tests": 2,
-    "score": 75,
-    "side": "R",
-    "strength": 73,
-    "tf": "H1",
-    "touches": 2,
-    "why": "H1 swing · แตะ 2 ครั้ง (proven) · ≈PDH · เลขกลม"
-   },
-   {
-    "avg_bounce": 78.5,
-    "bars_since_touch": 21,
+    "avg_bounce": 53.3,
+    "bars_since_touch": 2,
     "bounce_pct": null,
     "break_hold": null,
     "break_pct": null,
@@ -270,35 +224,41 @@
       "H4 R"
      ]
     },
-    "grade": "B",
+    "grade": "A",
     "level": 4434.95,
-    "n_tests": 1,
-    "score": 59,
+    "n_tests": 2,
+    "score": 84,
     "side": "R",
-    "strength": 50,
+    "strength": 70,
     "tf": "H1",
-    "touches": 1,
-    "why": "H1 swing"
+    "touches": 2,
+    "why": "H1 swing · แตะ 2 ครั้ง (proven) · ≈PDH"
    },
    {
-    "avg_bounce": 36.2,
-    "bars_since_touch": 5,
-    "bounce_pct": 57,
+    "avg_bounce": 45.8,
+    "bars_since_touch": 17,
+    "bounce_pct": 50,
     "break_hold": null,
-    "break_pct": 43,
-    "grade": "C",
-    "level": 4356.49,
-    "n_tests": 7,
-    "score": 52,
+    "break_pct": 50,
+    "confluence": {
+     "count": 1,
+     "with": [
+      "H4 S"
+     ]
+    },
+    "grade": "B",
+    "level": 4360.11,
+    "n_tests": 8,
+    "score": 56,
     "side": "S",
     "strength": 40,
     "tf": "H1",
-    "touches": 7,
-    "why": "H1 swing · แตะ 7 ครั้ง — ใกล้สึก/เสี่ยงทะลุ"
+    "touches": 8,
+    "why": "H1 swing · แตะ 8 ครั้ง — ใกล้สึก/เสี่ยงทะลุ"
    },
    {
     "avg_bounce": 52.1,
-    "bars_since_touch": 34,
+    "bars_since_touch": 46,
     "bounce_pct": 83,
     "break_hold": null,
     "break_pct": 17,
@@ -314,7 +274,7 @@
    },
    {
     "avg_bounce": 34.0,
-    "bars_since_touch": 76,
+    "bars_since_touch": 88,
     "bounce_pct": 25,
     "break_hold": null,
     "break_pct": 75,
@@ -330,7 +290,7 @@
    },
    {
     "avg_bounce": 50.2,
-    "bars_since_touch": 76,
+    "bars_since_touch": 88,
     "bounce_pct": 100,
     "break_hold": null,
     "break_pct": 0,
@@ -351,38 +311,32 @@
     "why": "H1 swing · แตะ 3 ครั้ง (proven)"
    },
    {
-    "avg_bounce": 41.7,
-    "bars_since_touch": 112,
-    "bounce_pct": 31,
+    "avg_bounce": 36.0,
+    "bars_since_touch": 125,
+    "bounce_pct": 25,
     "break_hold": null,
-    "break_pct": 69,
-    "confluence": {
-     "count": 1,
-     "with": [
-      "H4 S"
-     ]
-    },
+    "break_pct": 75,
     "grade": "C",
-    "level": 4116.54,
-    "n_tests": 13,
-    "score": 54,
+    "level": 4106.54,
+    "n_tests": 20,
+    "score": 46,
     "side": "S",
     "strength": 40,
     "tf": "H1",
-    "touches": 13,
-    "why": "H1 swing · แตะ 13 ครั้ง — ใกล้สึก/เสี่ยงทะลุ"
+    "touches": 20,
+    "why": "H1 swing · แตะ 20 ครั้ง — ใกล้สึก/เสี่ยงทะลุ"
    }
   ],
   "support": [
    4366.27,
-   4356.49,
+   4360.11,
    4316.53,
    4268.45,
    4246.94,
    4229.51,
    4223.22,
    4121.48,
-   4116.54,
+   4106.54,
    4023.73
   ]
  }

@@ -1,45 +1,55 @@
 {
- "atr": 15.42,
+ "atr": 14.82,
  "clusters": [
   {
-   "dist_atr": 20.6,
-   "level": 4050.09,
+   "dist_atr": 24.63,
+   "level": 4049.12,
    "touches": 7
   },
   {
-   "dist_atr": 20.35,
-   "level": 4053.94,
-   "touches": 11
+   "dist_atr": 24.38,
+   "level": 4052.82,
+   "touches": 8
   },
   {
-   "dist_atr": 19.85,
-   "level": 4061.65,
+   "dist_atr": 24.13,
+   "level": 4056.53,
+   "touches": 6
+  },
+  {
+   "dist_atr": 23.88,
+   "level": 4060.23,
+   "touches": 6
+  },
+  {
+   "dist_atr": 23.63,
+   "level": 4063.94,
    "touches": 9
   },
   {
-   "dist_atr": 18.85,
-   "level": 4077.07,
-   "touches": 7
+   "dist_atr": 22.88,
+   "level": 4075.05,
+   "touches": 6
   },
   {
-   "dist_atr": 7.6,
-   "level": 4250.5,
+   "dist_atr": 4.88,
+   "level": 4341.78,
    "touches": 6
   }
  ],
  "donchian": {
-  "buy": 4434.95,
-  "sell": 4356.49
+  "buy": 4424.09,
+  "sell": 4360.11
  },
  "hint": null,
  "momentum": "flat",
  "near": false,
  "ok": true,
- "price": 4367.67,
+ "price": 4414.02,
  "resistance": null,
  "support": {
-  "dist_atr": 7.6,
-  "level": 4250.5,
+  "dist_atr": 4.88,
+  "level": 4341.78,
   "touches": 6
  },
  "symbol": "XAUUSD"

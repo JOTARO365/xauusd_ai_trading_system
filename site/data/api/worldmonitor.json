@@ -1,98 +1,98 @@
 {
- "attention": 0.78,
+ "attention": 1.0,
  "events": [
   {
-   "count": 7,
+   "count": 10,
    "lat": 38.9,
    "lng": -77.0,
    "name": "United States",
    "sev": 1.0
   },
   {
-   "count": 3,
+   "count": 5,
    "lat": 35.7,
    "lng": 51.4,
    "name": "Iran",
-   "sev": 0.42857142857142855
+   "sev": 0.5
+  },
+  {
+   "count": 3,
+   "lat": 39.9,
+   "lng": 116.4,
+   "name": "China",
+   "sev": 0.3
+  },
+  {
+   "count": 2,
+   "lat": 26.57,
+   "lng": 56.25,
+   "name": "Strait of Hormuz",
+   "sev": 0.2
+  },
+  {
+   "count": 2,
+   "lat": 29.0,
+   "lng": 47.0,
+   "name": "Middle East",
+   "sev": 0.2
   },
   {
    "count": 1,
    "lat": 55.8,
    "lng": 37.6,
    "name": "Russia",
-   "sev": 0.14285714285714285
-  },
-  {
-   "count": 1,
-   "lat": 29.0,
-   "lng": 47.0,
-   "name": "Middle East",
-   "sev": 0.14285714285714285
-  },
-  {
-   "count": 1,
-   "lat": 39.9,
-   "lng": 116.4,
-   "name": "China",
-   "sev": 0.14285714285714285
-  },
-  {
-   "count": 1,
-   "lat": 26.57,
-   "lng": 56.25,
-   "name": "Strait of Hormuz",
-   "sev": 0.14285714285714285
+   "sev": 0.1
   }
  ],
  "headlines": [
   {
    "country": "",
-   "domain": "Fox News",
-   "seen": "20260810T100011Z",
-   "title": "A quiet rush for gold is sweeping the globe — here's why countries are stockpiling it",
-   "url": "https://news.google.com/rss/articles/CBMikwFBVV95cUxPT0JYN3BFbWVRSnI5UVRhOExvdm5WcUhKdEVJQlI0dHM3QlZWTjVrZFR0VlpBS3FnRnh1WGdIWmhUb0RUUXp2LXBhQ0VPY1dIdVphVmo1S2JueWZBaEszZXlSU3UyWXFiUlozOHRLWEFWa2p3U1hmWV9udjZSMm5oOWE1YVFCczJoSWxlZW5fYzVaUVk?oc=5"
-  },
-  {
-   "country": "Russia",
-   "domain": "CryptoRank",
-   "seen": "20260811T231442Z",
-   "title": "Bank of Russia approves Bitcoin, Ethereum and Tether for public trading",
-   "url": "https://news.google.com/rss/articles/CBMihAFBVV95cUxNVklGc29xYzV2Wk42RGlRejQtZE14QWZyMmpIUnpXY0RCaW9HbUdoRTJmSzByLUE0WENHTFg4RTNlWklBbmpiQW8wQmoyV2JNd2F0d2pLUnVVSGptT3lzZWFBa2tuM1ktWnRXYm94Z3RxZGpIZGtXU3ZsTmp2SGJwdkc1elM?oc=5"
-  },
-  {
-   "country": "",
-   "domain": "actionforex.com",
-   "seen": "20260811T085315Z",
-   "title": "Gold Rallies: Long-Awaited Rise and Growing Safe-Haven Demand",
-   "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxPZ0hmLThtMUQxWE5TZG1Oc1U1Mzl6ZHNKRTgtVnNXMFhCQmF1ZGVLRUZxSEdrRmdIUVlybDJIdGtWVDZ3amRqYnowUG1ESUQ1OE9YbzJsX2hQel9ZWWlETXdlM185R244TkF6Zmc3TWJNNE51SDRxX0c4TGZ6Y1h5UGF6MW1MM0RId2JJNEpnTWppclJJVzhlaVRnN1QzeU5sRVB6TVBjT2NKU0NienhB?oc=5"
-  },
-  {
-   "country": "",
-   "domain": "Shanghai Metals Market",
-   "seen": "20260811T065720Z",
-   "title": "Precious metals rally continues; SHFE gold and silver rise for sixth straight session; spot trades for platinum and silver remain weak; how ",
-   "url": "https://news.google.com/rss/articles/CBMi0AJBVV95cUxPX2hSb3JoX2JlQkNFa1oxTWNrM1hGTnpIejRUaWJ2bkFTNHpMd0x1M00tUFdkT2NhaGZMdkZfMDBGS01TcXNYUnFZeHNUd2dMbWhoaDZPaDNqdUdmdkFIWGJielFxQ3ZRcExsTGlHQ29VMXZaZkhqVHA5b2ppUk9CaE9jazNLNHNpQ1pOaEhxcFA0U2t3OUhKNnphdXRDZS1maXBKc2wwTlRtc3JBbEJIcm1GaW1HNjVWYklQeUNOMUh5Wk1kelVWUnhTQmNqY1ZsNThqZzhwbXlCT1ZhSHR2U2wzbkNBMHdNZFJVQmJkNWtmQUtqVmZ6SzNoYnFqSFF5X20wQXpaUzhsbGlFMlJMVnhMSGpqdFhWNnlUWnRLa2pwbU9iTXRpQzI0aW5fSldnS295YzhOQXREdVB2V3lkM3NpZG02U1lzZ3JHODh4cG0?oc=5"
+   "domain": "Barron's",
+   "seen": "20260812T050000Z",
+   "title": "This Crypto Platform Buys Gold Like a Central Bank—and for the Very Same Reasons",
+   "url": "https://news.google.com/rss/articles/CBMickFVX3lxTFBxZUZxZHhWOVIzbERpUGVNNDhpZ3o4ZkdjZnpLeVlrZl9RWlgwUTQzMGV4RlRKUkRuZEtsbXZoaUlYbzZOZVVCZkNNcmpfcGFwRGlyX0ROeDlpcmVRTTRjd3F5SjJtR0MyN3VvQkxaMHZfZw?oc=5"
   },
   {
    "country": "",
    "domain": "Yellow.com",
-   "seen": "20260811T145520Z",
-   "title": "How Rate Hikes Crushed Investors In 1980s - And Again In 2026",
-   "url": "https://news.google.com/rss/articles/CBMigAFBVV95cUxNWEc1c1gzU2sydGwyV3JybkVtN0JGSGwyUnRETzhWSzhUcWl6aFFad1JlLVZ1ZzBuOV83UGVJdXpDTTRJb0I1X2hwYjh5c0hBM1A1T0tsSmNmLTVCNmVQMGtLbnIwVGpUZlVpd3VMeFEwMmJCVG5MNXBwSElMT294OA?oc=5"
+   "seen": "20260812T045033Z",
+   "title": "Gold Logs Its Worst Monthly Loss Since 2013 But Stays Resilient",
+   "url": "https://news.google.com/rss/articles/CBMiakFVX3lxTFA3eXg2Zkd2bHhOWXpKS0FDMHU4T2hvcGVINHlwaDRlUDRrVlAxQkNDSHZQbHNZSG9FdHhsSEF4ZHFhSTRmYkFiendEU216WXl2WDJzRjd0cWN4S2pWSy1Qbm16OUlsNERJZ0E?oc=5"
   },
   {
    "country": "",
-   "domain": "KITCO",
-   "seen": "20260810T205345Z",
-   "title": "Price correction ‘improved the long-term risk-reward profile’ for both gold and silver – Sprott’s Smirnova",
-   "url": "https://news.google.com/rss/articles/CBMitgFBVV95cUxOU1pTV3RHRUNLV3RzUjhsSmFyWHdURXVsYzctT0toWkEyVElOUXNoa3dFTWZFNFVxdDZGV01obU12SnlPTVp3ZG1vY0gzbjBpR1hwOFpuWXV4U2lzVXVEZ3BuRWxsRTNTQXFNbGdnRXNqVG1BaVdlNDNvb3djeXpSR1BfY25kYUdSY21xSEYxelI5NXBKeXAtVmZ4dUdsVzBFVnRQd2NGSGYwSk5QMFhJT0JkY2s3UQ?oc=5"
+   "domain": "The Cryptonomist",
+   "seen": "20260812T094654Z",
+   "title": "Gold price inflation climbs to $4,400 ahead of US CPI data",
+   "url": "https://news.google.com/rss/articles/CBMicEFVX3lxTFBKdmNLSGhCNTllQWJTNUdkUGp4aERzeE85T19VSE5pa3lqaEItRnVEbDNlVjJ4bUJta2V1QzJaWk96dG16alZ2SzJiMXFoSHZoQ2JtanE2LWJjdW55R3pHbjRhalVTNU1fejRFc3pHMGY?oc=5"
   },
   {
    "country": "",
-   "domain": "odaily.news",
-   "seen": "20260811T101722Z",
-   "title": "Gold returns to $4,350 — Is the precious metals correction over?",
-   "url": "https://news.google.com/rss/articles/CBMiUEFVX3lxTE1CQ1g3TTRaaU5saHZNU1dIYTVnX295WFNrMElkeTJjZzRLMUMtS1RVb19qWnZzTDJmUVZMTklIcXcxc2JoLWhCLUdiYUpDbmNW?oc=5"
+   "domain": "Businesskorea",
+   "seen": "20260812T011859Z",
+   "title": "Bank of Korea Resumes Gold Investment After 13 Years",
+   "url": "https://news.google.com/rss/articles/CBMidEFVX3lxTE0yVXF0c0ZzTDZsUnNaVkhmdjc0dkNSR0JSdENhbnQwdzdKTkJkMWVLeXU4b0lKNklOVEprZXZWTDM0UGhIeDhsUHh6V1VpTlktbmZNcXlJZDhjMGZUYktpQUg0YkFxNFNCdkJqTFA2SlJ4YUxp?oc=5"
+  },
+  {
+   "country": "",
+   "domain": "CryptoRank",
+   "seen": "20260812T044954Z",
+   "title": "SpaceX 盘中跌超 5%",
+   "url": "https://news.google.com/rss/articles/CBMiWEFVX3lxTE05M3pWRjFrakRqQ3kwT3dHYnRlVTg3MTJUal9BNENaenlzQ2VjUmk2N2dPTFY0QjJVSUVKRklYdWxXdDdDSjZFT2ZIS2w1N1JRT2R3bDhybng?oc=5"
+  },
+  {
+   "country": "",
+   "domain": "StreetInsider",
+   "seen": "20260811T143700Z",
+   "title": "Is Crypto the New Safe Haven? Comparing Gold, Stablecoins and Tokenized Metals During Market Stress",
+   "url": "https://news.google.com/rss/articles/CBMi7wFBVV95cUxPTVpMbjBEWXdwUEZ6Z0Vudjc2YUJvUUVVQVZ3LS16M252a1lNRzc5c1M0enh4WjVvMm9fNTZiVGcxS1FmQ3h2OUpLQ0hEZV9seTY3S3g3dDVkNEk1YjB0N0NUeE93VnpMbTVDNFprN05xSExBZmxEMUpPQnQ3eFFma25COG9ZNTQtQkVIT0lfZUVWX0VSX04zMUdpWFRmZkhiT24tWVZseFRmejQ4S2M4VS1VbFRySXpoMnAxTVY5MHVUUVVESnVBSzhlWmhYajM1Y01VMUdUZzlFdTloWWRpVWwxRUpJZzROTjdIaXVZbw?oc=5"
+  },
+  {
+   "country": "",
+   "domain": "Geomechanics.io",
+   "seen": "20260812T000225Z",
+   "title": "Gold price hits two‑month high: volatility signals for mine project economics",
+   "url": "https://news.google.com/rss/articles/CBMitwFBVV95cUxOMU1abjZOVnViT2JGQlBkb1RCQUV4bmhFdDdPQk5TbHd4YnpkTEhIbnZWcGlUYjFva2hFWU1JV1BLVmdmRUVyN0x1U3h0eXJpdFllSms2Vkl4NlRFYUMzazE2NnItWVluWVVGME9QNEZvMUloeUJZcDBWakliM2Y3ZHFxUEZyOXdMakRGOWN4a19mUWh6VElhOUc5MWtfcDVMUXA1MUJTd25QUmhJZ0VVekI4Z1R4a2s?oc=5"
   },
   {
    "country": "",
@@ -102,36 +102,36 @@
    "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxQdFd0el9aYUFjdU0wWFRKdk1iQ2VSS1BjTVQwdS1GeHZiNVNlNEVPaDFWMWNTX2hSLWg1SVQzUThMTkNwcXFMUVB0M3h0NmhwaUJNRklnZHVyMWNjanVVUUYwa2lZcW5EVVJrZnJIWWhkZW9fSkRYaXc3am5leXRhVzN1Tl9JSnNmM3JvdzBQMU5vVjMxeF9QQ0RqUHIyR1JsNWgta2lSWnZMMVE0NDBB?oc=5"
   },
   {
-   "country": "United States",
-   "domain": "Seoul Economic Daily",
-   "seen": "20260811T061828Z",
-   "title": "Gold Hits 2-Month High as Weak U.S. Jobs Data, Central Bank Buying Lift Prices",
-   "url": "https://news.google.com/rss/articles/CBMipwFBVV95cUxNZVYxTjhBbHAxdWZ5TjZlVFVlblpseGdDY0NDNEJFUExjbjd4OGx1S2tTa2VyT09tVkEzREtUTVJ3OHVCaDVsTjRJdjdRYzc3eTUyYVFmNHZjYVhuODdPb19vc21NMFkwZlhxTzRaWl9UekgycTlIZldhUWNTdnBRZVlaaTcza19pWmNSQnhrQzE2YmtlQnRlalkzNENBQnJESzc0VHk2Yw?oc=5"
+   "country": "",
+   "domain": "LiteFinance",
+   "seen": "20260811T165342Z",
+   "title": "Gold Price Forecast & Predictions for 2026, 2027, 2028–2030 and Beyond",
+   "url": "https://news.google.com/rss/articles/CBMiigFBVV95cUxQeElueWM4b01fQWpUbVpoOHdMYkw3SkQ5QldoaHBvSVh0QUhDeF9iTWZVM0NqZFV1cXg5QzRCU3NpM05kMkgtaEJUa2hvWTBrWTVSaEY1R2wyM1BkMnFXdHF6TnhqVF8tRXozYXBhMW16WnVWelhwOXBWT3ZnbnlTaDctU2RqYmlfVXc?oc=5"
+  },
+  {
+   "country": "Strait of Hormuz",
+   "domain": "CryptoRank",
+   "seen": "20260811T203210Z",
+   "title": "Gold Eases as Dollar Firms; CPI and Hormuz Risks in Focus",
+   "url": "https://news.google.com/rss/articles/CBMihAFBVV95cUxOaXJvWHRBcHlKdmtQLTJJWmJ3b2txaE1vMDRzQk9yRExFV0hZbVN1a1MwSnlTNnlCSlcwMHo2bG1EU1FOMTJjQ3lvcHQ1WHRLVjdBTVRLQjVBYnVCUlNwQTYwQmxkS3o2MXE3c0VrcUEtTFRoQm1CeWVodUlyclBTWExOd3c?oc=5"
   },
   {
    "country": "",
-   "domain": "FXEmpire",
-   "seen": "20260811T074000Z",
-   "title": "Gold (XAU/USD) & Silver Price Forecast: Can CPI Revive Gold After $4,430 Rejection?",
-   "url": "https://news.google.com/rss/articles/CBMixAFBVV95cUxOTDR6d05WNjRUNGZiUzB3MDktbmtyQ1VIcTRlZ2hEQ3I3UExqQUdwaEJtU2VSbmJWQ2F6dlNidno5TEoxanMwTURoZUgtSE1RMGF4ck9PdjVzOWFPVGF2cTRkcjJ2VlEwZkVCejMzNUI1OFdncVBfZWF1Q2pZVEtnSGNEWVo1REVRMk50UFdzR1BiY3pVM1Rvc01RMTNEQk8tV3lnWDlIQUZoTTFoSERQYUI2ay1LbWhxQXlSTllyeDRmODhP?oc=5"
+   "domain": "Yellow.com",
+   "seen": "20260811T221439Z",
+   "title": "How Rate Hikes Crushed Investors In 1980s - And Again In 2026",
+   "url": "https://news.google.com/rss/articles/CBMifkFVX3lxTE1wdEJPNVFJd05TMVcwUHM4MUc2WndVa1ZPbWdkWlVFVGluX2NObGwzc01SX0JsUXc4UUVOX0lOWVBRVDFpMnFsR2F1cWNRdkFwR2ZTNkdPdGJDemNrMkNBU3diNDd3cVZGZnlVR1JQNHpTOC15TmF3RG5SdkJ6Zw?oc=5"
   },
   {
-   "country": "United States",
-   "domain": "조선일보",
-   "seen": "20260811T001245Z",
-   "title": "Gold ETFs Rebound on U.S. Employment Shock, Rate Hike Fears Ease",
-   "url": "https://news.google.com/rss/articles/CBMijgFBVV95cUxNMk5OaW02QXBrdWUwUHZGdURmNTdtd2JqZy1mMUVPcFNsUVRrd1EwSlRTb0ZZanVMVkNzelMwQVJNaDdNS1oxOXBLdE9BZ0N2cXpTZDhOTEV5VTRkei1Ub1RDUEo2dWRzaHRjd01BUWZzakFBbWd6bVMzTVZJSXl3WFBrVVRjd2pNY1hhSmln?oc=5"
-  },
-  {
-   "country": "United States",
-   "domain": "intellectia.ai",
-   "seen": "20260811T001942Z",
-   "title": "Gold Price Hits $4,400: Fed Inflation Data Driving Historic Rally 2026",
-   "url": "https://news.google.com/rss/articles/CBMib0FVX3lxTE9Eblk5UDE5cUE2Q0NtZkV5WGI5OGNNdXhzOEk3ODdFMG42R0htM0RWQWtNay0yemZmUEMzSGNwMGxUNDltSm9qaUprSS1YZ0Q2UHRsUklVR1FSenFoaEJsRVpUVTZMSFgyOEt3Mnh1Yw?oc=5"
+   "country": "",
+   "domain": "CryptoRank",
+   "seen": "20260812T042836Z",
+   "title": "Banks split on whether RBA’s next move is a hike or cut as energy risks loom",
+   "url": "https://news.google.com/rss/articles/CBMijgFBVV95cUxOeF9hR1I2YlFuWWRtU3U4UF8ydHdYOVByQThwbjgwV2Fxc3dESmNBdHlibFZ3TGM3RTV3T1ZFVVpKeC10OXZxZ2RkOXhnbjlheEVuQW1ITFF2YTBseFhNMUFrRVoxSTNnQWE3cDVCbUkzT1VqTTRCMEJoZF9Bc2ZQUWRaT0RDd18xYVdTaFpn?oc=5"
   }
  ],
- "n_articles": 47,
+ "n_articles": 99,
  "ok": true,
  "source": "GoogleNews",
- "ts": 1786490978
+ "ts": 1786532285
 }

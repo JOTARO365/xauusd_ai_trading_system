@@ -2,7 +2,7 @@
  "caveat": "proxy — XAUUSD retail ไม่มี order book จริง (tick-vol/dwell/COT); guide เท่านั้น",
  "components": {
   "cot_flow": 0.2281,
-  "vol_tilt": -0.1617
+  "vol_tilt": 0.0194
  },
  "confidence": 0.35,
  "cot_net": 197634,
@@ -10,29 +10,29 @@
  "magnets": {
   "hvn_above": null,
   "hvn_below": {
-   "level": 4342.32,
-   "pct": 10.4
+   "level": 4386.43,
+   "pct": 7.4
   },
   "stop_pools_above": [],
   "stop_pools_below": [
    {
     "count": 2,
-    "dist_pct": 1.23,
-    "level": 4314.9
+    "dist_pct": 1.22,
+    "level": 4358.3
    },
    {
     "count": 2,
-    "dist_pct": 3.25,
-    "level": 4226.36
+    "dist_pct": 2.21,
+    "level": 4314.9
    }
   ],
   "wall": {
    "level": 4342.32,
-   "pct": 10.4
+   "pct": 10.9
   }
  },
  "ok": true,
- "score": 9,
- "tilt": "balanced",
+ "score": 35,
+ "tilt": "BUY-flow",
  "vp_basis": "tick-volume (ไม่ใช่ contract จริง)"
 }

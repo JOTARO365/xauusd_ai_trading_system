@@ -25,7 +25,7 @@
   "n_eligible": 0,
   "n_tests": 1
  },
- "generated": "2026-08-11T23:41Z",
+ "generated": "2026-08-12T11:01Z",
  "note": "P3-D: validation gate (min-ESS + WR-significance + FDR Benjamini-Hochberg) ยาม winner's curse · P2 Thompson vote · P1.5 cross-user DB+ESS+regime · exp_R=avg pnl (ยังไม่ R-normalize) · shadow-only ไม่แตะ entry (eligible ≠ auto-trade; order-control=P3b)",
  "ok": true,
  "prior": {

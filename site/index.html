@@ -5,46 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>XAU/USD · Gold Desk</title>
   <script>/* apply theme ก่อน paint กัน flash */try{if(localStorage.getItem('theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
+  <script>
+window.__PUBLIC_STATIC__ = true;
+(function () {
+  var _f = window.fetch.bind(window);
+  window.fetch = function (url, opts) {
+    opts = opts || {};
+    var m = String(opts.method || 'GET').toUpperCase();
+    var u = String(url);
+    if (m !== 'GET') { return Promise.resolve(new Response('{"ok":false,"static":true}', { status: 200, headers: { 'Content-Type': 'application/json' } })); }
+    if (u.indexOf('/api/') === 0) {
+      var name = u.slice(5).split('?')[0].replace(/\/+$/, '').replace(/\//g, '_');
+      var cb = '?cb=' + Math.floor(Date.now() / 60000);
+      return _f('./data/api/' + name + '.json' + cb).then(function (r) { return r.ok ? r : new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }); }).catch(function () { return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }); });
+    }
+    return _f(url, opts);
+  };
+})();
+function _m(v){ return (v==null || (typeof v==='number' && !isFinite(v))) ? '—' : v; }
+</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="./static/chart.umd.min.js"></script><!-- vendored -->
-  <script src="./static/lightweight-charts.standalone.production.js"></script><!-- vendored -->
-  <script>
-  /* ── PUBLIC STATIC SHIM ──────────────────────────────────────────────
-     หน้านี้ = สำเนา dashboard จริง แต่ไม่มี Flask/MT5. map GET /api/<name> →
-     ./data/api/<name>.json (snapshot จาก scripts/export_dashboard_static.py,
-     sanitize เงิน/บัญชี/positions แล้ว). POST/DELETE (config/close/switch) = no-op. */
-  window.__PUBLIC_STATIC__ = true;
-  (function () {
-    var _f = window.fetch.bind(window);
-    window.fetch = function (url, opts) {
-      opts = opts || {};
-      var m = String(opts.method || 'GET').toUpperCase();
-      var u = String(url);
-      if (m !== 'GET') {
-        return Promise.resolve(new Response('{"ok":false,"static":true}',
-          { status: 200, headers: { 'Content-Type': 'application/json' } }));
-      }
-      if (u.indexOf('/api/') === 0) {
-        var name = u.slice(5).split('?')[0].replace(/\/+$/, '').replace(/\//g, '_');
-        // cache-bust ต่อนาที: gh-pages ตั้ง Cache-Control max-age=600 → ไม่งั้น viewer เห็น snapshot
-        // เก่าถึง 10 นาทีหลัง hourly refresh. per-minute = สดเร็ว แต่ poll ในนาทีเดียวกันยังใช้ cache
-        var cb = '?cb=' + Math.floor(Date.now() / 60000);
-        return _f('./data/api/' + name + '.json' + cb).then(function (r) {
-          return r.ok ? r : new Response('{}',
-            { status: 200, headers: { 'Content-Type': 'application/json' } });
-        }).catch(function () {
-          return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
-        });
-      }
-      return _f(url, opts);
-    };
-  })();
-  /* public snapshots drop money/account fields → keys absent. _m() degrades a
-     missing money value to an em-dash instead of "undefined฿"/"NaN฿"/a throw. */
-  function _m(v){ return (v==null || (typeof v==='number' && !isFinite(v))) ? '—' : v; }
-  </script>
+  <script src="./static/chart.umd.min.js"></script><!-- vendored: VM/offline ใช้ได้ (เดิม CDN → กราฟ win/loss+cost ไม่ขึ้นบน VM offline) -->
+  <script src="./static/lightweight-charts.standalone.production.js"></script><!-- vendored 07-03: VM/offline ใช้ได้ -->
 
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1511,6 +1495,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       <button class="tab-sub-item" onclick="goSection('wm-map-section')">แผนที่/ข่าว</button>
       <button class="tab-sub-item" onclick="goSection('pair-context-section')">Gold-Complex</button>
       <button class="tab-sub-item" onclick="goSection('ecosystem-section')">Ecosystem</button>
+      <button class="tab-sub-item" onclick="goSection('shadow-matrix-section')">Shadow · เงินจริง</button>
       <button class="tab-sub-item" onclick="goSection('ai-sentiment-section')">Sentiment</button>
       <button class="tab-sub-item" onclick="goSection('cluster-map-section')">S/R</button>
       <button class="tab-sub-item" onclick="goSection('macro-quant-section')">Macro</button>
@@ -1694,27 +1679,6 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
     </div>
   </section>
 
-  <!-- SOURCE BREAKDOWN -->
-  <section>
-    <div class="section-title">ALGO vs DISCRETIONARY</div>
-    <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
-      <div class="card">
-        <div class="label">System Trades</div>
-        <div class="value cyan" id="sys-count">—</div>
-        <div class="sub" id="sys-winrate">Win rate —</div>
-      </div>
-      <div class="card">
-        <div class="label">Manual Trades</div>
-        <div class="value" id="man-count" style="color:var(--amber)">—</div>
-        <div class="sub" id="man-winrate">Win rate —</div>
-      </div>
-      <div class="card legacy-llm" style="grid-column:span 2">
-        <div class="label">Strategy Breakdown (System)</div>
-        <div id="entry-type-stats" style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.8;font-family:var(--mono)">—</div>
-      </div>
-    </div>
-  </section>
-
   <!-- WEEKLY OUTLOOK (LLM Opus — แนวโน้มประจำสัปดาห์) -->
   <section>
     <div class="table-card" style="border-left:3px solid var(--gold)">
@@ -1758,11 +1722,15 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
     <!-- TSMOM-D1 ENGINE — directional engine รายวัน (edge เดียวที่ validated). display-only, compute-in-code -->
     <section id="tsmom-section" style="margin-bottom:10px">
       <div class="section-title">TSMOM-D1 Engine — time-series momentum รายวัน (edge เดียวที่ validated)</div>
+      <div id="ts-capital-warn" style="display:none;margin-bottom:8px;padding:8px 12px;border-radius:6px;
+           background:rgba(239,68,68,0.15);border:1px solid var(--red,var(--red));color:var(--red,var(--red));
+           font-family:var(--mono);font-size:12px;font-weight:600"></div>
       <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;padding:10px 14px;border:1px solid var(--border);border-left:3px solid var(--violet);border-radius:8px;font-family:var(--mono);font-size:12px">
         <div><span style="color:var(--muted);font-size:10px">ENGINE</span><br><span id="ts-engine" style="font-weight:700;font-size:14px">—</span></div>
         <div><span style="color:var(--muted);font-size:10px">SIGNAL (ensemble)</span><br><span id="ts-signal" style="font-weight:700;font-size:15px">—</span></div>
         <div><span style="color:var(--muted);font-size:10px">VOTES (L=63/126/252)</span><br><span id="ts-votes">—</span></div>
         <div><span style="color:var(--muted);font-size:10px">POSITION</span><br><span id="ts-position">—</span></div>
+        <div><span style="color:var(--muted);font-size:10px">P&amp;L</span><br><span id="ts-pnl">—</span></div>
         <div><span style="color:var(--muted);font-size:10px">SL / ATR(D1)</span><br><span id="ts-sl">—</span></div>
         <div style="flex:1;min-width:180px"><span style="color:var(--muted);font-size:10px">STATE</span><br><span id="ts-state" style="color:var(--muted)">—</span></div>
       </div>
@@ -2134,6 +2102,23 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       </div>
     </section>
 
+    <!-- STRUCTURAL READ (โค้ช) — position-in-range / nearest S-R + strength / action-state / prob-path (จาก UHAS analyst 08-12, 0 token) -->
+    <section>
+      <div class="section-title" style="display:flex;align-items:center"><svg class="ic"><use href="#ic-eye"/></svg> STRUCTURAL READ &mdash; อ่านโครงสร้างสด (โค้ช)
+        <span style="font-size:9px;color:var(--muted);font-weight:400;margin-left:6px">(ตำแหน่งในกรอบ · แนวใกล้+ความแข็ง · state · โอกาสเด้ง/ทะลุ · display 0 token)</span></div>
+      <div id="struct-read" class="card" style="padding:10px 12px;font-size:12px">รอข้อมูล S/R…</div>
+    </section>
+
+    <!-- ALGO SIGNALS — โอกาสเข้า order ต่อ algo (จุดเข้า/SL/TP + สถานะ เข้าแล้ว/โดน block) -->
+    <section>
+      <div class="section-title" style="display:flex;align-items:center"><svg class="ic"><use href="#ic-target"/></svg> ALGO SIGNALS &mdash; โอกาสเข้า order ต่อ algo
+        <span style="font-size:9px;color:var(--muted);font-weight:400;margin-left:6px">(จุดเข้า/SL/TP ของทุก algo แม้ไม่เข้าจริง · บอกว่าเข้าไปแล้ว/โดน block เพราะอะไร · display 0 token)</span>
+        <span id="algosig-sym" style="margin-left:auto;font-size:10px;color:var(--muted);font-family:var(--mono)"></span></div>
+      <div id="algosig-cards" style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="card" style="flex:1;min-width:240px;color:var(--muted);padding:10px">รอสัญญาณ…</div>
+      </div>
+    </section>
+
     <!-- WHY NO ENTRY — gate blocks สด (07-03) -->
     <section id="legacy-gateblocks" class="legacy-llm">
       <div class="section-title">STAND-DOWN LOG &mdash; Gate Blocks</div>
@@ -2267,6 +2252,23 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
             <tbody id="ee-upcoming"><tr><td colspan="6" style="color:var(--muted)">—</td></tr></tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <!-- EVENT REACTION STATS — ทองต่อข่าวเศรษฐกิจ ทุก event (15 ปี) + $ ที่ราคาสด (จาก analyst UHAS 08-12) -->
+    <section id="event-reaction-section" style="margin-bottom:10px">
+      <div class="section-title" style="display:flex;align-items:center"><svg class="ic"><use href="#ic-bank"/></svg> EVENT REACTION STATS &mdash; ปฏิกิริยาทองต่อข่าว (15 ปี)
+        <span style="font-size:9px;color:var(--muted);font-weight:400;margin-left:6px">(move เฉลี่ย + $ ที่ราคาสด + prob ขึ้น/ลง ต่อ event · เรียงตามแรงกระแทก · display 0 token)</span>
+        <span id="evrx-px" style="margin-left:auto;font-size:10px;color:var(--muted);font-family:var(--mono)"></span></div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:var(--mono)">
+          <thead><tr style="color:var(--muted);text-align:left">
+            <th style="padding:3px 6px">event</th><th style="text-align:right">N</th>
+            <th style="text-align:right">ขึ้น%</th><th style="text-align:right">ลง%</th>
+            <th style="text-align:right">move เฉลี่ย</th><th style="text-align:right">≈ $ ที่ราคาสด</th>
+            <th style="text-align:right">×วันปกติ</th><th style="text-align:right">ทะลุ D+2</th></tr></thead>
+          <tbody id="evrx-body"><tr><td colspan="8" style="color:var(--muted);padding:4px 6px">Loading…</td></tr></tbody>
+        </table>
       </div>
     </section>
 
@@ -2532,8 +2534,8 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       </div>
     </section>
 
-    <!-- CALIBRATION CARD — §3.5 calibration.json (LLM confidence — vestigial ในระบบ deterministic) -->
-    <section id="calibration-section" class="legacy-llm">
+    <!-- CALIBRATION CARD — §3.5 calibration.json (relocated from Costs tab) -->
+    <section id="calibration-section" class="legacy-llm" style="margin-bottom:18px">
       <div class="section-title">Confidence Calibration (Predicted vs Realized Win-Rate)</div>
       <div class="card" style="overflow-x:auto">
         <div class="label" style="margin-bottom:8px">Per-bin: n trades / realized WR% / total PnL &mdash; bar = realized, line = predicted midpoint</div>
@@ -2543,8 +2545,8 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       </div>
     </section>
 
-    <!-- COT CARD — §3.5 cot.json (CFTC non-commercial gold futures, weekly via scripts/fetch_cot.py) -->
-    <section id="cot-section">
+    <!-- COT CARD — §3.5 cot.json (relocated from Costs tab) -->
+    <section id="cot-section" style="margin-bottom:18px">
       <div class="section-title">CFTC COT &mdash; Non-Commercial Gold Futures Positioning</div>
       <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
         <div class="card">
@@ -2685,9 +2687,9 @@ async function loadGapMonitor() {
         ? (p.be ? '<span style="color:var(--green)">จะชน SL แต่ BE = ปิดกำไร ✓</span>'
                 : '<span style="color:var(--red)">⚠ จะชน SL = ขาดทุน</span>')
         : `<span style="color:var(--muted)">ปลอดภัย (ห่าง ${p.dist_pt}pt)</span>`;
-      const pc = p.pnl == null ? 'var(--muted)' : (p.pnl >= 0 ? 'var(--green)' : 'var(--red)');
+      const pc = p.pnl >= 0 ? 'var(--green)' : 'var(--red)';
       return `<div style="padding:2px 0;font-family:var(--mono);font-size:12px">
-        <b>${p.symbol}</b> TK${p.ticket} ${p.dir} · SL ${p.sl} · <span style="color:${pc}">${_m(p.pnl)}</span>
+        <b>${p.symbol}</b> TK${p.ticket} ${p.dir} · SL ${p.sl} · <span style="color:${pc}">${p.pnl >= 0 ? '+' : ''}${p.pnl}</span>
         <span style="color:var(--muted);font-size:10px">(${p.proj_by})</span> — ${tag}</div>`;
     }).join('') || '<div style="color:var(--muted)">ไม่มีไม้ระบบเปิด</div>';
     body.innerHTML =
@@ -2714,7 +2716,6 @@ let activeSystem = 'xauusd';
 function setActiveSystem(v) {                     // ทอง / ทุกคู่ (all = รวม WTI/BTC จาก DB)
   activeSystem = v || 'xauusd';
   try { fetchData(); } catch (e) {}
-  try { loadAccounting(); } catch (e) {}
   try { loadMonitor(); } catch (e) {}
   try { loadEventEngine(); } catch (e) {}
   try { loadPairs(); } catch (e) {}
@@ -2756,10 +2757,6 @@ function confBar(pct) {
 /* ════════════════════════════════════════════════════════════
    CHARTS
    ════════════════════════════════════════════════════════════ */
-function initCharts() {
-  // public static: overview equity-curve + win/loss charts removed (money display)
-}
-
 /* ════════════════════════════════════════════════════════════
    SPARKLINE
    ════════════════════════════════════════════════════════════ */
@@ -2789,47 +2786,7 @@ function renderSparkline(values) {
 /* ════════════════════════════════════════════════════════════
    STATS
    ════════════════════════════════════════════════════════════ */
-function updateStats(stats) {
-  // Alert bar — losing-streak advisory (kept)
-  const streak = stats.losing_streak || 0;
-  const alert = document.getElementById('alert-bar');
-  if (alert) {
-    if (streak >= 5) {
-      alert.style.display = 'flex';
-      alert.textContent = '⚠  Losing streak ' + streak + ' — confidence ≥ 62% required for new orders';
-    } else if (streak >= 3) {
-      alert.style.display = 'flex';
-      alert.textContent = '⚠  Losing streak ' + streak + ' — caution, consecutive losses';
-    } else {
-      alert.style.display = 'none';
-    }
-  }
-
-  // System vs Manual breakdown (kept)
-  const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
-  set('sys-count',   stats.system_count || 0);
-  set('sys-winrate', 'Win rate ' + (stats.system_winrate || 0) + '%');
-  set('man-count',   stats.manual_count || 0);
-  set('man-winrate', 'Win rate ' + (stats.manual_winrate || 0) + '%');
-
-  const etStats = stats.entry_type_stats || {};
-  const etKeys  = Object.keys(etStats);
-  const etEl    = document.getElementById('entry-type-stats');
-  if (!etEl) return;
-  if (!etKeys.length) {
-    etEl.textContent = '—';
-  } else {
-    etEl.innerHTML = etKeys.map(k => {
-      const s   = etStats[k];
-      const wr  = s.count ? Math.round(s.wins / s.count * 100) : 0;
-      const pnlColor = s.pnl == null ? 'var(--muted)' : (s.pnl >= 0 ? 'var(--green)' : 'var(--red)');
-      return `<div style="display:flex;justify-content:space-between;gap:16px;padding:1px 0">
-        <span style="color:var(--text)">${k}</span>
-        <span>${s.count} &middot; ${wr}% WR &middot; <span style="color:${pnlColor}">${_m(s.pnl)}</span></span>
-      </div>`;
-    }).join('');
-  }
-}
+function updateStats(stats) { /* public static: book-performance / equity / algo-vs-disc panels removed */ }
 
 /* ════════════════════════════════════════════════════════════
    PAGINATION + TABLE
@@ -2934,12 +2891,21 @@ function renderPage() {
       <td>${analysisHtml}</td>
       <td class="num">${fmtPnl(t.pnl)}</td>
       <td>${closeReasonHtml}</td>
-      <td class="center"><span class="badge badge-${status}">${t.status || '—'}</span> ${result}</td>
+      <td class="center"><span class="badge badge-${status}">${t.status || '—'}</span> ${result}${t.status === 'OPEN' && t.ticket ? `<button onclick="modifyPosition(${t.ticket})" style="margin-left:6px;padding:4px 9px;font-size:10px;background:var(--gold);color:#111;border:none;border-radius:4px;cursor:pointer;font-family:var(--mono)">✎ SL/TP</button><button onclick="closePosition(${t.ticket}, ${t.pnl || 0})" style="margin-left:4px;padding:4px 9px;font-size:10px;background:var(--red);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--mono);letter-spacing:0.5px">✕ Close</button>` : ''}</td>
     </tr>`;
   }).join('');
 }
 
+/* ════════════════════════════════════════════════════════════
+   TRADE CONTROL (close / cancel / modify) — สั่งจากมือถือผ่าน dashboard
+   ════════════════════════════════════════════════════════════ */
+// public static: trade-control actions removed (no live positions on the public page)
+function closePosition() {}
+function modifyPosition() {}
+function cancelPending() {}
+
 function renderTable(trades) {
+  if (!document.getElementById('trade-tbody')) return;   // public static: trade history removed
   const sourceF = document.getElementById('filter-source').value;
   const dirF    = document.getElementById('filter-dir').value;
   const statusF = document.getElementById('filter-status').value;
@@ -2963,6 +2929,11 @@ function renderTable(trades) {
 }
 
 /* ════════════════════════════════════════════════════════════
+   PORTFOLIO
+   ════════════════════════════════════════════════════════════ */
+function updatePortfolio() { /* public static: portfolio balance bar removed */ }
+
+/* ════════════════════════════════════════════════════════════
    TAB SWITCHING  (BTC switcher ตัดออก 07-03 — backend multi-system คงไว้)
    ════════════════════════════════════════════════════════════ */
 function switchTab(name) {
@@ -2974,8 +2945,7 @@ function switchTab(name) {
   if (_sub) _sub.style.display = (name === 'monitor') ? 'flex' : 'none';
   const _bsub = document.getElementById('backtest-submenu');  // Analytics submenu
   if (_bsub) _bsub.style.display = (name === 'backtest') ? 'flex' : 'none';
-  if (name === 'accounting') loadAccounting();
-  if (name === 'monitor')    { loadMonitor(); loadEventEngine(); loadPairs(); loadComex(); loadPairLots(); }
+  if (name === 'monitor')    { loadMonitor(); loadEventEngine(); loadEventReaction(); loadPairs(); loadComex(); }
   if (name === 'backtest') { loadBacktestResults(); loadBacktest(); loadRegimeAnalytics(); loadDailySummary(); loadOwnerEdge(); loadRiskSat(); loadEquityCurve(); loadCointegration(); }
 }
 
@@ -3010,11 +2980,16 @@ async function fetchData() {
 
   try {
     allTrades = data.trades || [];
-    updateStats(data.stats || {});
+    if (histSymbol) { onSymbolChange(); }        // ดูประวัติ DB ต่อคู่อยู่ → คง view (ไม่ override ด้วย logs)
+    else { updateStats(data.stats || {}); renderTable(allTrades); }
   } catch (e) {
-    console.error('stats error:', e);
+    console.error('stats/table error:', e);
     document.getElementById('last-update').textContent = 'Dashboard error: ' + e.message;
   }
+
+  try {
+    updatePortfolio(data.account, data.usd_thb);
+  } catch (e) { /* public static: portfolio bar removed */ }
 
   document.getElementById('last-update').textContent =
     'Updated ' + new Date().toLocaleTimeString('en-US', { hour12: false }) +
@@ -3393,167 +3368,7 @@ function fmtUsd(v) {
   return '$' + Number(v).toFixed(4);
 }
 
-async function loadAccounting() {
-  try {
-    const res  = await fetch('/api/accounting?system=' + activeSystem);
-    const data = await res.json();
-    if (!data.ok) return;
-
-    const s       = data.summary || {};
-    const today   = data.today   || {};
-    const agents  = data.agents  || {};
-    const daily   = data.daily   || {};
-
-    const todayCycles = today.cycles || 0;
-    const todayTrades = today.trades || 0;
-    document.getElementById('acc-today-cost').textContent    = fmtUsd(today.total_cost_usd || 0);
-    document.getElementById('acc-today-cycles').textContent  = `${todayCycles} cycles, ${todayTrades} trades`;
-    document.getElementById('acc-total-cost').textContent    = fmtUsd(s.total_cost_usd || 0);
-    document.getElementById('acc-total-cycles').textContent  = `${s.total_cycles || 0} cycles total`;
-
-    const totalCycles = s.total_cycles || 1;
-    const totalTrades = s.total_trades || 0;
-    const avgCycle    = (s.total_cost_usd || 0) / totalCycles;
-    document.getElementById('acc-avg-cycle').textContent = fmtUsd(avgCycle);
-
-    if (totalTrades > 0) {
-      const tradeCycles = Object.values(daily).reduce((sum, d) => sum + (d.trades || 0), 0);
-      const tradeCost   = (s.total_cost_usd || 0) * (tradeCycles / totalCycles);
-      document.getElementById('acc-avg-trade').textContent     = fmtUsd(tradeCost / totalTrades);
-      document.getElementById('acc-total-trades-sub').textContent = `${totalTrades} trades with AI cost`;
-    } else {
-      document.getElementById('acc-avg-trade').textContent = '—';
-    }
-
-    const ORDER = ['chart_watcher','market_advisor','analyst','decision_maker','reporter'];
-    const rows = ORDER.filter(k => agents[k]).concat(
-      Object.keys(agents).filter(k => !ORDER.includes(k))
-    );
-
-    const tbody = document.getElementById('agent-cost-tbody');
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="no-data">No data — run bot ≥ 1 cycle</td></tr>';
-    } else {
-      tbody.innerHTML = rows.map(name => {
-        const a       = agents[name];
-        const calls   = a.total_calls || 0;
-        const cost    = a.total_cost_usd || 0;
-        const perCall = calls > 0 ? cost / calls : 0;
-        const hitRate = a.avg_cache_hit_rate ?? 0;
-        const isHaiku = (a.model || '').includes('haiku');
-        const modelCls   = isHaiku ? 'model-haiku' : 'model-sonnet';
-        const modelLabel = isHaiku ? 'Haiku' : 'Sonnet';
-        const barWidth   = Math.min(hitRate, 100).toFixed(0);
-        const hitColor   = hitRate >= 70 ? 'var(--green)' : hitRate >= 40 ? 'var(--amber)' : 'var(--red)';
-        return `<tr>
-          <td><strong style="font-family:var(--mono)">${name}</strong></td>
-          <td><span class="model-badge ${modelCls}">${modelLabel}</span></td>
-          <td class="num">${calls.toLocaleString()}</td>
-          <td class="num">${fmtUsd(cost)}</td>
-          <td class="num">${fmtUsd(perCall)}</td>
-          <td>
-            <div class="hit-bar">
-              <div class="hit-bar-track">
-                <div class="hit-bar-fill" style="width:${barWidth}%;background:${hitColor}"></div>
-              </div>
-              <span style="font-size:11px;color:${hitColor};font-family:var(--mono)">${hitRate.toFixed(1)}%</span>
-            </div>
-          </td>
-          <td class="num">${a.avg_latency_ms ? (a.avg_latency_ms / 1000).toFixed(1) + 's' : '—'}</td>
-        </tr>`;
-      }).join('');
-    }
-
-    const todayKey   = new Date().toISOString().slice(0, 10);
-    const sortedDays = Object.keys(daily).sort().slice(-30);
-    const labels     = sortedDays.map(d => d.slice(5));
-    const costs      = sortedDays.map(d => +(daily[d].total_cost_usd || 0).toFixed(6));
-    const cycles     = sortedDays.map(d => daily[d].cycles || 0);
-    const barColors  = sortedDays.map(d =>
-      d === todayKey ? 'rgba(74,222,128,0.85)' : 'rgba(74,222,128,0.28)'
-    );
-    const barBorders = sortedDays.map(d =>
-      d === todayKey ? 'rgba(74,222,128,1)' : 'rgba(74,222,128,0.55)'
-    );
-
-    if (dailyCostChart) dailyCostChart.destroy();
-    const ctx = document.getElementById('dailyCostChart').getContext('2d');
-    dailyCostChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          {
-            label: 'Cost (USD)',
-            data: costs,
-            backgroundColor: barColors,
-            borderColor: barBorders,
-            borderWidth: 1,
-            borderRadius: 2,
-            yAxisID: 'yCost',
-            order: 2,
-          },
-          {
-            label: 'Cycles',
-            data: cycles,
-            type: 'line',
-            borderColor: 'rgba(96,165,250,0.85)',
-            backgroundColor: 'rgba(96,165,250,0.06)',
-            borderWidth: 1.5,
-            pointRadius: 2,
-            pointBackgroundColor: 'rgba(96,165,250,0.9)',
-            fill: false,
-            tension: 0.3,
-            yAxisID: 'yCycles',
-            order: 1,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => ctx.dataset.label === 'Cost (USD)'
-                ? 'Cost: $' + ctx.parsed.y.toFixed(5)
-                : 'Cycles: ' + ctx.parsed.y,
-            }
-          }
-        },
-        scales: {
-          x: {
-            grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
-            border: { display: false },
-            ticks: { color: '#4b5563', maxTicksLimit: 15, maxRotation: 0, font: { size: 10, family: 'JetBrains Mono' } },
-          },
-          yCost: {
-            type: 'linear',
-            position: 'left',
-            grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
-            border: { display: false },
-            ticks: { color: '#4b5563', callback: v => '$' + v.toFixed(4), font: { size: 10, family: 'JetBrains Mono' } },
-          },
-          yCycles: {
-            type: 'linear',
-            position: 'right',
-            grid: { drawOnChartArea: false, drawBorder: false },
-            border: { display: false },
-            ticks: { color: '#4b5563', stepSize: 1, precision: 0, font: { size: 10, family: 'JetBrains Mono' } },
-          },
-        },
-      },
-    });
-
-    // load burn + calibration cards alongside accounting data
-    loadBurn();
-    loadCalibration();
-
-  } catch (e) {
-    console.error('loadAccounting error:', e);
-  }
-}
+function loadAccounting() { /* public static: Costs tab removed (calibration relocated → loaded in _bootstrap) */ }
 
 /* ════════════════════════════════════════════════════════════
    BURN CARD — §3.4 /api/burn
@@ -3573,7 +3388,7 @@ async function loadBurn() {
     const todayEl  = document.getElementById('burn-today');
     const statusEl = document.getElementById('burn-today-status');
     if (todayEl) {
-      todayEl.textContent = _m(data.today_thb);
+      todayEl.textContent = todayThb.toFixed(0) + ' ฿';
       if (todayThb === 0) {
         todayEl.className = 'value';
         if (statusEl) statusEl.textContent = 'target ' + tMin + '–' + tMax + ' ฿';
@@ -3594,14 +3409,14 @@ async function loadBurn() {
     if (histEl && days.length) {
       const recent = days.slice(-14);
       histEl.innerHTML = recent.map(d => {
-        const thb  = _m(d.thb);
+        const thb  = (d.thb || 0).toFixed(0);
         const date = d.date ? d.date.slice(5) : '';
         let col = 'var(--muted)';
         let tag = '';
         if (d.vs_target === 'in')   { col = 'var(--green)'; tag = '●'; }
         else if (d.vs_target === 'over') { col = 'var(--red)';   tag = '▲'; }
         else                         { tag = '○'; }
-        return `<span style="color:${col};margin-right:14px">${tag} ${date} <strong>${thb}</strong></span>`;
+        return `<span style="color:${col};margin-right:14px">${tag} ${date} <strong>${thb}฿</strong></span>`;
       }).join('');
     } else if (histEl) {
       histEl.textContent = 'No data — run scripts/report_burn.py first';
@@ -4042,8 +3857,8 @@ async function loadTsmom() {
     const p = d.position;
     if (p) {
       const pc = p.direction === 'BUY' ? 'var(--green)' : 'var(--red)';
-      set('ts-position', `<b style="color:${pc}">${p.direction}</b> ${_m(p.lot)} lot @ ${p.entry} <span style="color:var(--muted)">(${p.days}d)</span>`);
-      set('ts-pnl', _m(p.profit), p.profit == null ? 'var(--muted)' : (p.profit >= 0 ? 'var(--green)' : 'var(--red)'));
+      set('ts-position', `<b style="color:${pc}">${p.direction}</b> ${p.lot} lot @ ${p.entry} <span style="color:var(--muted)">(${p.days}d)</span>`);
+      set('ts-pnl', (p.profit >= 0 ? '+' : '') + p.profit, p.profit >= 0 ? 'var(--green)' : 'var(--red)');
     } else {
       set('ts-position', '<span style="color:var(--muted)">ไม่มี position</span>'); set('ts-pnl', '—', 'var(--muted)');
     }
@@ -4055,7 +3870,7 @@ async function loadTsmom() {
       if (w) {
         cw.style.display = '';
         cw.innerHTML = `⚠️ CAPITAL WARNING — เสี่ยง <b>${w.risk_pct}%</b>/ไม้ &gt; เพดาน ${w.threshold}% · ` +
-          `ทุน ${_m(w.equity)} · ควรมี ~<b>${_m(w.needed)}</b> ถึงจะเหมาะ ` +
+          `ทุน ${w.equity.toLocaleString()}฿ · ควรมี ~<b>${w.needed.toLocaleString()}฿</b> ถึงจะเหมาะ ` +
           `(เข้า order ต่อ — ระวังพอร์ตหมดเร็ว)`;
       } else { cw.style.display = 'none'; }
     }
@@ -4477,9 +4292,7 @@ async function toggleShadowOrders(algo, symbol, key) {
 }
 
 // ── switch cell: combo (MSE, shadow-switch) · regime_gold (LIVE/PAPER↔REGIME_SHADOW_FILL) · tsmom_gold (LIVE/OFF↔TSMOM_LIVE) ──
-function switchCell(r) {
-  return '';   // public static: per-row execution switch removed
-}
+function switchCell(r) { return ''; }   // public static: execution switch removed
 
 // ── gold engine flags (.env, live-reload) — toggle ผ่าน /api/config ──
 async function setGoldFlag(key, value, label) {
@@ -4521,6 +4334,11 @@ async function setAlgoDir(algo, mode) {
     loadShadowMatrix(true);
   } catch (_e) { toast('เชื่อมต่อ /api/algo-dir ไม่ได้', 'err'); }
 }
+
+// public static: multi-symbol master toggle + Real Edge (เงินจริง) panels removed
+function refreshMasterToggle() {}
+function toggleMultiSymbolLive() {}
+function loadRealEdge() {}
 
 let _asLast = 0;
 async function loadAlgoSelector() {
@@ -4606,17 +4424,18 @@ async function loadOwnerEdge() {
     if (!d.ok) { bd.textContent = d.error || 'ไม่มีข้อมูล'; return; }
     const o = d.overall || {};
     const ov = document.getElementById('oe-overall');
-    if (ov) ov.innerHTML = `รวม ${o.n} ออเดอร์ · WR ${Math.round((o.win_rate || 0) * 100)}% · net `
-      + `<span style="color:${o.net == null ? 'var(--muted)' : (o.net >= 0 ? 'var(--green)' : 'var(--red)')}">${_m(o.net)}</span> · PF ${_m(o.pf)} `
-      + `<span style="color:var(--muted)">(map vol ${d.n_mapped}/${d.n_manual})</span>`;
+    const _mMoney = v => (v == null || (typeof v === 'number' && !isFinite(v))) ? '—' : ((v >= 0 ? '+' : '') + v);   // no ฿ when missing
+    const _mCol   = v => (v == null || (typeof v === 'number' && !isFinite(v))) ? 'var(--muted)' : (v >= 0 ? 'var(--green)' : 'var(--red)');
+    if (ov) ov.innerHTML = `รวม ${_m(o.n)} ออเดอร์ · WR ${Math.round((o.win_rate || 0) * 100)}% · net `
+      + `<span style="color:${_mCol(o.net)}">${_mMoney(o.net)}${o.net == null ? '' : '฿'}</span> · PF ${_m(o.pf)} `
+      + `<span style="color:var(--muted)">(map vol ${_m(d.n_mapped)}/${_m(d.n_manual)})</span>`;
     const tbl = (title, rows) => {
       if (!(rows || []).length) return '';
       const body = rows.map(r => {
-        const nc = r.net == null ? 'var(--muted)' : (r.net >= 0 ? 'var(--green)' : 'var(--red)');
         const out = (r.top3_pct != null && r.top3_pct > 60) ? ` <span style="color:var(--gold)" title="net ${r.top3_pct}% มาจาก 3 ออเดอร์ใหญ่ = outlier">⚠${r.top3_pct}%</span>` : '';
         return `<tr style="text-align:left"><td style="text-align:left;padding:4px 8px">${r.key}</td>`
           + `<td>${r.n}</td><td>${Math.round(r.win_rate * 100)}%</td>`
-          + `<td style="color:${nc}">${_m(r.net)}${out}</td><td>${_m(r.avg)}</td><td>${_m(r.pf)}</td></tr>`;
+          + `<td style="color:${_mCol(r.net)}">${_mMoney(r.net)}${out}</td><td>${_mMoney(r.avg).replace('+','')}</td><td>${_m(r.pf)}</td></tr>`;
       }).join('');
       return `<div style="margin-bottom:8px"><div style="color:var(--gold);font-size:11px;margin:4px 0">${title}</div>`
         + `<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="color:var(--muted);text-align:left">`
@@ -4635,7 +4454,7 @@ async function loadDailySummary() {
     _dsData = d;
     const sel = document.getElementById('ds-day');
     if (sel) sel.innerHTML = (d.days || []).map(x =>
-      `<option value="${x.date}">${x.date} (${x.n} ออเดอร์${x.open ? ' · ' + x.open + ' open' : ''} · net ${_m(x.net_pnl)})</option>`
+      `<option value="${x.date}">${x.date} (${x.n} ออเดอร์${x.open ? ' · ' + x.open + ' open' : ''} · net ${x.net_pnl >= 0 ? '+' : ''}${x.net_pnl}฿)</option>`
     ).join('') || '<option value="">ไม่มีข้อมูล</option>';
     if ((d.days || []).length) renderDay(d.days[0].date);   // default: วันล่าสุด
   } catch (_e) {}
@@ -4648,15 +4467,15 @@ function renderDay(date) {
   const tot = document.getElementById('ds-totals');
   if (!tb) return;
   if (!day) { tb.innerHTML = '<tr><td colspan="6" style="padding:4px 8px;color:var(--muted)">—</td></tr>'; return; }
-  const pc = day.net_pnl == null ? 'var(--muted)' : (day.net_pnl >= 0 ? 'var(--green)' : 'var(--red)');
+  const pc = day.net_pnl >= 0 ? 'var(--green)' : 'var(--red)';
   const techs = Object.entries(day.techniques || {}).map(([k, v]) => `${k}×${v}`).join(', ');
-  const openTxt = (day.open ? ` · <span style="color:var(--gold)">${day.open} open</span> (float ${_m(day.float_pnl)})` : '')
+  const openTxt = (day.open ? ` · <span style="color:var(--gold)">${day.open} open</span> (float ${day.float_pnl >= 0 ? '+' : ''}${day.float_pnl}฿)` : '')
     + (day.pending ? ` · <span style="color:var(--cyan,#4fd1e0)">${day.pending} pending (algo รอ fill)</span>` : '');
   if (tot) tot.innerHTML = `<b>${day.date}</b> · regime <b>${day.regime}</b> · ${day.n} ออเดอร์ ${day.wins}/${day.losses} `
-    + `(WR ${Math.round(day.win_rate * 100)}%) · net <span style="color:${pc}">${_m(day.net_pnl)}</span>${openTxt} · ${techs}`;
+    + `(WR ${Math.round(day.win_rate * 100)}%) · net <span style="color:${pc}">${day.net_pnl >= 0 ? '+' : ''}${day.net_pnl}฿</span>${openTxt} · ${techs}`;
   tb.innerHTML = (day.trades || []).map(t => {
     const isOpen = t.status === 'OPEN', isPend = t.status === 'PENDING';
-    const pnlTxt = isPend ? 'PENDING' : (t.pnl === null || t.pnl === undefined ? 'OPEN' : _m(t.pnl));
+    const pnlTxt = isPend ? 'PENDING' : (t.pnl === null || t.pnl === undefined ? 'OPEN' : (t.pnl >= 0 ? '+' : '') + t.pnl);
     const tp = (isPend || t.pnl === null || t.pnl === undefined) ? 'var(--gold)' : (t.pnl >= 0 ? 'var(--green)' : 'var(--red)');
     const dc = t.dir === 'BUY' ? 'var(--green)' : (t.dir === 'SELL' ? 'var(--red)' : 'var(--muted)');
     const mark = isPend ? ' <span style="color:var(--cyan,#4fd1e0);font-size:9px">◇PEND</span>'
@@ -4702,8 +4521,8 @@ async function loadRegimeAnalytics() {
         wl.textContent = wk.note || 'ยังไม่มี shadow data';
       } else {
         wl.innerHTML = wk.weeks.map(w => {
-          const pc = w.pnl == null ? 'var(--muted)' : (w.pnl >= 0 ? 'var(--green)' : 'var(--red)');
-          return `<div>${w.week} — N=${w.n} · WR ${Math.round((w.wr || 0) * 100)}% · <span style="color:${pc}">PnL ${_m(w.pnl)}</span></div>`;
+          const pc = (w.pnl || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+          return `<div>${w.week} — N=${w.n} · WR ${Math.round((w.wr || 0) * 100)}% · <span style="color:${pc}">PnL ${w.pnl}฿</span></div>`;
         }).join('');
       }
     }
@@ -4721,7 +4540,7 @@ async function loadRegimeAnalytics() {
           const dec = mr.decay && mr.decay.decaying;
           const col = dec ? 'var(--red)' : ((mr.n || 0) >= 389 ? 'var(--green)' : 'var(--muted)');
           mel.innerHTML = `<span style="color:${col};font-weight:600">${mr.verdict || ''}</span>` +
-            ((mr.n || 0) ? `<br>N=${mr.n} · WR=${((mr.wr || 0) * 100).toFixed(0)}% · expR=${mr.exp_R != null ? mr.exp_R : '—'} · PnL=${_m(mr.pnl)}` : '');
+            ((mr.n || 0) ? `<br>N=${mr.n} · WR=${((mr.wr || 0) * 100).toFixed(0)}% · expR=${mr.exp_R != null ? mr.exp_R : '—'} · PnL=${mr.pnl || 0}฿` : '');
         }
       }
     } catch (_e) {}
@@ -4763,8 +4582,8 @@ async function loadCalibration() {
       const barW      = Math.max(1, Math.min(100, Math.round(realPct)));
       const predW     = Math.max(1, Math.min(100, Math.round(predicted)));
       const col       = realPct >= predicted ? 'var(--green)' : 'var(--red)';
-      const pnlCol    = b.pnl == null ? 'var(--muted)' : (b.pnl >= 0 ? 'var(--green)' : 'var(--red)');
-      const pnlStr    = _m(b.pnl);
+      const pnlCol    = b.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+      const pnlStr    = (b.pnl >= 0 ? '+' : '') + b.pnl.toFixed(0);
 
       return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">` +
         `<span style="width:54px;text-align:right;color:var(--muted)">${b.conf_lo}&ndash;${b.conf_hi}</span>` +
@@ -4826,7 +4645,7 @@ async function loadNewsGate() {
     set('ng-wr', wr == null ? '—' : wr + '%');
     set('ng-wl', (d.win || 0) + 'W / ' + (d.loss || 0) + 'L');
     const pnlEl = document.getElementById('ng-pnl');
-    if (pnlEl) { pnlEl.textContent = _m(d.pnl); pnlEl.className = 'value ' + (d.pnl == null ? '' : (d.pnl > 0 ? 'green' : d.pnl < 0 ? 'red' : '')); }
+    if (pnlEl) { pnlEl.textContent = (pnl > 0 ? '+' : '') + pnl.toFixed(0); pnlEl.className = 'value ' + (pnl > 0 ? 'green' : pnl < 0 ? 'red' : ''); }
     // Verdict: honest — n<20 = collecting, else PnL/WR based
     const vEl = document.getElementById('ng-verdict');
     if (vEl) {
@@ -4839,11 +4658,11 @@ async function loadNewsGate() {
     if (t) {
       const rows = (d.trades || []).slice(0, 8);
       t.innerHTML = rows.length ? rows.map(r => {
-        const col = r.pnl == null ? 'var(--muted)' : (r.pnl > 0 ? 'var(--green)' : r.pnl < 0 ? 'var(--red)' : 'var(--muted)');
+        const col = r.pnl > 0 ? 'var(--green)' : r.pnl < 0 ? 'var(--red)' : 'var(--muted)';
         const st  = r.closed ? '' : ' <span style="color:var(--gold)">(open)</span>';
         return '<div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.05);padding:3px 0">' +
           '<span>' + r.time + ' · ' + r.dir + st + '</span>' +
-          '<span style="color:' + col + '">' + _m(r.pnl) + '</span></div>';
+          '<span style="color:' + col + '">' + (r.pnl > 0 ? '+' : '') + r.pnl.toFixed(0) + '฿</span></div>';
       }).join('') : 'ยังไม่มีออเดอร์ที่ relax ตัดสิน (โปรดเปิดใช้งาน NEWS_GATE ก่อน)';
     }
   } catch (e) { console.error('loadNewsGate error:', e); }
@@ -4998,6 +4817,129 @@ async function loadImpactCalibration() {
   } catch (e) {
     console.error('loadImpactCalibration error:', e);
   }
+}
+
+/* ════════════════════════════════════════════════════════════
+   CONFIG
+   ════════════════════════════════════════════════════════════ */
+/* ⚠️ ทั้ง 3 arrays ต้อง sync กับ _CONFIG_SPEC ใน dashboard/app.py — key ที่ไม่อยู่ใน
+   spec จะโดน backend ทิ้งเงียบตอน Save (เคยเกิดกับ HTF_BE_* มาแล้ว) */
+const _NUM_KEYS  = ['START_BALANCE','RISK_PER_TRADE','MAX_DAILY_LOSS','MAX_OPEN_TRADES',
+  'DEFAULT_SL_PIPS','DEFAULT_TP_PIPS','MIN_RR_RATIO','FIXED_LOT','MIN_LOT','MAX_LOT',
+  'MAX_LOSING_STREAK','STREAK_MIN_CONFIDENCE','MAX_PENDING_BUY','MAX_PENDING_SELL',
+  'PENDING_EXPIRY_HOURS','HEDGE_BUFFER_PIPS',
+  'BE_TRIGGER_R','BE_BUFFER_PIPS','BE_CONFIRM_CYCLES',
+  'HTF_BE_TRIGGER_R','HTF_BE_BUFFER_PIPS','BE_MAX_TRIGGER_PIPS','SL_MIN_GAP_PIPS','AUTO_SL_PIPS',
+  'NNLB_BASE_EQUITY','NNLB_EQUITY_PER_LOT','NNLB_MAX_LOSS_PCT',
+  'TRAILING_ATR_MULT','TRAILING_MIN_PROFIT_R','TRAILING_LOOKBACK',
+  'MAX_TRADES_PER_DAY','MIN_TECH_CONF','ASIAN_MIN_CONF','MIN_AI_EQUITY',
+  'COUNTER_SPIKE_PIPS','NEWS_BIAS_MIN_CONF','NEWS_CONFIRM_PIPS',
+  'NEWS_OVERRIDE_MIN_CONF','HTF_REVERSAL_MIN_CONF','TREND_CONT_CONF',
+  'TREND_CONT_MAX_DIST_PCT'];
+const _TXT_KEYS  = ['SYMBOL','LOT_MODE','X_ACCOUNTS_TO_FOLLOW','X_KEYWORDS','TRAILING_ATR_TF'];
+const _BOOL_KEYS = ['PORTFOLIO_PROTECTION','STREAK_PROTECTION','DYNAMIC_TP',
+  'LESSON_LEARNING','DRY_RUN','NNLB_MODE','TRAILING_STOP',
+  'HTF_DIRECTION_BLOCK','AUTO_SL_PROTECT','EMA_PULLBACK_BLOCK',
+  'NEWS_FIRST','HTF_FADE_BLOCK','NEWS_OVERRIDE_TREND','NNLB_FASTPATH','MOMENTUM_RIDE'];
+
+async function loadModeAdvice() {
+  try {
+    const r = await fetch('/api/mode-advice'); const d = await r.json();
+    const head = document.getElementById('ma-head');
+    if (head) head.innerHTML = d.ok ? ('ทุน <b>' + d.equity.toLocaleString() + ' ' + d.ccy + '</b> → tier: <b style="color:var(--gold)">' + d.tier + '</b>'
+      + (d.note ? '<div style="font-size:11px;color:var(--muted);margin-top:4px">' + d.note + '</div>' : '')) : 'ไม่มีข้อมูลทุน';
+    const b = document.getElementById('ma-body'); if (!b) return;
+    const adv = d.advice || [];
+    if (!adv.length) { b.innerHTML = '<tr><td colspan="3" style="color:var(--muted)">—</td></tr>'; return; }
+    const col = v => v === 'true' ? 'var(--green)' : v === 'false' ? 'var(--red)' : 'var(--amber)';
+    b.innerHTML = adv.map(a => '<tr style="border-top:1px solid var(--border)">'
+      + '<td style="padding:3px 6px;font-weight:700">' + a.key + '</td>'
+      + '<td style="color:' + col(a.safe) + ';font-weight:700">' + a.safe + '</td>'
+      + '<td style="color:' + col(a.growth) + ';font-weight:700">' + a.growth + '</td>'
+      + '<td style="color:var(--muted)">' + a.why + '</td></tr>').join('');
+  } catch (e) { console.error('loadModeAdvice', e); }
+}
+
+async function loadConfig() {
+  document.getElementById('cfg-status').textContent = '';
+  try {
+    const res = await fetch('/api/config');
+    const cfg = await res.json();
+    _NUM_KEYS.forEach(k => {
+      const el = document.getElementById('cfg-' + k);
+      if (el && cfg[k] !== undefined) el.value = cfg[k];
+    });
+    _TXT_KEYS.forEach(k => {
+      const el = document.getElementById('cfg-' + k);
+      if (!el || cfg[k] === undefined) return;
+      if (el.tagName === 'TEXTAREA') {
+        el.value = cfg[k].split(',').map(s => s.trim()).join(',\n');
+      } else {
+        el.value = cfg[k];
+      }
+    });
+    _BOOL_KEYS.forEach(k => {
+      const el = document.getElementById('cfg-' + k);
+      if (el) el.checked = String(cfg[k]).toLowerCase() !== 'false';
+    });
+  } catch (e) {
+    document.getElementById('cfg-status').textContent = 'Failed to load config: ' + e.message;
+  }
+}
+
+async function saveConfig() {
+  const btn    = document.querySelector('.save-btn');
+  const status = document.getElementById('cfg-status');
+  btn.disabled = true;
+  status.style.color   = 'var(--muted)';
+  status.textContent   = 'Saving…';
+
+  const payload = {};
+  [..._NUM_KEYS, ..._TXT_KEYS].forEach(k => {
+    const el = document.getElementById('cfg-' + k);
+    if (!el) return;
+    if (el.tagName === 'TEXTAREA') {
+      payload[k] = el.value.split(/[\n,]+/).map(s => s.trim()).filter(Boolean).join(',');
+    } else {
+      payload[k] = el.value;
+    }
+  });
+  _BOOL_KEYS.forEach(k => {
+    const el = document.getElementById('cfg-' + k);
+    if (el) payload[k] = el.checked ? 'true' : 'false';
+  });
+  payload._restart = document.getElementById('cfg-restart-pm2')?.checked ? 'true' : 'false';
+
+  try {
+    const res  = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      if (!data.restarted) {
+        status.textContent = '✓ Saved — live-reload ภายใน 1 cycle (ไม่ต้อง restart)';
+        status.style.color = 'var(--green)';
+      } else if (data.pm2_ok) {
+        status.textContent = '✓ Saved — ' + data.pm2_msg;
+        status.style.color = 'var(--green)';
+      } else if (data.pm2_msg && data.pm2_msg.includes('not found')) {
+        status.textContent = '✓ Saved — restart main.py manually (pm2 not found)';
+        status.style.color = 'var(--gold)';
+      } else {
+        status.textContent = '✓ Saved — PM2: ' + (data.pm2_msg || 'no response');
+        status.style.color = 'var(--gold)';
+      }
+    } else {
+      status.textContent = 'Error: ' + (data.error || 'unknown');
+      status.style.color = 'var(--red)';
+    }
+  } catch (e) {
+    status.textContent   = 'Error: ' + e.message;
+    status.style.color   = 'var(--red)';
+  }
+  btn.disabled = false;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -5652,12 +5594,12 @@ function renderFeed() {
    MANUAL RANGE
    ════════════════════════════════════════════════════════════ */
 async function loadManualRange() {
-  const wrap = document.getElementById('range-bar-wrap');
-  const statusEl = document.getElementById('range-status');
-  if (!wrap || !statusEl) return;   // public: manual-range section ถูกตัด → no-op (กัน 404 + null.style)
+  if (!document.getElementById('range-bar-wrap') || !document.getElementById('range-status')) return;   // public static: manual-range panel removed
   try {
     const res  = await fetch('/api/manual-range');
     const data = await res.json();
+    const wrap = document.getElementById('range-bar-wrap');
+    const statusEl = document.getElementById('range-status');
     if (data.active && data.high && data.low) {
       document.getElementById('range-high').value = data.high;
       document.getElementById('range-low').value  = data.low;
@@ -5674,6 +5616,32 @@ async function loadManualRange() {
   } catch(e) { console.error('loadManualRange:', e); }
 }
 
+async function setManualRange() {
+  const high = parseFloat(document.getElementById('range-high').value);
+  const low  = parseFloat(document.getElementById('range-low').value);
+  if (!high || !low) { toast('กรอกทั้ง High และ Low', 'err'); return; }
+  if (high <= low)   { toast('High ต้องมากกว่า Low', 'err'); return; }
+  try {
+    const res  = await fetch('/api/manual-range', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({high, low}),
+    });
+    const data = await res.json();
+    if (data.ok) { toast('ตั้ง manual range แล้ว', 'ok'); await loadManualRange(); }
+    else { toast('Error: ' + data.error, 'err'); }
+  } catch(e) { toast('Network error: ' + e, 'err'); }
+}
+
+async function clearManualRange() {
+  try {
+    await fetch('/api/manual-range', {method: 'DELETE'});
+    document.getElementById('range-high').value = '';
+    document.getElementById('range-low').value  = '';
+    await loadManualRange();
+  } catch(e) { toast('Network error: ' + e, 'err'); }
+}
+
 /* ════════════════════════════════════════════════════════════
    MONITOR TAB
    ════════════════════════════════════════════════════════════ */
@@ -5685,6 +5653,8 @@ async function loadMonitor() {
     if (!data.ok) return;
 
     const bs = data.bot_status || {};
+    const ls = bs.last_signal  || {};
+    // public static: DESK STATUS + LAST TICKET panels removed — skip their writes, keep live renderers below
 
     renderVerdict(bs);
     renderZones(bs);
@@ -5703,6 +5673,7 @@ async function loadMonitor() {
     renderScenarioCards(bs); // UHAS-style: scenario cards ก/ข/พัก (slice 3, display จาก S/R+trend)
     loadGateBlocks();
     loadRideStats();
+    // public static: WORKING ORDERS (pending) panel removed
   } catch(e) {
     console.error('loadMonitor error:', e);
   }
@@ -6048,6 +6019,7 @@ function setChartSym(s) {                       // เลือกคู่ (ว
   loadCandles(true); loadClusterMap();
   if (typeof loadExpMoveBias === 'function') loadExpMoveBias();   // tiles (expected-move/pattern) ตามคู่ใหม่
   if (typeof renderScenarioCards === 'function') renderScenarioCards();   // scenario ตามคู่ใหม่ (non-gold ดึง sr-ladder เอง)
+  if (typeof loadAlgoSignals === 'function') loadAlgoSignals();           // algo signals ตามคู่ใหม่
 }
 async function populateChartSymbols() {
   const sel = document.getElementById('chart-sym'); if (!sel) return;
@@ -6240,17 +6212,25 @@ function drawZoneLines(bs) {
       lineStyle: style !== undefined ? style : LightweightCharts.LineStyle.Dashed,
       axisLabelVisible: !!label, title,
     }));
+  // UHAS-style label: prefix + strength + touch count + state (เด้งจริง/เบรกบ่อย จาก bounce/break%)
+  const zlabel = (pfx, lv, st) => {
+    const m = metaFor(lv);
+    const tc = m && (m.touches || m.n_tests);
+    const bp = m && m.bounce_pct, kp = m && m.break_pct;
+    const state = (bp != null && bp >= 60) ? ' เด้งจริง' : ((kp != null && kp >= 60) ? ' เบรกบ่อย' : '');
+    return pfx + (st ? st : '') + (tc ? ' ×' + tc : '') + state;
+  };
   (z.resistance || []).forEach(lv => {
     const sc = scoreFor(lv), m = metaFor(lv);
     const st = Math.max(sc || 0, (m && m.strength) || 0) || null;   // % = max(live setup, โครงสร้าง)
     add(lv, st >= 65 ? 'rgba(239,68,68,0.9)' : 'rgba(239,68,68,0.45)',
-        st ? `R ${st}%` : 'R', st >= 80 ? 3 : st >= 65 ? 2 : 1, undefined, st >= 75 || !!sc);
+        st ? zlabel('R', lv, st) : 'R', st >= 80 ? 3 : st >= 65 ? 2 : 1, undefined, st >= 75 || !!sc);
   });
   (z.support || []).forEach(lv => {
     const sc = scoreFor(lv), m = metaFor(lv);
     const st = Math.max(sc || 0, (m && m.strength) || 0) || null;
     add(lv, st >= 65 ? 'rgba(34,197,94,0.9)' : 'rgba(34,197,94,0.45)',
-        st ? `S ${st}%` : 'S', st >= 80 ? 3 : st >= 65 ? 2 : 1, undefined, st >= 75 || !!sc);
+        st ? zlabel('S', lv, st) : 'S', st >= 80 ? 3 : st >= 65 ? 2 : 1, undefined, st >= 75 || !!sc);
   });
   // PDH/PDL — key levels เมื่อวาน (เดิมไม่ถูกวาดเลย)
   const kl = z.key_levels || {};
@@ -6326,6 +6306,56 @@ function _scMeta(sm, lvl) {
   const hits = m.filter(x => x.level && Math.abs(x.level - lvl) / lvl < 0.001);
   return hits.length ? hits.reduce((a, b) => (((b.score || b.strength || 0) > (a.score || a.strength || 0)) ? b : a)) : null;
 }
+
+/* STRUCTURAL READ (โค้ช) — อ่านโครงสร้างจาก S/R+price+trend (จาก UHAS): ตำแหน่งในกรอบ · แนวใกล้+ความแข็ง+เตะจริง
+   · action-state · โอกาสเด้ง/ทะลุ · level เปลี่ยนโครงสร้าง. computed-in-code, 0 token. */
+function renderStructuralRead(z, px, trend) {
+  const el = document.getElementById('struct-read'); if (!el) return;
+  if (!px || !z || (!z.support && !z.resistance)) { el.innerHTML = '<span style="color:var(--muted)">รอข้อมูล S/R…</span>'; return; }
+  const _sm = z.sr_meta || [];
+  const sups = (z.support || []).filter(x => x < px).sort((a, b) => b - a);
+  const ress = (z.resistance || []).filter(x => x > px).sort((a, b) => a - b);
+  const S = sups.length ? sups[0] : null, R = ress.length ? ress[0] : null;
+  const mS = S != null ? _scMeta(_sm, S) : null, mR = R != null ? _scMeta(_sm, R) : null;
+  const tU = String(trend || '').toUpperCase();
+  const bull = tU.includes('BULL') || tU.includes('UP');
+  const pipDiv = px > 1000 ? 0.1 : (px > 100 ? 0.01 : 0.0001);
+  const dist = lv => lv != null ? Math.round(Math.abs(px - lv) / pipDiv) : null;
+  const str = m => m ? Math.round(m.score || m.strength || 0) : null;
+  const touches = m => m ? (m.touches || m.n_tests || null) : null;
+  const real = m => m && m.bounce_pct != null && m.bounce_pct >= 60;
+  let posPct = null;
+  if (S != null && R != null && R > S) posPct = Math.max(0, Math.min(100, Math.round((px - S) / (R - S) * 100)));
+  const nf = 0.0015;
+  let state, sc;
+  if (R != null && (R - px) / px < nf) { state = 'ทดสอบแนวต้าน — รอเบรก/เด้งลง'; sc = 'var(--red)'; }
+  else if (S != null && (px - S) / px < nf) { state = 'ทดสอบแนวรับ — รอเด้ง/หลุด'; sc = 'var(--green)'; }
+  else if (posPct != null && posPct >= 65) { state = 'ครึ่งบนของกรอบ — วิ่งเข้าหาต้าน'; sc = 'var(--gold)'; }
+  else if (posPct != null && posPct <= 35) { state = 'ครึ่งล่างของกรอบ — วิ่งเข้าหารับ'; sc = 'var(--gold)'; }
+  else { state = 'กลางกรอบ — รอเข้าโซน'; sc = 'var(--muted)'; }
+  const up = (posPct == null) ? bull : (posPct >= 50);
+  const tgt = up ? R : S, mT = up ? mR : mS;
+  const bounceP = mT && mT.bounce_pct != null ? Math.round(mT.bounce_pct) : null;
+  const breakP = mT && mT.break_pct != null ? Math.round(mT.break_pct) : (bounceP != null ? 100 - bounceP : null);
+  const scLvl = bull ? S : R;
+  const f = v => v != null ? v.toFixed(2) : '—';
+  const line = (lbl, lv, m, col) => lv == null ? '' :
+    `<div style="margin-top:3px"><span style="color:${col}">${lbl} <b>${f(lv)}</b></span>`
+    + ` <span style="color:var(--muted);font-size:10px">ห่าง ${dist(lv)}p`
+    + (str(m) != null ? ` · แข็ง ${str(m)}` : '') + (touches(m) != null ? ` · ${touches(m)} ครั้ง` : '')
+    + (real(m) ? ` · <span style="color:var(--gold)">เตะเป็นจริง</span>` : '') + `</span></div>`;
+  const biasTxt = bull ? '<span style="color:var(--green)">ขึ้น</span>'
+    : (tU.includes('BEAR') || tU.includes('DOWN') ? '<span style="color:var(--red)">ลง</span>' : 'กลาง');
+  el.innerHTML =
+    `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="color:${sc};font-weight:700">${state}</span>`
+    + (posPct != null ? `<span style="color:var(--muted);font-size:11px">· ตำแหน่งในกรอบ <b style="color:var(--text)">${posPct}%</b></span>` : '')
+    + `<span style="margin-left:auto;font-size:10px;color:var(--muted)">bias ${biasTxt}</span></div>`
+    + line('ต้านใกล้', R, mR, 'var(--red)') + line('รับใกล้', S, mS, 'var(--green)')
+    + (tgt != null && bounceP != null
+      ? `<div style="margin-top:5px;font-size:11px">น่าจะทดสอบ <b>${f(tgt)}</b> · เด้ง <b style="color:var(--gold)">${bounceP}%</b> / ทะลุ <b>${breakP}%</b></div>` : '')
+    + (scLvl != null
+      ? `<div style="margin-top:3px;font-size:10px;color:var(--muted)">โครงสร้างเปลี่ยนทิศเมื่อ${bull ? 'หลุด' : 'ผ่าน'} <b>${f(scLvl)}</b></div>` : '');
+}
 function _scCard(p) {
   const dcol = p.dir === 'BUY' ? 'var(--green)' : p.dir === 'SELL' ? 'var(--red)' : 'var(--muted)';
   const mid = (p.entryLo + p.entryHi) / 2;
@@ -6373,11 +6403,21 @@ async function renderScenarioCards(bs) {
     z = bs.zones || {}; px = (bs.price_info && bs.price_info.bid) || null;
     trend = String((bs.market && bs.market.trend) || bs.trend || '').toUpperCase();
   }
-  if (!px || (!z.support && !z.resistance)) { el.innerHTML = '<div class="card" style="flex:1;color:var(--muted);padding:10px">รอข้อมูลแนว S/R…</div>'; return; }
+  _scLive.z = z; _scLive.px = px; _scLive.trend = trend; _scLive.sym = _chartSym || '';
+  _scRender(z, px, trend);
+}
+
+/* live Scenario Plan (แผน ก/ข/พัก): ราคาสด ทุก 5 วิ (proximity) + zone S/R สดจาก MT5 ทุก 5 นาที
+   (ไม่รอ cycle บอท). โครงสร้างแผน (entry/SL/TP) มาจาก S/R+trend = ไม่เปลี่ยนทุก tick; ราคาเท่านั้นที่สด. 0 token */
+var _scLive = { z: null, px: null, trend: '', sym: '' };
+function _scRender(z, px, trend) {
+  const el = document.getElementById('scenario-cards'); if (!el) return;
+  trend = String(trend || '').toUpperCase();
+  if (!px || !z || (!z.support && !z.resistance)) { el.innerHTML = '<div class="card" style="flex:1;color:var(--muted);padding:10px">รอข้อมูลแนว S/R…</div>'; return; }
   const _sm = z.sr_meta || [];
   const sups = (z.support || []).filter(x => x < px).sort((a, b) => b - a);   // ใกล้ราคาก่อน
   const ress = (z.resistance || []).filter(x => x > px).sort((a, b) => a - b);
-  const band = lv => lv * 0.0006, slBuf = lv => lv * 0.0014;
+  const band = lv => lv * 0.0010, slBuf = lv => lv * 0.0035;   // entry zone 0.10% · SL buffer 0.35% (user 08-12: เดิม SL 0.14% แคบ → โดน wick ก่อนเด้ง; ทอง 0.35%≈15p ให้พ้นไส้เทียน)
   const mkBuy = (s, title) => { if (s == null) return null; const mm = _scMeta(_sm, s);
     return { title, dir: 'BUY', entryLo: s, entryHi: s + band(s), sl: s - slBuf(s), tp: ress[0] || null,
       score: mm && (mm.score || mm.strength), grade: mm && mm.grade,
@@ -6393,6 +6433,70 @@ async function renderScenarioCards(bs) {
   const tot = plans.reduce((a, p) => a + (p.score || 0), 0);   // prob สัมพัทธ์จาก score (display เท่านั้น)
   if (tot > 0) plans.forEach(p => p.prob = Math.round((p.score || 0) / tot * 100));
   el.innerHTML = plans.length ? plans.map(_scCard).join('') : '<div class="card" style="flex:1;color:var(--muted);padding:10px">ไม่มี setup ชัด — พัก</div>';
+  try { renderStructuralRead(z, px, trend); } catch (e) {}    // โค้ช: อ่านโครงสร้างสด (ใช้ z/px/trend เดียวกัน)
+}
+async function _scRefreshPrice() {          // ราคาสด → re-render proximity (ทุก ~5 วิ)
+  if (!_scLive.z) return;
+  try {
+    const d = await (await fetch('/api/tick?symbol=' + encodeURIComponent(_scLive.sym || ''))).json();
+    if (d && d.ok !== false && d.bid) { _scLive.px = d.bid; _scRender(_scLive.z, d.bid, _scLive.trend); }
+  } catch (e) {}
+}
+async function _scRefreshZones() {           // zone S/R สดจาก MT5 (ทุก 5 นาที, ไม่รอบอท)
+  const sym = _chartSym || '';
+  try {
+    const d = await (await fetch('/api/sr-ladder?symbol=' + encodeURIComponent(sym))).json();
+    if (d && d.ok !== false && d.zones) {
+      _scLive.z = d.zones; _scLive.sym = sym;
+      if (d.price) _scLive.px = d.price;
+      if (!_scLive.trend) _scLive.trend = sym ? (_candleTrend || 'BULLISH') : 'BULLISH';
+      _scRender(_scLive.z, _scLive.px, _scLive.trend);
+    }
+  } catch (e) {}
+}
+if (!window._scTimersOn) {
+  window._scTimersOn = 1;
+  setInterval(_scRefreshPrice, 5000);        // ราคา/proximity สด
+  setInterval(_scRefreshZones, 300000);      // zone S/R สด ทุก 5 นาที
+  setTimeout(_scRefreshZones, 1500);         // เติมครั้งแรกเร็ว (แผนขึ้นแม้บอทยังไม่เขียน bot_status)
+}
+
+/* ── ALGO SIGNALS — โอกาสเข้า order ต่อ algo (จุดเข้า/SL/TP + สถานะ เข้าแล้ว/โดน block), display 0 token ── */
+async function loadAlgoSignals() {
+  const el = document.getElementById('algosig-cards'); if (!el) return;
+  const sym = _chartSym || '';
+  try {
+    const d = await (await fetch('/api/algo-signals' + (sym ? '?symbol=' + encodeURIComponent(sym) : ''))).json();
+    const sy = document.getElementById('algosig-sym'); if (sy) sy.textContent = d.symbol || '';
+    const rows = d.rows || [];
+    if (!rows.length) { el.innerHTML = '<div class="card" style="flex:1;color:var(--muted);padding:10px">ไม่มี algo สำหรับคู่นี้</div>'; return; }
+    const badge = (s) => {
+      const m = { ENTERED: ['var(--green)', 'เข้าแล้ว ●'], BLOCKED: ['var(--red)', 'BLOCK ✗'],
+                  SIGNAL: ['var(--gold)', 'พร้อมเข้า ◆'], SHADOW: ['var(--cyan,#4fd1e0)', 'SHADOW ◇'],
+                  NO_SIGNAL: ['var(--muted)', 'ไม่มีสัญญาณ'] };
+      const [c, t] = m[s] || ['var(--muted)', s];
+      return '<span style="color:' + c + ';font-weight:700;font-size:10px">' + t + '</span>';
+    };
+    el.innerHTML = rows.map(r => {
+      const dc = r.dir === 'BUY' ? 'var(--green)' : (r.dir === 'SELL' ? 'var(--red)' : 'var(--muted)');
+      const dim = r.status === 'NO_SIGNAL' ? 'opacity:.5' : '';
+      const body = r.dir
+        ? ('<div style="font-size:11px;margin-top:4px">เข้า <b>' + r.entry + '</b> · SL <span style="color:var(--red)">' + r.sl +
+           '</span> · TP ' + (r.no_tp ? '<span style="color:var(--gold)">ถือยาว(flip)</span>' : r.tp) + '</div>' +
+           (r.reason ? '<div style="font-size:9px;color:var(--muted);margin-top:2px">' + r.reason + '</div>' : ''))
+        : '<div style="font-size:9px;color:var(--muted);margin-top:4px">' + (r.reason || '') + '</div>';
+      return '<div class="card" style="flex:1;min-width:210px;padding:8px 10px;' + dim + '">' +
+        '<div style="display:flex;align-items:center;gap:6px">' +
+        '<b style="font-size:12px">' + r.algo + '</b><span style="font-size:9px;color:var(--muted)">' + r.tf + '</span>' +
+        (r.dir ? '<span style="color:' + dc + ';font-weight:700;font-size:11px">' + r.dir + '</span>' : '') +
+        '<span style="margin-left:auto">' + badge(r.status) + '</span></div>' + body + '</div>';
+    }).join('');
+  } catch (e) {}
+}
+if (!window._asTimersOn) {
+  window._asTimersOn = 1;
+  setInterval(loadAlgoSignals, 20000);       // signal เปลี่ยนช้า (D1/H1) → 20 วิพอ
+  setTimeout(loadAlgoSignals, 1400);
 }
 
 /* ── Why No Entry — gate blocks สด (07-03) ── */
@@ -6425,6 +6529,7 @@ async function loadGateBlocks() {
 
 /* ── RIDE cohort — หน้าปัดการทดลอง (07-03) ── */
 async function loadRideStats() {
+  if (!document.getElementById('ride-n')) return;   // public static: System Trades Cohort removed
   try {
     const r = await fetch('/api/ride-stats');
     const d = await r.json();
@@ -6434,10 +6539,10 @@ async function loadRideStats() {
     wrEl.textContent = d.wr === null ? 'รอออเดอร์แรก' : d.wr + '%';
     wrEl.className = 'value ' + (d.wr === null ? '' : d.wr >= 50 ? 'green' : 'red');
     const pnlEl = document.getElementById('ride-pnl');
-    pnlEl.textContent = _m(d.pnl);
-    pnlEl.className = 'value ' + (d.pnl == null ? '' : (d.pnl > 0 ? 'green' : d.pnl < 0 ? 'red' : 'gold'));
+    pnlEl.textContent = (d.pnl >= 0 ? '+' : '') + d.pnl.toFixed(2);
+    pnlEl.className = 'value ' + (d.pnl > 0 ? 'green' : d.pnl < 0 ? 'red' : 'gold');
     document.getElementById('ride-recent').innerHTML = (d.recent || []).length
-      ? d.recent.map(t => `${t.time.slice(5)} ${t.dir} ${_m(t.pnl)}${t.closed ? '' : ' (open)'}`).join('<br>')
+      ? d.recent.map(t => `${t.time.slice(5)} ${t.dir} ${t.pnl >= 0 ? '+' : ''}${t.pnl}${t.closed ? '' : ' (open)'}`).join('<br>')
       : 'ยังไม่มีออเดอร์ RIDE — รอ setup แรก';
   } catch (e) {}
 }
@@ -6528,13 +6633,14 @@ function renderEventCard(bs) {
    BACKTEST
    ════════════════════════════════════════════════════════════ */
 function _btRow(key, b) {
-  const pnlColor = b.pnl == null ? 'var(--muted)' : (b.pnl >= 0 ? 'var(--green)' : 'var(--red)');
+  const pnlColor = b.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+  const pnlSign = b.pnl >= 0 ? '+' : '';
   const wrColor = b.win_rate >= 55 ? 'var(--green)' : b.win_rate >= 45 ? 'var(--gold)' : 'var(--red)';
   return `<tr>
     <td style="font-weight:600">${key}</td>
     <td class="num">${b.count}</td>
     <td class="num" style="color:${wrColor};font-weight:700;font-size:13px">${b.win_rate}%</td>
-    <td class="num" style="color:${pnlColor};font-weight:700;font-size:13px">${_m(b.pnl)}</td>
+    <td class="num" style="color:${pnlColor};font-weight:700;font-size:13px">${pnlSign}${b.pnl.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ฿</td>
   </tr>`;
 }
 
@@ -6581,10 +6687,21 @@ async function loadPairLots() {
           + (r.lot || '') + '" placeholder="' + r.min + '" style="width:64px;text-align:right;font-family:var(--mono);font-size:12px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 4px"></td>'
         + '<td style="text-align:right">' + r.risk + (r.using_min ? '*' : '') + '</td>'
         + '<td style="text-align:right;color:' + pcC + ';font-weight:700">' + (pc == null ? '—' : pc + '%') + '</td>'
-        + '<td></td></tr>';
+        + '<td><button onclick="savePairLot(\'' + r.logical + '\')" style="font-size:11px;padding:2px 8px;border:1px solid var(--gold);color:var(--gold);background:none;border-radius:4px;cursor:pointer">ตั้ง</button></td></tr>';
     }).join('') + '<tr><td colspan="8" style="color:var(--muted);font-size:10px;padding-top:4px">* = risk คำนวณที่ min-lot (ยังไม่กำหนด lot)</td></tr>';
   } catch (e) { body.innerHTML = '<tr><td colspan="8" style="color:var(--red)">เชื่อมต่อ /api/pair-lots ไม่ได้</td></tr>'; }
 }
+async function savePairLot(sym) {
+  const el = document.getElementById('plot-' + sym); if (!el) return;
+  try {
+    const r = await (await fetch('/api/pair-lots', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: sym, lot: el.value }) })).json();
+    if (!r.ok) { toast('ตั้ง lot ไม่สำเร็จ: ' + (r.error || ''), 'err'); return; }
+    toast(sym + ' → lot ' + (r.lot || 'global'), 'ok');
+    loadPairLots();
+  } catch (_e) { toast('เชื่อมต่อไม่ได้', 'err'); }
+}
+
 async function loadPairs() {
   try {
     const r = await fetch('/api/pairs'); const d = await r.json();
@@ -6599,6 +6716,36 @@ async function loadPairs() {
       + ' · β=' + d.beta + ' · ' + pos
       + '<div style="font-size:11px;color:var(--muted);margin-top:6px">z>+2 → SELL XAU+BUY XAG · z<−2 → BUY XAU+SELL XAG · ออก |z|≤0.5 · cut |z|≥3.5</div>';
   } catch (e) { console.error('loadPairs', e); }
+}
+
+// ── Event Reaction Stats — ตารางทองต่อข่าว ทุก event (15 ปี) + $ ที่ราคาสด (0 token) ──
+async function loadEventReaction() {
+  const body = document.getElementById('evrx-body'); if (!body) return;
+  try {
+    const d = await (await fetch('/api/event-stats')).json();
+    const evs = (d && d.events) || {};
+    const keys = Object.keys(evs);
+    if (!keys.length) { body.innerHTML = '<tr><td colspan="8" style="color:var(--muted);padding:4px 6px">—</td></tr>'; return; }
+    const px = (window._scLive && _scLive.px) || null;                 // ราคาสดจาก scenario cache
+    const pxEl = document.getElementById('evrx-px'); if (pxEl) pxEl.textContent = px ? ('@ ' + px) : '';
+    keys.sort((a, b) => (evs[b].vs_baseline_x || 0) - (evs[a].vs_baseline_x || 0));    // แรงกระแทกมากก่อน
+    body.innerHTML = keys.map(k => {
+      const s = evs[k];
+      const usd = px ? ('±$' + (px * (s.avg_abs_d0_pct / 100)).toFixed(0)) : '—';
+      const upC = (s.up_pct || 0) >= (s.down_pct || 0) ? 'var(--green)' : 'var(--muted)';
+      const dnC = (s.down_pct || 0) > (s.up_pct || 0) ? 'var(--red)' : 'var(--muted)';
+      const bx = (s.vs_baseline_x || 0) >= 1.4 ? 'var(--gold)' : 'var(--muted)';
+      return '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:3px 6px;color:var(--text)">' + k + '</td>'
+        + '<td style="text-align:right;color:var(--muted)">' + (s.n || '—') + '</td>'
+        + '<td style="text-align:right;color:' + upC + '">' + (s.up_pct || 0) + '</td>'
+        + '<td style="text-align:right;color:' + dnC + '">' + (s.down_pct || 0) + '</td>'
+        + '<td style="text-align:right">' + (s.avg_abs_d0_pct || 0) + '%</td>'
+        + '<td style="text-align:right;color:var(--gold)">' + usd + '</td>'
+        + '<td style="text-align:right;color:' + bx + '">' + (s.vs_baseline_x || 0) + '×</td>'
+        + '<td style="text-align:right;color:var(--muted)">' + (s.d2_extends_pct != null ? s.d2_extends_pct + '%' : '—') + '</td></tr>';
+    }).join('');
+  } catch (e) {}
 }
 
 // ── Event Engine (NFP/CPI/FOMC) — ชนข่าว panel ──
@@ -6658,8 +6805,12 @@ function renderBtr() {
   const liveC = s => s === 'LIVE' ? 'var(--green)' : (s === 'CUT' ? 'var(--red)' : 'var(--muted)');
   body.innerHTML = rows.map(r => {
     const pos = r.group === '+EV';
+    // display-only tag: +EV by exp_R & robust (t≥2) แต่ n<80 (position algo ไม้น้อย) — ไม่ใช่ −EV จริง, ไม่แตะ auto-seed
+    const promising = !pos && (r.exp_R || 0) > 0 && (r.oos || 0) >= 0 && (r.t || 0) >= 2 && r.n >= 20 && r.n < 80;
+    const promBadge = promising
+      ? ' <span title="+EV by exp_R + robust (t≥2) แต่ n<80 (position algo ไม้น้อย) — ยังไม่ auto-live" style="color:var(--gold);font-size:9px;font-weight:700">◆n<80</span>' : '';
     return '<tr style="border-top:1px solid var(--border)">'
-      + '<td style="padding:4px 8px;color:' + (pos ? 'var(--green)' : 'var(--red)') + ';font-weight:700">' + r.algo + '</td>'
+      + '<td style="padding:4px 8px;color:' + (pos ? 'var(--green)' : (promising ? 'var(--gold)' : 'var(--red)')) + ';font-weight:700">' + r.algo + promBadge + '</td>'
       + '<td>' + r.pair + '</td><td>' + (r.tf || '—') + '</td>'
       + '<td style="text-align:right;color:' + ((r.exp_R || 0) >= 0 ? 'var(--green)' : 'var(--red)') + '">' + num(r.exp_R) + '</td>'
       + '<td style="text-align:right">' + num(r.t, 2) + ' ' + tBadge(r.t) + '</td>'
@@ -6686,16 +6837,16 @@ async function loadRiskSat() {
     const d = await (await fetch('/api/risk-sat')).json();
     if (d.collecting) { el.innerHTML = '<span style="color:var(--gold)">' + (d.note || 'collecting') + '</span>'; return; }
     if (!d.ok) { el.textContent = 'ไม่มีข้อมูล'; return; }
-    const c = v => (v == null ? 'var(--muted)' : (v >= 0 ? 'var(--green)' : 'var(--red)'));
+    const c = v => (v >= 0 ? 'var(--green)' : 'var(--red)');
     el.innerHTML =
       '<div style="display:flex;gap:18px;flex-wrap:wrap">'
-      + '<div>Sharpe <b style="color:' + c(d.sharpe) + '">' + _m(d.sharpe) + '</b></div>'
-      + '<div>Max DD <b style="color:var(--red)">' + _m(d.max_dd_pct) + '%</b> (' + _m(d.max_dd_days) + ' วัน)</div>'
-      + '<div>WR <b>' + _m(d.wr) + '%</b></div>'
-      + '<div>net PnL <b style="color:' + c(d.total_pnl) + '">' + _m(d.total_pnl) + '</b></div>'
-      + '<div>n <b>' + _m(d.n) + '</b> (' + _m(d.span_days) + ' วัน)</div></div>'
-      + '<div style="margin-top:8px">VaR95 <b>' + _m(d.var95_hist) + '</b>(hist)/' + _m(d.var95_param) + '(param) · '
-      + 'VaR99 <b>' + _m(d.var99_hist) + '</b>/' + _m(d.var99_param) + '</div>'
+      + '<div>Sharpe <b style="color:' + c(d.sharpe) + '">' + d.sharpe + '</b></div>'
+      + '<div>Max DD <b style="color:var(--red)">' + d.max_dd_pct + '%</b> (' + d.max_dd_days + ' วัน)</div>'
+      + '<div>WR <b>' + d.wr + '%</b></div>'
+      + '<div>net PnL <b style="color:' + c(d.total_pnl) + '">' + d.total_pnl + '฿</b></div>'
+      + '<div>n <b>' + d.n + '</b> (' + d.span_days + ' วัน)</div></div>'
+      + '<div style="margin-top:8px">VaR95 <b>' + d.var95_hist + '฿</b>(hist)/' + d.var95_param + '(param) · '
+      + 'VaR99 <b>' + d.var99_hist + '฿</b>/' + d.var99_param + '</div>'
       + '<div style="color:var(--muted);font-size:10px;margin-top:4px">' + (d.note || '') + '</div>';
   } catch (e) { el.textContent = 'เชื่อมต่อ /api/risk-sat ไม่ได้'; }
 }
@@ -6705,28 +6856,27 @@ async function loadEquityCurve() {
   try {
     const d = await (await fetch('/api/equity-curve')).json();
     const pts = d.points || [];
+    const eqs = pts.map(p => p.equity), dds = pts.map(p => p.dd_pct);
+    const hasEq = eqs.some(v => Number.isFinite(v));   // public static: account equity may be stripped
     document.getElementById('equity-note').textContent =
-      pts.length ? ('n=' + _m(d.n) + ' · เริ่ม ' + _m(d.start_equity)) : 'ยังไม่มีไม้ปิด';
+      pts.length ? ('n=' + _m(d.n) + (hasEq ? (' · เริ่ม ' + d.start_equity + '฿') : ' · underwater เท่านั้น')) : 'ยังไม่มีไม้ปิด';
     if (pts.length < 2) { svg.innerHTML = ''; return; }
     const W = Math.max(600, svg.clientWidth || 600), H = 220, pad = 30;
-    const eqs = pts.map(p => p.equity), dds = pts.map(p => p.dd_pct);
-    // public: equity ($) curve is money → stripped from snapshot; render only underwater/drawdown
-    const hasEq = eqs.some(v => typeof v === 'number' && isFinite(v));
+    const emin = Math.min(...eqs), emax = Math.max(...eqs);
     const x = i => pad + i / (pts.length - 1) * (W - 2 * pad);
-    const ddmax = Math.max(...dds.filter(v => typeof v === 'number' && isFinite(v)), 1);
+    const yE = v => 10 + (1 - (v - emin) / (emax - emin || 1)) * (H * 0.55);
+    const ddmax = Math.max(...dds, 1);
     const yD = v => H * 0.62 + (v / ddmax) * (H * 0.32);
-    let eqSvg = '';
-    if (hasEq) {
-      const emin = Math.min(...eqs), emax = Math.max(...eqs);
-      const yE = v => 10 + (1 - (v - emin) / (emax - emin || 1)) * (H * 0.55);
+    const ddPath = dds.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + yD(v).toFixed(1)).join(' ');
+    let out = '';
+    if (hasEq) {                                        // gold equity path only when finite equity present
       const eqPath = eqs.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + yE(v).toFixed(1)).join(' ');
-      eqSvg = '<path d="' + eqPath + '" fill="none" stroke="var(--gold)" stroke-width="1.5"/>'
-        + '<text x="' + pad + '" y="12" fill="var(--gold)" font-size="10">equity ' + emax.toFixed(0) + '</text>';
+      out += '<path d="' + eqPath + '" fill="none" stroke="var(--gold)" stroke-width="1.5"/>'
+           + '<text x="' + pad + '" y="12" fill="var(--gold)" font-size="10">equity ' + emax.toFixed(0) + '</text>';
     }
-    const ddPath = dds.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + yD(v || 0).toFixed(1)).join(' ');
-    svg.innerHTML = eqSvg
-      + '<path d="' + ddPath + '" fill="none" stroke="var(--red)" stroke-width="1"/>'
-      + '<text x="' + pad + '" y="' + (H - 4) + '" fill="var(--red)" font-size="10">underwater max ' + ddmax.toFixed(1) + '%</text>';
+    out += '<path d="' + ddPath + '" fill="none" stroke="var(--red)" stroke-width="1"/>'
+         + '<text x="' + pad + '" y="' + (H - 4) + '" fill="var(--red)" font-size="10">underwater max ' + ddmax.toFixed(1) + '%</text>';
+    svg.innerHTML = out;
   } catch (e) { document.getElementById('equity-note').textContent = 'เชื่อมต่อไม่ได้'; }
 }
 
@@ -7054,7 +7204,6 @@ async function loadCotCard() {
    ════════════════════════════════════════════════════════════ */
 function _bootstrap() {
   _initNnlbModal();
-  initCharts();
   fetchData();
   fetchCalendar();
   loadLivePrice();
@@ -7070,7 +7219,7 @@ function _bootstrap() {
   loadRegimeExtra();
   loadRiskRegime();
   loadCotCard();
-  loadCalibration();
+  loadCalibration();                               // relocated to Analytics tab (was triggered by loadAccounting)
   loadNewsImpact();
   loadImpactCalibration();
   loadNewsGate();

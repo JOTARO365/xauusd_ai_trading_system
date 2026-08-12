@@ -114,6 +114,8 @@ _ENDPOINTS = [
     ("/api/trades-symbol?symbol=XAUUSD", "trades-symbol"),
     ("/api/sr-ladder", "sr-ladder"),
     ("/api/candles?tf=H1", "candles"),
+    ("/api/tick", "tick"),                  # ราคาสด (scenario/structural read)
+    ("/api/algo-signals", "algo-signals"),  # โอกาสเข้า order ต่อ algo
 ]
 
 
