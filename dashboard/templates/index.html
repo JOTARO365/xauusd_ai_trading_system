@@ -2283,6 +2283,13 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       </div>
     </section>
 
+    <!-- STRUCTURAL READ (โค้ช) — position-in-range / nearest S-R + strength / action-state / prob-path (จาก UHAS analyst 08-12, 0 token) -->
+    <section>
+      <div class="section-title" style="display:flex;align-items:center"><svg class="ic"><use href="#ic-eye"/></svg> STRUCTURAL READ &mdash; อ่านโครงสร้างสด (โค้ช)
+        <span style="font-size:9px;color:var(--muted);font-weight:400;margin-left:6px">(ตำแหน่งในกรอบ · แนวใกล้+ความแข็ง · state · โอกาสเด้ง/ทะลุ · display 0 token)</span></div>
+      <div id="struct-read" class="card" style="padding:10px 12px;font-size:12px">รอข้อมูล S/R…</div>
+    </section>
+
     <!-- ALGO SIGNALS — โอกาสเข้า order ต่อ algo (จุดเข้า/SL/TP + สถานะ เข้าแล้ว/โดน block) -->
     <section>
       <div class="section-title" style="display:flex;align-items:center"><svg class="ic"><use href="#ic-target"/></svg> ALGO SIGNALS &mdash; โอกาสเข้า order ต่อ algo
@@ -7749,6 +7756,56 @@ function _scMeta(sm, lvl) {
   const hits = m.filter(x => x.level && Math.abs(x.level - lvl) / lvl < 0.001);
   return hits.length ? hits.reduce((a, b) => (((b.score || b.strength || 0) > (a.score || a.strength || 0)) ? b : a)) : null;
 }
+
+/* STRUCTURAL READ (โค้ช) — อ่านโครงสร้างจาก S/R+price+trend (จาก UHAS): ตำแหน่งในกรอบ · แนวใกล้+ความแข็ง+เตะจริง
+   · action-state · โอกาสเด้ง/ทะลุ · level เปลี่ยนโครงสร้าง. computed-in-code, 0 token. */
+function renderStructuralRead(z, px, trend) {
+  const el = document.getElementById('struct-read'); if (!el) return;
+  if (!px || !z || (!z.support && !z.resistance)) { el.innerHTML = '<span style="color:var(--muted)">รอข้อมูล S/R…</span>'; return; }
+  const _sm = z.sr_meta || [];
+  const sups = (z.support || []).filter(x => x < px).sort((a, b) => b - a);
+  const ress = (z.resistance || []).filter(x => x > px).sort((a, b) => a - b);
+  const S = sups.length ? sups[0] : null, R = ress.length ? ress[0] : null;
+  const mS = S != null ? _scMeta(_sm, S) : null, mR = R != null ? _scMeta(_sm, R) : null;
+  const tU = String(trend || '').toUpperCase();
+  const bull = tU.includes('BULL') || tU.includes('UP');
+  const pipDiv = px > 1000 ? 0.1 : (px > 100 ? 0.01 : 0.0001);
+  const dist = lv => lv != null ? Math.round(Math.abs(px - lv) / pipDiv) : null;
+  const str = m => m ? Math.round(m.score || m.strength || 0) : null;
+  const touches = m => m ? (m.touches || m.n_tests || null) : null;
+  const real = m => m && m.bounce_pct != null && m.bounce_pct >= 60;
+  let posPct = null;
+  if (S != null && R != null && R > S) posPct = Math.max(0, Math.min(100, Math.round((px - S) / (R - S) * 100)));
+  const nf = 0.0015;
+  let state, sc;
+  if (R != null && (R - px) / px < nf) { state = 'ทดสอบแนวต้าน — รอเบรก/เด้งลง'; sc = 'var(--red)'; }
+  else if (S != null && (px - S) / px < nf) { state = 'ทดสอบแนวรับ — รอเด้ง/หลุด'; sc = 'var(--green)'; }
+  else if (posPct != null && posPct >= 65) { state = 'ครึ่งบนของกรอบ — วิ่งเข้าหาต้าน'; sc = 'var(--gold)'; }
+  else if (posPct != null && posPct <= 35) { state = 'ครึ่งล่างของกรอบ — วิ่งเข้าหารับ'; sc = 'var(--gold)'; }
+  else { state = 'กลางกรอบ — รอเข้าโซน'; sc = 'var(--muted)'; }
+  const up = (posPct == null) ? bull : (posPct >= 50);
+  const tgt = up ? R : S, mT = up ? mR : mS;
+  const bounceP = mT && mT.bounce_pct != null ? Math.round(mT.bounce_pct) : null;
+  const breakP = mT && mT.break_pct != null ? Math.round(mT.break_pct) : (bounceP != null ? 100 - bounceP : null);
+  const scLvl = bull ? S : R;
+  const f = v => v != null ? v.toFixed(2) : '—';
+  const line = (lbl, lv, m, col) => lv == null ? '' :
+    `<div style="margin-top:3px"><span style="color:${col}">${lbl} <b>${f(lv)}</b></span>`
+    + ` <span style="color:var(--muted);font-size:10px">ห่าง ${dist(lv)}p`
+    + (str(m) != null ? ` · แข็ง ${str(m)}` : '') + (touches(m) != null ? ` · ${touches(m)} ครั้ง` : '')
+    + (real(m) ? ` · <span style="color:var(--gold)">เตะเป็นจริง</span>` : '') + `</span></div>`;
+  const biasTxt = bull ? '<span style="color:var(--green)">ขึ้น</span>'
+    : (tU.includes('BEAR') || tU.includes('DOWN') ? '<span style="color:var(--red)">ลง</span>' : 'กลาง');
+  el.innerHTML =
+    `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="color:${sc};font-weight:700">${state}</span>`
+    + (posPct != null ? `<span style="color:var(--muted);font-size:11px">· ตำแหน่งในกรอบ <b style="color:var(--text)">${posPct}%</b></span>` : '')
+    + `<span style="margin-left:auto;font-size:10px;color:var(--muted)">bias ${biasTxt}</span></div>`
+    + line('ต้านใกล้', R, mR, 'var(--red)') + line('รับใกล้', S, mS, 'var(--green)')
+    + (tgt != null && bounceP != null
+      ? `<div style="margin-top:5px;font-size:11px">น่าจะทดสอบ <b>${f(tgt)}</b> · เด้ง <b style="color:var(--gold)">${bounceP}%</b> / ทะลุ <b>${breakP}%</b></div>` : '')
+    + (scLvl != null
+      ? `<div style="margin-top:3px;font-size:10px;color:var(--muted)">โครงสร้างเปลี่ยนทิศเมื่อ${bull ? 'หลุด' : 'ผ่าน'} <b>${f(scLvl)}</b></div>` : '');
+}
 function _scCard(p) {
   const dcol = p.dir === 'BUY' ? 'var(--green)' : p.dir === 'SELL' ? 'var(--red)' : 'var(--muted)';
   const mid = (p.entryLo + p.entryHi) / 2;
@@ -7826,6 +7883,7 @@ function _scRender(z, px, trend) {
   const tot = plans.reduce((a, p) => a + (p.score || 0), 0);   // prob สัมพัทธ์จาก score (display เท่านั้น)
   if (tot > 0) plans.forEach(p => p.prob = Math.round((p.score || 0) / tot * 100));
   el.innerHTML = plans.length ? plans.map(_scCard).join('') : '<div class="card" style="flex:1;color:var(--muted);padding:10px">ไม่มี setup ชัด — พัก</div>';
+  try { renderStructuralRead(z, px, trend); } catch (e) {}    // โค้ช: อ่านโครงสร้างสด (ใช้ z/px/trend เดียวกัน)
 }
 async function _scRefreshPrice() {          // ราคาสด → re-render proximity (ทุก ~5 วิ)
   if (!_scLive.z) return;
