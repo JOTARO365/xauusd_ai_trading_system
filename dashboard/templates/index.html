@@ -8149,8 +8149,12 @@ function renderBtr() {
   const liveC = s => s === 'LIVE' ? 'var(--green)' : (s === 'CUT' ? 'var(--red)' : 'var(--muted)');
   body.innerHTML = rows.map(r => {
     const pos = r.group === '+EV';
+    // display-only tag: +EV by exp_R & robust (t≥2) แต่ n<80 (position algo ไม้น้อย) — ไม่ใช่ −EV จริง, ไม่แตะ auto-seed
+    const promising = !pos && (r.exp_R || 0) > 0 && (r.oos || 0) >= 0 && (r.t || 0) >= 2 && r.n >= 20 && r.n < 80;
+    const promBadge = promising
+      ? ' <span title="+EV by exp_R + robust (t≥2) แต่ n<80 (position algo ไม้น้อย) — ยังไม่ auto-live" style="color:var(--gold);font-size:9px;font-weight:700">◆n<80</span>' : '';
     return '<tr style="border-top:1px solid var(--border)">'
-      + '<td style="padding:4px 8px;color:' + (pos ? 'var(--green)' : 'var(--red)') + ';font-weight:700">' + r.algo + '</td>'
+      + '<td style="padding:4px 8px;color:' + (pos ? 'var(--green)' : (promising ? 'var(--gold)' : 'var(--red)')) + ';font-weight:700">' + r.algo + promBadge + '</td>'
       + '<td>' + r.pair + '</td><td>' + (r.tf || '—') + '</td>'
       + '<td style="text-align:right;color:' + ((r.exp_R || 0) >= 0 ? 'var(--green)' : 'var(--red)') + '">' + num(r.exp_R) + '</td>'
       + '<td style="text-align:right">' + num(r.t, 2) + ' ' + tBadge(r.t) + '</td>'
