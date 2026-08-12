@@ -35,9 +35,9 @@
       "tf": "H1",
       "live": "SHADOW",
       "note": "z-fade RANGE",
-      "exp_R": -0.087,
+      "exp_R": -0.0871,
       "t": -4.08,
-      "oos": -0.0289,
+      "oos": -0.029,
       "wr": 46.4,
       "n": 1392
     },
@@ -50,7 +50,7 @@
       "note": "prior-day sweep fade",
       "exp_R": -0.0498,
       "t": -1.48,
-      "oos": -0.069,
+      "oos": -0.0691,
       "wr": 40.4,
       "n": 1339
     },
@@ -74,11 +74,11 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "CDC Action Zone (โฉลก) long-only · exit-on-flip · Turtle 2N SL · ถือยาว",
-      "exp_R": 0.8844,
-      "t": 1.99,
-      "oos": 2.3759,
-      "wr": 37.7,
-      "n": 53
+      "exp_R": 0.9833,
+      "t": 2.05,
+      "oos": 2.4784,
+      "wr": 38.3,
+      "n": 47
     },
     {
       "group": "+EV",
@@ -140,8 +140,8 @@
       "live": "SHADOW",
       "note": "z-fade RANGE",
       "exp_R": -0.4325,
-      "t": -19.93,
-      "oos": -0.3242,
+      "t": -19.94,
+      "oos": -0.3244,
       "wr": 34.9,
       "n": 1450
     },
@@ -178,9 +178,9 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "CDC Action Zone (โฉลก) long-only · exit-on-flip · Turtle 2N SL · ถือยาว",
-      "exp_R": 0.3728,
-      "t": 0.7,
-      "oos": 1.3768,
+      "exp_R": 0.393,
+      "t": 0.74,
+      "oos": 1.4189,
       "wr": 25.0,
       "n": 52
     },
@@ -191,9 +191,9 @@
       "tf": "H4",
       "live": "SHADOW",
       "note": "breakout + EURUSD confirm (structural, sign +1)",
-      "exp_R": -0.151,
+      "exp_R": -0.1509,
       "t": -2.25,
-      "oos": 0.0423,
+      "oos": 0.0426,
       "wr": 34.4,
       "n": 456
     },
@@ -282,11 +282,11 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "CDC Action Zone (โฉลก) long-only · exit-on-flip · Turtle 2N SL · ถือยาว",
-      "exp_R": 0.8629,
-      "t": 1.72,
-      "oos": 1.8731,
-      "wr": 40.4,
-      "n": 47
+      "exp_R": 1.0073,
+      "t": 1.89,
+      "oos": 2.1716,
+      "wr": 36.4,
+      "n": 44
     },
     {
       "group": "+EV",
@@ -464,11 +464,11 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "CDC Action Zone (โฉลก) long-only · exit-on-flip · Turtle 2N SL · ถือยาว",
-      "exp_R": -0.1579,
-      "t": -1.09,
-      "oos": -0.1778,
-      "wr": 25.9,
-      "n": 58
+      "exp_R": -0.1076,
+      "t": -0.76,
+      "oos": -0.1319,
+      "wr": 24.1,
+      "n": 54
     },
     {
       "group": "-EV",
@@ -544,7 +544,7 @@
       "note": "prior-day sweep fade",
       "exp_R": -0.1083,
       "t": -3.35,
-      "oos": -0.0842,
+      "oos": -0.0841,
       "wr": 38.9,
       "n": 1417
     },
@@ -568,11 +568,11 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "CDC Action Zone (โฉลก) long-only · exit-on-flip · Turtle 2N SL · ถือยาว",
-      "exp_R": 0.0996,
-      "t": 0.42,
-      "oos": 0.2623,
-      "wr": 29.8,
-      "n": 57
+      "exp_R": 0.1318,
+      "t": 0.53,
+      "oos": 0.2376,
+      "wr": 33.3,
+      "n": 54
     },
     {
       "group": "-EV",
@@ -647,8 +647,8 @@
       "live": "SHADOW",
       "note": "prior-day sweep fade",
       "exp_R": -0.1387,
-      "t": -4.25,
-      "oos": -0.1273,
+      "t": -4.26,
+      "oos": -0.1274,
       "wr": 39.0,
       "n": 1408
     },
@@ -672,11 +672,11 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "CDC Action Zone (โฉลก) long-only · exit-on-flip · Turtle 2N SL · ถือยาว",
-      "exp_R": -0.0782,
-      "t": -0.55,
-      "oos": 0.2877,
-      "wr": 36.2,
-      "n": 58
+      "exp_R": -0.1212,
+      "t": -0.82,
+      "oos": 0.2502,
+      "wr": 28.6,
+      "n": 56
     },
     {
       "group": "-EV",
@@ -685,9 +685,9 @@
       "tf": "H4",
       "live": "SHADOW",
       "note": "breakout + EURUSD confirm (structural, sign +1)",
-      "exp_R": 0.0145,
+      "exp_R": 0.0146,
       "t": 0.29,
-      "oos": -0.0924,
+      "oos": -0.0923,
       "wr": 35.2,
       "n": 823
     },
@@ -739,7 +739,7 @@
       "note": "z-fade RANGE",
       "exp_R": -0.1097,
       "t": -5.74,
-      "oos": -0.1061,
+      "oos": -0.1059,
       "wr": 46.0,
       "n": 1719
     },
@@ -776,11 +776,11 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "CDC Action Zone (โฉลก) long-only · exit-on-flip · Turtle 2N SL · ถือยาว",
-      "exp_R": -0.2626,
-      "t": -2.47,
-      "oos": -0.0264,
-      "wr": 29.2,
-      "n": 72
+      "exp_R": -0.2382,
+      "t": -2.03,
+      "oos": -0.0572,
+      "wr": 23.9,
+      "n": 67
     },
     {
       "group": "-EV",
@@ -843,7 +843,7 @@
       "note": "z-fade RANGE",
       "exp_R": -0.0833,
       "t": -4.0,
-      "oos": -0.0974,
+      "oos": -0.0972,
       "wr": 47.6,
       "n": 1476
     },
@@ -880,11 +880,11 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "CDC Action Zone (โฉลก) long-only · exit-on-flip · Turtle 2N SL · ถือยาว",
-      "exp_R": 0.2631,
-      "t": 0.9,
-      "oos": 1.1013,
-      "wr": 40.7,
-      "n": 54
+      "exp_R": 0.2104,
+      "t": 0.75,
+      "oos": 0.1886,
+      "wr": 43.6,
+      "n": 55
     },
     {
       "group": "-EV",
@@ -895,7 +895,7 @@
       "note": "breakout + EURUSD confirm (structural, sign +1)",
       "exp_R": -0.0836,
       "t": -1.22,
-      "oos": -0.11,
+      "oos": -0.1101,
       "wr": 31.9,
       "n": 417
     },
@@ -984,11 +984,11 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "CDC Action Zone (โฉลก) long-only · exit-on-flip · Turtle 2N SL · ถือยาว",
-      "exp_R": 2.9924,
-      "t": 2.1,
-      "oos": 0.1375,
-      "wr": 42.0,
-      "n": 50
+      "exp_R": 3.063,
+      "t": 2.04,
+      "oos": 0.1397,
+      "wr": 40.4,
+      "n": 47
     },
     {
       "group": "+EV",
@@ -1088,11 +1088,11 @@
       "tf": "D1",
       "live": "SHADOW",
       "note": "CDC Action Zone (โฉลก) long-only · exit-on-flip · Turtle 2N SL · ถือยาว",
-      "exp_R": 0.2061,
-      "t": 0.83,
-      "oos": 0.2848,
-      "wr": 32.8,
-      "n": 58
+      "exp_R": 0.2182,
+      "t": 0.86,
+      "oos": 0.3088,
+      "wr": 34.5,
+      "n": 55
     },
     {
       "group": "-EV",
