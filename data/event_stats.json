@@ -1,5 +1,5 @@
 {
- "updated": "2026-07-06",
+ "updated": "2026-08-12",
  "source": "data/xau_daily.json (AlphaVantage daily)",
  "baseline_avg_abs_pct": 0.56,
  "events": {
@@ -130,6 +130,86 @@
    "basis": "daily close; วันประกาศจริงจาก rule: วันพุธก่อนศุกร์แรก (สัปดาห์เดียวกับ NFP)",
    "flat_threshold_pct": 0.05,
    "vs_baseline_x": 1.26
+  },
+  "JOBLESS_CLAIMS": {
+   "n": 787,
+   "window": "2011-06-02 .. 2026-06-25",
+   "up_pct": 47.8,
+   "down_pct": 44.9,
+   "flat_pct": 7.4,
+   "avg_d0_pct": 0.024,
+   "median_d0_pct": 0.028,
+   "avg_abs_d0_pct": 0.716,
+   "avg_up_pct": 0.772,
+   "avg_down_pct": -0.769,
+   "d2_extends_pct": 44.4,
+   "basis": "daily close; วันประกาศจริงจาก rule: ทุกพฤหัส (วันหยุด→พุธ)",
+   "flat_threshold_pct": 0.05,
+   "vs_baseline_x": 1.28
+  },
+  "CB_CONF": {
+   "n": 180,
+   "window": "2011-06-28 .. 2026-05-26",
+   "up_pct": 46.1,
+   "down_pct": 47.2,
+   "flat_pct": 6.7,
+   "avg_d0_pct": -0.054,
+   "median_d0_pct": -0.001,
+   "avg_abs_d0_pct": 0.615,
+   "avg_up_pct": 0.607,
+   "avg_down_pct": -0.707,
+   "d2_extends_pct": 46.4,
+   "basis": "daily close; วันประกาศจริงจาก rule: อังคารสุดท้ายของเดือน",
+   "flat_threshold_pct": 0.05,
+   "vs_baseline_x": 1.1
+  },
+  "GDP": {
+   "n": 60,
+   "window": "2011-07-28 .. 2026-04-23",
+   "up_pct": 48.3,
+   "down_pct": 46.7,
+   "flat_pct": 5.0,
+   "avg_d0_pct": 0.074,
+   "median_d0_pct": 0.033,
+   "avg_abs_d0_pct": 0.682,
+   "avg_up_pct": 0.78,
+   "avg_down_pct": -0.649,
+   "d2_extends_pct": 47.4,
+   "basis": "daily close; วันประกาศจริงจาก rule: พฤหัสที่ 4 ของ ม.ค./เม.ย./ก.ค./ต.ค. (advance)",
+   "flat_threshold_pct": 0.05,
+   "vs_baseline_x": 1.22
+  },
+  "PPI": {
+   "n": 181,
+   "window": "2011-06-13 .. 2026-06-11",
+   "up_pct": 49.2,
+   "down_pct": 47.0,
+   "flat_pct": 3.9,
+   "avg_d0_pct": -0.033,
+   "median_d0_pct": 0.048,
+   "avg_abs_d0_pct": 0.765,
+   "avg_up_pct": 0.742,
+   "avg_down_pct": -0.85,
+   "d2_extends_pct": 52.9,
+   "basis": "daily close; วันประกาศจริงจาก rule: วันทำการที่ 9 (~กลางเดือน ใกล้ CPI)",
+   "flat_threshold_pct": 0.05,
+   "vs_baseline_x": 1.37
+  },
+  "RETAIL_SALES": {
+   "n": 181,
+   "window": "2011-06-15 .. 2026-06-15",
+   "up_pct": 47.0,
+   "down_pct": 49.2,
+   "flat_pct": 3.9,
+   "avg_d0_pct": -0.138,
+   "median_d0_pct": -0.029,
+   "avg_abs_d0_pct": 0.718,
+   "avg_up_pct": 0.616,
+   "avg_down_pct": -0.87,
+   "d2_extends_pct": 51.7,
+   "basis": "daily close; วันประกาศจริงจาก rule: วันทำการที่ 11 (~กลางเดือน)",
+   "flat_threshold_pct": 0.05,
+   "vs_baseline_x": 1.28
   }
  }
 }

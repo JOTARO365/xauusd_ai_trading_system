@@ -118,6 +118,44 @@ def _unemployment() -> list:
     return out
 
 
+def _monthly_nbd(n: int) -> list:
+    """วันทำการที่ n ของทุกเดือน (generic; ใช้กับ PPI/Retail Sales ~กลางเดือน)."""
+    out = []
+    for y, m in _months():
+        d = _nth_business_day(y, m, n, _us_holidays(y))
+        if d <= _END:
+            out.append(d.isoformat())
+    return out
+
+
+def _weekly_thursday() -> list:
+    """Jobless Claims — ทุกพฤหัส; พฤหัสที่เป็นวันหยุด → เลื่อนเป็นพุธ (ธรรมเนียม DOL)."""
+    out = []
+    d = date(_START_YEAR, 1, 1)
+    d += timedelta(days=(3 - d.weekday()) % 7)          # พฤหัสแรก (Thu=3)
+    while d <= _END:
+        rel = d - timedelta(days=1) if d in _us_holidays(d.year) else d
+        out.append(rel.isoformat())
+        d += timedelta(weeks=1)
+    return out
+
+
+def _last_tuesday() -> list:
+    """CB Consumer Confidence — อังคารสุดท้ายของเดือน."""
+    return [_last_weekday(y, m, 1).isoformat() for y, m in _months() if _last_weekday(y, m, 1) <= _END]
+
+
+def _gdp() -> list:
+    """GDP advance — พฤหัสที่ 4 ของ ม.ค./เม.ย./ก.ค./ต.ค. (quarterly)."""
+    out = []
+    for y in range(_START_YEAR, _END.year + 1):
+        for m in (1, 4, 7, 10):
+            d = _nth_weekday(y, m, 3, 4)                 # 4th Thursday
+            if date(_START_YEAR, 1, 1) <= d <= _END:
+                out.append(d.isoformat())
+    return out
+
+
 def main() -> None:
     with open(_EVENT_DATES, "r", encoding="utf-8") as f:
         doc = json.load(f)
@@ -150,11 +188,38 @@ def main() -> None:
         "source": "rule: วันพุธก่อนศุกร์แรก (สัปดาห์เดียวกับ NFP)",
         "notes": "Tier B — ADP monthly (ไม่ใช่ ADP weekly)",
     }
+    # ── ขยาย event set (จาก analyst UHAS 08-12) — gold-impact + date rule แม่นพอ ──
+    events["JOBLESS_CLAIMS"] = {
+        "dates": _weekly_thursday(),
+        "source": "rule: ทุกพฤหัส (วันหยุด→พุธ)",
+        "notes": "Tier B — weekly, N สูง (labor สด รายสัปดาห์)",
+    }
+    events["CB_CONF"] = {
+        "dates": _last_tuesday(),
+        "source": "rule: อังคารสุดท้ายของเดือน",
+        "notes": "Tier B — Conference Board Consumer Confidence",
+    }
+    events["GDP"] = {
+        "dates": _gdp(),
+        "source": "rule: พฤหัสที่ 4 ของ ม.ค./เม.ย./ก.ค./ต.ค. (advance)",
+        "notes": "Tier B — quarterly advance estimate",
+    }
+    events["PPI"] = {
+        "dates": _monthly_nbd(9),
+        "source": "rule: วันทำการที่ 9 (~กลางเดือน ใกล้ CPI)",
+        "notes": "Tier C — คลาด ~1-2 วัน (ไม่มี official schedule)",
+    }
+    events["RETAIL_SALES"] = {
+        "dates": _monthly_nbd(11),
+        "source": "rule: วันทำการที่ 11 (~กลางเดือน)",
+        "notes": "Tier C — คลาด ~1-2 วัน",
+    }
 
     with open(_EVENT_DATES, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, indent=1)
 
-    for k in ("CORE_CPI", "UNEMPLOYMENT", "ISM_MFG", "ISM_SVC", "ADP"):
+    for k in ("CORE_CPI", "UNEMPLOYMENT", "ISM_MFG", "ISM_SVC", "ADP",
+              "JOBLESS_CLAIMS", "CB_CONF", "GDP", "PPI", "RETAIL_SALES"):
         ds = events[k]["dates"]
         print(f"{k}: {len(ds)} dates ({ds[0]} .. {ds[-1]})")
 

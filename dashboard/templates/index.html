@@ -2491,6 +2491,23 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       </div>
     </section>
 
+    <!-- EVENT REACTION STATS — ทองต่อข่าวเศรษฐกิจ ทุก event (15 ปี) + $ ที่ราคาสด (จาก analyst UHAS 08-12) -->
+    <section id="event-reaction-section" style="margin-bottom:10px">
+      <div class="section-title" style="display:flex;align-items:center"><svg class="ic"><use href="#ic-bank"/></svg> EVENT REACTION STATS &mdash; ปฏิกิริยาทองต่อข่าว (15 ปี)
+        <span style="font-size:9px;color:var(--muted);font-weight:400;margin-left:6px">(move เฉลี่ย + $ ที่ราคาสด + prob ขึ้น/ลง ต่อ event · เรียงตามแรงกระแทก · display 0 token)</span>
+        <span id="evrx-px" style="margin-left:auto;font-size:10px;color:var(--muted);font-family:var(--mono)"></span></div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:var(--mono)">
+          <thead><tr style="color:var(--muted);text-align:left">
+            <th style="padding:3px 6px">event</th><th style="text-align:right">N</th>
+            <th style="text-align:right">ขึ้น%</th><th style="text-align:right">ลง%</th>
+            <th style="text-align:right">move เฉลี่ย</th><th style="text-align:right">≈ $ ที่ราคาสด</th>
+            <th style="text-align:right">×วันปกติ</th><th style="text-align:right">ทะลุ D+2</th></tr></thead>
+          <tbody id="evrx-body"><tr><td colspan="8" style="color:var(--muted);padding:4px 6px">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
     <section id="econ-calendar-section">
       <div class="section-title">ECONOMIC CALENDAR &mdash; This Week (A/F/P)</div>
       <div class="chart-card" style="padding:14px 16px">
@@ -4096,7 +4113,7 @@ function switchTab(name) {
   if (_bsub) _bsub.style.display = (name === 'backtest') ? 'flex' : 'none';
   if (name === 'settings')   { loadConfig(); loadModeAdvice(); }
   if (name === 'accounting') loadAccounting();
-  if (name === 'monitor')    { loadMonitor(); loadEventEngine(); loadPairs(); loadComex(); loadPairLots(); }
+  if (name === 'monitor')    { loadMonitor(); loadEventEngine(); loadEventReaction(); loadPairs(); loadComex(); loadPairLots(); }
   if (name === 'backtest') { loadBacktestResults(); loadBacktest(); loadRegimeAnalytics(); loadDailySummary(); loadOwnerEdge(); loadRiskSat(); loadEquityCurve(); loadCointegration(); }
 }
 
@@ -8090,6 +8107,36 @@ async function loadPairs() {
       + ' · β=' + d.beta + ' · ' + pos
       + '<div style="font-size:11px;color:var(--muted);margin-top:6px">z>+2 → SELL XAU+BUY XAG · z<−2 → BUY XAU+SELL XAG · ออก |z|≤0.5 · cut |z|≥3.5</div>';
   } catch (e) { console.error('loadPairs', e); }
+}
+
+// ── Event Reaction Stats — ตารางทองต่อข่าว ทุก event (15 ปี) + $ ที่ราคาสด (0 token) ──
+async function loadEventReaction() {
+  const body = document.getElementById('evrx-body'); if (!body) return;
+  try {
+    const d = await (await fetch('/api/event-stats')).json();
+    const evs = (d && d.events) || {};
+    const keys = Object.keys(evs);
+    if (!keys.length) { body.innerHTML = '<tr><td colspan="8" style="color:var(--muted);padding:4px 6px">—</td></tr>'; return; }
+    const px = (window._scLive && _scLive.px) || null;                 // ราคาสดจาก scenario cache
+    const pxEl = document.getElementById('evrx-px'); if (pxEl) pxEl.textContent = px ? ('@ ' + px) : '';
+    keys.sort((a, b) => (evs[b].vs_baseline_x || 0) - (evs[a].vs_baseline_x || 0));    // แรงกระแทกมากก่อน
+    body.innerHTML = keys.map(k => {
+      const s = evs[k];
+      const usd = px ? ('±$' + (px * (s.avg_abs_d0_pct / 100)).toFixed(0)) : '—';
+      const upC = (s.up_pct || 0) >= (s.down_pct || 0) ? 'var(--green)' : 'var(--muted)';
+      const dnC = (s.down_pct || 0) > (s.up_pct || 0) ? 'var(--red)' : 'var(--muted)';
+      const bx = (s.vs_baseline_x || 0) >= 1.4 ? 'var(--gold)' : 'var(--muted)';
+      return '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:3px 6px;color:var(--text)">' + k + '</td>'
+        + '<td style="text-align:right;color:var(--muted)">' + (s.n || '—') + '</td>'
+        + '<td style="text-align:right;color:' + upC + '">' + (s.up_pct || 0) + '</td>'
+        + '<td style="text-align:right;color:' + dnC + '">' + (s.down_pct || 0) + '</td>'
+        + '<td style="text-align:right">' + (s.avg_abs_d0_pct || 0) + '%</td>'
+        + '<td style="text-align:right;color:var(--gold)">' + usd + '</td>'
+        + '<td style="text-align:right;color:' + bx + '">' + (s.vs_baseline_x || 0) + '×</td>'
+        + '<td style="text-align:right;color:var(--muted)">' + (s.d2_extends_pct != null ? s.d2_extends_pct + '%' : '—') + '</td></tr>';
+    }).join('');
+  } catch (e) {}
 }
 
 // ── Event Engine (NFP/CPI/FOMC) — ชนข่าว panel ──
