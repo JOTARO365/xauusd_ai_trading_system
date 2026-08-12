@@ -7,7 +7,7 @@
   {
    "be": false,
    "dir": "SELL",
-   "dist_pt": 343015,
+   "dist_pt": 338775,
    "entry": 63550.75,
    "hit": false,
    "proj_by": "MT5",
@@ -17,7 +17,7 @@
   {
    "be": false,
    "dir": "BUY",
-   "dist_pt": 921,
+   "dist_pt": 947,
    "entry": 83.78,
    "hit": false,
    "proj_by": "MT5",
@@ -25,18 +25,18 @@
    "symbol": "WTIUSD"
   },
   {
-   "be": true,
-   "dir": "SELL",
-   "dist_pt": 248,
-   "entry": 4416.96,
+   "be": false,
+   "dir": "BUY",
+   "dist_pt": 217,
+   "entry": 4414.34,
    "hit": false,
    "proj_by": "MT5",
-   "sl": 4416.54,
+   "sl": 4410.28,
    "symbol": "XAUUSD"
   }
  ],
  "spot": null,
  "spot_src": null,
  "weekend": false,
- "xm_close": 4413.51
+ "xm_close": 4412.45
 }

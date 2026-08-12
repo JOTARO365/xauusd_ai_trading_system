@@ -31,28 +31,28 @@
   {
    "algo_id": "mean_reversion",
    "best": [
-    "GBPUSD",
-    0.586
+    "USDCHF",
+    0.336
    ],
    "dir_key": "mean_reversion",
    "dir_mode": "both",
-   "exp_R": -0.04,
+   "exp_R": -0.045,
    "live": false,
    "live_symbol": null,
    "live_syms": [],
-   "n": 102,
+   "n": 106,
    "name": "Mean-Reversion (z-fade)",
    "note": "CUT 07-19 (OOS −EV) — shadow/reference เท่านั้น ไม่ได้ใช้จริง",
    "pairs_pos": 3,
    "pairs_traded": 11,
    "regime": "RANGE",
-   "sum_R": -4.1,
-   "wins": 54,
+   "sum_R": -4.8,
+   "wins": 56,
    "worst": [
     "XAUJPY",
     -1.04
    ],
-   "wr": 52.9
+   "wr": 52.8
   },
   {
    "algo_id": "tsmom_d1",
@@ -121,25 +121,25 @@
    ],
    "dir_key": "sweep_reversal",
    "dir_mode": "both",
-   "exp_R": -0.107,
+   "exp_R": -0.119,
    "live": true,
    "live_symbol": null,
    "live_syms": [
     "BTCUSD"
    ],
-   "n": 94,
+   "n": 95,
    "name": "sweep_reversal",
    "note": null,
    "pairs_pos": 5,
    "pairs_traded": 11,
    "regime": "—",
-   "sum_R": -10.1,
+   "sum_R": -11.3,
    "wins": 35,
    "worst": [
     "GBPUSD",
-    -1.053
+    -1.065
    ],
-   "wr": 37.2
+   "wr": 36.8
   },
   {
    "algo_id": "macro_momentum",
@@ -174,31 +174,31 @@
   {
    "algo_id": "confluence_15m",
    "best": [
-    "XAUUSD",
-    0.379
+    "GBPUSD",
+    1.7
    ],
    "dir_key": "confluence_15m",
    "dir_mode": "both",
-   "exp_R": -1.017,
+   "exp_R": -0.629,
    "live": true,
    "live_symbol": null,
    "live_syms": [
     "XAUUSD",
     "BTCUSD"
    ],
-   "n": 6,
+   "n": 7,
    "name": "confluence_15m",
    "note": null,
-   "pairs_pos": 1,
-   "pairs_traded": 5,
+   "pairs_pos": 2,
+   "pairs_traded": 6,
    "regime": "—",
-   "sum_R": -6.1,
-   "wins": 1,
+   "sum_R": -4.4,
+   "wins": 2,
    "worst": [
     "BTCUSD",
     -2.073
    ],
-   "wr": 16.7
+   "wr": 28.6
   },
   {
    "algo_id": "cdc_zone",
@@ -247,7 +247,7 @@
   "ready": 0
  },
  "engine_on": true,
- "generated": "2026-08-12T11:01Z",
+ "generated": "2026-08-12T11:59Z",
  "min_span_days": 60,
  "n_ready": {
   "scalp": 100,
@@ -803,7 +803,7 @@
   },
   {
    "algo_id": "mean_reversion",
-   "avg_hold": 7.3,
+   "avg_hold": 7.0,
    "backtest_exp_R": -0.0668,
    "backtest_managed": false,
    "backtest_n": 1470,
@@ -812,66 +812,66 @@
    "by_result": {
     "SL": 9,
     "TIMEOUT": 0,
-    "TP": 10
+    "TP": 11
    },
    "exec_mode": "SHADOW",
-   "exp_R": -0.092,
+   "exp_R": -0.044,
    "klass": "scalp",
    "live": false,
-   "mae_R": -0.7,
+   "mae_R": -0.67,
    "max_dd_R": -5.9,
-   "mfe_R": 0.77,
-   "n": 19,
-   "n_open": 1,
+   "mfe_R": 0.78,
+   "n": 20,
+   "n_open": 0,
    "real_exp_R": null,
    "real_n": 0,
    "real_regime": {},
    "real_wr": null,
    "span_days": 18.6,
    "state": "SHADOW",
-   "sum_R": -1.7,
+   "sum_R": -0.9,
    "switch_kind": "combo",
    "switch_state": "SHADOW",
    "symbol": "EURUSD",
-   "wr": 52.6
+   "wr": 55.0
   },
   {
    "algo_id": "mean_reversion",
-   "avg_hold": 5.1,
+   "avg_hold": 4.4,
    "backtest_exp_R": -0.0866,
    "backtest_managed": false,
    "backtest_n": 1509,
    "backtest_wr": 47.0,
    "badge": "collecting",
    "by_result": {
-    "SL": 1,
+    "SL": 3,
     "TIMEOUT": 0,
     "TP": 7
    },
    "exec_mode": "SHADOW",
-   "exp_R": 0.586,
+   "exp_R": 0.23,
    "klass": "scalp",
    "live": false,
-   "mae_R": -0.33,
-   "max_dd_R": -1.2,
-   "mfe_R": 0.97,
-   "n": 8,
-   "n_open": 2,
+   "mae_R": -0.47,
+   "max_dd_R": -2.4,
+   "mfe_R": 0.79,
+   "n": 10,
+   "n_open": 0,
    "real_exp_R": null,
    "real_n": 0,
    "real_regime": {},
    "real_wr": null,
    "span_days": 15.0,
    "state": "SHADOW",
-   "sum_R": 4.7,
+   "sum_R": 2.3,
    "switch_kind": "combo",
    "switch_state": "SHADOW",
    "symbol": "GBPUSD",
-   "wr": 87.5
+   "wr": 70.0
   },
   {
    "algo_id": "mean_reversion",
-   "avg_hold": 7.3,
+   "avg_hold": 7.2,
    "backtest_exp_R": -0.1097,
    "backtest_managed": false,
    "backtest_n": 1719,
@@ -880,28 +880,28 @@
    "by_result": {
     "SL": 5,
     "TIMEOUT": 0,
-    "TP": 13
+    "TP": 14
    },
    "exec_mode": "SHADOW",
-   "exp_R": 0.308,
+   "exp_R": 0.336,
    "klass": "scalp",
    "live": false,
-   "mae_R": -0.57,
+   "mae_R": -0.58,
    "max_dd_R": -3.5,
-   "mfe_R": 1.12,
-   "n": 18,
-   "n_open": 3,
+   "mfe_R": 1.11,
+   "n": 19,
+   "n_open": 2,
    "real_exp_R": null,
    "real_n": 0,
    "real_regime": {},
    "real_wr": null,
    "span_days": 18.5,
    "state": "SHADOW",
-   "sum_R": 5.5,
+   "sum_R": 6.4,
    "switch_kind": "combo",
    "switch_state": "SHADOW",
    "symbol": "USDCHF",
-   "wr": 72.2
+   "wr": 73.7
   },
   {
    "algo_id": "mean_reversion",
@@ -1943,37 +1943,37 @@
   },
   {
    "algo_id": "sweep_reversal",
-   "avg_hold": 8.2,
+   "avg_hold": 7.6,
    "backtest_exp_R": -0.1387,
    "backtest_managed": false,
    "backtest_n": 1408,
    "backtest_wr": 39.0,
    "badge": "collecting",
    "by_result": {
-    "SL": 10,
+    "SL": 11,
     "TIMEOUT": 0,
     "TP": 1
    },
    "exec_mode": "SHADOW",
-   "exp_R": -1.053,
+   "exp_R": -1.065,
    "klass": "scalp",
    "live": false,
    "mae_R": -1.0,
-   "max_dd_R": -11.6,
-   "mfe_R": 0.87,
-   "n": 11,
-   "n_open": 2,
+   "max_dd_R": -12.8,
+   "mfe_R": 0.81,
+   "n": 12,
+   "n_open": 1,
    "real_exp_R": null,
    "real_n": 0,
    "real_regime": {},
    "real_wr": null,
    "span_days": 7.4,
    "state": "SHADOW",
-   "sum_R": -11.6,
+   "sum_R": -12.8,
    "switch_kind": "combo",
    "switch_state": "SHADOW",
    "symbol": "GBPUSD",
-   "wr": 9.1
+   "wr": 8.3
   },
   {
    "algo_id": "sweep_reversal",
@@ -2691,7 +2691,7 @@
   },
   {
    "algo_id": "confluence_15m",
-   "avg_hold": null,
+   "avg_hold": 2.0,
    "backtest_exp_R": -0.2092,
    "backtest_managed": false,
    "backtest_n": 255,
@@ -2700,28 +2700,28 @@
    "by_result": {
     "SL": 0,
     "TIMEOUT": 0,
-    "TP": 0
+    "TP": 1
    },
    "exec_mode": "SHADOW",
-   "exp_R": null,
+   "exp_R": 1.7,
    "klass": "scalp",
    "live": false,
-   "mae_R": null,
+   "mae_R": -0.06,
    "max_dd_R": 0.0,
-   "mfe_R": null,
-   "n": 0,
-   "n_open": 1,
+   "mfe_R": 2.01,
+   "n": 1,
+   "n_open": 0,
    "real_exp_R": null,
    "real_n": 0,
    "real_regime": {},
    "real_wr": null,
    "span_days": 0.0,
    "state": "SHADOW",
-   "sum_R": 0.0,
+   "sum_R": 1.7,
    "switch_kind": "combo",
    "switch_state": "SHADOW",
    "symbol": "GBPUSD",
-   "wr": null
+   "wr": 100.0
   },
   {
    "algo_id": "confluence_15m",

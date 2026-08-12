@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "updated": "2026-07-06",
+  "updated": "2026-08-12",
   "window": "2011-08-05 .. 2026-06-05",
   "min_n": 30,
   "scenarios": {
@@ -235,6 +235,162 @@
           "date": "2026-06-05",
           "move_pct": 0.01,
           "dir": "up"
+        }
+      ]
+    },
+    "RETAIL_SALES": {
+      "sign": "hot_gold_down",
+      "hot": {
+        "dir": "down",
+        "magnitude_pct": 0.87,
+        "provenance": "rubric",
+        "n": 181
+      },
+      "cool": {
+        "dir": "up",
+        "magnitude_pct": 0.616,
+        "provenance": "rubric",
+        "n": 181
+      },
+      "surprise_curve": null,
+      "reactions": [
+        {
+          "date": "2025-07-16",
+          "move_pct": -0.507,
+          "dir": "down"
+        },
+        {
+          "date": "2025-08-15",
+          "move_pct": -1.012,
+          "dir": "down"
+        },
+        {
+          "date": "2025-09-16",
+          "move_pct": 1.035,
+          "dir": "up"
+        },
+        {
+          "date": "2025-10-16",
+          "move_pct": 1.064,
+          "dir": "up"
+        },
+        {
+          "date": "2025-11-18",
+          "move_pct": -1.167,
+          "dir": "down"
+        },
+        {
+          "date": "2025-12-15",
+          "move_pct": 0.261,
+          "dir": "up"
+        },
+        {
+          "date": "2026-01-16",
+          "move_pct": -0.242,
+          "dir": "down"
+        },
+        {
+          "date": "2026-02-17",
+          "move_pct": -1.489,
+          "dir": "down"
+        },
+        {
+          "date": "2026-03-16",
+          "move_pct": -0.395,
+          "dir": "down"
+        },
+        {
+          "date": "2026-04-15",
+          "move_pct": 1.568,
+          "dir": "up"
+        },
+        {
+          "date": "2026-05-15",
+          "move_pct": -1.031,
+          "dir": "down"
+        },
+        {
+          "date": "2026-06-15",
+          "move_pct": 1.978,
+          "dir": "up"
+        }
+      ]
+    },
+    "GDP": {
+      "sign": "hot_gold_down",
+      "hot": {
+        "dir": "down",
+        "magnitude_pct": 0.649,
+        "provenance": "rubric",
+        "n": 60
+      },
+      "cool": {
+        "dir": "up",
+        "magnitude_pct": 0.78,
+        "provenance": "rubric",
+        "n": 60
+      },
+      "surprise_curve": null,
+      "reactions": [
+        {
+          "date": "2023-07-27",
+          "move_pct": 0.705,
+          "dir": "up"
+        },
+        {
+          "date": "2023-10-26",
+          "move_pct": 0.468,
+          "dir": "up"
+        },
+        {
+          "date": "2024-01-25",
+          "move_pct": -0.495,
+          "dir": "down"
+        },
+        {
+          "date": "2024-04-25",
+          "move_pct": 0.032,
+          "dir": "up"
+        },
+        {
+          "date": "2024-07-25",
+          "move_pct": -0.51,
+          "dir": "down"
+        },
+        {
+          "date": "2024-10-24",
+          "move_pct": -0.817,
+          "dir": "down"
+        },
+        {
+          "date": "2025-01-23",
+          "move_pct": 0.343,
+          "dir": "up"
+        },
+        {
+          "date": "2025-04-24",
+          "move_pct": -0.726,
+          "dir": "down"
+        },
+        {
+          "date": "2025-07-24",
+          "move_pct": -1.239,
+          "dir": "down"
+        },
+        {
+          "date": "2025-10-23",
+          "move_pct": 1.942,
+          "dir": "up"
+        },
+        {
+          "date": "2026-01-22",
+          "move_pct": -0.368,
+          "dir": "down"
+        },
+        {
+          "date": "2026-04-23",
+          "move_pct": -0.818,
+          "dir": "down"
         }
       ]
     },
@@ -625,6 +781,240 @@
           "date": "2026-06-17",
           "move_pct": 0.542,
           "dir": "up"
+        }
+      ]
+    },
+    "JOBLESS_CLAIMS": {
+      "sign": "hot_gold_up",
+      "hot": {
+        "dir": "up",
+        "magnitude_pct": 0.772,
+        "provenance": "rubric",
+        "n": 787
+      },
+      "cool": {
+        "dir": "down",
+        "magnitude_pct": 0.769,
+        "provenance": "rubric",
+        "n": 787
+      },
+      "surprise_curve": null,
+      "reactions": [
+        {
+          "date": "2026-04-09",
+          "move_pct": -2.893,
+          "dir": "down"
+        },
+        {
+          "date": "2026-04-16",
+          "move_pct": -0.045,
+          "dir": "down"
+        },
+        {
+          "date": "2026-04-23",
+          "move_pct": -0.818,
+          "dir": "down"
+        },
+        {
+          "date": "2026-04-30",
+          "move_pct": -1.059,
+          "dir": "down"
+        },
+        {
+          "date": "2026-05-07",
+          "move_pct": 2.364,
+          "dir": "up"
+        },
+        {
+          "date": "2026-05-14",
+          "move_pct": -0.548,
+          "dir": "down"
+        },
+        {
+          "date": "2026-05-21",
+          "move_pct": 1.255,
+          "dir": "up"
+        },
+        {
+          "date": "2026-05-28",
+          "move_pct": -1.64,
+          "dir": "down"
+        },
+        {
+          "date": "2026-06-04",
+          "move_pct": -0.453,
+          "dir": "down"
+        },
+        {
+          "date": "2026-06-11",
+          "move_pct": -4.041,
+          "dir": "down"
+        },
+        {
+          "date": "2026-06-18",
+          "move_pct": -0.97,
+          "dir": "down"
+        },
+        {
+          "date": "2026-06-25",
+          "move_pct": -2.397,
+          "dir": "down"
+        }
+      ]
+    },
+    "PPI": {
+      "sign": "hot_gold_down",
+      "hot": {
+        "dir": "down",
+        "magnitude_pct": 0.85,
+        "provenance": "rubric",
+        "n": 181
+      },
+      "cool": {
+        "dir": "up",
+        "magnitude_pct": 0.742,
+        "provenance": "rubric",
+        "n": 181
+      },
+      "surprise_curve": null,
+      "reactions": [
+        {
+          "date": "2025-07-14",
+          "move_pct": 0.355,
+          "dir": "up"
+        },
+        {
+          "date": "2025-08-13",
+          "move_pct": -0.092,
+          "dir": "down"
+        },
+        {
+          "date": "2025-09-12",
+          "move_pct": -0.336,
+          "dir": "down"
+        },
+        {
+          "date": "2025-10-14",
+          "move_pct": 2.271,
+          "dir": "up"
+        },
+        {
+          "date": "2025-11-14",
+          "move_pct": -0.069,
+          "dir": "down"
+        },
+        {
+          "date": "2025-12-11",
+          "move_pct": 0.671,
+          "dir": "up"
+        },
+        {
+          "date": "2026-01-14",
+          "move_pct": 0.46,
+          "dir": "up"
+        },
+        {
+          "date": "2026-02-12",
+          "move_pct": 0.098,
+          "dir": "up"
+        },
+        {
+          "date": "2026-03-12",
+          "move_pct": -1.174,
+          "dir": "down"
+        },
+        {
+          "date": "2026-04-13",
+          "move_pct": -1.652,
+          "dir": "down"
+        },
+        {
+          "date": "2026-05-13",
+          "move_pct": -0.94,
+          "dir": "down"
+        },
+        {
+          "date": "2026-06-11",
+          "move_pct": -4.041,
+          "dir": "down"
+        }
+      ]
+    },
+    "CB_CONF": {
+      "sign": "hot_gold_down",
+      "hot": {
+        "dir": "down",
+        "magnitude_pct": 0.707,
+        "provenance": "rubric",
+        "n": 180
+      },
+      "cool": {
+        "dir": "up",
+        "magnitude_pct": 0.607,
+        "provenance": "rubric",
+        "n": 180
+      },
+      "surprise_curve": null,
+      "reactions": [
+        {
+          "date": "2025-07-29",
+          "move_pct": -0.668,
+          "dir": "down"
+        },
+        {
+          "date": "2025-08-26",
+          "move_pct": 0.004,
+          "dir": "up"
+        },
+        {
+          "date": "2025-09-30",
+          "move_pct": 1.652,
+          "dir": "up"
+        },
+        {
+          "date": "2025-10-28",
+          "move_pct": -1.983,
+          "dir": "down"
+        },
+        {
+          "date": "2025-11-25",
+          "move_pct": 1.762,
+          "dir": "up"
+        },
+        {
+          "date": "2025-12-30",
+          "move_pct": -3.978,
+          "dir": "down"
+        },
+        {
+          "date": "2026-01-27",
+          "move_pct": 0.115,
+          "dir": "up"
+        },
+        {
+          "date": "2026-02-24",
+          "move_pct": 0.806,
+          "dir": "up"
+        },
+        {
+          "date": "2026-03-31",
+          "move_pct": 2.091,
+          "dir": "up"
+        },
+        {
+          "date": "2026-04-28",
+          "move_pct": 0.438,
+          "dir": "up"
+        },
+        {
+          "date": "2026-05-26",
+          "move_pct": -0.461,
+          "dir": "down"
+        },
+        {
+          "date": "2026-06-30",
+          "move_pct": -1.169,
+          "dir": "down"
         }
       ]
     }

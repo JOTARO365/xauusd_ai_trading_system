@@ -2509,7 +2509,8 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
             <th style="padding:3px 6px">event</th><th style="text-align:right">N</th>
             <th style="text-align:right">ขึ้น%</th><th style="text-align:right">ลง%</th>
             <th style="text-align:right">move เฉลี่ย</th><th style="text-align:right">≈ $ ที่ราคาสด</th>
-            <th style="text-align:right">×วันปกติ</th><th style="text-align:right">ทะลุ D+2</th></tr></thead>
+            <th style="text-align:right">×วันปกติ</th><th style="text-align:right">ทะลุ D+2</th>
+            <th>scenario (ร้อน/เย็น → เป้าที่ราคาสด)</th></tr></thead>
           <tbody id="evrx-body"><tr><td colspan="8" style="color:var(--muted);padding:4px 6px">Loading…</td></tr></tbody>
         </table>
       </div>
@@ -8179,19 +8180,31 @@ async function loadPairs() {
 async function loadEventReaction() {
   const body = document.getElementById('evrx-body'); if (!body) return;
   try {
-    const d = await (await fetch('/api/event-stats')).json();
+    const [d, sd] = await Promise.all([
+      (await fetch('/api/event-stats')).json(),
+      (await fetch('/api/event-scenario')).json().catch(() => ({})),
+    ]);
     const evs = (d && d.events) || {};
+    const scen = (sd && sd.scenarios) || {};
     const keys = Object.keys(evs);
-    if (!keys.length) { body.innerHTML = '<tr><td colspan="8" style="color:var(--muted);padding:4px 6px">—</td></tr>'; return; }
+    if (!keys.length) { body.innerHTML = '<tr><td colspan="9" style="color:var(--muted);padding:4px 6px">—</td></tr>'; return; }
     const px = (window._scLive && _scLive.px) || null;                 // ราคาสดจาก scenario cache
     const pxEl = document.getElementById('evrx-px'); if (pxEl) pxEl.textContent = px ? ('@ ' + px) : '';
     keys.sort((a, b) => (evs[b].vs_baseline_x || 0) - (evs[a].vs_baseline_x || 0));    // แรงกระแทกมากก่อน
+    // scenario cell: ร้อน/เย็น → ทิศ + $ เป้าที่ราคาสด (ถ้าออกเกินคาด ทองจะไปทางไหน)
+    const tgt = (o) => {
+      if (!o || !px) return '—';
+      const mag = o.magnitude_pct || 0, up = o.dir === 'up';
+      const t = up ? px * (1 + mag / 100) : px * (1 - mag / 100);
+      return '<span style="color:' + (up ? 'var(--green)' : 'var(--red)') + '">' + (up ? '↑' : '↓') + '$' + t.toFixed(0) + '</span>';
+    };
     body.innerHTML = keys.map(k => {
-      const s = evs[k];
+      const s = evs[k], sc = scen[k];
       const usd = px ? ('±$' + (px * (s.avg_abs_d0_pct / 100)).toFixed(0)) : '—';
       const upC = (s.up_pct || 0) >= (s.down_pct || 0) ? 'var(--green)' : 'var(--muted)';
       const dnC = (s.down_pct || 0) > (s.up_pct || 0) ? 'var(--red)' : 'var(--muted)';
       const bx = (s.vs_baseline_x || 0) >= 1.4 ? 'var(--gold)' : 'var(--muted)';
+      const scCell = sc ? ('<span style="color:var(--muted)">ร้อน</span> ' + tgt(sc.hot) + ' <span style="color:var(--muted)">เย็น</span> ' + tgt(sc.cool)) : '—';
       return '<tr style="border-top:1px solid var(--border)">'
         + '<td style="padding:3px 6px;color:var(--text)">' + k + '</td>'
         + '<td style="text-align:right;color:var(--muted)">' + (s.n || '—') + '</td>'
@@ -8200,7 +8213,8 @@ async function loadEventReaction() {
         + '<td style="text-align:right">' + (s.avg_abs_d0_pct || 0) + '%</td>'
         + '<td style="text-align:right;color:var(--gold)">' + usd + '</td>'
         + '<td style="text-align:right;color:' + bx + '">' + (s.vs_baseline_x || 0) + '×</td>'
-        + '<td style="text-align:right;color:var(--muted)">' + (s.d2_extends_pct != null ? s.d2_extends_pct + '%' : '—') + '</td></tr>';
+        + '<td style="text-align:right;color:var(--muted)">' + (s.d2_extends_pct != null ? s.d2_extends_pct + '%' : '—') + '</td>'
+        + '<td style="padding:3px 6px;white-space:nowrap;font-size:10px">' + scCell + '</td></tr>';
     }).join('');
   } catch (e) {}
 }

@@ -2,13 +2,13 @@
  "days": [
   {
    "date": "2026-08-12",
-   "losses": 4,
-   "n": 12,
+   "losses": 6,
+   "n": 14,
    "open": 1,
    "pending": 0,
-   "regime": "BULLISH",
+   "regime": "—",
    "techniques": {
-    "Manual (owner)": 12
+    "Manual (owner)": 14
    },
    "trades": [
     {
@@ -101,17 +101,33 @@
     },
     {
      "dir": "SELL",
+     "status": "CLOSED",
+     "tech": "Manual (owner)",
+     "time": "17:55",
+     "why_in": "MANUAL",
+     "why_out": "ราคาเคลื่อนสวนทาง (SL)"
+    },
+    {
+     "dir": "BUY",
+     "status": "CLOSED",
+     "tech": "Manual (owner)",
+     "time": "18:04",
+     "why_in": "MANUAL",
+     "why_out": "ราคาเคลื่อนสวนทาง (SL)"
+    },
+    {
+     "dir": "BUY",
      "status": "OPEN",
      "tech": "Manual (owner)",
-     "time": "20:34",
+     "time": "21:47",
      "why_in": "MANUAL",
      "why_out": "ยังเปิดอยู่"
     }
    ],
    "why_loss": {
-    "ราคาเคลื่อนสวนทาง (SL)": 4
+    "ราคาเคลื่อนสวนทาง (SL)": 6
    },
-   "win_rate": 0.636,
+   "win_rate": 0.538,
    "wins": 7,
    "worst": {
     "dir": "SELL",
@@ -185,7 +201,7 @@
   "WK-SELL Core CPI m"
  ],
  "totals": {
-  "n": 16,
-  "win_rate": 0.438
+  "n": 18,
+  "win_rate": 0.389
  }
 }

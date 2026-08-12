@@ -1,6 +1,6 @@
 {
  "bot_status": {
-  "cycle": 5031,
+  "cycle": 5478,
   "decision": "SKIP",
   "last_signal": {
    "action": "SKIP",
@@ -9,7 +9,7 @@
    "entry_type": "NONE",
    "reason": "",
    "sr_zone": "NONE",
-   "time": "2026-08-12T18:01:12",
+   "time": "2026-08-12T18:59:30",
    "trend": "BULLISH"
   },
   "liquidity_pools": {
@@ -17,24 +17,24 @@
    "sell_side": [
     {
      "count": 2,
-     "dist_pct": 1.22,
+     "dist_pct": 1.26,
      "level": 4358.3
     },
     {
      "count": 2,
-     "dist_pct": 2.21,
+     "dist_pct": 2.24,
      "level": 4314.9
     },
     {
      "count": 2,
-     "dist_pct": 4.21,
+     "dist_pct": 4.25,
      "level": 4226.36
     }
    ]
   },
   "market": {
    "d1_trend": "BULLISH",
-   "fast_move_pips": -547.0,
+   "fast_move_pips": 628.0,
    "momentum_tf": {
     "h1": {
      "direction": "UP",
@@ -45,11 +45,11 @@
      "strength": "MODERATE"
     },
     "m15": {
-     "direction": "FLAT",
-     "strength": "WEAK"
+     "direction": "DOWN",
+     "strength": "MODERATE"
     }
    },
-   "rsi": 60.9056,
+   "rsi": 61.638,
    "trend": "BULLISH"
   },
   "plan": {
@@ -58,16 +58,16 @@
    "tp_pips": 1500
   },
   "price_info": {
-   "ask": 4415.09,
-   "bid": 4414.53,
-   "change_pct": -0.026,
-   "spread": 0.56
+   "ask": 4413.4,
+   "bid": 4412.86,
+   "change_pct": 0.008,
+   "spread": 0.54
   },
   "ready_mode": {
    "active": true,
-   "set_at": "2026-08-12T17:59:05.327554",
+   "set_at": "2026-08-12T18:57:41.990200",
    "zone": {
-    "dist_pct": 0.209,
+    "dist_pct": 0.248,
     "level": 4402.99,
     "tf": "W1",
     "zone_type": "SUPPORT"
@@ -82,16 +82,8 @@
    "double_pattern": null,
    "fvg": [
     {
-     "bottom": 4415.49,
-     "dist_pct": 0.09,
-     "mid": 4416.34,
-     "size_pips": 171,
-     "top": 4417.2,
-     "type": "bear"
-    },
-    {
      "bottom": 4390.33,
-     "dist_pct": -0.45,
+     "dist_pct": -0.49,
      "mid": 4392.31,
      "size_pips": 395,
      "top": 4394.28,
@@ -104,25 +96,14 @@
     "state": "UPTREND",
     "why": "HH + HL"
    },
-   "retrace_entry": {
-    "close_sl_pips": 627,
-    "direction": "BUY",
-    "sl_tighter_pct": 69,
-    "suggested_entry": 4407.85,
-    "tight_sl": 4405.93,
-    "wick_sl_pips": 192
-   },
-   "reversal_confirm": {
-    "direction": "BUY",
-    "note": "reversal ที่ zone — แท่งล่าสุดยังไม่ตามทิศ รอยืนยัน",
-    "status": "waiting"
-   }
+   "retrace_entry": null,
+   "reversal_confirm": null
   },
   "skip_ai": true,
-  "updated_at": "2026-08-12T18:01:12",
+  "updated_at": "2026-08-12T18:59:30",
   "zones": {
    "htf_zone": {
-    "dist_pct": 0.209,
+    "dist_pct": 0.248,
     "level": 4402.99,
     "tf": "W1",
     "zone_type": "SUPPORT"
@@ -272,7 +253,7 @@
     },
     {
      "avg_bounce": 49.0,
-     "bars_since_touch": 8,
+     "bars_since_touch": 9,
      "bounce_pct": 67,
      "break_hold": {
       "closes": 0,
@@ -291,7 +272,7 @@
     },
     {
      "avg_bounce": 53.3,
-     "bars_since_touch": 1,
+     "bars_since_touch": 2,
      "bounce_pct": null,
      "break_hold": null,
      "break_pct": null,
@@ -313,7 +294,7 @@
     },
     {
      "avg_bounce": 32.9,
-     "bars_since_touch": 6,
+     "bars_since_touch": 7,
      "bounce_pct": 40,
      "break_hold": null,
      "break_pct": 60,
@@ -335,7 +316,7 @@
     },
     {
      "avg_bounce": 45.8,
-     "bars_since_touch": 16,
+     "bars_since_touch": 17,
      "bounce_pct": 50,
      "break_hold": null,
      "break_pct": 50,
@@ -357,7 +338,7 @@
     },
     {
      "avg_bounce": 52.1,
-     "bars_since_touch": 45,
+     "bars_since_touch": 46,
      "bounce_pct": 100,
      "break_hold": null,
      "break_pct": 0,
@@ -373,7 +354,7 @@
     },
     {
      "avg_bounce": 66.2,
-     "bars_since_touch": 55,
+     "bars_since_touch": 56,
      "bounce_pct": 67,
      "break_hold": null,
      "break_pct": 33,
@@ -389,7 +370,7 @@
     },
     {
      "avg_bounce": 38.8,
-     "bars_since_touch": 87,
+     "bars_since_touch": 88,
      "bounce_pct": null,
      "break_hold": null,
      "break_pct": null,
@@ -426,7 +407,7 @@
    {
     "comment": "",
     "expiry": null,
-    "price": 4434.9,
+    "price": 4425.0,
     "sl": null,
     "tag": "AP",
     "tp": null,
@@ -476,7 +457,7 @@
   {
    "comment": "",
    "expiry": null,
-   "price": 4434.9,
+   "price": 4425.0,
    "sl": null,
    "tag": "AP",
    "tp": null,

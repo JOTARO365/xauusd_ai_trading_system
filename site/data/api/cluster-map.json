@@ -1,40 +1,40 @@
 {
- "atr": 14.82,
+ "atr": 15.27,
  "clusters": [
   {
-   "dist_atr": 24.63,
-   "level": 4049.12,
+   "dist_atr": 23.78,
+   "level": 4049.85,
+   "touches": 6
+  },
+  {
+   "dist_atr": 23.53,
+   "level": 4053.66,
+   "touches": 12
+  },
+  {
+   "dist_atr": 22.78,
+   "level": 4065.11,
    "touches": 7
   },
   {
-   "dist_atr": 24.38,
-   "level": 4052.82,
+   "dist_atr": 22.03,
+   "level": 4076.56,
    "touches": 8
   },
   {
-   "dist_atr": 24.13,
-   "level": 4056.53,
+   "dist_atr": 10.78,
+   "level": 4248.31,
+   "touches": 8
+  },
+  {
+   "dist_atr": 4.78,
+   "level": 4339.9,
    "touches": 6
   },
   {
-   "dist_atr": 23.88,
-   "level": 4060.23,
-   "touches": 6
-  },
-  {
-   "dist_atr": 23.63,
-   "level": 4063.94,
-   "touches": 9
-  },
-  {
-   "dist_atr": 22.88,
-   "level": 4075.05,
-   "touches": 6
-  },
-  {
-   "dist_atr": 4.88,
-   "level": 4341.78,
-   "touches": 6
+   "dist_atr": 2.78,
+   "level": 4370.44,
+   "touches": 7
   }
  ],
  "donchian": {
@@ -45,12 +45,12 @@
  "momentum": "flat",
  "near": false,
  "ok": true,
- "price": 4414.02,
+ "price": 4412.83,
  "resistance": null,
  "support": {
-  "dist_atr": 4.88,
-  "level": 4341.78,
-  "touches": 6
+  "dist_atr": 2.78,
+  "level": 4370.44,
+  "touches": 7
  },
  "symbol": "XAUUSD"
 }

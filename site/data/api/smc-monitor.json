@@ -57,55 +57,55 @@
  ],
  "liquidity": [
   {
-   "dist_pips": 402,
+   "dist_pips": 283,
    "level": 4410.0,
    "name": "R4410",
    "side": "below"
   },
   {
-   "dist_pips": 598,
+   "dist_pips": 717,
    "level": 4420.0,
    "name": "R4420",
    "side": "above"
   },
   {
-   "dist_pips": 1402,
+   "dist_pips": 1283,
    "level": 4400.0,
    "name": "R4400",
    "side": "below"
   },
   {
-   "dist_pips": 1598,
+   "dist_pips": 1717,
    "level": 4430.0,
    "name": "R4430",
    "side": "above"
   },
   {
-   "dist_pips": 2093,
+   "dist_pips": 2212,
    "level": 4434.95,
    "name": "PDH",
    "side": "above"
   },
   {
-   "dist_pips": 2402,
+   "dist_pips": 2283,
    "level": 4390.0,
    "name": "R4390",
    "side": "below"
   },
   {
-   "dist_pips": 3598,
+   "dist_pips": 3717,
    "level": 4450.0,
    "name": "R4450",
    "side": "above"
   },
   {
-   "dist_pips": 5753,
+   "dist_pips": 5634,
    "level": 4356.49,
    "name": "PDL",
    "side": "below"
   },
   {
-   "dist_pips": 6402,
+   "dist_pips": 6283,
    "level": 4350.0,
    "name": "R4350",
    "side": "below"
@@ -113,7 +113,7 @@
  ],
  "note": "SMC = บริบท/เฝ้าดูเท่านั้น ไม่ป้อน entry (backtest: ไม่มี edge หลัง cost)",
  "ok": true,
- "price": 4414.02,
+ "price": 4412.83,
  "regime": "NEUTRAL",
  "sweep": null
 }

@@ -1,7 +1,7 @@
 {
  "ok": true,
  "point": 0.01,
- "price": 4413.41,
+ "price": 4411.86,
  "symbol": "XAUUSD",
  "zones": {
   "htf_zone": null,
@@ -195,7 +195,7 @@
    },
    {
     "avg_bounce": 49.0,
-    "bars_since_touch": 9,
+    "bars_since_touch": 10,
     "bounce_pct": 67,
     "break_hold": {
      "closes": 0,
@@ -214,7 +214,7 @@
    },
    {
     "avg_bounce": 53.3,
-    "bars_since_touch": 2,
+    "bars_since_touch": 3,
     "bounce_pct": null,
     "break_hold": null,
     "break_pct": null,
@@ -236,7 +236,7 @@
    },
    {
     "avg_bounce": 45.8,
-    "bars_since_touch": 17,
+    "bars_since_touch": 18,
     "bounce_pct": 50,
     "break_hold": null,
     "break_pct": 50,
@@ -258,7 +258,7 @@
    },
    {
     "avg_bounce": 52.1,
-    "bars_since_touch": 46,
+    "bars_since_touch": 47,
     "bounce_pct": 83,
     "break_hold": null,
     "break_pct": 17,
@@ -274,7 +274,7 @@
    },
    {
     "avg_bounce": 34.0,
-    "bars_since_touch": 88,
+    "bars_since_touch": 89,
     "bounce_pct": 25,
     "break_hold": null,
     "break_pct": 75,
@@ -290,7 +290,7 @@
    },
    {
     "avg_bounce": 50.2,
-    "bars_since_touch": 88,
+    "bars_since_touch": 89,
     "bounce_pct": 100,
     "break_hold": null,
     "break_pct": 0,
@@ -312,7 +312,7 @@
    },
    {
     "avg_bounce": 36.0,
-    "bars_since_touch": 125,
+    "bars_since_touch": 126,
     "bounce_pct": 25,
     "break_hold": null,
     "break_pct": 75,

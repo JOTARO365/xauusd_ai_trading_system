@@ -1,6 +1,6 @@
 {
  "engine_on": true,
- "generated": "2026-08-12T11:01Z",
+ "generated": "2026-08-12T11:59Z",
  "note": "forward mark-to-market TSMOM-D1 equity (clean, no backfill). Sharpe annualized; judge on OOS>0 + Sharpe. Promotion to LIVE = manual + Batch D.",
  "ok": true,
  "rows": [

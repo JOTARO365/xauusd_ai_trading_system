@@ -1,13 +1,7 @@
 {
- "manual_shorts": 1,
+ "manual_shorts": 0,
  "ok": true,
  "vol_pct": 0.08,
  "vol_regime": "low-vol",
- "warnings": [
-  {
-   "level": "warn",
-   "msg": "1 SHORT (manual) เปิดอยู่ — SELL ของพี่ underperform (hist −6,220฿ · PF 0.88 vs BUY +7,299)",
-   "tag": "SHORT"
-  }
- ]
+ "warnings": []
 }

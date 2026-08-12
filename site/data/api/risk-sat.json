@@ -1,7 +1,16 @@
 {
- "collecting": true,
- "min_n": 15,
- "n": 13,
- "note": "เก็บไม้ปิด 13/15 ก่อนคำนวณ metric เชื่อถือได้",
- "ok": true
+ "collecting": false,
+ "max_dd_days": 1.0,
+ "max_dd_pct": 55.2,
+ "n": 15,
+ "note": "SAT ch12/13 · net ไม้ปิดจริง · VaR สมมติ normal (understate tail) → ดู maxDD ควบ",
+ "ok": true,
+ "sharpe": 6.37,
+ "span_days": 1.0,
+ "trades_per_year": 4741.0,
+ "var95_hist": 664.1,
+ "var95_param": 1006.26,
+ "var99_hist": 890.98,
+ "var99_param": 1415.22,
+ "wr": 46.7
 }
