@@ -7670,17 +7670,25 @@ function drawZoneLines(bs) {
       lineStyle: style !== undefined ? style : LightweightCharts.LineStyle.Dashed,
       axisLabelVisible: !!label, title,
     }));
+  // UHAS-style label: prefix + strength + touch count + state (เด้งจริง/เบรกบ่อย จาก bounce/break%)
+  const zlabel = (pfx, lv, st) => {
+    const m = metaFor(lv);
+    const tc = m && (m.touches || m.n_tests);
+    const bp = m && m.bounce_pct, kp = m && m.break_pct;
+    const state = (bp != null && bp >= 60) ? ' เด้งจริง' : ((kp != null && kp >= 60) ? ' เบรกบ่อย' : '');
+    return pfx + (st ? st : '') + (tc ? ' ×' + tc : '') + state;
+  };
   (z.resistance || []).forEach(lv => {
     const sc = scoreFor(lv), m = metaFor(lv);
     const st = Math.max(sc || 0, (m && m.strength) || 0) || null;   // % = max(live setup, โครงสร้าง)
     add(lv, st >= 65 ? 'rgba(239,68,68,0.9)' : 'rgba(239,68,68,0.45)',
-        st ? `R ${st}%` : 'R', st >= 80 ? 3 : st >= 65 ? 2 : 1, undefined, st >= 75 || !!sc);
+        st ? zlabel('R', lv, st) : 'R', st >= 80 ? 3 : st >= 65 ? 2 : 1, undefined, st >= 75 || !!sc);
   });
   (z.support || []).forEach(lv => {
     const sc = scoreFor(lv), m = metaFor(lv);
     const st = Math.max(sc || 0, (m && m.strength) || 0) || null;
     add(lv, st >= 65 ? 'rgba(34,197,94,0.9)' : 'rgba(34,197,94,0.45)',
-        st ? `S ${st}%` : 'S', st >= 80 ? 3 : st >= 65 ? 2 : 1, undefined, st >= 75 || !!sc);
+        st ? zlabel('S', lv, st) : 'S', st >= 80 ? 3 : st >= 65 ? 2 : 1, undefined, st >= 75 || !!sc);
   });
   // PDH/PDL — key levels เมื่อวาน (เดิมไม่ถูกวาดเลย)
   const kl = z.key_levels || {};
