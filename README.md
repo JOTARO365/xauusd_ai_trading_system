@@ -440,6 +440,11 @@ via `bot_status.json` — these fields are **never sent to the LLM** (no token c
   score + grade (A/B/C)**, break-vs-bounce probability with test count, break-confirmation
   (held *ยืน* / wick *ไส้เทียน*), cross-TF + Fibonacci **confluence ⚡**, HTF-major-zone **★**,
   recency + average bounce ($)
+- **Scenario Plan (แผน ก/ข/พัก)** — synthesised in the browser from the S/R ladder + trend
+  (display-only, *not* an order). Live: price re-renders every **~5 s** via `/api/tick`
+  (`symbol_info_tick`) so entry-proximity/trigger is current, and the S/R zones are refreshed from
+  MT5 every **5 min** via `/api/sr-ladder` — so the plan stays live even between bot cycles. The
+  plan *levels* (entry/SL/TP) come from S/R+trend and only move when zones/trend change; 0 token.
 - **Volume Profile 📊** (VPOC / value area) — each ladder level shows the **volume-share % at that
   price** (peaks flagged **VPOC** = heaviest, **VA** = 70% value area), computed in code from MT5
   `tick_volume` (`/api/volume-profile`, H1×500). Spot XAUUSD is OTC — it has **no market-wide open

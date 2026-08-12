@@ -7652,7 +7652,7 @@ function drawZoneLines(bs) {
   if (kl.pdh) add(kl.pdh, 'rgba(245,158,11,0.85)', 'PDH', 1, LightweightCharts.LineStyle.Dotted, true);
   if (kl.pdl) add(kl.pdl, 'rgba(245,158,11,0.85)', 'PDL', 1, LightweightCharts.LineStyle.Dotted, true);
   const htf = z.htf_zone;
-  if (htf && htf.level) add(htf.level, '#4ade80', '<svg class="ic"><use href="#ic-star"/></svg> ' + htf.tf, 3, LightweightCharts.LineStyle.Solid, true);
+  if (htf && htf.level) add(htf.level, '#4ade80', '★ ' + htf.tf, 3, LightweightCharts.LineStyle.Solid, true);  // chart price-line label = plain text → ใช้ ★ ไม่ยัด svg-icon (render literal)
   // UHAS-style: สร้างแถบ zone (band) จาก level เดิม — ±0.06% เป็นความหนาโซน, alpha ∝ strength% (additive, ไม่แตะเส้น)
   const bands = [];
   const mkBand = (lv, rgb) => {
@@ -7768,7 +7768,17 @@ async function renderScenarioCards(bs) {
     z = bs.zones || {}; px = (bs.price_info && bs.price_info.bid) || null;
     trend = String((bs.market && bs.market.trend) || bs.trend || '').toUpperCase();
   }
-  if (!px || (!z.support && !z.resistance)) { el.innerHTML = '<div class="card" style="flex:1;color:var(--muted);padding:10px">รอข้อมูลแนว S/R…</div>'; return; }
+  _scLive.z = z; _scLive.px = px; _scLive.trend = trend; _scLive.sym = _chartSym || '';
+  _scRender(z, px, trend);
+}
+
+/* live Scenario Plan (แผน ก/ข/พัก): ราคาสด ทุก 5 วิ (proximity) + zone S/R สดจาก MT5 ทุก 5 นาที
+   (ไม่รอ cycle บอท). โครงสร้างแผน (entry/SL/TP) มาจาก S/R+trend = ไม่เปลี่ยนทุก tick; ราคาเท่านั้นที่สด. 0 token */
+var _scLive = { z: null, px: null, trend: '', sym: '' };
+function _scRender(z, px, trend) {
+  const el = document.getElementById('scenario-cards'); if (!el) return;
+  trend = String(trend || '').toUpperCase();
+  if (!px || !z || (!z.support && !z.resistance)) { el.innerHTML = '<div class="card" style="flex:1;color:var(--muted);padding:10px">รอข้อมูลแนว S/R…</div>'; return; }
   const _sm = z.sr_meta || [];
   const sups = (z.support || []).filter(x => x < px).sort((a, b) => b - a);   // ใกล้ราคาก่อน
   const ress = (z.resistance || []).filter(x => x > px).sort((a, b) => a - b);
@@ -7788,6 +7798,31 @@ async function renderScenarioCards(bs) {
   const tot = plans.reduce((a, p) => a + (p.score || 0), 0);   // prob สัมพัทธ์จาก score (display เท่านั้น)
   if (tot > 0) plans.forEach(p => p.prob = Math.round((p.score || 0) / tot * 100));
   el.innerHTML = plans.length ? plans.map(_scCard).join('') : '<div class="card" style="flex:1;color:var(--muted);padding:10px">ไม่มี setup ชัด — พัก</div>';
+}
+async function _scRefreshPrice() {          // ราคาสด → re-render proximity (ทุก ~5 วิ)
+  if (!_scLive.z) return;
+  try {
+    const d = await (await fetch('/api/tick?symbol=' + encodeURIComponent(_scLive.sym || ''))).json();
+    if (d && d.ok !== false && d.bid) { _scLive.px = d.bid; _scRender(_scLive.z, d.bid, _scLive.trend); }
+  } catch (e) {}
+}
+async function _scRefreshZones() {           // zone S/R สดจาก MT5 (ทุก 5 นาที, ไม่รอบอท)
+  const sym = _chartSym || '';
+  try {
+    const d = await (await fetch('/api/sr-ladder?symbol=' + encodeURIComponent(sym))).json();
+    if (d && d.ok !== false && d.zones) {
+      _scLive.z = d.zones; _scLive.sym = sym;
+      if (d.price) _scLive.px = d.price;
+      if (!_scLive.trend) _scLive.trend = sym ? (_candleTrend || 'BULLISH') : 'BULLISH';
+      _scRender(_scLive.z, _scLive.px, _scLive.trend);
+    }
+  } catch (e) {}
+}
+if (!window._scTimersOn) {
+  window._scTimersOn = 1;
+  setInterval(_scRefreshPrice, 5000);        // ราคา/proximity สด
+  setInterval(_scRefreshZones, 300000);      // zone S/R สด ทุก 5 นาที
+  setTimeout(_scRefreshZones, 1500);         // เติมครั้งแรกเร็ว (แผนขึ้นแม้บอทยังไม่เขียน bot_status)
 }
 
 /* ── Why No Entry — gate blocks สด (07-03) ── */

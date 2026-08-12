@@ -1589,6 +1589,31 @@ def api_sr_ladder():
     return jsonify(_cached(f"sr-ladder:{sym or 'gold'}", _c, ttl=30))
 
 
+@app.route("/api/tick")
+def api_tick():
+    """ราคาสด bid/ask (symbol_info_tick) — เบาสุด, ให้ Scenario Plan re-render ทุก ~5 วิ (proximity สด). 0 token."""
+    sym = (request.args.get("symbol", "") or "").strip()
+    def _c():
+        import MetaTrader5 as mt5
+        broker = SYMBOL
+        if sym:
+            try:
+                from connectors.pair_collector import _broker_map
+                broker = (_broker_map() or {}).get(sym, sym)
+            except Exception:
+                broker = sym
+        try:
+            if not mt5.initialize():
+                return {"ok": False}
+            t = mt5.symbol_info_tick(broker)
+            if not t or not t.bid:
+                return {"ok": False, "symbol": broker}
+            return {"ok": True, "symbol": broker, "bid": t.bid, "ask": t.ask}
+        except Exception:
+            return {"ok": False}
+    return jsonify(_cached(f"tick:{sym or 'gold'}", _c, ttl=2))
+
+
 @app.route("/api/sr-level-stats")
 def api_sr_level_stats():
     """touch-outcome stats ต่อเส้น S/R (section C+D ของ dropdown): ราคาไปไกลแค่ไหนหลังแตะ + recency/session.
