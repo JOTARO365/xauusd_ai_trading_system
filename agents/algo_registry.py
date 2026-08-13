@@ -415,9 +415,9 @@ class MacroMomAlgo(Algo):
             bar_ts = datetime.fromtimestamp(int(times[i]), timezone.utc).isoformat()
         except Exception:
             return None
-        slp = round(self.SL_ATR * av / point)
+        slp = round(sl_atr * av / point)                   # per-pair SL_ATR (bug fix: เดิมใช้ self.SL_ATR = override ตาย)
         return {"algo_id": self.algo_id, "symbol": symbol, "dir": d, "entry": px,
-                "sl_pips": slp, "tp_pips": round(slp * self.RR), "regime": "MACRO",
+                "sl_pips": slp, "tp_pips": round(slp * rr), "regime": "MACRO",   # per-pair RR (bug fix: เดิม self.RR)
                 "bar_ts": bar_ts, "klass": self.klass}
 
 
