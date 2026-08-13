@@ -670,6 +670,21 @@ def _maybe_enter(algo_id, symbol, broker, bars, point, sl_mult, combo_state, max
             return 0
     except Exception:
         pass
+    try:                                                       # candle-confirmation gate: แท่งปิด best-TF ต้องยืนยันทิศ (block-only)
+        from agents import confirm_gate as _cg                 # (CONFIRM_GATE off / algo best_tf=None / ไม่อยู่ allowlist → no-op)
+        _ctf = _cg.best_tf_for(algo_id)
+        if _ctf:
+            _sig_tf = getattr(algo, "timeframe", None)
+            _cbars = None
+            if _sig_tf and str(_ctf).upper() != str(_sig_tf).upper():   # cross-TF → ดึงแท่ง confirm-TF (H1/H4/D1)
+                _cbars = _bars(broker, str(_ctf).upper(), 200)
+            _blk2, _why2 = _cg.blocks_live(bars, vo.get("dir"), algo_id, symbol,
+                                           confirm_bars=_cbars, signal_tf=_sig_tf)
+            if _blk2:
+                logger.debug(f"[MSE] {algo_id}:{symbol} {vo.get('dir')} skip — {_why2}")
+                return 0
+    except Exception:
+        pass
     if algo_id == "cdc_zone" and _cdc_risk_too_high(broker, float(vo.get("sl_pips") or 0), point):
         logger.debug(f"[MSE] {algo_id}:{symbol} skip — risk/ไม้ > CDC_MAX_UNIT_RISK_PCT% (ทุนน้อยเกิน 2N SL)")
         return 0

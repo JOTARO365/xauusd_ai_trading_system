@@ -85,28 +85,86 @@ def params_from_config(algo_id=None):
     return (thr, mode_for(algo_id) if algo_id else DEFAULTS[1])
 
 
-def blocks_live(bars, direction, price=None, algo_id=None, symbol=None):
-    """live wrapper: เรียกจาก executor ก่อน open_order. คืน (block: bool, reason: str).
-    เคารพ flag CONFIRM_GATE. ใช้ close ของแท่งล่าสุดที่ปิดแล้ว (ไม่ใช่ tick สด) วัด CLV = confirm จริง
-    ไม่ขึ้นกับ slippage. apply ทุก algo (รวม breakout)."""
+# แท่งปิด TF ที่ confirm ดีสุดต่อ algo (จาก scripts/confirm_tf_matrix.py 2026-08-13). None = ไม่ confirm (ทำแย่ทุก TF).
+# momentum/trend → HTF close (D1 ดีสุด) · sweep(fade) → H4 · mean_reversion → None (ลบทุก TF) · conf15m → None (M15-signal, confirm แย่)
+BEST_TF_BY_ALGO = {
+    "cdc_zone": "D1", "regime_momentum": "D1", "regime_momentum_fvg": "D1",
+    "macro_momentum": "D1", "tsmom_d1": "D1", "sweep_reversal": "H4",
+    "mean_reversion": None, "confluence_15m": None,
+}
+_COMBOS_FILE = _MODULE_DIR = None
+try:
+    import os as _os
+    _COMBOS_FILE = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+                                 "data", "confirm_gate_combos.json")
+except Exception:
+    pass
+
+
+def best_tf_for(algo_id):
+    """confirm-TF ต่อ algo (config CONFIRM_TF_OVERRIDES override ได้). None = ไม่ confirm."""
+    tf = BEST_TF_BY_ALGO.get(algo_id, None)
+    try:
+        import config as _c
+        ov = getattr(_c, "CONFIRM_TF_OVERRIDES", None)
+        if isinstance(ov, dict) and algo_id in ov:
+            v = ov[algo_id]
+            return None if (v is None or str(v).lower() in ("none", "off", "")) else str(v).upper()
+    except Exception:
+        pass
+    return tf
+
+
+def _combo_enabled(algo_id, symbol):
+    """allowlist ต่อ combo (data/confirm_gate_combos.json). ว่าง/ไม่มีไฟล์ = apply ทุก combo (ที่ best_tf≠None)."""
+    try:
+        import json as _j
+        with open(_COMBOS_FILE, encoding="utf-8") as f:
+            combos = (_j.load(f) or {}).get("combos", [])
+        if not combos:
+            return True
+        return f"{algo_id}|{symbol}" in combos
+    except Exception:
+        return True
+
+
+def blocks_live(bars, direction, algo_id=None, symbol=None, confirm_bars=None, signal_tf=None):
+    """live wrapper: เรียกจาก executor ก่อน open_order. คืน (block: bool, reason: str). block-only.
+    เคารพ flag CONFIRM_GATE + allowlist. confirm ด้วยแท่งปิดของ best_tf ต่อ algo:
+      - same-TF (best_tf == signal_tf): ใช้ bars (แท่งสัญญาณล่าสุด = last, เหมือน sr_entry_gate)
+      - cross-TF (เช่น momentum H1 → D1 confirm): ใช้ confirm_bars แท่ง**ปิดล่าสุด** (index −2; −1 = แท่งกำลังฟอร์ม)
+    ไม่มี confirm_bars ตอนต้อง cross-TF → fail-open (ไม่ block). ใช้ close ของแท่ง (ไม่ใช่ tick) = ไม่ขึ้น slippage."""
     try:
         import config as _c
         if not getattr(_c, "CONFIRM_GATE", False):
             return False, ""
     except Exception:
         return False, ""
+    tf = best_tf_for(algo_id)
+    if tf is None:                                     # algo ที่ confirm ทำแย่ → ไม่ block
+        return False, ""
+    if not _combo_enabled(algo_id, symbol):
+        return False, ""
     try:
-        h, l, c = bars[0], bars[1], bars[2]
-        if c is None or len(c) < 3:
-            return False, ""
+        if signal_tf and str(tf).upper() == str(signal_tf).upper():
+            h, l, c = bars[0], bars[1], bars[2]
+            if c is None or len(c) < 3:
+                return False, ""
+            i = len(c) - 1                             # แท่งสัญญาณล่าสุด
+        elif confirm_bars is not None:
+            h, l, c = confirm_bars[0], confirm_bars[1], confirm_bars[2]
+            if c is None or len(c) < 4:
+                return False, ""
+            i = len(c) - 2                             # แท่ง confirm-TF ที่ปิดครบล่าสุด (กัน look-ahead)
+        else:
+            return False, ""                           # ต้อง cross-TF แต่ไม่ได้ส่ง confirm_bars → fail-open
         d = 1 if str(direction).upper() == "BUY" else -1
-        i = len(c) - 1
         p = params_from_config(algo_id)
         if blocks_at(h, l, i, float(c[i]), d, None, p):
             if p[1] == "rev":
-                return True, f"confirm gate (rev): แท่งสัญญาณไม่ใช่ pin กลับตัวที่ปลาย"
+                return True, f"confirm gate (rev/{tf}): แท่ง {tf} ไม่ใช่ pin กลับตัวที่ปลาย"
             side = "บน" if d > 0 else "ล่าง"
-            return True, f"confirm gate (cont): แท่งสัญญาณปิดอ่อน (CLV ไม่ถึง {p[0]} ฝั่ง{side}) = แท่งปฏิเสธ"
+            return True, f"confirm gate (cont/{tf}): แท่ง {tf} ปิดอ่อน (CLV ไม่ถึง {p[0]} ฝั่ง{side})"
     except Exception:
         return False, ""
     return False, ""

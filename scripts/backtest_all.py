@@ -158,7 +158,7 @@ def bt_cdc(h, l, c, cost_price, sl_atr=2.0, mode="long", pb_min=None, pb_lb=None
     return tr
 
 
-def bt_tsmom(h, l, c, cost_price, lbs=(21, 63, 126), confirm=21, sl_atr=3.0):
+def bt_tsmom(h, l, c, cost_price, lbs=(21, 63, 126), confirm=21, sl_atr=3.0, gate=None):
     """R-multiple (norm 3×ATR-D1 = disaster SL ของ live) + disaster stop → เทียบ algo อื่นได้.
     (เดิมคืน %ของราคาสุดท้าย = magnitude เทียบไม่ได้; live มี SL_ATR=3.0 ที่ backtest เดิมไม่มี)."""
     atr = R.atr(h, l, c)
@@ -177,6 +177,10 @@ def bt_tsmom(h, l, c, cost_price, lbs=(21, 63, 126), confirm=21, sl_atr=3.0):
                 d = 0
         if d == 0:
             d = pos
+        if gate and d != pos and d != 0:                       # candle-confirm ก่อน flip → ไม่ยืนยัน = เลื่อน (คง pos เดิม)
+            av = float(atr[i]) if atr[i] == atr[i] else 0.0
+            if gate(h, l, i, float(c[i]), d, av):
+                d = pos
         if d != pos:
             if pos != 0 and risk > 0:
                 tr.append((pos * (c[i] - entry) - cost_price) / risk)   # R = pnl/risk_unit

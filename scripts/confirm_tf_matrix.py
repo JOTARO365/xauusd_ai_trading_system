@@ -165,6 +165,9 @@ def main():
             add("cdc_zone", lg, "D1",
                 lambda: B.bt_cdc(dh, dl, dc, cost * pt),
                 lambda g: B.bt_cdc(dh, dl, dc, cost * pt, gate=g), cf_d1)
+            add("tsmom_d1", lg, "D1",
+                lambda: B.bt_tsmom(dh, dl, dc, cost * pt),
+                lambda g: B.bt_tsmom(dh, dl, dc, cost * pt, gate=g), cf_d1)
         print(f"  {lg}: done")
     mt5.shutdown()
 
