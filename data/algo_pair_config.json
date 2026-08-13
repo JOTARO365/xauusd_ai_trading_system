@@ -1,5 +1,5 @@
 {
-  "_doc": "per-(algo × คู่) override. ว่าง = ใช้ global default. tune ได้: SL_ATR, RR, BRK, MLB, VK, session, lookbacks. DISCIPLINE: structural หรือ OOS-validated เท่านั้น (ไม่ไล่ backtest = curve-fit). ตัวอย่าง: \"confluence_15m\":{\"XAUUSD\":{\"session\":\"13-17\"}} | applied 08-09: macro BTC + sweep BTC (robust per-family deflated-t+OOS; caveat: ยังไม่ผ่าน global-trials bar → shadow-forward ก่อน)",
+  "_doc": "per-(algo × คู่) override. ว่าง = ใช้ global default. tune ได้: SL_ATR, RR, BRK, MLB, VK, session, lookbacks. DISCIPLINE: structural หรือ OOS-validated เท่านั้น (ไม่ไล่ backtest = curve-fit). ตัวอย่าง: \"confluence_15m\":{\"XAUUSD\":{\"session\":\"13-17\"}} | sweep BTC active 08-09; macro BTC (RR2.5/SL1.0) active จริง 08-13 หลังแก้ bug override (เดิม inert), user keep active; macro XAUEUR/XAUUSD RR4 applied 08-13 (OOS-validated momentum-exit.md, user-approved)",
   "confluence_15m": {},
   "macro_momentum": {
     "BTCUSD": {
