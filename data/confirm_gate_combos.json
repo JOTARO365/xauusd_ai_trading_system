@@ -1,0 +1,18 @@
+{
+ "generated_utc": "2026-08-13T08:35:50+00:00",
+ "params": {
+  "clv_thr": 0.5
+ },
+ "mode_by_algo": {
+  "regime_momentum": "cont",
+  "regime_momentum_fvg": "cont",
+  "macro_momentum": "cont",
+  "confluence_15m": "cont",
+  "cdc_zone": "cont",
+  "tsmom_d1": "cont",
+  "mean_reversion": "rev",
+  "sweep_reversal": "rev"
+ },
+ "criteria": "exp_R>0 · OOS≥0 · t≥2 · n≥80 · exp_R_on≥exp_R_off · n_on≥0.30·n_off",
+ "combos": []
+}

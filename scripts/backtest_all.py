@@ -121,7 +121,7 @@ def bt_momentum_fvg(h, l, c, cost, pt, brk=20, rr=2.0, sl_atr=1.5, mh=120, fvg_l
     return tr
 
 
-def bt_cdc(h, l, c, cost_price, sl_atr=2.0, mode="long", pb_min=None, pb_lb=None):
+def bt_cdc(h, l, c, cost_price, sl_atr=2.0, mode="long", pb_min=None, pb_lb=None, gate=None):
     """CDC Action Zone (อ.โฉลก) — trend-follow exit-on-flip + pullback entry (โฉลก wave-2/4: เข้าตอนย่อ),
     R-norm 2N (Turtle). mirror agents.CDCZoneAlgo + shadow _resolve_cdc_flip = parity. pb จาก config (parity live)."""
     try:
@@ -147,6 +147,8 @@ def bt_cdc(h, l, c, cost_price, sl_atr=2.0, mode="long", pb_min=None, pb_lb=None
                     continue
                 if want < 0 and c[i] < float(l[i - pb_lb:i].min()) * (1 + pb_min):
                     continue
+            if gate and gate(h, l, i, float(c[i]), want, 0.0):
+                continue
             pos = want; entry = c[i]
             av = float(atr[i]) if atr[i] == atr[i] else 0.0
             risk = sl_atr * av if av > 0 else 0.0

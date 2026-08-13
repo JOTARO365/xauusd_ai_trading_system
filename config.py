@@ -389,6 +389,11 @@ CDC_MAX_UNITS  = int(os.getenv("CDC_MAX_UNITS") or 4)             # จำนว
 CDC_ADD_HALF_N = float(os.getenv("CDC_ADD_HALF_N") or 0.5)        # เติม unit ทุก +นี้×ATR(N) ที่ราคาไปในทาง
 # safety: block cdc entry/pyramid ถ้า risk/unit (min-lot × 2N SL) > นี้% ของ equity (audit: ทอง micro 2N=63%/ไม้!)
 CDC_MAX_UNIT_RISK_PCT = float(os.getenv("CDC_MAX_UNIT_RISK_PCT") or 3.0)   # 0=ปิด guard
+# Confirmation gate (agents/confirm_gate.py): กรอง "แท่งปฏิเสธ/fakeout" ของสัญญาณ algo เอง — เข้าเฉพาะแท่งสัญญาณ
+# ที่ปิดแข็งฝั่งสัญญาณ (BUY ปิดครึ่งบน / SELL ปิดครึ่งล่าง). block-only, apply ทุก algo. price-action confirm.
+# เปิดเฉพาะ combo ที่ผ่าน confirm_gate_backtest → data/confirm_gate_combos.json (ว่าง=ทุก combo). default OFF
+CONFIRM_GATE = (os.getenv("CONFIRM_GATE") or "false").lower() == "true"
+CONFIRM_CLV  = float(os.getenv("CONFIRM_CLV") or 0.5)   # close ต้องอยู่เลย นี้ ของช่วงแท่งไปฝั่งสัญญาณ (0.5=กึ่งกลาง)
 CUSTOM_LOT_ENABLE = (os.getenv("CUSTOM_LOT_ENABLE") or "false").lower() == "true"   # ใช้ lot ต่อคู่ (data/pair_lots.json แก้จาก dashboard)
 # trailing หลวมสำหรับ momentum algo (ปล่อยวิ่งถึง TP; replay: trail แน่นตัดกำไร +119%→+12%)
 TRAILING_MOM_MULT = float(os.getenv("TRAILING_MOM_MULT") or 3.0)      # trail กว้าง (×ATR)
@@ -633,6 +638,9 @@ def reload_config():
     CDC_PYRAMID    = (os.getenv("CDC_PYRAMID") or "false").lower() == "true"
     CDC_MAX_UNITS  = int(os.getenv("CDC_MAX_UNITS") or 4)
     CDC_ADD_HALF_N = float(os.getenv("CDC_ADD_HALF_N") or 0.5)
+    global CONFIRM_GATE, CONFIRM_CLV
+    CONFIRM_GATE = (os.getenv("CONFIRM_GATE") or "false").lower() == "true"
+    CONFIRM_CLV  = float(os.getenv("CONFIRM_CLV") or 0.5)
     global CDC_MAX_UNIT_RISK_PCT
     CDC_MAX_UNIT_RISK_PCT = float(os.getenv("CDC_MAX_UNIT_RISK_PCT") or 3.0)
     global CUSTOM_LOT_ENABLE
