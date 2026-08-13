@@ -1,18 +1,479 @@
 {
- "generated_utc": "2026-08-13T08:35:50+00:00",
- "params": {
-  "clv_thr": 0.5
- },
- "mode_by_algo": {
-  "regime_momentum": "cont",
-  "regime_momentum_fvg": "cont",
-  "macro_momentum": "cont",
-  "confluence_15m": "cont",
-  "cdc_zone": "cont",
-  "tsmom_d1": "cont",
-  "mean_reversion": "rev",
-  "sweep_reversal": "rev"
- },
- "criteria": "exp_R>0 · OOS≥0 · t≥2 · n≥80 · exp_R_on≥exp_R_off · n_on≥0.30·n_off",
- "combos": []
+ "note": "confirm gate apply เฉพาะ combo นี้ (best-TF confirm ให้ Δexp_R>0, n≥25). ว่าง=apply ทุก combo.",
+ "criteria": "dR>0 · n≥25 (apply) · +t≥2·OOS≥0·expR>0·n≥80 (validated_live)",
+ "combos": [
+  "cdc_zone|BTCUSD",
+  "cdc_zone|EURUSD",
+  "cdc_zone|USDCHF",
+  "cdc_zone|USDJPY",
+  "cdc_zone|WTIUSD",
+  "cdc_zone|XAGUSD",
+  "cdc_zone|XAUEUR",
+  "cdc_zone|XAUUSD",
+  "macro_momentum|AUDUSD",
+  "macro_momentum|BTCUSD",
+  "macro_momentum|EURUSD",
+  "macro_momentum|GBPUSD",
+  "macro_momentum|USDJPY",
+  "macro_momentum|WTIUSD",
+  "macro_momentum|XAGUSD",
+  "macro_momentum|XAUEUR",
+  "regime_momentum_fvg|BTCUSD",
+  "regime_momentum_fvg|EURUSD",
+  "regime_momentum_fvg|GBPUSD",
+  "regime_momentum_fvg|USDCHF",
+  "regime_momentum_fvg|USDJPY",
+  "regime_momentum_fvg|XAUEUR",
+  "regime_momentum_fvg|XAUJPY",
+  "regime_momentum_fvg|XAUUSD",
+  "regime_momentum|BTCUSD",
+  "regime_momentum|EURUSD",
+  "regime_momentum|GBPUSD",
+  "regime_momentum|USDCHF",
+  "regime_momentum|USDJPY",
+  "regime_momentum|WTIUSD",
+  "regime_momentum|XAUEUR",
+  "regime_momentum|XAUJPY",
+  "regime_momentum|XAUUSD",
+  "sweep_reversal|AUDUSD",
+  "sweep_reversal|BTCUSD",
+  "sweep_reversal|GBPUSD",
+  "sweep_reversal|USDJPY",
+  "sweep_reversal|WTIUSD",
+  "sweep_reversal|XAUEUR",
+  "sweep_reversal|XAUJPY",
+  "sweep_reversal|XAUUSD",
+  "tsmom_d1|BTCUSD",
+  "tsmom_d1|EURUSD",
+  "tsmom_d1|GBPUSD",
+  "tsmom_d1|USDCHF",
+  "tsmom_d1|USDJPY",
+  "tsmom_d1|XAGUSD"
+ ],
+ "validated_live": [],
+ "detail": [
+  {
+   "combo": "cdc_zone|BTCUSD",
+   "tf": "D1",
+   "dR": 0.6213,
+   "on_expR": 3.6912,
+   "on_t": 2.12,
+   "on_oos": 0.3602,
+   "n": 41
+  },
+  {
+   "combo": "regime_momentum_fvg|XAUJPY",
+   "tf": "D1",
+   "dR": 0.3649,
+   "on_expR": 0.6479,
+   "on_t": 2.82,
+   "on_oos": 0.5875,
+   "n": 43
+  },
+  {
+   "combo": "cdc_zone|XAUEUR",
+   "tf": "D1",
+   "dR": 0.3052,
+   "on_expR": 1.3123,
+   "on_t": 2.05,
+   "on_oos": 2.6328,
+   "n": 36
+  },
+  {
+   "combo": "regime_momentum|XAUJPY",
+   "tf": "D1",
+   "dR": 0.2588,
+   "on_expR": 0.5036,
+   "on_t": 2.33,
+   "on_oos": 0.3713,
+   "n": 49
+  },
+  {
+   "combo": "tsmom_d1|BTCUSD",
+   "tf": "D1",
+   "dR": 0.185,
+   "on_expR": 1.0291,
+   "on_t": 2.01,
+   "on_oos": 0.4161,
+   "n": 66
+  },
+  {
+   "combo": "cdc_zone|WTIUSD",
+   "tf": "D1",
+   "dR": 0.1647,
+   "on_expR": 0.3781,
+   "on_t": 1.2,
+   "on_oos": 0.3272,
+   "n": 44
+  },
+  {
+   "combo": "cdc_zone|USDJPY",
+   "tf": "D1",
+   "dR": 0.1148,
+   "on_expR": 0.3268,
+   "on_t": 1.0,
+   "on_oos": 0.1941,
+   "n": 47
+  },
+  {
+   "combo": "cdc_zone|XAUUSD",
+   "tf": "D1",
+   "dR": 0.1132,
+   "on_expR": 1.1056,
+   "on_t": 2.28,
+   "on_oos": 2.5971,
+   "n": 40
+  },
+  {
+   "combo": "sweep_reversal|XAUJPY",
+   "tf": "H4",
+   "dR": 0.1027,
+   "on_expR": 0.0783,
+   "on_t": 0.45,
+   "on_oos": 0.0618,
+   "n": 52
+  },
+  {
+   "combo": "regime_momentum_fvg|USDCHF",
+   "tf": "D1",
+   "dR": 0.0816,
+   "on_expR": -0.1505,
+   "on_t": -2.09,
+   "on_oos": 0.1,
+   "n": 377
+  },
+  {
+   "combo": "cdc_zone|USDCHF",
+   "tf": "D1",
+   "dR": 0.0814,
+   "on_expR": -0.1566,
+   "on_t": -1.2,
+   "on_oos": 0.031,
+   "n": 52
+  },
+  {
+   "combo": "sweep_reversal|XAUEUR",
+   "tf": "H4",
+   "dR": 0.0634,
+   "on_expR": -0.0846,
+   "on_t": -1.48,
+   "on_oos": -0.0255,
+   "n": 466
+  },
+  {
+   "combo": "sweep_reversal|GBPUSD",
+   "tf": "H4",
+   "dR": 0.0634,
+   "on_expR": -0.0713,
+   "on_t": -1.25,
+   "on_oos": -0.0081,
+   "n": 471
+  },
+  {
+   "combo": "sweep_reversal|WTIUSD",
+   "tf": "H4",
+   "dR": 0.0611,
+   "on_expR": 0.0223,
+   "on_t": 0.4,
+   "on_oos": 0.0737,
+   "n": 487
+  },
+  {
+   "combo": "regime_momentum|USDCHF",
+   "tf": "D1",
+   "dR": 0.0605,
+   "on_expR": -0.1239,
+   "on_t": -1.81,
+   "on_oos": 0.1794,
+   "n": 425
+  },
+  {
+   "combo": "cdc_zone|XAGUSD",
+   "tf": "D1",
+   "dR": 0.0591,
+   "on_expR": 0.3084,
+   "on_t": 0.63,
+   "on_oos": 1.2849,
+   "n": 57
+  },
+  {
+   "combo": "regime_momentum_fvg|XAUUSD",
+   "tf": "D1",
+   "dR": 0.0582,
+   "on_expR": 0.0983,
+   "on_t": 1.3,
+   "on_oos": 0.0888,
+   "n": 370
+  },
+  {
+   "combo": "regime_momentum|BTCUSD",
+   "tf": "D1",
+   "dR": 0.0574,
+   "on_expR": 0.0171,
+   "on_t": 0.23,
+   "on_oos": -0.05,
+   "n": 375
+  },
+  {
+   "combo": "regime_momentum|EURUSD",
+   "tf": "D1",
+   "dR": 0.0565,
+   "on_expR": -0.0503,
+   "on_t": -0.76,
+   "on_oos": -0.0559,
+   "n": 461
+  },
+  {
+   "combo": "regime_momentum_fvg|EURUSD",
+   "tf": "D1",
+   "dR": 0.0555,
+   "on_expR": -0.0899,
+   "on_t": -1.3,
+   "on_oos": -0.1262,
+   "n": 412
+  },
+  {
+   "combo": "regime_momentum_fvg|GBPUSD",
+   "tf": "D1",
+   "dR": 0.0491,
+   "on_expR": -0.032,
+   "on_t": -0.45,
+   "on_oos": 0.0391,
+   "n": 413
+  },
+  {
+   "combo": "regime_momentum_fvg|BTCUSD",
+   "tf": "D1",
+   "dR": 0.0468,
+   "on_expR": -0.0085,
+   "on_t": -0.11,
+   "on_oos": -0.1409,
+   "n": 336
+  },
+  {
+   "combo": "sweep_reversal|AUDUSD",
+   "tf": "H4",
+   "dR": 0.0464,
+   "on_expR": -0.0388,
+   "on_t": -0.68,
+   "on_oos": 0.0186,
+   "n": 468
+  },
+  {
+   "combo": "macro_momentum|AUDUSD",
+   "tf": "D1",
+   "dR": 0.0461,
+   "on_expR": -0.0309,
+   "on_t": -0.45,
+   "on_oos": -0.0154,
+   "n": 434
+  },
+  {
+   "combo": "regime_momentum|XAUUSD",
+   "tf": "D1",
+   "dR": 0.0458,
+   "on_expR": 0.0662,
+   "on_t": 0.93,
+   "on_oos": 0.093,
+   "n": 413
+  },
+  {
+   "combo": "regime_momentum|GBPUSD",
+   "tf": "D1",
+   "dR": 0.0405,
+   "on_expR": -0.0694,
+   "on_t": -1.06,
+   "on_oos": 0.0288,
+   "n": 469
+  },
+  {
+   "combo": "cdc_zone|EURUSD",
+   "tf": "D1",
+   "dR": 0.0348,
+   "on_expR": 0.1654,
+   "on_t": 0.61,
+   "on_oos": -0.1572,
+   "n": 46
+  },
+  {
+   "combo": "sweep_reversal|USDJPY",
+   "tf": "H4",
+   "dR": 0.0327,
+   "on_expR": -0.131,
+   "on_t": -2.18,
+   "on_oos": -0.1754,
+   "n": 409
+  },
+  {
+   "combo": "macro_momentum|USDJPY",
+   "tf": "D1",
+   "dR": 0.0288,
+   "on_expR": -0.0289,
+   "on_t": -0.45,
+   "on_oos": -0.0712,
+   "n": 483
+  },
+  {
+   "combo": "macro_momentum|XAUEUR",
+   "tf": "D1",
+   "dR": 0.0266,
+   "on_expR": 0.1464,
+   "on_t": 1.56,
+   "on_oos": 0.5771,
+   "n": 247
+  },
+  {
+   "combo": "tsmom_d1|EURUSD",
+   "tf": "D1",
+   "dR": 0.026,
+   "on_expR": 0.1364,
+   "on_t": 0.99,
+   "on_oos": 0.0386,
+   "n": 73
+  },
+  {
+   "combo": "macro_momentum|WTIUSD",
+   "tf": "D1",
+   "dR": 0.0229,
+   "on_expR": -0.0178,
+   "on_t": -0.26,
+   "on_oos": -0.1225,
+   "n": 418
+  },
+  {
+   "combo": "sweep_reversal|BTCUSD",
+   "tf": "H4",
+   "dR": 0.0225,
+   "on_expR": 0.0531,
+   "on_t": 0.84,
+   "on_oos": 0.3006,
+   "n": 389
+  },
+  {
+   "combo": "sweep_reversal|XAUUSD",
+   "tf": "H4",
+   "dR": 0.0167,
+   "on_expR": -0.0241,
+   "on_t": -0.42,
+   "on_oos": 0.064,
+   "n": 465
+  },
+  {
+   "combo": "macro_momentum|GBPUSD",
+   "tf": "D1",
+   "dR": 0.0165,
+   "on_expR": -0.0465,
+   "on_t": -1.03,
+   "on_oos": -0.0818,
+   "n": 979
+  },
+  {
+   "combo": "macro_momentum|XAGUSD",
+   "tf": "D1",
+   "dR": 0.0155,
+   "on_expR": -0.1028,
+   "on_t": -1.33,
+   "on_oos": 0.0334,
+   "n": 349
+  },
+  {
+   "combo": "tsmom_d1|USDJPY",
+   "tf": "D1",
+   "dR": 0.0137,
+   "on_expR": 0.0081,
+   "on_t": 0.07,
+   "on_oos": -0.074,
+   "n": 115
+  },
+  {
+   "combo": "regime_momentum_fvg|USDJPY",
+   "tf": "D1",
+   "dR": 0.0127,
+   "on_expR": -0.0507,
+   "on_t": -0.76,
+   "on_oos": -0.1443,
+   "n": 460
+  },
+  {
+   "combo": "regime_momentum|USDJPY",
+   "tf": "D1",
+   "dR": 0.012,
+   "on_expR": -0.0623,
+   "on_t": -0.99,
+   "on_oos": -0.1885,
+   "n": 506
+  },
+  {
+   "combo": "tsmom_d1|USDCHF",
+   "tf": "D1",
+   "dR": 0.0108,
+   "on_expR": -0.0307,
+   "on_t": -0.46,
+   "on_oos": 0.1256,
+   "n": 117
+  },
+  {
+   "combo": "macro_momentum|BTCUSD",
+   "tf": "D1",
+   "dR": 0.01,
+   "on_expR": 0.08,
+   "on_t": 0.82,
+   "on_oos": 0.2179,
+   "n": 314
+  },
+  {
+   "combo": "regime_momentum_fvg|XAUEUR",
+   "tf": "D1",
+   "dR": 0.0085,
+   "on_expR": -0.0738,
+   "on_t": -1.0,
+   "on_oos": 0.017,
+   "n": 376
+  },
+  {
+   "combo": "regime_momentum|XAUEUR",
+   "tf": "D1",
+   "dR": 0.0046,
+   "on_expR": -0.0402,
+   "on_t": -0.57,
+   "on_oos": 0.0971,
+   "n": 420
+  },
+  {
+   "combo": "regime_momentum|WTIUSD",
+   "tf": "D1",
+   "dR": 0.0041,
+   "on_expR": -0.0751,
+   "on_t": -1.24,
+   "on_oos": -0.1491,
+   "n": 548
+  },
+  {
+   "combo": "tsmom_d1|XAGUSD",
+   "tf": "D1",
+   "dR": 0.004,
+   "on_expR": -0.0537,
+   "on_t": -0.43,
+   "on_oos": 0.0799,
+   "n": 134
+  },
+  {
+   "combo": "tsmom_d1|GBPUSD",
+   "tf": "D1",
+   "dR": 0.0024,
+   "on_expR": -0.0064,
+   "on_t": -0.07,
+   "on_oos": -0.1809,
+   "n": 98
+  },
+  {
+   "combo": "macro_momentum|EURUSD",
+   "tf": "D1",
+   "dR": 0.0013,
+   "on_expR": -0.0596,
+   "on_t": -1.42,
+   "on_oos": -0.0924,
+   "n": 1121
+  }
+ ]
 }
