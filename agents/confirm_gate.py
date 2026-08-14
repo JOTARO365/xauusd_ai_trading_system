@@ -87,8 +87,10 @@ def params_from_config(algo_id=None):
 
 # แท่งปิด TF ที่ confirm ดีสุดต่อ algo (จาก scripts/confirm_tf_matrix.py 2026-08-13). None = ไม่ confirm (ทำแย่ทุก TF).
 # momentum/trend → HTF close (D1 ดีสุด) · sweep(fade) → H4 · mean_reversion → None (ลบทุก TF) · conf15m → None (M15-signal, confirm แย่)
+# cdc_zone = None: cdc เข้าตอน "ย่อ (pullback)" ในเทรนด์ → แท่งปิดอ่อนโดยธรรมชาติ → cont-confirm (ต้องปิดแข็ง) ขัดกันเอง
+# block cdc ตอนควรเข้าพอดี (เหมือน fade+confirm). cdc มี pullback filter เป็น entry discipline อยู่แล้ว = ไม่ต้อง confirm.
 BEST_TF_BY_ALGO = {
-    "cdc_zone": "D1", "regime_momentum": "D1", "regime_momentum_fvg": "D1",
+    "cdc_zone": None, "regime_momentum": "D1", "regime_momentum_fvg": "D1",
     "macro_momentum": "D1", "tsmom_d1": "D1", "sweep_reversal": "H4",
     "mean_reversion": None, "confluence_15m": None,
 }

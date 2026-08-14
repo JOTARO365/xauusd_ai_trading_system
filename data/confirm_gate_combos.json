@@ -2,14 +2,6 @@
  "note": "confirm gate apply เฉพาะ combo นี้ (best-TF confirm ให้ Δexp_R>0, n≥25). ว่าง=apply ทุก combo.",
  "criteria": "dR>0 · n≥25 (apply) · +t≥2·OOS≥0·expR>0·n≥80 (validated_live)",
  "combos": [
-  "cdc_zone|BTCUSD",
-  "cdc_zone|EURUSD",
-  "cdc_zone|USDCHF",
-  "cdc_zone|USDJPY",
-  "cdc_zone|WTIUSD",
-  "cdc_zone|XAGUSD",
-  "cdc_zone|XAUEUR",
-  "cdc_zone|XAUUSD",
   "macro_momentum|AUDUSD",
   "macro_momentum|BTCUSD",
   "macro_momentum|EURUSD",
@@ -53,15 +45,6 @@
  "validated_live": [],
  "detail": [
   {
-   "combo": "cdc_zone|BTCUSD",
-   "tf": "D1",
-   "dR": 0.6213,
-   "on_expR": 3.6912,
-   "on_t": 2.12,
-   "on_oos": 0.3602,
-   "n": 41
-  },
-  {
    "combo": "regime_momentum_fvg|XAUJPY",
    "tf": "D1",
    "dR": 0.3649,
@@ -69,15 +52,6 @@
    "on_t": 2.82,
    "on_oos": 0.5875,
    "n": 43
-  },
-  {
-   "combo": "cdc_zone|XAUEUR",
-   "tf": "D1",
-   "dR": 0.3052,
-   "on_expR": 1.3123,
-   "on_t": 2.05,
-   "on_oos": 2.6328,
-   "n": 36
   },
   {
    "combo": "regime_momentum|XAUJPY",
@@ -98,33 +72,6 @@
    "n": 66
   },
   {
-   "combo": "cdc_zone|WTIUSD",
-   "tf": "D1",
-   "dR": 0.1647,
-   "on_expR": 0.3781,
-   "on_t": 1.2,
-   "on_oos": 0.3272,
-   "n": 44
-  },
-  {
-   "combo": "cdc_zone|USDJPY",
-   "tf": "D1",
-   "dR": 0.1148,
-   "on_expR": 0.3268,
-   "on_t": 1.0,
-   "on_oos": 0.1941,
-   "n": 47
-  },
-  {
-   "combo": "cdc_zone|XAUUSD",
-   "tf": "D1",
-   "dR": 0.1132,
-   "on_expR": 1.1056,
-   "on_t": 2.28,
-   "on_oos": 2.5971,
-   "n": 40
-  },
-  {
    "combo": "sweep_reversal|XAUJPY",
    "tf": "H4",
    "dR": 0.1027,
@@ -141,15 +88,6 @@
    "on_t": -2.09,
    "on_oos": 0.1,
    "n": 377
-  },
-  {
-   "combo": "cdc_zone|USDCHF",
-   "tf": "D1",
-   "dR": 0.0814,
-   "on_expR": -0.1566,
-   "on_t": -1.2,
-   "on_oos": 0.031,
-   "n": 52
   },
   {
    "combo": "sweep_reversal|XAUEUR",
@@ -186,15 +124,6 @@
    "on_t": -1.81,
    "on_oos": 0.1794,
    "n": 425
-  },
-  {
-   "combo": "cdc_zone|XAGUSD",
-   "tf": "D1",
-   "dR": 0.0591,
-   "on_expR": 0.3084,
-   "on_t": 0.63,
-   "on_oos": 1.2849,
-   "n": 57
   },
   {
    "combo": "regime_momentum_fvg|XAUUSD",
@@ -285,15 +214,6 @@
    "on_t": -1.06,
    "on_oos": 0.0288,
    "n": 469
-  },
-  {
-   "combo": "cdc_zone|EURUSD",
-   "tf": "D1",
-   "dR": 0.0348,
-   "on_expR": 0.1654,
-   "on_t": 0.61,
-   "on_oos": -0.1572,
-   "n": 46
   },
   {
    "combo": "sweep_reversal|USDJPY",
