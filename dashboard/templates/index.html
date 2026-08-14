@@ -59,6 +59,12 @@
       --mono:      'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
       --display:   'Space Grotesk', 'Inter', -apple-system, system-ui, sans-serif;
       --sans:      'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+      /* radius scale — เดิมกระจาย 3/4/5/7/8px (impeccable: no scale = slop); รวมเป็น scale เดียว */
+      --r-sm:      6px;    /* stat cards, inputs, chips เล็ก */
+      --r-md:      8px;    /* panels, table-card, chart-card */
+      --r-lg:      12px;   /* modal / large surface */
+      --r-pill:    999px;  /* badge = pill */
     }
 
     /* ── LIGHT MODE — override tokens เมื่อ data-theme=light (toggle) ── */
@@ -522,7 +528,7 @@
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 4px;
+      border-radius: var(--r-sm);
       padding: 13px 16px;
       display: flex;
       flex-direction: column;
@@ -589,7 +595,7 @@
     .chart-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 7px;
+      border-radius: var(--r-md);
       padding: 16px 18px;
     }
 
@@ -607,7 +613,7 @@
     .table-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: var(--r-md);
       overflow: hidden;
     }
 
@@ -718,7 +724,7 @@
       align-items: center;
       justify-content: center;
       padding: 2px 9px;
-      border-radius: 3px;
+      border-radius: var(--r-pill);
       font-size: 10px;
       font-weight: 700;
       letter-spacing: 0.8px;
