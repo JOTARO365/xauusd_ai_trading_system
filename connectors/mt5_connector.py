@@ -880,6 +880,12 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
     """วาง market order. B11: OPEN_ORDER_FINE_LOCK=true → ปล่อย _mt5_lock ระหว่าง retry-backoff sleep
     (guardian ไม่ถูก starve). default (false) → ครอบ _mt5_lock ก้อนเดียว = พฤติกรรมเดิม (sleep ใต้ lock).
     NOTE: open_order ถูกถอดออกจาก auto-wrap list ด้านล่าง — lock จัดการที่นี่/ใน _open_order_fine."""
+    # METALS_LONG_ONLY: block SELL บนโลหะมีค่าทุก path (decision/pending/zre/MSE) ที่จุดเดียว — โลหะขาขึ้น ไม่มี short edge
+    if not shadow and getattr(_cfg, "METALS_LONG_ONLY", False) and str(direction).upper() == "SELL":
+        _sym = str(symbol or SYMBOL).upper()
+        if _sym.startswith("XAU") or _sym.startswith("XAG") or "GOLD" in _sym or "SILVER" in _sym:
+            logger.info(f"[METALS_LONG_ONLY] block SELL {_sym} — โลหะ long-only (short ไม่มี edge)")
+            return {"success": False, "error": "METALS_LONG_ONLY: SELL blocked on metal"}
     _args = (direction, sl_pips, tp_pips, comment, min_rr, confidence_scale,
              lot, shadow, symbol, max_open_override, magic)
     if getattr(_cfg, "OPEN_ORDER_FINE_LOCK", False):

@@ -394,6 +394,9 @@ CDC_MAX_UNIT_RISK_PCT = float(os.getenv("CDC_MAX_UNIT_RISK_PCT") or 3.0)   # 0=�
 # เปิดเฉพาะ combo ที่ผ่าน confirm_gate_backtest → data/confirm_gate_combos.json (ว่าง=ทุก combo). default OFF
 CONFIRM_GATE = (os.getenv("CONFIRM_GATE") or "false").lower() == "true"
 CONFIRM_CLV  = float(os.getenv("CONFIRM_CLV") or 0.5)   # close ต้องอยู่เลย นี้ ของช่วงแท่งไปฝั่งสัญญาณ (0.5=กึ่งกลาง)
+# METALS_LONG_ONLY: block ทุก SELL บนโลหะมีค่า (XAU*/XAG*/GOLD/SILVER) ทุก path (open_order choke) — โลหะขาขึ้น
+# โครงสร้าง + พิสูจน์แล้วไม่มี short edge (short ทอง/เงินเสีย −9.4k). BTC/อื่น short ได้ปกติ. kill switch = false
+METALS_LONG_ONLY = (os.getenv("METALS_LONG_ONLY") or "false").lower() == "true"
 CUSTOM_LOT_ENABLE = (os.getenv("CUSTOM_LOT_ENABLE") or "false").lower() == "true"   # ใช้ lot ต่อคู่ (data/pair_lots.json แก้จาก dashboard)
 # trailing หลวมสำหรับ momentum algo (ปล่อยวิ่งถึง TP; replay: trail แน่นตัดกำไร +119%→+12%)
 TRAILING_MOM_MULT = float(os.getenv("TRAILING_MOM_MULT") or 3.0)      # trail กว้าง (×ATR)
@@ -638,9 +641,10 @@ def reload_config():
     CDC_PYRAMID    = (os.getenv("CDC_PYRAMID") or "false").lower() == "true"
     CDC_MAX_UNITS  = int(os.getenv("CDC_MAX_UNITS") or 4)
     CDC_ADD_HALF_N = float(os.getenv("CDC_ADD_HALF_N") or 0.5)
-    global CONFIRM_GATE, CONFIRM_CLV
+    global CONFIRM_GATE, CONFIRM_CLV, METALS_LONG_ONLY
     CONFIRM_GATE = (os.getenv("CONFIRM_GATE") or "false").lower() == "true"
     CONFIRM_CLV  = float(os.getenv("CONFIRM_CLV") or 0.5)
+    METALS_LONG_ONLY = (os.getenv("METALS_LONG_ONLY") or "false").lower() == "true"
     global CDC_MAX_UNIT_RISK_PCT
     CDC_MAX_UNIT_RISK_PCT = float(os.getenv("CDC_MAX_UNIT_RISK_PCT") or 3.0)
     global CUSTOM_LOT_ENABLE
