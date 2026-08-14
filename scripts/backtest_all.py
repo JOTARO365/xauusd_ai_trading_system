@@ -158,6 +158,35 @@ def bt_cdc(h, l, c, cost_price, sl_atr=2.0, mode="long", pb_min=None, pb_lb=None
     return tr
 
 
+def _ema_arr(x, n):
+    e = np.zeros_like(x, float); e[0] = x[0]; k = 2.0 / (n + 1)
+    for i in range(1, len(x)):
+        e[i] = x[i] * k + e[i - 1] * (1 - k)
+    return e
+
+
+def bt_pullback(h, l, c, tm, d1_time, d1_close, cost, pt, ema_n=20, d1_ema=20, lb=8,
+                buf_atr=0.25, cap_atr=2.0, rr=3.0, mh=72):
+    """pullback_buy (dip-buyer, long-only): D1 ขาขึ้น + H1 reclaim EMA หลังย่อ · SL=ก้นดิพ cap · mirror PullbackBuyAlgo.
+    parity: entry/SL ตรง algo live. causal (d1 map -2)."""
+    de = _ema_arr(d1_close, d1_ema); up = (d1_close > de).astype(int)
+    idx = np.clip(np.searchsorted(d1_time, tm.astype(np.int64), side="right") - 2, 0, len(up) - 1)
+    d1_up = up[idx].astype(bool)
+    ema = _ema_arr(c, ema_n); atr = R.atr(h, l, c)
+    n = len(c); tr = []; i = max(ema_n, lb, R.VOL_LOOKBACK) + 2
+    while i < n - 1:
+        av = float(atr[i]) if atr[i] == atr[i] else 0.0
+        if av <= 0 or not d1_up[i] or not (c[i] > ema[i] and c[i - 1] <= ema[i - 1]):
+            i += 1; continue
+        px = float(c[i]); swing = float(l[i - lb:i + 1].min())
+        sld = min((px - swing) + buf_atr * av, cap_atr * av)
+        if sld <= 0:
+            i += 1; continue
+        r, ei = _resolve(h, l, c, i, 1, px, sld / pt, rr, pt, cost, mh)
+        tr.append(r); i = ei + 1
+    return tr
+
+
 def bt_tsmom(h, l, c, cost_price, lbs=(21, 63, 126), confirm=21, sl_atr=3.0, gate=None):
     """R-multiple (norm 3×ATR-D1 = disaster SL ของ live) + disaster stop → เทียบ algo อื่นได้.
     (เดิมคืน %ของราคาสุดท้าย = magnitude เทียบไม่ได้; live มี SL_ATR=3.0 ที่ backtest เดิมไม่มี)."""
@@ -459,6 +488,9 @@ def main():
                              "ensemble 21/63/126 + confirm21 · R-norm 3×ATR + disaster SL"))
             rows.append(_row("cdc_zone", lg, "D1", _stats(bt_cdc(dh, dl, dc, cost * pt)),
                              "CDC Action Zone (โฉลก) long-only · exit-on-flip · Turtle 2N SL · ถือยาว"))
+            rows.append(_row("pullback_buy", lg, "H1", _stats(bt_pullback(
+                h, l, c, tm, rd["time"].astype(np.int64), dc, cost, pt)),
+                "dip-buyer long-only · D1-up + H1 reclaim EMA20 · SL=ก้นดิพ cap 2×ATR_H1 (แคบ ~0.7% risk) · RR3"))
         # macro_momentum (ทุกคู่เพื่อ matrix ครบ; DXY driver ตรงเฉพาะ gold-complex → non-gold คาด −EV = data จริง)
         rh4 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H4, 0, 30000)
         if rh4 is not None and len(rh4) > 500:

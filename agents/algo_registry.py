@@ -585,10 +585,89 @@ class CDCZoneAlgo(Algo):
         }
 
 
+class PullbackBuyAlgo(Algo):
+    """Dip-buyer (trend-pullback, SL แคบ) — เข้า "ย่อ" ในเทรนด์ขึ้นด้วย SL เล็ก (ต่าง cdc: cdc SL 2N=$192=15.5% risk
+    บน 41k เข้าไม่ได้; ตัวนี้ SL=ก้นดิพ cap 2×ATR_H1 ~$8 = ~0.7% risk เข้าได้จริง). long-only (เข้า METALS_LONG_ONLY).
+    entry: D1 ขาขึ้น (close_D1>EMA_D1) + H1 reclaim EMA20 หลังย่อ (close[i]>EMA · close[i-1]≤EMA = จุดกลับดิพ).
+    SL=swing-low k แท่ง − buffer, cap. TP=RR×SL (managed: BE+trailing). validated scripts/pullback_buy_backtest.py:
+    XAUUSD OOS+0.278 t3.88 · XAUEUR OOS+0.138 t2.05 (RR3) — แต่ IS อ่อน (edge กระจุก gold-bull) → SHADOW เก็บ forward ก่อน."""
+    algo_id = "pullback_buy"
+    version = 1
+    klass = "intraday"
+    timeframe = "H1"
+    mgmt = "managed"
+    eligible_pairs = ["XAUUSD", "XAUEUR"]              # OOS+ บน gold; คู่อื่น = ไม่ eligible (ไม่มี edge)
+
+    @staticmethod
+    def _ema(x, n):
+        import numpy as np
+        e = np.zeros_like(x, float); e[0] = x[0]; k = 2.0 / (n + 1)
+        for j in range(1, len(x)):
+            e[j] = x[j] * k + e[j - 1] * (1 - k)
+        return e
+
+    def _p(self, key, default):
+        import config as _c
+        return getattr(_c, key, default)
+
+    def _d1_up(self, symbol, ts):
+        """True = D1 ขาขึ้น (close_D1 > EMA_D1) ณ D1 แท่งปิดล่าสุดก่อน ts (causal). None = ข้อมูลไม่พอ → ไม่เข้า."""
+        try:
+            import MetaTrader5 as mt5, numpy as np
+            dn = int(self._p("PULLBACK_D1_EMA", 20))
+            r = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_D1, 0, 300)
+            if r is None or len(r) < dn + 3:
+                return None
+            dc = r["close"].astype(float); dt = r["time"].astype(np.int64)
+            e = self._ema(dc, dn)
+            idx = int(np.clip(np.searchsorted(dt, ts, side="right") - 2, 0, len(dc) - 1))
+            return bool(dc[idx] > e[idx])
+        except Exception:
+            return None
+
+    def evaluate(self, symbol, bars, ctx=None, point=None):
+        import numpy as np
+        high, low, close, times = bars
+        emaN = int(self._p("PULLBACK_EMA", 20)); lb = int(self._p("PULLBACK_SWING_LB", 8))
+        n = len(close)
+        if n < max(emaN, lb) + 30 or not point:
+            return None
+        i = n - 2                                          # H1 บาร์ปิดล่าสุด
+        ema = self._ema(np.asarray(close, float), emaN)
+        if not (close[i] > ema[i] and close[i - 1] <= ema[i - 1]):   # reclaim EMA หลังย่อ = จุดกลับดิพ
+            return None
+        up = self._d1_up(symbol, int(times[i]))            # D1 ต้องขาขึ้น (ซื้อดิพในเทรนด์ ไม่รับมีดตลาดหมี)
+        if not up:
+            return None
+        if _season_block(symbol, "BUY", times, i):
+            return None
+        atr = R.atr(high, low, close)
+        av = float(atr[i]) if atr[i] == atr[i] else 0.0
+        if av <= 0:
+            return None
+        swing_low = float(np.asarray(low[i - lb:i + 1], float).min())
+        sl_dist = (float(close[i]) - swing_low) + float(self._p("PULLBACK_SL_BUF_ATR", 0.25)) * av
+        sl_dist = min(sl_dist, float(self._p("PULLBACK_SL_CAP_ATR", 2.0)) * av)
+        if sl_dist <= 0:
+            return None
+        sl_pips = sl_dist / point
+        rr = float(self._p("PULLBACK_RR", 3.0))
+        try:
+            from datetime import datetime, timezone
+            bar_ts = datetime.fromtimestamp(int(times[i]), timezone.utc).isoformat()
+        except Exception:
+            return None
+        return {
+            "algo_id": self.algo_id, "symbol": symbol, "dir": "BUY",
+            "entry": float(close[i]), "sl_pips": sl_pips, "tp_pips": sl_pips * rr,
+            "regime": "PULLBACK", "bar_ts": bar_ts, "klass": self.klass,
+        }
+
+
 ALGO_REGISTRY = {a.algo_id: a for a in (
     RegimeMomentumAlgo(), MeanReversionAlgo(), TSMOMDailyAlgo(),
     MomentumFVGAlgo(), SweepReversalAlgo(), MacroMomAlgo(), ConfluenceVol15m(),
-    CDCZoneAlgo(),
+    CDCZoneAlgo(), PullbackBuyAlgo(),
 )}
 # sr_fade (S/R Book fade) ถูก CUT 2026-08-07: backtest −EV ทุกคู่/ทุก variant (t−4..−22, OOS ลบ) —
 # naive S/R fade ไม่มี edge (เหมือน mean_reversion). หลักฐาน: scripts/sr_fade_backtest.py
