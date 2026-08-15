@@ -880,10 +880,14 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
     """วาง market order. B11: OPEN_ORDER_FINE_LOCK=true → ปล่อย _mt5_lock ระหว่าง retry-backoff sleep
     (guardian ไม่ถูก starve). default (false) → ครอบ _mt5_lock ก้อนเดียว = พฤติกรรมเดิม (sleep ใต้ lock).
     NOTE: open_order ถูกถอดออกจาก auto-wrap list ด้านล่าง — lock จัดการที่นี่/ใน _open_order_fine."""
-    # METALS_LONG_ONLY: block SELL บนโลหะมีค่าทุก path (decision/pending/zre/MSE) ที่จุดเดียว — โลหะขาขึ้น ไม่มี short edge
-    if not shadow and getattr(_cfg, "METALS_LONG_ONLY", False) and str(direction).upper() == "SELL":
+    # long-only guard: block SELL ทุก path (decision/pending/zre/MSE) ที่จุดเดียว. LONG_ONLY_ALL=ทุกคู่ · METALS_LONG_ONLY=โลหะ
+    if not shadow and str(direction).upper() == "SELL":
         _sym = str(symbol or SYMBOL).upper()
-        if _sym.startswith("XAU") or _sym.startswith("XAG") or "GOLD" in _sym or "SILVER" in _sym:
+        _metal = _sym.startswith("XAU") or _sym.startswith("XAG") or "GOLD" in _sym or "SILVER" in _sym
+        if getattr(_cfg, "LONG_ONLY_ALL", False):
+            logger.info(f"[LONG_ONLY_ALL] block SELL {_sym} — long-only ทุกคู่ (short −79k, regime bull)")
+            return {"success": False, "error": "LONG_ONLY_ALL: SELL blocked"}
+        if getattr(_cfg, "METALS_LONG_ONLY", False) and _metal:
             logger.info(f"[METALS_LONG_ONLY] block SELL {_sym} — โลหะ long-only (short ไม่มี edge)")
             return {"success": False, "error": "METALS_LONG_ONLY: SELL blocked on metal"}
     _args = (direction, sl_pips, tp_pips, comment, min_rr, confidence_scale,
@@ -1017,6 +1021,11 @@ def place_pending_order(pending_type: str, price: float, sl_pips: float, tp_pips
         logger.warning(f"[{tag}] would have placed {pending_type} @ {price:.2f} SL={sl_pips}p TP={tp_pips}p")
         return {"success": True, "ticket": 0, "pending_type": pending_type,
                 "price": price, "sl": 0.0, "tp": 0.0, "dry_run": True, "shadow": bool(shadow)}
+    # long-only guard: block SELL pending (SELL_LIMIT hedge/fade). ใช้ SYMBOL (gold=metal) → โดนทั้ง 2 flag
+    if str(pending_type).upper().startswith("SELL") and (
+            getattr(_cfg, "LONG_ONLY_ALL", False) or getattr(_cfg, "METALS_LONG_ONLY", False)):
+        logger.info(f"[long-only] block pending {pending_type} {SYMBOL} — long-only (short −79k)")
+        return {"success": False, "error": "long-only: SELL pending blocked"}
 
     if pending_type not in PENDING_TYPE_MAP:
         return {"success": False, "error": f"Invalid pending_type: {pending_type}"}
