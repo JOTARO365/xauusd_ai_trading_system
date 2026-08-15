@@ -21,6 +21,13 @@ import numpy as np
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT); sys.path.insert(0, os.path.join(_ROOT, "scripts"))
 import regime_lib as R                                       # noqa: E402
+from agents import sr_entry_gate as SR                        # noqa: E402  (swing/cluster S/R strength)
+
+SR_LOOKBACK = 60             # หา swing pivot กี่แท่ง (support ladder)
+SR_PIVOT = 3
+SR_CLUSTER_ATR = 0.3        # merge แนวห่าง ≤ นี้×ATR
+SR_MIN_TOUCHES = 2          # support ต้องโดนแตะ ≥ นี้ (แข็ง) ถึงเข้า
+SR_DIST_ATR = 0.5           # ก้นดิพต้องอยู่ ≤ นี้×ATR จาก support แข็ง
 
 EMA_FAST = 20                # H1 pullback EMA
 D1_EMA = 20                  # D1 trend filter
@@ -48,10 +55,22 @@ def _d1_up_map(h1_time, d1_time, d1_close):
     return up[idx].astype(bool)
 
 
-def _entries(h, l, c, tm, d1_up, pt):
-    """long-only pullback+reclaim. คืน (i, px, sl_dist)."""
+def _sr_support_ok(h, l, i, swing_low, av):
+    """True = ก้นดิพลงมาที่ 'แนวรับแข็ง' จริง (swing-low cluster touch≥SR_MIN_TOUCHES ใกล้ ≤SR_DIST_ATR×ATR)."""
+    _, sup = SR._swing_levels(h, l, i, SR_LOOKBACK, SR_PIVOT)
+    if not sup:
+        return False
+    tol = SR_CLUSTER_ATR * av
+    for lv, ct in SR._cluster(sup, tol):
+        if ct >= SR_MIN_TOUCHES and abs(lv - swing_low) <= SR_DIST_ATR * av:
+            return True
+    return False
+
+
+def _entries(h, l, c, tm, d1_up, pt, sr_filter=False):
+    """long-only pullback+reclaim. sr_filter=True → เข้าเฉพาะดิพที่แนวรับแข็ง. คืน (i, px, sl_dist)."""
     ema = _ema(c, EMA_FAST); atr = R.atr(h, l, c)
-    n = len(c); out = []; i = max(EMA_FAST, SWING_LB, R.VOL_LOOKBACK) + 2
+    n = len(c); out = []; i = max(EMA_FAST, SWING_LB, SR_LOOKBACK, R.VOL_LOOKBACK) + 2
     while i < n - 1:
         av = float(atr[i]) if atr[i] == atr[i] else 0.0
         if av <= 0 or not d1_up[i]:
@@ -61,6 +80,8 @@ def _entries(h, l, c, tm, d1_up, pt):
             i += 1; continue
         px = float(c[i])
         swing_low = float(l[i - SWING_LB:i + 1].min())
+        if sr_filter and not _sr_support_ok(h, l, i, swing_low, av):    # analyst-style: เฉพาะแนวรับแข็ง
+            i += 1; continue
         sl_dist = (px - swing_low) + SL_BUF_ATR * av
         sl_dist = min(sl_dist, SL_CAP_ATR * av)             # cap = risk คุมได้
         if sl_dist <= 0:
@@ -119,27 +140,33 @@ def main():
         h = rh["high"].astype(float); l = rh["low"].astype(float); c = rh["close"].astype(float)
         tm = rh["time"].astype(np.int64)
         d1_up = _d1_up_map(tm, rd["time"].astype(np.int64), rd["close"].astype(float))
-        ents = _entries(h, l, c, tm, d1_up, pt)
-        if len(ents) < MIN_N:
-            print(f"  {lg}: entries น้อย ({len(ents)})"); rows.append((lg, len(ents), {}, None)); continue
         n = len(c)
-        # risk check: SL เฉลี่ยกี่ $ (ดู risk คุมได้จริงมั้ย)
-        sl_med_px = float(np.median([sld for _, _, sld in ents]))
-        # scan RR: best บน IS(70) → วัด OOS(30)
-        variants = {}
-        for rr in RR_GRID:
-            isr = [_resolve(h, l, c, i, px, sld, rr, cost * pt, MAX_HOLD)
-                   for (i, px, sld) in ents if i < int(n * 0.7)]
-            oor = [_resolve(h, l, c, i, px, sld, rr, cost * pt, MAX_HOLD)
-                   for (i, px, sld) in ents if i >= int(n * 0.7)]
-            variants[rr] = {"is": _agg(isr), "oos": _agg(oor)}
-        cand = [(rr, v) for rr, v in variants.items() if v["is"] and v["is"]["n"] >= 30]
-        best = max(cand, key=lambda t: t[1]["is"]["exp"])[0] if cand else RR_GRID[1]
-        rows.append((lg, len(ents), variants, {"best_rr": best, "sl_med_px": sl_med_px}))
-        b = variants[best]
-        print(f"  {lg:7s} n={len(ents)} SLmed={sl_med_px:.2f} bestRR={best} "
-              f"IS {b['is']['exp'] if b['is'] else '—'}/{b['is']['t'] if b['is'] else '—'} "
-              f"OOS {b['oos']['exp'] if b['oos'] else '—'}/{b['oos']['t'] if b['oos'] else '—'}")
+
+        def scan(ents):
+            if len(ents) < 20:
+                return None
+            variants = {}
+            for rr in RR_GRID:
+                isr = [_resolve(h, l, c, i, px, sld, rr, cost * pt, MAX_HOLD)
+                       for (i, px, sld) in ents if i < int(n * 0.7)]
+                oor = [_resolve(h, l, c, i, px, sld, rr, cost * pt, MAX_HOLD)
+                       for (i, px, sld) in ents if i >= int(n * 0.7)]
+                variants[rr] = {"is": _agg(isr), "oos": _agg(oor)}
+            cand = [(rr, v) for rr, v in variants.items() if v["is"] and v["is"]["n"] >= 20]
+            best = max(cand, key=lambda t: t[1]["is"]["exp"])[0] if cand else RR_GRID[1]
+            return {"n": len(ents), "best_rr": best, "variants": variants,
+                    "sl_med": float(np.median([s for _, _, s in ents]))}
+
+        plain = scan(_entries(h, l, c, tm, d1_up, pt, sr_filter=False))
+        srf = scan(_entries(h, l, c, tm, d1_up, pt, sr_filter=True))
+        rows.append((lg, plain, srf))
+
+        def fmt(r):
+            if not r:
+                return "n<20"
+            b = r["variants"][r["best_rr"]]; o = b["oos"]
+            return f"n={r['n']} RR{r['best_rr']} OOS {o['exp'] if o else '—'}/{o['t'] if o else '—'}" if o else f"n={r['n']} —"
+        print(f"  {lg:7s} | plain {fmt(plain):32s} | +S/R {fmt(srf)}")
     mt5.shutdown()
 
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
@@ -147,21 +174,20 @@ def main():
         f.write(f"# Pullback-buy (dip-buyer, tight SL) — validation ({datetime.now(timezone.utc).strftime('%Y-%m-%d')})\n\n")
         f.write("long-only · D1 ขาขึ้น + ราคา reclaim EMA20-H1 หลังย่อ · SL = ก้นดิพ (cap %.1f×ATR_H1) · OOS 70/30.\n" % SL_CAP_ATR)
         f.write("edge จริง = **OOS exp>0 + t≥2 + n≥%d**. SL med = ดูว่า risk เล็กจริงมั้ย (เทียบ cdc 2N=$192).\n\n" % MIN_N)
-        f.write("| คู่ | n | SL med | best RR | IS exp/t/n | **OOS exp/t/n** |\n|---|---|---|---|---|---|\n")
-        for lg, ne, variants, meta in rows:
-            if not meta:
-                f.write(f"| {lg} | {ne} | — | — | entries น้อย | — |\n"); continue
-            rr = meta["best_rr"]; b = variants[rr]
+        f.write("**เทียบ plain (pullback ล้วน) vs +S/R (เข้าเฉพาะดิพที่แนวรับแข็ง touch≥%d = analyst-style):**\n\n" % SR_MIN_TOUCHES)
+
+        def cell(r):
+            if not r:
+                return "n<20", "—", "—"
+            b = r["variants"][r["best_rr"]]
             isf = f"{b['is']['exp']:+.3f}/{b['is']['t']:+.2f}/{b['is']['n']}" if b['is'] else "—"
             oof = f"{b['oos']['exp']:+.3f}/{b['oos']['t']:+.2f}/{b['oos']['n']}" if b['oos'] else "—"
-            f.write(f"| {lg} | {ne} | {meta['sl_med_px']:.2f} | {rr} | {isf} | **{oof}** |\n")
-        f.write("\nRR scan (OOS exp) ต่อคู่:\n\n| คู่ | " + " | ".join(f"RR{rr}" for rr in RR_GRID) + " |\n")
-        f.write("|---|" + "|".join(["---"] * len(RR_GRID)) + "|\n")
-        for lg, ne, variants, meta in rows:
-            if not meta:
-                continue
-            cells = " | ".join((f"{variants[rr]['oos']['exp']:+.3f}" if variants[rr]['oos'] else "—") for rr in RR_GRID)
-            f.write(f"| {lg} | {cells} |\n")
+            return f"n{r['n']} RR{r['best_rr']} SL{r['sl_med']:.1f}", isf, oof
+        f.write("| คู่ | | n/RR/SL | IS exp/t/n | **OOS exp/t/n** |\n|---|---|---|---|---|\n")
+        for lg, plain, srf in rows:
+            for tag, r in (("plain", plain), ("**+S/R**", srf)):
+                a, i_, o = cell(r)
+                f.write(f"| {lg} | {tag} | {a} | {i_} | **{o}** |\n")
     print(f"\nreport → {REPORT}")
 
 
