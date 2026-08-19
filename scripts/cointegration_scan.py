@@ -118,10 +118,11 @@ def _test_pair(y, x):
             "adf_h1": adf1, "adf_h2": adf2, "tradeable": tradeable}
 
 
-def run(tf_name="H1", count=8000):
+def run(tf_name="H1", count=8000, manage_mt5=True):
+    """manage_mt5=False → ไม่ init/shutdown (เรียกจาก dashboard ที่มี MT5 อยู่แล้ว + ถือ lock; กัน shutdown connection ร่วม)."""
     import MetaTrader5 as mt5
     from connectors.pair_collector import _broker_map
-    if not mt5.initialize():
+    if manage_mt5 and not mt5.initialize():
         print("MT5 init fail"); return
     bm = _broker_map() or {}
     tf = mt5.TIMEFRAME_H1 if tf_name == "H1" else mt5.TIMEFRAME_D1
@@ -147,7 +148,19 @@ def run(tf_name="H1", count=8000):
         print("%-16s %6.1f %8.2f %7.2f %9s %7.2f %7.2f %7.2f  %s" % (
             r["pair"], r["beta"], r["adf"], r["hurst"], hl, r["corr"],
             r["adf_h1"], r["adf_h2"], "✅ YES" if r["tradeable"] else "—"))
-    mt5.shutdown()
+    if manage_mt5:
+        mt5.shutdown()                                    # ปิดเฉพาะ standalone; dashboard คุม connection เอง
+    try:                                                  # persist ผลล่าสุด (dashboard อ่านไฟล์นี้)
+        import json as _json
+        import math as _math
+        def _clean(v):                                    # NaN/inf → None: browser JSON.parse reject NaN → fetch พัง "ต่อไม่ได้"
+            return None if (isinstance(v, float) and (_math.isnan(v) or _math.isinf(v))) else v
+        _rows = [{k: _clean(v) for k, v in r.items()} for r in rows]
+        _out = os.path.join(_ROOT, "data", "cointegration.json")
+        with open(_out, "w", encoding="utf-8") as _f:
+            _json.dump({"rows": _rows, "tf": tf_name, "n": len(_rows)}, _f, ensure_ascii=False, allow_nan=False)
+    except Exception:
+        pass
     print("=" * 92)
     good = [r for r in rows if r["tradeable"]]
     n_tested = len(rows)

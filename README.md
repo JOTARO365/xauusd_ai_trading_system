@@ -150,6 +150,17 @@ Running in parallel, independent of the regime router:
   Safeguards: master gate `PAIRS_LIVE` (default OFF), **atomic legs** (if the second leg fails the first is
   closed immediately — never a naked leg), a wide per-leg disaster stop, and state persistence. Hooked into
   the cycle like the other engines; kill switch = `PAIRS_LIVE=false`.
+  **Re-entry cooldown** (`PAIRS_REENTRY_COOLDOWN_MIN`, default 30): after any emergency close — a repair-close
+  ("ขาไม่ครบ 2": one leg vanished to an SL/manual close/broker magic-reset), a leg-open failure (e.g.
+  AutoTrading disabled), or an atomic abort — the engine waits this many minutes before opening again, so a
+  repeatedly-failing leg can't churn open→close→open every cycle (which silently bleeds spread on each round).
+  Normal z-exits are exempt (they may re-enter as soon as `|z|` crosses back).
+  **Shadow mode** (`PAIRS_SHADOW`, default OFF): with `PAIRS_LIVE=false` **and** `PAIRS_SHADOW=true` the sleeve
+  runs the same z-signal but paper-only (0 orders) — logging discrete z-trades to
+  `logs/shadow/xau_xag_pairs.jsonl` (surfaced as a row in the Shadow Matrix and the weekly-outlook roster).
+  Resolution is **live-first** (`PAIRS_LIVE` wins), so demote to shadow only once the live 2-leg position is flat
+  — flipping `PAIRS_LIVE=false` mid-position stops z-exit management (the open legs then ride their disaster stop).
+  Toggle both flags from the dashboard Config panel. Kill switch (both off) = `PAIRS_LIVE=false` + `PAIRS_SHADOW=false`.
 - **Multi-symbol live engine** (`agents/multi_symbol_executor.py`) — extends live execution
   beyond gold to other instruments (currently **WTI oil**) via a per-combo live/shadow toggle in
   the dashboard's Shadow Matrix. **Default OFF** behind a two-layer gate (`MULTI_SYMBOL_LIVE=false`
@@ -159,6 +170,16 @@ Running in parallel, independent of the regime router:
   pip-scaled managers), a data-derived SL multiplier (WTI ×0.7, from MFE/MAE analysis) and an ATR
   sanity clamp. Gold's path is untouched (separate symbol + engine; gold's `MAX_OPEN_TRADES` is not
   affected). WTI is the one instrument whose momentum survived the full-history validation gauntlet.
+- **Discretion Cockpit** (`agents/cockpit_executor.py` + dashboard "DECISION COCKPIT" card) — assisted-discretion
+  for markets where no mechanical edge exists (e.g. gold): the card is a **context board** (fair-value gap vs a
+  macro model, sentiment, nearest S/R — `/api/cockpit`, display-only), and **you** make the entry call while the
+  bot handles execution + risk. *Phase 1* (the board) is always on and places nothing. *Phase 2* (manual order,
+  `POST /api/cockpit/order`) is gated by **`COCKPIT_LIVE` (default OFF)** — with it off every order is refused
+  before MT5 is touched. When on, a BUY/SELL click opens a per-order confirm dialog, then routes through the
+  normal `open_order` (so **all existing guards apply** — `LONG_ONLY_ALL`, margin/slot caps, min-lot) with a
+  **structural D1/H4-wick SL** and its own magic (`SYSTEM_MAGIC+8`). The bot never places an order on its own —
+  only your click does. Rationale: don't mechanise judgment (backtests proved gold has no rule-based edge);
+  amplify it — your context read picks direction/timing, the bot enforces the risk. Kill switch = `COCKPIT_LIVE=false`.
 - **Exit management** — vol-adaptive trailing stop (buffer = `TRAILING_ATR_MULT × ATR`),
   break-even, momentum-exit, zone-break — all deterministic, run on a fast poll.
 - **Gold-complex data collector** (`connectors/pair_collector.py`) — pulls OHLC + spread

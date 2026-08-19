@@ -107,7 +107,9 @@ def resolve_managed(rec, high, low, close, times, atr_v=None, *, point, cost_pip
         prof_r = ((c - entry) if is_buy else (entry - c)) / sl_dist
         # breakeven: profit ≥ trigger → ย้าย SL เป็น entry ± buffer (improve เท่านั้น)
         if not be_done and prof_r >= be_trig_r:
-            be_sl = entry + be_buf if is_buy else entry - be_buf
+            be_buf_eff = min(be_buf, 0.25 * sl_dist)          # FIX: BE_BUFFER_PIPS gold-calibrated (300pt=$3); FX buffer ใหญ่เกิน TP → scale ตาม sl_dist
+            be_sl = entry + be_buf_eff if is_buy else entry - be_buf_eff
+            be_sl = min(be_sl, c) if is_buy else max(be_sl, c)  # FIX: cap SL ไม่ให้เลย close ปัจจุบัน (กัน SL teleport เหนือตลาด = fabricated TP ที่ราคาไม่เคยเทรด)
             if (be_sl > sl_price) if is_buy else (be_sl < sl_price):
                 sl_price = be_sl
             be_done = True

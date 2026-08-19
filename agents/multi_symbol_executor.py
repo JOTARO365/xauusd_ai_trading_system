@@ -117,8 +117,10 @@ def _bars(broker, tf="H1", count=None):
     เครื่อง/โบรกอื่นที่ symbol map ไม่ตรง → copy_rates ว่าง → block 3s×2/combo/cycle. fail-fast → None → ข้าม combo."""
     try:
         import MetaTrader5 as mt5
-        tfmap = {"H1": mt5.TIMEFRAME_H1, "H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1}
-        mt5_tf = tfmap.get(tf, mt5.TIMEFRAME_H1)
+        tfmap = {"M15": mt5.TIMEFRAME_M15, "H1": mt5.TIMEFRAME_H1, "H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1}
+        if tf not in tfmap:                                   # FIX (user approved): unknown TF = skip; เดิม fallback เงียบ H1 → M15 combo live ใช้ signal ผิด TF
+            return None
+        mt5_tf = tfmap[tf]
         if count is None:
             count = 400 if tf == "D1" else _BARS_COUNT       # D1 ~400 บาร์พอ L=252 + buffer
         min_bars = 282 if tf == "D1" else _MIN_BARS          # tsmom ต้อง ≥ max(LOOKBACK 252)+30

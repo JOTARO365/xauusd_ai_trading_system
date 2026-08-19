@@ -228,8 +228,10 @@ def _bars(broker_symbol, tf="H1", count=None):
     try:
         import MetaTrader5 as mt5
         from connectors.price_feed import get_ohlcv
-        tfmap = {"H1": mt5.TIMEFRAME_H1, "H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1}
-        mt5_tf = tfmap.get(tf, mt5.TIMEFRAME_H1)
+        tfmap = {"M15": mt5.TIMEFRAME_M15, "H1": mt5.TIMEFRAME_H1, "H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1}
+        if tf not in tfmap:                                   # FIX: unknown TF = skip ชัดเจน (เดิม fallback เงียบ H1 → confluence_15m ถูกเทสเป็น H1)
+            return None
+        mt5_tf = tfmap[tf]
         if count is None:
             count = 400 if tf == "D1" else _BARS_COUNT
         min_bars = 282 if tf == "D1" else 520

@@ -255,6 +255,8 @@ ALGO_MAX_SAME_DIR     = int(os.getenv("ALGO_MAX_SAME_DIR") or 1)
 ALGO_ENTRY_HOURS      = os.getenv("ALGO_ENTRY_HOURS", "")
 # MULTI_SYMBOL_LIVE = master toggle: multi_symbol_executor วางออเดอร์จริงบน symbol ที่ toggle=LIVE (default OFF = 0 order; ต้องเปิด + toggle combo LIVE 2 ชั้น)
 MULTI_SYMBOL_LIVE     = os.getenv("MULTI_SYMBOL_LIVE", "false").lower() == "true"
+# COCKPIT_LIVE = Discretion Cockpit Phase 2: อนุญาต manual order (user กดใน dashboard → cockpit_executor). default OFF = ปฏิเสธทุก order. ⚠️ LIVE MONEY. reuse guard เดิม (LONG_ONLY_ALL/cap/structural-SL). kill = false
+COCKPIT_LIVE          = os.getenv("COCKPIT_LIVE", "false").lower() == "true"
 # ALGO_SL_MULT = SL multiplier ต่อ symbol "SYM:mult,..." (WTIUSD:0.7 = validated; ตัวอื่น default 1.0)
 ALGO_SL_MULT          = os.getenv("ALGO_SL_MULT", "WTIUSD:0.7")
 # MSE_MAX_POSITIONS = ไม้สูงสุดที่ multi_symbol_executor ถือพร้อมกันต่อ combo (stack ทีละไม้ต่อ signal-bar ใหม่)
@@ -332,6 +334,8 @@ ALGO_TF_OVERRIDE = os.getenv("ALGO_TF_OVERRIDE", "regime_momentum:BTCUSD=H4;tsmo
 ALGO_LB_OVERRIDE = os.getenv("ALGO_LB_OVERRIDE", "tsmom_d1:XAGUSD=6,18,42")                        # lookbacks (บาร์ TF) ต่อ combo
 # XAU-XAG pairs-trade (stat-arb, 2-leg market-neutral, 08-07). backtest rolling-β causal: WR57% OOS+2.45 t1.89
 PAIRS_LIVE       = os.getenv("PAIRS_LIVE", "false").lower() == "true"        # master gate (default OFF → 0 order)
+PAIRS_SHADOW     = os.getenv("PAIRS_SHADOW", "false").lower() == "true"      # paper mode (PAIRS_LIVE=false + นี่=true): log z-trade เก็บสถิติ ไม่วาง order. live-first
+PAIRS_REENTRY_COOLDOWN_MIN = int(os.getenv("PAIRS_REENTRY_COOLDOWN_MIN") or 30)   # พักหลังปิดฉุกเฉิน (repair-close/leg-fail/atomic-abort) ก่อนเข้าใหม่ = กัน churn ลูป
 PAIRS_SYMBOLS    = os.getenv("PAIRS_SYMBOLS", "XAUUSD:XAGUSD")               # y:x (spread = y − β·x)
 PAIRS_WIN        = int(os.getenv("PAIRS_WIN") or 120)                        # rolling window (β + z), บาร์ H1
 PAIRS_Z_IN       = float(os.getenv("PAIRS_Z_IN") or 2.0)                     # เข้าเมื่อ |z| ≥
@@ -533,7 +537,7 @@ def reload_config():
     CYCLE_DEADLINE_SEC       = float(os.getenv("CYCLE_DEADLINE_SEC") or 0)                    # B9: เพดานเวลา/cycle (0=ปิด)
     global SPECIALIST_ENABLED, SPECIALIST_SHADOW, MAX_RISK_PCT, REGIME_SHADOW
     global REGIME_LIVE, REGIME_LIVE_TICK, REGIME_TICK_INTERVAL_SEC, REGIME_PENDING, REGIME_SR_ENTRY, REGIME_PENDING_FADE, REGIME_SR_EXIT
-    global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK, ALGO_MAX_SAME_DIR, ALGO_ENTRY_HOURS, MULTI_SYMBOL_LIVE, ALGO_SL_MULT, MSE_MAX_POSITIONS, MSE_MAX_TOTAL, MSE_SL_MIN_ATR, MSE_SL_MAX_ATR, MSE_RR_SPREAD_TOL, WEEKEND_RUN, WEEKEND_INTERVAL_SECS, AUTO_SL_PCT_OTHER
+    global REGIME_SR_SIZING, REGIME_SR_RISK_PCT, REGIME_SHADOW_FILL, ALGO_MAX_STACK, ALGO_MAX_SAME_DIR, ALGO_ENTRY_HOURS, MULTI_SYMBOL_LIVE, COCKPIT_LIVE, ALGO_SL_MULT, MSE_MAX_POSITIONS, MSE_MAX_TOTAL, MSE_SL_MIN_ATR, MSE_SL_MAX_ATR, MSE_RR_SPREAD_TOL, WEEKEND_RUN, WEEKEND_INTERVAL_SECS, AUTO_SL_PCT_OTHER
     global STRUCTURAL_SL_GOLD, STRUCTURAL_SL_MSE, STRUCTURAL_SL_BUFFER_ATR, STRUCTURAL_SL_MIN_ATR, STRUCTURAL_SL_MAX_ATR, STRUCTURAL_SL_TFS, STRUCTURAL_SL_PICK, ALGO_ENTRY_MIN_GAP_ATR
     global ALGO_SIZE_STANDDOWN, ALGO_MAX_TRADE_RISK_PCT
     global SENTIMENT_BIAS, SENTIMENT_BIAS_DEADBAND, SENTIMENT_LOT_FLOOR, SENTIMENT_MARGIN_MULT, SENTIMENT_BLOCK_ABOVE, SENTIMENT_REFRESH_MIN, SENTIMENT_MODEL
@@ -566,6 +570,7 @@ def reload_config():
     ALGO_MAX_SAME_DIR        = int(os.getenv("ALGO_MAX_SAME_DIR") or 1)                      # ไม้ ALGO ทิศเดียวกันสูงสุด
     ALGO_ENTRY_HOURS         = os.getenv("ALGO_ENTRY_HOURS", "")                             # allow-list ชม UTC (ว่าง=ทุกชม)
     MULTI_SYMBOL_LIVE        = os.getenv("MULTI_SYMBOL_LIVE", "false").lower() == "true"     # master: executor multi-symbol วางออเดอร์จริง (default OFF)
+    COCKPIT_LIVE             = os.getenv("COCKPIT_LIVE", "false").lower() == "true"          # Cockpit Phase 2: manual order (default OFF)
     ALGO_SL_MULT             = os.getenv("ALGO_SL_MULT", "WTIUSD:0.7")                        # SL mult ต่อ symbol "SYM:mult,..."
     MSE_MAX_POSITIONS        = int(os.getenv("MSE_MAX_POSITIONS") or 1)                       # ไม้สูงสุด/combo ที่ executor ถือ
     MSE_MAX_TOTAL            = int(os.getenv("MSE_MAX_TOTAL") or 0)                            # เพดานรวมไม้ MSE ทุก symbol (0=ไม่จำกัด)
@@ -595,8 +600,10 @@ def reload_config():
     TSMOM_CONFIRM_LB         = int(os.getenv("TSMOM_CONFIRM_LB") or 21)
     ALGO_TF_OVERRIDE         = os.getenv("ALGO_TF_OVERRIDE", "regime_momentum:BTCUSD=H4;tsmom_d1:XAGUSD=H4")
     ALGO_LB_OVERRIDE         = os.getenv("ALGO_LB_OVERRIDE", "tsmom_d1:XAGUSD=6,18,42")
-    global PAIRS_LIVE, PAIRS_SYMBOLS, PAIRS_WIN, PAIRS_Z_IN, PAIRS_Z_OUT, PAIRS_Z_STOP, PAIRS_XAU_LOT, PAIRS_DISASTER_ATR
+    global PAIRS_LIVE, PAIRS_SHADOW, PAIRS_REENTRY_COOLDOWN_MIN, PAIRS_SYMBOLS, PAIRS_WIN, PAIRS_Z_IN, PAIRS_Z_OUT, PAIRS_Z_STOP, PAIRS_XAU_LOT, PAIRS_DISASTER_ATR
     PAIRS_LIVE               = os.getenv("PAIRS_LIVE", "false").lower() == "true"
+    PAIRS_SHADOW             = os.getenv("PAIRS_SHADOW", "false").lower() == "true"
+    PAIRS_REENTRY_COOLDOWN_MIN = int(os.getenv("PAIRS_REENTRY_COOLDOWN_MIN") or 30)
     PAIRS_SYMBOLS            = os.getenv("PAIRS_SYMBOLS", "XAUUSD:XAGUSD")
     PAIRS_WIN                = int(os.getenv("PAIRS_WIN") or 120)
     PAIRS_Z_IN               = float(os.getenv("PAIRS_Z_IN") or 2.0)

@@ -159,6 +159,55 @@ def snapshot():
                                  "dir_mode": _adir.mode_of("tsmom_d1")})
         except Exception:
             pass
+        # macro_momentum — H4 Donchian breakout (BRK=20) + DXY/EURUSD ยืนยันทิศ
+        try:
+            h4 = mt5.copy_rates_from_pos(S, mt5.TIMEFRAME_H4, 0, 100)
+            if h4 is not None and len(h4) > 25:
+                h4h, h4l = h4["high"].astype(float), h4["low"].astype(float); j4 = len(h4h) - 2
+                _add("macro_momentum", "macro_momentum", float(h4h[j4 - 20:j4].max()), float(h4l[j4 - 20:j4].min()),
+                     "H4 breakout + DXY/EURUSD ยืนยันทิศ")
+        except Exception:
+            pass
+        # confluence_15m — M15 Donchian (BRK=12) + confluence H1+H4+vol (NY 13-21)
+        try:
+            m15 = mt5.copy_rates_from_pos(S, mt5.TIMEFRAME_M15, 0, 60)
+            if m15 is not None and len(m15) > 15:
+                m5h, m5l = m15["high"].astype(float), m15["low"].astype(float); j5 = len(m5h) - 2
+                _add("confluence_15m", "confluence_15m", float(m5h[j5 - 12:j5].max()), float(m5l[j5 - 12:j5].min()),
+                     "M15 breakout + H1+H4+DXY+volume (NY 13-21)")
+        except Exception:
+            pass
+        # cdc_zone — D1 CDC Action Zone (EMA2→12/26); long เมื่อ zone พลิกเขียว (ถือยาว)
+        try:
+            dd = mt5.copy_rates_from_pos(S, mt5.TIMEFRAME_D1, 0, 300)
+            if dd is not None and len(dd) > 30:
+                from cdc_backtest import cdc_zone as _cdc
+                dcc = dd["close"].astype(float)
+                fast, slow = _cdc(dcc, dcc, dcc, dcc)
+                zone = "เขียว (bull)" if fast[-2] > slow[-2] else "แดง (bear)"
+                _add("cdc_zone", "cdc_zone", None, None, f"D1 zone: {zone} · long เมื่อพลิกเขียว (exit เมื่อพลิกแดง)")
+        except Exception:
+            pass
+        # pullback_buy — reclaim EMA20-H1 ในเทรนด์ D1↑ (long-only, SL แคบ)
+        try:
+            kk = 2.0 / 21.0; e20 = float(cl[0])
+            for v in cl:
+                e20 = float(v) * kk + e20 * (1 - kk)
+            _add("pullback_buy", "pullback_buy", e20, None, "ซื้อย่อ: D1↑ + reclaim EMA20-H1 (long-only, SL แคบ)")
+        except Exception:
+            pass
+        # xau_xag_pairs — spread z-fade (market-neutral, 2-leg) — คนละชนิด (ไม่ใช่ราคาเข้า) → โชว์ z ปัจจุบัน
+        try:
+            from agents.pairs_executor import snapshot as _psnap
+            ps = _psnap()
+            if ps.get("ok"):
+                zi = float(getattr(_cfg, "PAIRS_Z_IN", 2.0))
+                out["algos"].append({"algo": "xau_xag_pairs", "name": "xau_xag_pairs", "regime": "market-neutral",
+                                     "buy": None, "sell": None,
+                                     "note": f"spread z={ps.get('z')} · เข้าเมื่อ |z|≥{zi} (2-leg XAU–XAG) · {ps.get('mode', '?')}",
+                                     "dir_mode": "both"})
+        except Exception:
+            pass
     except Exception:
         pass
     return out

@@ -219,60 +219,145 @@ _PROMPT = """Real data for analysis (JSON):
 Write in Markdown using EXACTLY these Thai headings, in this order (do not add, remove, reorder, or
 translate the headings). Write ALL body text in Thai.
 
+IMPORTANT SCOPE: this article is ADVISORY CONTEXT for a human reader and for choosing which algos fit
+the week. It must NEVER instruct placing a specific trade (no "เปิด buy ที่ราคา X ตอนนี้", no lot size,
+no SL/TP orders) and never claims to override the system's rule-based entry logic. Scenarios and zones
+describe the market; the algos decide entries.
+
+GROUNDING: every claim must trace to the provided JSON (calendar / event_scenarios / news / macro /
+COT / gold_tech / world / drivers). Never invent a price, level, probability number, or event. If the
+data for a section is missing/empty, say so briefly in Thai ("ข้อมูลส่วนนี้ไม่มีในสัปดาห์นี้") instead of guessing.
+
 ## 📅 สรุปข่าว & ตลาดสัปดาห์ที่แล้ว
-(4-6 lines) Recap last week's key news / data / geopolitical events and how gold reacted, plus the main
-driver (Fed / dollar / safe-haven). Use ONLY gold_tech.last_week for prices (open/close/high/low/pct),
-never this_week. Cite dates ONLY from gold_tech.last_week.week_of (Mon–Fri range) — do not guess or
-compute dates. Reference real recent_headlines + world.headlines.
+(5-8 lines) Recap last week's key news / data / geopolitical events and how gold reacted, plus the main
+driver (Fed / dollar / safe-haven). Tell it as cause→effect: which event pushed gold which way, and did
+the week close stronger or weaker than it opened. Use ONLY gold_tech.last_week for prices
+(open/close/high/low/pct), never this_week. Cite dates ONLY from gold_tech.last_week.week_of (Mon–Fri
+range) — do not guess or compute dates. Reference real recent_headlines + world.headlines.
 
 ## 🌍 ภูมิรัฐศาสตร์ & Safe-Haven
-(3-5 substantive lines) Geopolitical factors moving gold now (from world.events/headlines/attention):
+(4-6 substantive lines) Geopolitical factors moving gold now (from world.events/headlines/attention):
 what happened, tension level and direction (easing/rising), and the MECHANISM to gold (safe-haven bid,
-central-bank buying, oil→inflation).
+central-bank buying, oil→inflation). End with one sentence: is the geopolitical backdrop this week a
+net tailwind, headwind, or neutral for gold, and what single development would flip that.
 
 ## 🎯 ทิศทาง & Bias สัปดาห์นี้
-Main direction (up/down/sideways) + confidence (high/medium/low) with reasons in plain prose (paragraphs,
-not a value dump):
+Main direction (up/down/sideways) + conviction (สูง/กลาง/ต่ำ) stated PLAINLY in the first sentence, then
+the reasons in plain prose (paragraphs, not a value dump). Rank the drivers: name the 2-3 factors that
+matter MOST this week and say explicitly which side each pushes gold:
 - Are the US dollar and Treasury yields supporting or pressuring gold — explain why (use
   drivers/macro_strip/regime_state as EVIDENCE, but never show field names or bare values; add a number
   only with context).
-- Fed stance & inflation, institutional/fund positioning (from COT), market risk mood, and the direction
-  of silver — which way each pushes gold and why.
-- Technical picture: where gold sits in its range, near which key support/resistance (use real prices from
-  gold_tech.this_week + daily).
+- Fed stance & inflation, institutional/fund positioning (from COT — are big funds adding or trimming,
+  and does that agree or clash with the price trend), market risk mood, and the direction of silver —
+  which way each pushes gold and why.
+- If the drivers CONFLICT (e.g. dollar pressures but safe-haven supports), say so honestly and explain
+  which side you weight more and why — that is what conviction สูง/กลาง/ต่ำ must reflect.
+
+## 📐 โซนราคาสำคัญ & สิ่งที่ต้องเห็น
+Key levels for THIS week, from real prices only (gold_tech.this_week + gold_tech.daily high/low/close;
+last week's high/low are natural reference levels too). Format:
+- **แนวต้าน**: 1-2 zones with the actual price area and WHY it matters (recent high, last week's high...).
+- **แนวรับ**: 1-2 zones, same treatment.
+- **สิ่งที่ต้องเห็นเพื่อยืนยันขาขึ้น**: what price behaviour would confirm the bullish read (e.g. holding above /
+  reclaiming a stated zone) — in plain Thai, using only levels stated above.
+- **สิ่งที่ต้องเห็นเพื่อยืนยันขาลง**: same for the bearish side.
+Use the ATR/range in gold_tech to say how far gold typically travels, so the reader knows if a zone is
+"ใกล้ถึงได้ในสัปดาห์นี้" or a stretch. Do NOT invent levels not derivable from the data.
+
+## 🎬 สถานการณ์ If-Then สัปดาห์นี้
+2-3 scenarios (เช่น กรณีหลัก / กรณีรอง / กรณีหางเสี่ยง), each 2-3 lines: IF <trigger: a calendar event
+outcome, a geopolitical turn, or price breaking a zone from the section above> THEN <expected gold
+behaviour + which zone it targets>. Express likelihood ONLY as Thai words (เป็นไปได้มากสุด / มีโอกาสรอง /
+โอกาสน้อยแต่แรง) justified by the context — NEVER as made-up percentages. The main scenario must be
+consistent with the bias above; at least one scenario must be the OPPOSITE case so the reader knows
+what the other side looks like.
 
 ## 🤖 แนะนำเปิด Algo สัปดาห์นี้
-จาก ALGO ROSTER ข้างล่าง แนะนำว่าควรเปิด (enable) algo ไหนบ้างให้เหมาะกับ bias/regime ของสัปดาห์นี้ + ระบุทิศ
-(สำหรับ tsmom_d1: long / short / both) พร้อมเหตุผลสั้นๆ ภาษาชาวบ้าน. ยึด domain ของแต่ละ algo; ตัวไหนไม่เข้าสภาพ
-ตลาดสัปดาห์นี้ให้บอก "พัก (stand down)". เขียนเป็น bullet สั้น algo ละบรรทัด.
-ALGO ROSTER (✅=+EV backtest, LIVE ได้ · ⚠️=อ่อน/−EV):
-✅ macro_momentum (ทอง H4: breakout + DXY/EURUSD ยืนยันทิศ + sentiment · เข้าจุดสำคัญ ไม่สวน macro) ·
-✅ confluence_15m (ทอง M15 NY-session: breakout + H1+H4+DXY + volume surge · scalp คุณภาพสูง ถี่) ·
-✅ xau_xag_pairs (stat-arb 2-leg XAU-XAG spread z-fade · market-neutral · WR57%) ·
-✅ tsmom_d1 (time-series momentum D1 · 21/63/126 + short-term confirm; long/short/both) ·
-⚠️ regime_momentum (momentum breakout · TREND; ทอง H1 อ่อน, BTC H4 +EV) ·
-⚠️ regime_momentum_fvg (momentum+FVG · TREND; −EV) · mean_reversion (z-fade · RANGE; CUT −EV) ·
-sweep_reversal (fade ไฮ/โลว์วันก่อน · RANGE/NEUTRAL; −EV).
+จาก ALGO ROSTER ข้างล่าง (= algo ที่ระบบมีจริงทั้งหมด) แนะนำว่า algo ไหนเข้ากับ bias/regime ของสัปดาห์นี้ + ระบุทิศ
+(สำหรับ tsmom_d1: long / short / both) พร้อมเหตุผลสั้นๆ ภาษาชาวบ้าน. ยึด domain ของแต่ละ algo (trend-follow
+เหมาะสัปดาห์มีเทรนด์/มี catalyst · mean-reversion/fade เหมาะสัปดาห์ sideways · pairs ไม่แคร์ทิศ). เชื่อมเหตุผลกับ
+bias และ scenario ข้างบน (เช่น "ถ้าเกิดกรณีหลัก algo นี้ได้เปรียบ"). เน้นแนะนำตัวที่ 🟢 LIVE (พร้อมเทรดจริง) ก่อน;
+ตัว 🟡 SHADOW แนะนำได้แต่บอกว่ายังเก็บสถิติ/ต้องระวัง. ตัวไหนไม่เข้าสภาพตลาดสัปดาห์นี้ให้บอก "พัก (stand down)"
+พร้อมเหตุผลสั้น. เขียนเป็น bullet algo ละบรรทัด และ**ทุก bullet ต้องขึ้นต้นด้วยชื่อ algo + ทิศ เป็นตัวหนา**
+เช่น "- **tsmom_d1 — long**: เหตุผล..." (ชื่อ algo ตรงตาม roster). อย่าแนะนำ algo ที่ไม่อยู่ใน roster.
+ย้ำ: นี่คือคำแนะนำว่า "algo ไหนเหมาะ" เท่านั้น — ไม่ใช่คำสั่งเปิดไม้ ระบบ entry ตัดสินเองตามกฎของมัน.
+ALGO ROSTER (🟢 LIVE=ขึ้นเทรดจริงแล้ว ผ่าน validation · 🟡 SHADOW=เก็บสถิติ/ยังไม่ยืนยัน edge · [TF]=timeframe):
+{roster}
 
 ## 🗓️ ปฏิทิน & Scenario สัปดาห์นี้
 For each key event in calendar: date/time + hot→gold direction / cool→gold direction. Base magnitudes on
 event_scenarios (magnitude% + n) — do not guess; if an event has no stats, say "ไม่มีสถิติ". Convey the
 statistic's reliability from n as a Thai WORD, never the raw count or "n=": n≥100 → "ความน่าเชื่อถือสูง",
-30–100 → "ปานกลาง", <30 → "ต่ำ (ตัวอย่างน้อย)".
+30–100 → "ปานกลาง", <30 → "ต่ำ (ตัวอย่างน้อย)". Where forecast/previous exist, add one clause on what the
+market expects and which side a surprise would land. Mark the 1-2 events of the week most likely to move
+gold hardest as **จุดชี้ขาดของสัปดาห์** and say which day the volatility risk concentrates on.
 
 ## ⚠️ เฝ้าระวัง (Risk Factors)
-This week's risks — bullets + short reason: geopolitics (world) + market risk mood + major calendar events.
+This week's risks — bullets + short reason: geopolitics (world) + market risk mood + major calendar
+events. Then a short sub-part **อะไรจะทำให้มุมมองนี้ผิด**: 2-3 bullets of concrete falsifiers — the specific
+data outcome, headline type, or price behaviour (vs the zones above) that would invalidate the main bias,
+and what the reader should conclude if it happens (bias flips vs just weakens).
 
 ## 🔍 Macro ที่ต้องติดตาม
-Ongoing macro themes (Fed path, real yield, dollar trend, CPI, central-bank gold buying) — bullets.
+Ongoing macro themes (Fed path, real yield, dollar trend, CPI, central-bank gold buying) — bullets, each
+with WHY it matters to gold in one clause, not a bare topic list.
 
-End with: a one-line **สรุป** (summary) for this week, in Thai.
+End with: a one-line **สรุป** (summary) for this week, in Thai — bias + conviction + the one thing to watch.
 """
 
 
 import threading as _threading
 _BUILD_LOCK = _threading.Lock()                          # atomic check-and-set (กัน Opus รันซ้อน = เงินจริง)
 _BUILDING = {"on": False}                                # กัน Opus รันซ้อน (poll หลายรอบ)
+
+
+# คำบรรยาย domain (ภาษาชาวบ้าน) ต่อ algo — ตัวไม่มี key จะ fallback docstring บรรทัดแรกของ class
+_ALGO_DESC = {
+    "macro_momentum":      "ทอง H4: breakout + DXY/EURUSD ยืนยันทิศ + sentiment · เข้าจุดสำคัญ ไม่สวน macro",
+    "confluence_15m":      "ทอง M15 NY-session: breakout + H1+H4+DXY + volume surge · scalp คุณภาพสูง ถี่",
+    "tsmom_d1":            "time-series momentum D1 · 21/63/126 + short-term confirm; long/short/both",
+    "cdc_zone":            "CDC Action Zone D1: EMA2 ตัด 12/26 · trend-follow ถือยาว exit เมื่อ zone พลิก",
+    "pullback_buy":        "ซื้อย่อในเทรนด์ (long-only): D1 ขาขึ้น + reclaim EMA20-H1 หลังย่อ · SL แคบ",
+    "regime_momentum":     "momentum breakout · TREND (ทอง H1 อ่อน, BTC H4 ดีกว่า)",
+    "regime_momentum_fvg": "momentum + FVG · TREND",
+    "mean_reversion":      "z-fade กลับค่าเฉลี่ย · RANGE",
+    "sweep_reversal":      "fade ไฮ/โลว์วันก่อน · RANGE/NEUTRAL",
+    "xau_xag_pairs":       "stat-arb 2-leg XAU–XAG spread z-fade · market-neutral (ไม่แคร์ทิศทองรวม)",
+}
+
+
+def _build_roster():
+    """ALGO ROSTER สด: WHICH algo = ALGO_REGISTRY (ตัวใหม่โผล่เอง) + สถานะ LIVE/SHADOW จริงจาก shadow_switches.
+    LIVE = ผ่าน validation ขึ้นเทรดจริง (XAUUSD ใช้ gold_state เคารพ .env flag) · fail-soft → "" (prompt แค่ไม่มี roster)."""
+    try:
+        from agents.algo_registry import ALGO_REGISTRY
+        from agents import shadow_switches as _sw
+    except Exception as e:                               # noqa: BLE001
+        logger.warning(f"[weekly] roster build fail: {e}")
+        return ""
+    lines = []
+    for aid, algo in ALGO_REGISTRY.items():
+        pairs = list(getattr(algo, "eligible_pairs", []) or [])
+        live = [s for s in pairs
+                if (_sw.gold_state(aid) if s == "XAUUSD" else _sw.state_of(aid, s)) == _sw.LIVE]
+        status = f"🟢 LIVE ({', '.join(live)})" if live else "🟡 SHADOW"
+        desc = _ALGO_DESC.get(aid) or next(
+            (ln.strip() for ln in (type(algo).__doc__ or "").splitlines() if ln.strip()), "")
+        lines.append(f"{status} {aid} [{getattr(algo, 'timeframe', '?')}] — {desc}")
+    # xau_xag_pairs = engine แยก (ไม่อยู่ ALGO_REGISTRY/shadow_switches) — gate ด้วย config.PAIRS_LIVE/PAIRS_SHADOW (3-state)
+    try:
+        import config as _cfg
+        if getattr(_cfg, "PAIRS_LIVE", False):
+            pstat = "🟢 LIVE (XAUUSD/XAGUSD)"
+        elif getattr(_cfg, "PAIRS_SHADOW", False):
+            pstat = "🟡 SHADOW"
+        else:
+            pstat = "⚪ OFF"
+        lines.append(f"{pstat} xau_xag_pairs [D1] — {_ALGO_DESC['xau_xag_pairs']}")
+    except Exception:                                   # noqa: BLE001
+        pass
+    return "\n".join(lines)
 
 
 def build(force=False):
@@ -290,7 +375,7 @@ def build(force=False):
         from langchain_core.messages import SystemMessage, HumanMessage
         import config as _cfg
         ctx = _gather()
-        _maxtok = int(os.getenv("WEEKLY_OUTLOOK_MAX_TOKENS") or 6000)   # cap (ไม่ใช่ cost); +geopolitics section = ยาวขึ้น
+        _maxtok = int(os.getenv("WEEKLY_OUTLOOK_MAX_TOKENS") or 8000)   # cap (ไม่ใช่ cost); +zones/if-then sections = ยาวขึ้น
         llm = ChatAnthropic(model=_MODEL, api_key=_cfg.ANTHROPIC_API_KEY,
                             max_tokens=_maxtok, timeout=120)   # ไม่ตั้ง temperature — Opus 4.8 deprecated
         from datetime import datetime as _dt, timedelta as _td
@@ -299,7 +384,8 @@ def build(force=False):
         _whdr = (f"Target week to analyse: **{wk}** (Mon {_mon:%Y-%m-%d} to Sun {_sun:%Y-%m-%d}). "
                  f"Write this week's outlook for this window only; 'last week' = the preceding Monday. "
                  f"Write the entire output in Thai.\n\n")
-        user_msg = _whdr + _PROMPT.format(context=json.dumps(ctx, ensure_ascii=False)[:60000])   # กว้าง — Opus รับได้เยอะ
+        user_msg = _whdr + _PROMPT.format(context=json.dumps(ctx, ensure_ascii=False)[:60000],
+                                          roster=_build_roster())   # กว้าง — Opus รับได้เยอะ
         resp = llm.invoke([SystemMessage(content=_SYSTEM), HumanMessage(content=user_msg)])
         md = resp.content if isinstance(resp.content, str) else str(resp.content)
         usage = getattr(resp, "usage_metadata", None) or {}

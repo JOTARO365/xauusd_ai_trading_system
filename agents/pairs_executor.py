@@ -15,6 +15,7 @@ hook: trading_graph.node_position_mgmt ทุก cycle. fail-soft.
 import json
 import math
 import os
+import time
 from pathlib import Path
 
 import numpy as np
@@ -22,11 +23,27 @@ from loguru import logger
 
 _BASE = Path(__file__).resolve().parent.parent
 _STATE = _BASE / "data" / "pairs_state.json"
+_SHADOW_STATE = _BASE / "data" / "pairs_shadow_state.json"       # paper position (แยกจาก live _STATE)
+_SHADOW_LOG = _BASE / "logs" / "shadow" / "xau_xag_pairs.jsonl"  # discrete paper trades (matrix อ่าน)
 
 
 def _cfg(name, default):
     import config as _c
     return getattr(_c, name, default)
+
+
+def _mode():
+    """live (PAIRS_LIVE) > shadow (PAIRS_SHADOW) > off. live-first: ถ้ายังมีไม้ live ค้าง PAIRS_LIVE ควรคง true จน flat."""
+    if _cfg("PAIRS_LIVE", False):
+        return "live"
+    if _cfg("PAIRS_SHADOW", False):
+        return "shadow"
+    return "off"
+
+
+def _cd_sec():
+    """cooldown หลังปิดฉุกเฉิน (repair-close/entry-fail/atomic-abort) — กันลูป churn เข้าใหม่ทันที."""
+    return int(_cfg("PAIRS_REENTRY_COOLDOWN_MIN", 30)) * 60
 
 
 def _pair_syms():
@@ -126,10 +143,65 @@ def _hedge_lots(mt5, xau_sym, xag_sym, beta):
     return round(xl, 2), xag_lot
 
 
-def tick(force=False):
-    """เรียกทุก cycle. gate PAIRS_LIVE. fail-soft. คืน summary หรือ None."""
+def _shadow_load():
     try:
-        if not _cfg("PAIRS_LIVE", False):
+        return json.loads(_SHADOW_STATE.read_text(encoding="utf-8"))
+    except Exception:
+        return {"open": False}
+
+
+def _shadow_save(d):
+    try:
+        _SHADOW_STATE.parent.mkdir(parents=True, exist_ok=True)
+        _SHADOW_STATE.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _shadow_append(rec):
+    try:
+        _SHADOW_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with open(_SHADOW_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
+def _shadow_step(z, beta, sd, yl, xl):
+    """paper pairs (0 order): same z-signal เป็น live แต่ track paper position + log R เมื่อปิด.
+    R = sign·(spread_exit−entry_spread)/sl_dist − cost/sl_dist (mirror pairs_trade_rigorous · β ตอนเข้า)."""
+    from datetime import datetime, timezone
+    z_in = float(_cfg("PAIRS_Z_IN", 2.0)); z_out = float(_cfg("PAIRS_Z_OUT", 0.5)); z_stop = float(_cfg("PAIRS_Z_STOP", 3.5))
+    st = _shadow_load(); now = datetime.now(timezone.utc).isoformat()
+    if st.get("open"):
+        sign = st["sign"]; eb = st["beta"]; es = st["entry_spread"]; esd = st["entry_sd"]
+        hit_stop = abs(z) >= z_stop; hit_out = abs(z) <= z_out
+        if hit_stop or hit_out:
+            sl_dist = (z_stop - z_in) * esd
+            cost_px = 0.30 + abs(eb) * 0.03                  # ~XAU spread + β·XAG spread (price units, อนุรักษ์)
+            r = (sign * ((yl - eb * xl) - es) - cost_px) / sl_dist if sl_dist > 0 else 0.0
+            _shadow_append({"ts_open": st.get("ts"), "ts_close": now, "dir": st.get("dir"),
+                            "entry_z": st.get("entry_z"), "exit_z": round(z, 2),
+                            "reason": "stop" if hit_stop else "revert", "R": round(r, 4), "beta": round(eb, 2)})
+            _shadow_save({"open": False})
+            logger.info(f"[PAIRS-SHADOW] EXIT {st.get('dir')} z={z:+.2f} R={r:+.3f} ({'STOP' if hit_stop else 'revert'})")
+            return {"ok": True, "mode": "shadow", "action": "exit", "z": round(z, 2), "R": round(r, 4)}
+        return {"ok": True, "mode": "shadow", "action": "hold", "z": round(z, 2)}
+    if abs(z) < z_in:
+        return {"ok": True, "mode": "shadow", "action": "flat", "z": round(z, 2)}
+    sign = 1 if z < 0 else -1                                 # long_spread(z<0)=+1 · short_spread(z>0)=−1
+    _shadow_save({"open": True, "sign": sign, "dir": "long_spread" if sign > 0 else "short_spread",
+                  "beta": round(beta, 3), "entry_spread": yl - beta * xl, "entry_sd": sd,
+                  "entry_z": round(z, 2), "ts": now})
+    logger.info(f"[PAIRS-SHADOW] ENTRY {'long' if sign > 0 else 'short'}-spread z={z:+.2f} β={beta:.1f} (paper)")
+    return {"ok": True, "mode": "shadow", "action": "entry", "z": round(z, 2)}
+
+
+def tick(force=False):
+    """เรียกทุก cycle. gate _mode() live/shadow/off. fail-soft. คืน summary หรือ None."""
+    try:
+        mode = _mode()
+        if mode == "off":
             return None
         import MetaTrader5 as mt5
         from connectors.pair_collector import _broker_map
@@ -147,6 +219,8 @@ def tick(force=False):
         if sd <= 0:
             return {"ok": False}
         z = (float(y[-1]) - beta * float(x[-1]) - m) / sd
+        if mode == "shadow":                              # paper: 0 order, log trade → matrix. live path ด้านล่างไม่แตะ
+            return _shadow_step(z, beta, sd, float(y[-1]), float(x[-1]))
         mag = _magic()
         pos = _positions(mt5, mag)
         st = _load()
@@ -155,11 +229,13 @@ def tick(force=False):
         # ── มี position อยู่ → เช็ค exit ──
         if pos:
             side = st.get("dir")                          # 'long_spread' / 'short_spread'
-            if len(pos) < 2:                              # ขาหาย (SL/manual) → ปิดที่เหลือ reset (กัน naked)
+            if len(pos) < 2:                              # ขาหาย (SL/manual/magic-reset) → ปิดที่เหลือ reset (กัน naked)
                 for p in pos:
                     _close(mt5, p)
-                logger.warning("[PAIRS] ขาไม่ครบ 2 → ปิดที่เหลือ reset")
-                _save({"open": False}); return {"ok": True, "action": "repair-close"}
+                cd_min = int(_cfg("PAIRS_REENTRY_COOLDOWN_MIN", 30))
+                logger.warning(f"[PAIRS] ขาไม่ครบ 2 → ปิดที่เหลือ reset + cooldown {cd_min}m (กัน churn)")
+                _save({"open": False, "cooldown_until": time.time() + _cd_sec()})   # กัน re-entry ทันที = ลูป
+                return {"ok": True, "action": "repair-close", "cooldown_min": cd_min}
             hit_stop = abs(z) >= z_stop
             hit_out = abs(z) <= z_out
             if hit_stop or hit_out:
@@ -169,8 +245,11 @@ def tick(force=False):
             return {"ok": True, "action": "hold", "z": round(z, 2)}
 
         # ── flat → เช็ค entry ──
-        if st.get("open"):                                # state บอก open แต่ไม่มี pos → reset
-            _save({"open": False})
+        if st.get("open"):                                # state บอก open แต่ไม่มี pos → reset (คง cooldown ถ้ามี)
+            _save({"open": False, "cooldown_until": st.get("cooldown_until")})
+        cd_until = st.get("cooldown_until")               # cooldown หลังปิดฉุกเฉิน → พักก่อนเข้าใหม่ (กัน churn)
+        if cd_until and time.time() < cd_until:
+            return {"ok": True, "action": "cooldown", "z": round(z, 2), "wait_s": int(cd_until - time.time())}
         if abs(z) < z_in:
             return {"ok": True, "action": "flat", "z": round(z, 2)}
         # z>z_in: spread สูง → short spread (SELL XAU + BUY XAG); z<−z_in → long spread
@@ -179,14 +258,16 @@ def tick(force=False):
         xag_dir = "BUY" if short_spread else "SELL"
         xl, bl = _hedge_lots(mt5, xau, xag, beta)
         t1 = _open_leg(mt5, xau, xau_dir, xl, mag)
-        if not t1:
+        if not t1:                                        # leg1 เปิดไม่ติด (เช่น AutoTrading disabled) → cooldown กัน hammer
+            _save({"open": False, "cooldown_until": time.time() + _cd_sec()})
             return {"ok": False, "action": "entry-fail-leg1"}
         t2 = _open_leg(mt5, xag, xag_dir, bl, mag)
-        if not t2:                                        # atomic: leg2 fail → ปิด leg1 ทันที
+        if not t2:                                        # atomic: leg2 fail → ปิด leg1 ทันที + cooldown
             for p in _positions(mt5, mag):
                 _close(mt5, p)
-            logger.warning("[PAIRS] leg2 fail → ปิด leg1 (atomic, ไม่มีขาโดด)")
-            _save({"open": False}); return {"ok": False, "action": "entry-atomic-abort"}
+            logger.warning("[PAIRS] leg2 fail → ปิด leg1 (atomic, ไม่มีขาโดด) + cooldown")
+            _save({"open": False, "cooldown_until": time.time() + _cd_sec()})
+            return {"ok": False, "action": "entry-atomic-abort"}
         _save({"open": True, "dir": "short_spread" if short_spread else "long_spread",
                "entry_z": round(z, 2), "beta": round(beta, 2), "xau_lot": xl, "xag_lot": bl,
                "xau_ticket": t1, "xag_ticket": t2})
@@ -212,8 +293,9 @@ def snapshot():
         beta = float(np.polyfit(x[-win:], y[-win:], 1)[0])
         sp = y[-win:] - beta * x[-win:]; sd = float(sp.std())
         z = (float(y[-1]) - beta * float(x[-1]) - float(sp.mean())) / sd if sd else 0.0
-        st = _load()
+        st = _load(); sh = _shadow_load(); mode = _mode()
         return {"ok": True, "z": round(z, 2), "beta": round(beta, 2), "live": bool(_cfg("PAIRS_LIVE", False)),
-                "position": st.get("dir") if st.get("open") else None, "entry_z": st.get("entry_z")}
+                "mode": mode, "position": st.get("dir") if st.get("open") else None, "entry_z": st.get("entry_z"),
+                "shadow_position": sh.get("dir") if sh.get("open") else None, "shadow_entry_z": sh.get("entry_z")}
     except Exception:
         return {"ok": False}

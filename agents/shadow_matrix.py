@@ -28,6 +28,31 @@ _READY_EXP_R = 0.05
 _DYING_EXP_R = -0.05
 _MIN_SPAN_DAYS = 60
 _N_READY = {"scalp": 100, "swing": 20}
+_PAIRS_LOG = os.path.join(_LOGDIR, "xau_xag_pairs.jsonl")     # xau_xag_pairs = engine แยก (ไม่อยู่ registry)
+
+
+def _pairs_row():
+    """row พิเศษ xau_xag_pairs (stat-arb engine แยก · gate PAIRS_LIVE/PAIRS_SHADOW ไม่ใช่ shadow_switches).
+    อ่าน paper-log (discrete z-trade). toggle ผ่าน Config panel (PAIRS_LIVE/PAIRS_SHADOW). display-only ใน matrix."""
+    import config as _cfg
+    live = bool(getattr(_cfg, "PAIRS_LIVE", False)); shadow = bool(getattr(_cfg, "PAIRS_SHADOW", False))
+    state = "LIVE" if live else ("SHADOW" if shadow else "OFF")
+    recs = _read(_PAIRS_LOG)
+    Rs = [float(r["R"]) for r in recs if r.get("R") is not None]
+    row = {"algo_id": "xau_xag_pairs", "symbol": "XAUUSD/XAGUSD", "klass": "swing", "state": state,
+           "exec_mode": "LIVE_ENGINE" if live else ("PAPER_ENGINE" if shadow else "OFF"),
+           "live": live, "switch_kind": "pairs", "switch_state": state,
+           "backtest_exp_R": None, "backtest_n": None, "backtest_wr": 57.0, "backtest_managed": True,
+           "real_n": 0, "real_exp_R": None, "real_wr": None, "real_regime": {}, **_aggregate([], "swing")}
+    if Rs:
+        import numpy as _np
+        a = _np.array(Rs, float); n = len(a); mu = float(a.mean())
+        row["n"] = n; row["exp_R"] = round(mu, 4); row["sum_R"] = round(float(a.sum()), 1)
+        row["wr"] = round(float((a > 0).mean()) * 100, 1)
+        row["by_result"] = {"TP": int((a > 0).sum()), "SL": int((a <= 0).sum())}  # FIX: rollup อ่าน by_result.TP หา wins → ไม่งั้น wr rollup=0
+        row["badge"] = ("ready" if (n >= _N_READY["swing"] and mu > _READY_EXP_R)
+                        else "dying" if (n >= 30 and mu < _DYING_EXP_R) else "collecting")
+    return row
 
 # display metadata — ให้เมทริกซ์โชว์ตรงกับที่เทรดจริง (ชื่อ + สถานะ live). ไม่แตะ algo_id/data pipeline.
 _ALGO_META = {
@@ -192,16 +217,18 @@ def build():
                      "OFF" if st == _sw.OFF else "SHADOW")
         # unify: ทองใช้ switch เดียวกับทุกคู่ (shadow_switches SHADOW/LIVE/OFF). engine อ่าน gold_state เดียวกัน → display/engine ตรงกัน
         switch_kind, switch_state = "combo", st
-        if engine_live:
+        live_flag = (st == _sw.LIVE)
+        if engine_live:                                     # gold engine: state จริง = gold_state (เคารพ switch SHADOW/OFF)
             gst = _sw.gold_state(algo_id)
             switch_state = gst
             exec_mode = ("LIVE_ENGINE" if gst == _sw.LIVE else
                          "PAPER_ENGINE" if gst == _sw.SHADOW else "OFF")
+            live_flag = (gst == _sw.LIVE)                   # FIX: live ตาม gold_state จริง ไม่ใช่ engine_live (กันโชว์ LIVE ทั้งที่ SHADOW)
         rows.append({"algo_id": algo_id, "symbol": symbol, "klass": klass,
                      "state": st, "exec_mode": exec_mode,
                      "switch_kind": switch_kind, "switch_state": switch_state,
-                     # live = คู่ที่เทรดจริง: gold intraday engine (live_symbol) หรือ combo ที่ toggle=LIVE (MSE เช่น WTI)
-                     "live": engine_live or st == _sw.LIVE,
+                     # live = คู่ที่เทรดจริง: gold engine (gold_state=LIVE) หรือ combo ที่ toggle=LIVE (MSE เช่น WTI)
+                     "live": live_flag,
                      "backtest_exp_R": (b.get("exp_R") if b else None),
                      "backtest_n": (b.get("n") if b else None),
                      "backtest_wr": (b.get("wr") if b else None),
@@ -236,6 +263,10 @@ def build():
                      "backtest_managed": bool(b.get("managed")) if b else False,
                      "real_n": rr.get("n", 0), "real_exp_R": rr.get("exp_R"),
                      "real_wr": rr.get("wr"), "real_regime": rr.get("by_regime", {}), **zero})
+    try:                                                   # xau_xag_pairs = engine แยก (gate PAIRS_LIVE/PAIRS_SHADOW)
+        rows.append(_pairs_row())
+    except Exception:
+        pass
     counts = {"ready": 0, "collecting": 0, "dying": 0}
     for r in rows:
         counts[r["badge"]] = counts.get(r["badge"], 0) + 1
@@ -250,7 +281,7 @@ def build():
         use_real = (r.get("real_n") or 0) > 0
         n = r["real_n"] if use_real else r["n"]
         expR = r["real_exp_R"] if use_real else r["exp_R"]
-        sumR = (r["real_exp_R"] * r["real_n"]) if use_real else (r["sum_R"] or 0.0)
+        sumR = (r["real_exp_R"] * r["real_n"]) if (use_real and r["real_exp_R"] is not None) else (r["sum_R"] or 0.0)  # FIX: real_exp_R=None (BE trades) → กัน None×int crash ทั้ง matrix
         wins = round((r.get("real_wr") or 0) / 100 * r["real_n"]) if use_real else (r["by_result"].get("TP", 0) if r["by_result"] else 0)
         a["n"] += n; a["sum_R"] += (sumR or 0.0)
         if n:
@@ -272,11 +303,11 @@ def build():
         a["exp_R"] = round(a["sum_R"] / a["n"], 3) if a["n"] else None
         a["wr"] = round(a["wins"] / a["n"] * 100, 1) if a["n"] else None
         m = _ALGO_META.get(a["algo_id"], {})
-        a["name"] = m.get("name", a["algo_id"])
+        a["name"] = a["algo_id"]                        # ชื่อ = algo_id เดียวกับ rows (ไม่ใช้ friendly name → กันสับสน 2 ชื่อ)
         a["note"] = m.get("note")
         a["live_symbol"] = m.get("live_symbol")
-        a["live_syms"] = live_syms.get(a["algo_id"], [])   # คู่ที่รันจริง (LIVE)
-        a["live"] = bool(a["live_syms"]) or bool(m.get("live_symbol"))   # live = มี combo LIVE จริง (ไม่ใช่แค่ gold meta)
+        a["live_syms"] = live_syms.get(a["algo_id"], [])   # คู่ที่รันจริง (LIVE) — จาก state จริง (row.live/exec_mode)
+        a["live"] = bool(a["live_syms"])                    # FIX: live = มี combo LIVE จริงเท่านั้น (ไม่ or live_symbol meta ที่ static → โชว์ LIVE ทั้งที่ SHADOW)
         try:                                            # per-algo direction mode (dropdown ใน dashboard)
             from agents import algo_dir as _adir
             a["dir_key"] = a["algo_id"]
@@ -284,30 +315,26 @@ def build():
         except Exception:
             a["dir_mode"] = "both"; a["dir_key"] = a["algo_id"]
     by_algo_list = list(by_algo.values())
-    try:
-        from agents import algo_dir as _adir
-        _tsmom_dir_mode = _adir.mode_of("tsmom_d1")
-    except Exception:
-        _tsmom_dir_mode = "long"
-    # TSMOM-D1 = engine ที่ 2 ที่เทรดจริงบนทอง (metric = Sharpe/equity คนละแบบ momentum → field headline แยก)
+    # tsmom_d1 = directional engine (metric = Sharpe) → enrich card เดิม (จาก registry rows) แทนสร้าง card ซ้ำ "TSMOM-D1 (daily)"
     try:
         from agents.shadow_tsmom import summary as _ts_summary
         _g = next((r for r in (_ts_summary().get("rows") or [])
                    if str(r.get("symbol", "")).upper().startswith("XAU")), None)
         if _g and _g.get("sharpe") is not None:
-            _hl = f"Sharpe {_g['sharpe']} · OOS {'+' if (_g.get('sr_oos') or 0) > 0 else ''}{_g.get('sr_oos')}"
+            _oos = _g.get("sr_oos")
+            _hl = f"Sharpe {_g['sharpe']}" + (f" · OOS {'+' if _oos > 0 else ''}{_oos}" if _oos is not None else "")
         else:
             _hl = (_g or {}).get("note") or "เก็บ data"
         _tn = (_g or {}).get("n_days")
     except Exception:
         _hl, _tn = "เก็บ data", None
-    by_algo_list.append({"algo_id": "TSMOM-D1", "name": "TSMOM-D1 (daily)", "regime": "TREND · D1",
-                         "live": getattr(_cfg, "TSMOM_LIVE", False), "live_symbol": "XAUUSD",
-                         "note": "directional รายวัน · เทรดจริงบนทอง · ดูรายละเอียด TSMOM section",
-                         "headline": _hl, "n": _tn, "wr": None, "exp_R": None, "sum_R": None,
-                         "dir_key": "tsmom_d1", "dir_mode": _tsmom_dir_mode,
-                         "hedge": bool(getattr(_cfg, "TSMOM_HEDGE_PENDING", False)),
-                         "pairs_pos": None, "pairs_traded": None, "best": None, "worst": None})
+    _tc = next((a for a in by_algo_list if a["algo_id"] == "tsmom_d1"), None)
+    if _tc is not None:                                   # ทองเทรดผ่าน tsmom (directional) → ผูก headline Sharpe เข้า card เดียว
+        _tc["headline"] = _hl
+        _tc["note"] = _tc.get("note") or "directional รายวัน · เทรดจริงบนทอง · ดูรายละเอียด TSMOM section"
+        _tc["hedge"] = bool(getattr(_cfg, "TSMOM_HEDGE_PENDING", False))
+        if _tn is not None:
+            _tc.setdefault("n_tsmom", _tn)
     return {"ok": True, "generated": datetime.now(timezone.utc).isoformat()[:16] + "Z",
             "engine_on": getattr(_cfg, "SHADOW_ENGINE", False),
             "n_ready": _N_READY, "ready_exp_R": _READY_EXP_R, "min_span_days": _MIN_SPAN_DAYS,

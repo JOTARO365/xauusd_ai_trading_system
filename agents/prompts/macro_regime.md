@@ -25,20 +25,23 @@ DATA (auto 2026-07-24): CPI YoY +3.5% m/m cooling (2026-06 -0.35%, 2026-05 +0.63
 - WATCH: re-acceleration would restore the bullish inflation tailwind
 <!-- MACRO_AUTO_END -->
 
-PHASE: Gold enters Friday's NFP release in a bullish-leaning but event-sensitive posture. The Fed remains data-dependent with no imminent cut signaled, keeping real rates elevated but not rising further — a neutral-to-mild headwind. The dominant midweek development is the labor market softness narrative: the prior NFP print was a weak 57K, and Friday's forecast of 85K still represents a historically subdued pace, keeping recession-hedge demand for gold alive. News sentiment scores bullish (19/5). The key risk is a hot NFP surprise — a print well above 85K with wages holding at 0.3% — which would reprice Fed cut expectations lower and pressure gold. Two-sided session ahead with asymmetric reaction potential.
+PHASE: Gold is mid-week in a cautious, two-sided phase. The dominant live catalyst is today's FOMC Meeting Minutes (14:00 ET), which will be parsed for how many members flagged inflation persistence versus growth concerns at the last meeting — any hawkish lean (fewer cuts signaled, higher-for-longer language) is a near-term headwind; dovish dissent or growth worry is a tailwind. UK CPI printed this morning at a forecast of 2.9% vs prior 2.6%, a hot read that strengthens the "sticky global inflation" narrative and modestly supports gold as a real-asset hedge, though it also lifts the dollar indirectly. The Fed remains on hold, real rates are elevated, and geopolitical risk (no fresh escalation reported) is a background bid rather than an active driver. The tilt is two-sided into the Minutes, with a mild bullish lean if the Fed signals concern about slowing growth.
 
 DRIVERS:
-1. NFP outcome vs. 85K forecast (labor weakness = gold up; beat = gold down ~0.92%)
-2. Unemployment Rate vs. 4.2% (rise = gold up ~0.87%; hold/fall = gold down)
-3. Average Hourly Earnings vs. 0.3% (hot wages reinforce Fed hold = gold down)
-4. Fed cut-path repricing driven by today's data bundle
-5. Residual safe-haven bid from prior geopolitical/macro uncertainty
-6. ⚠️ Hormuz/oil counter-channel: an oil spike from Middle-East tension feeds inflation → risks Fed hawkish repricing → real yields up = gold DOWN. Do NOT score geopolitics as pure safe-haven (+gold). Weight BOTH: acute safe-haven bid (short-term, gold up) vs sustained-oil→inflation→rate (medium-term, gold down). Currently CPI m/m −0.3% (disinflation) tilts near-term dovish → safe-haven holds short-term, but a sustained oil spike reverses it. Bias should be TWO-SIDED / lower-conviction, not a naive high +score.
+1. FOMC Minutes tone — hawkish vs. dovish split among members
+2. UK CPI surprise (hot 2.9%) — sticky global inflation narrative
+3. Real US interest rates and USD direction
+4. Geopolitical background bid (persistent, not acute)
+5. Philly Fed Manufacturing (Thursday, forecast 24.1 vs prior 41.4 — sharp slowdown expected)
 
-FILTER: UP — NFP miss (<70K), unemployment rising above 4.2%, wages soft; DOWN — NFP beat (>110K), unemployment steady/falling, wages above 0.3%
+FILTER: UP — Minutes show growth/labor concern, dovish dissent, or stagflation framing; Philly Fed misses badly. DOWN — Minutes confirm unanimous hawkish hold, hot language on inflation, USD rallies.
 
-CATALYSTS: Aug 7 — Non-Farm Payrolls (85K forecast, prev 57K): cool=gold UP ~0.87%; hot=gold DOWN ~0.92%. Unemployment Rate (4.2% forecast): rise=gold UP; hold=gold DOWN. Average Hourly Earnings (0.3% forecast): beat=gold DOWN.
+CATALYSTS:
+- FOMC Meeting Minutes today 14:00 ET — dovish=gold UP ~0.79%; hawkish=gold DOWN ~0.70%
+- Philly Fed Manufacturing Thu 08:30 ET — forecast 24.1 vs prior 41.4; miss=gold UP; beat=gold DOWN
+- Unemployment Claims Thu 08:30 ET — above 210K=gold UP; below=gold DOWN
+- Flash PMIs Friday (EUR/GBP) — weak readings support gold safe-haven bid
 
-RECOMMENDED ALGOS: tsmom_d1 LONG (D1 uptrend intact, labor softness bias supports longs; flip to short only on strong NFP beat); regime_momentum TREND (enable for breakout on NFP print, both directions); regime_momentum_fvg TREND (secondary momentum confirmation post-print); stand down sweep_reversal and mean_reversion (NFP day volatility breaks range assumptions).
+RECOMMENDED ALGOS: tsmom_d1 BOTH (two-sided into Minutes; no clean D1 directional conviction pre-release); regime_momentum ENABLED in TREND mode post-Minutes once direction is established; regime_momentum_fvg ENABLED as secondary trend filter after 14:00 ET volatility resolves; stand down sweep_reversal and mean_reversion (event-driven volatility environment, not range conditions).
 
-UPDATED: 2026-08-07 — NFP Friday dominates; prior 57K print and 85K forecast keep labor-weakness/gold-bid theme alive heading into the release.
+UPDATED: 2026-08-19 — UK CPI printed hot (2.9% vs 2.6% prior) and FOMC Minutes due today at 14:00 ET shift focus from week-open geopolitical baseline to Fed tone and sticky-inflation narrative.

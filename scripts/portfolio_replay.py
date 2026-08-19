@@ -210,6 +210,9 @@ def main():
         _sc = None
     global _MANAGED
     _MANAGED = "--managed" in sys.argv
+    global _TRAIL_ATR, _TRAIL_R
+    if "--trail_atr" in sys.argv: _TRAIL_ATR = float(sys.argv[sys.argv.index("--trail_atr")+1])
+    if "--trail_r" in sys.argv: _TRAIL_R = float(sys.argv[sys.argv.index("--trail_r")+1])
     risk = 0.005
     if "--risk" in sys.argv:
         try:

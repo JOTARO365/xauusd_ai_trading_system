@@ -1551,6 +1551,47 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
     </div>
   </div>
 
+  <!-- DECISION COCKPIT (Phase 1, display-only) — context board รวมจุดเดียว (/api/cockpit). 0 order. -->
+  <style>
+    .ckpt { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin:0 0 14px; }
+    .ckpt-h { font-family:var(--mono); font-size:10px; letter-spacing:1.2px; color:var(--muted);
+              text-transform:uppercase; margin-bottom:10px; display:flex; justify-content:space-between; }
+    .ckpt-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+    .ckpt-tile { border:1px solid var(--border2); border-radius:8px; padding:9px 11px; }
+    .ckpt-lbl { font-size:9px; letter-spacing:0.8px; color:var(--muted); text-transform:uppercase; margin-bottom:4px; }
+    .ckpt-val { font-family:var(--mono); font-size:15px; font-weight:700; color:var(--text); }
+    .ckpt-sub { font-size:10px; color:var(--muted); margin-top:3px; }
+    .ckpt-cheap { color:var(--green); } .ckpt-rich { color:var(--red); }
+  </style>
+  <div class="ckpt">
+    <div class="ckpt-h"><span>◆ DECISION COCKPIT · XAU/USD <span style="color:var(--muted)">(context board — คุณตัดสิน)</span></span>
+      <span id="ckpt-updated" style="color:var(--muted)">—</span></div>
+    <div class="ckpt-grid">
+      <div class="ckpt-tile"><div class="ckpt-lbl">Fair-Value Gap (macro model)</div>
+        <div class="ckpt-val" id="ckpt-fv">—</div><div class="ckpt-sub" id="ckpt-fv-sub">—</div></div>
+      <div class="ckpt-tile"><div class="ckpt-lbl">Sentiment</div>
+        <div class="ckpt-val" id="ckpt-sent">—</div><div class="ckpt-sub" id="ckpt-sent-sub">—</div></div>
+      <div class="ckpt-tile"><div class="ckpt-lbl">แนวรับใกล้สุด</div>
+        <div class="ckpt-val" id="ckpt-sup">—</div><div class="ckpt-sub" id="ckpt-sup-sub">—</div></div>
+      <div class="ckpt-tile"><div class="ckpt-lbl">แนวต้านใกล้สุด</div>
+        <div class="ckpt-val" id="ckpt-res">—</div><div class="ckpt-sub" id="ckpt-res-sub">—</div></div>
+    </div>
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border2)">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">คุณตัดสินใจ · บอท execute + คุม SL(structural)/TP เอง</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="ckpt-sym" class="filter-select" style="padding:3px 24px 3px 9px;font-size:11px">
+          <option value="XAUUSD">XAUUSD</option><option value="BTCUSD">BTCUSD</option>
+          <option value="WTIUSD">WTIUSD</option><option value="XAGUSD">XAGUSD</option></select>
+        <input id="ckpt-lot" type="number" step="0.01" min="0.01" placeholder="lot (ว่าง=default)"
+          style="width:130px;padding:3px 8px;font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text)">
+        <button onclick="submitCockpitOrder('BUY')" style="padding:4px 14px;font-size:12px;font-weight:700;border-radius:6px;border:1px solid var(--green);background:var(--green-dim);color:var(--green);cursor:pointer">BUY</button>
+        <button onclick="submitCockpitOrder('SELL')" style="padding:4px 14px;font-size:12px;font-weight:700;border-radius:6px;border:1px solid var(--red);background:var(--red-dim);color:var(--red);cursor:pointer">SELL</button>
+        <span id="ckpt-order-msg" style="font-family:var(--mono);font-size:10px;color:var(--muted)"></span>
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-top:5px">⚠️ ต้องเปิด <b>COCKPIT_LIVE</b> (Config) + ยืนยันทีละไม้ · SL=structural D1/H4 wick · guard เดิมครบ (LONG_ONLY_ALL บล็อก SELL ถ้าเปิด)</div>
+    </div>
+  </div>
+
   <!-- UHAS COMMAND DECK (07-17) — display-only, populate จาก bot_status (/api/monitor) -->
   <style>
     .cmd-deck { display:grid; grid-template-columns:1.2fr 1fr; gap:12px; margin:0 0 14px; }
@@ -1874,6 +1915,16 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
   </div><!-- /tab-overview -->
 
   <!-- ═══════════════════════════════════════════════════════════ -->
+  <style>
+    .panel-group { margin-bottom: 16px; }
+    .group-head { position: sticky; top: 0; z-index: 6; cursor: pointer; user-select: none;
+      font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+      color: var(--gold); background: var(--bg); border-bottom: 2px solid var(--gold-dim);
+      padding: 8px 4px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    .group-head::before { content: '▾'; font-size: 10px; color: var(--muted); }
+    .panel-group.collapsed .group-head::before { content: '▸'; }
+    .panel-group.collapsed > :not(.group-head) { display: none !important; }
+  </style>
   <div class="tab-content" id="tab-monitor">
 
     <!-- section quick-jump ย้ายไปเป็น submenu ใน sidebar ใต้ Live (07-23) -->
@@ -2239,7 +2290,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
     </section>
 
     <!-- PRICE CHART + AI ZONES OVERLAY (07-03) -->
-    <section>
+    <section id="price-chart-section">
       <div class="section-title" style="display:flex;align-items:center">
         <span>Price Chart &mdash; AI Zones Overlay</span>
         <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
@@ -2280,24 +2331,25 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
     </section>
 
     <!-- UHAS-style: Scenario plan cards ก/ข/พัก (slice 3) — สังเคราะห์จากแนว S/R + trend, display-only -->
-    <section>
+    <section id="scenario-section">
       <div class="section-title" style="display:flex;align-items:center">SCENARIO PLAN &mdash; แผน ก/ข/พัก
         <span style="font-size:9px;color:var(--muted);font-weight:400;margin-left:6px">(สังเคราะห์จากแนว S/R + เทรนด์ · display เฉยๆ ไม่ใช่คำสั่งเทรด)</span>
         <span id="scenario-validity" style="margin-left:auto;font-size:10px;color:var(--muted);font-weight:400;font-family:var(--mono)"></span></div>
+      <div id="scenario-prob" style="margin-bottom:10px"></div>
       <div id="scenario-cards" style="display:flex;gap:8px;flex-wrap:wrap">
         <div class="card" style="flex:1;min-width:240px;color:var(--muted);padding:10px">รอข้อมูลแนว S/R…</div>
       </div>
     </section>
 
     <!-- STRUCTURAL READ (โค้ช) — position-in-range / nearest S-R + strength / action-state / prob-path (จาก UHAS analyst 08-12, 0 token) -->
-    <section>
+    <section id="struct-read-section">
       <div class="section-title" style="display:flex;align-items:center"><svg class="ic"><use href="#ic-eye"/></svg> STRUCTURAL READ &mdash; อ่านโครงสร้างสด (โค้ช)
         <span style="font-size:9px;color:var(--muted);font-weight:400;margin-left:6px">(ตำแหน่งในกรอบ · แนวใกล้+ความแข็ง · state · โอกาสเด้ง/ทะลุ · display 0 token)</span></div>
       <div id="struct-read" class="card" style="padding:10px 12px;font-size:12px">รอข้อมูล S/R…</div>
     </section>
 
     <!-- ALGO SIGNALS — โอกาสเข้า order ต่อ algo (จุดเข้า/SL/TP + สถานะ เข้าแล้ว/โดน block) -->
-    <section>
+    <section id="algo-signals-section">
       <div class="section-title" style="display:flex;align-items:center"><svg class="ic"><use href="#ic-target"/></svg> ALGO SIGNALS &mdash; โอกาสเข้า order ต่อ algo
         <span style="font-size:9px;color:var(--muted);font-weight:400;margin-left:6px">(จุดเข้า/SL/TP ของทุก algo แม้ไม่เข้าจริง · บอกว่าเข้าไปแล้ว/โดน block เพราะอะไร · display 0 token)</span>
         <span id="algosig-sym" style="margin-left:auto;font-size:10px;color:var(--muted);font-family:var(--mono)"></span></div>
@@ -2307,7 +2359,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
     </section>
 
     <!-- RIDE COHORT — หน้าปัดการทดลอง MOMENTUM_RIDE (07-03) -->
-    <section>
+    <section id="cohort-section">
       <div class="section-title">System Trades Cohort &mdash; ไม้ระบบจริง (magic) closed WR/PnL + ล่าสุด</div>
       <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
         <div class="card"><div class="label">Closed / Open</div><div class="value gold" id="ride-n">—</div></div>
@@ -2331,7 +2383,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
     </section>
 
     <!-- BOT STATUS -->
-    <section>
+    <section id="desk-status-section">
       <div class="section-title">DESK STATUS</div>
       <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
         <div class="card">
@@ -2377,7 +2429,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
     </section>
 
     <!-- KEY LEVELS — AI zones ladder (UHAS-style ชิ้น 1, 07-03) -->
-    <section>
+    <section id="sr-book-section">
       <div class="section-title">LEVELS &mdash; S/R Book</div>
       <div id="sr-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
         <button class="ntab active" onclick="setSrTab('',this)">ทอง</button>
@@ -2408,7 +2460,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
       .tape-flow-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
       @media (max-width:900px){ .tape-flow-grid { grid-template-columns:1fr; } }
     </style>
-    <section>
+    <section id="tape-flow-section">
       <div class="section-title">TAPE / FLOW &mdash; Liquidity &middot; Volume &middot; Setups</div>
       <div class="tape-flow-grid">
         <div class="chart-card" id="liquidity-card" style="padding:12px 14px"><div id="liquidity-panel" style="font-family:var(--mono)"></div></div>
@@ -2418,7 +2470,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
     </section>
 
     <!-- EVENT RADAR — prior + forward projection (UHAS-style ชิ้น 3, 07-03) -->
-    <section>
+    <section id="macro-radar-section">
       <div class="section-title">MACRO RADAR &mdash; Priors &amp; Projection</div>
       <div class="chart-card" style="padding:14px 18px">
         <div id="event-radar" style="font-family:var(--mono);font-size:12px">Loading…</div>
@@ -2517,7 +2569,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
             <th style="text-align:right">move เฉลี่ย</th><th style="text-align:right">≈ $ ที่ราคาสด</th>
             <th style="text-align:right">×วันปกติ</th><th style="text-align:right">ทะลุ D+2</th>
             <th>scenario (ร้อน/เย็น → เป้าที่ราคาสด)</th></tr></thead>
-          <tbody id="evrx-body"><tr><td colspan="8" style="color:var(--muted);padding:4px 6px">Loading…</td></tr></tbody>
+          <tbody id="evrx-body"><tr><td colspan="9" style="color:var(--muted);padding:4px 6px">Loading…</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -2592,7 +2644,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
     </section>
 
     <!-- MANUAL RANGE OVERRIDE -->
-    <section>
+    <section id="manual-range-section">
       <div class="section-title">Manual Range Override &mdash; Sideways</div>
       <div class="chart-card" style="padding:16px 18px">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -2621,7 +2673,7 @@ document.addEventListener('DOMContentLoaded', function(){ _setThemeIcon(); });
     </section>
 
     <!-- PENDING ORDERS -->
-    <section>
+    <section id="working-orders-section">
       <div class="section-title">WORKING ORDERS</div>
       <div class="table-card">
         <div class="table-toolbar">
@@ -4139,6 +4191,7 @@ function jumpTo(id) {
 // submenu → สลับไป tab ที่ section นั้นอยู่ (monitor/backtest) แล้วเลื่อนไป section
 function goSection(id) {
   const el = document.getElementById(id);
+  if (el) el.closest('.panel-group')?.classList.remove('collapsed');   // Part B: เข้า section ในกลุ่มที่พับ → เปิดให้
   const tabContent = el && el.closest('.tab-content');            // section อยู่ tab ไหน
   const targetTab = tabContent ? tabContent.id.replace('tab-', '') : 'monitor';
   const already = tabContent && tabContent.classList.contains('active');
@@ -4228,7 +4281,7 @@ async function loadLivePrice() {
     loadMacroQuant();   // Macro/News quant — ข่าว+เศรษฐกิจ → gold bias (throttled, server-cached)
     loadLiquidityProxy();   // Liquidity/order-flow proxy (throttled, server-cached)
     loadAlgoJournal();      // Trade score — algo journal win-rate/exp_R (throttled, server-cached)
-    loadShadowMatrix(); loadAlgoPotential(); loadShadowTsmom(); loadRealEdge(); loadAlgoSelector();     // Batch B — multi-pair shadow matrix (throttled, server-cached)
+    loadShadowMatrix(); loadAlgoPotential(); loadShadowTsmom(); loadRealEdge(); loadAlgoSelector(); loadCockpit();     // Batch B — multi-pair shadow matrix (throttled, server-cached)
     loadAlgoStatus();   // System status — algo mode / regime / signal
     loadTsmom();        // TSMOM-D1 engine — signal ensemble / position / state
     loadWorldMonitor(); // GDELT geopolitical signals — globe live dots + attention/headline
@@ -4400,7 +4453,7 @@ function updateDeskBrief(bs) {
   const z = rmZone || zones.htf_zone;
   setTxt('brief-zone', (z && z.level != null)
     ? `${z.zone_type || ''} ${Number(z.level).toFixed(2)}`.trim()
-    : (sig.sr_zone || '—'));
+    : ((sig.sr_zone && sig.sr_zone !== 'NONE') ? sig.sr_zone : '—'));
 
   // SL/TP prices from plan pips + direction (gold pip = 0.01)
   const P = 0.01;
@@ -5116,7 +5169,7 @@ async function loadEcosystem() {
       return;
     }
     const g = d.gold || {}, s = d.sentiment || {};
-    (function(){var _e=document.getElementById('eco-emoji');if(_e)_e.style.background=({'<svg class="ic" style="color:var(--green)"><use href="#ic-dot"/></svg> ':'var(--green)','🟡':'var(--amber)','<svg class="ic" style="color:var(--red)"><use href="#ic-dot"/></svg> ':'var(--red)','⚪':'var(--muted)'}[s.emoji]||'var(--muted)');})(); set('eco-label', s.label || '—'); set('eco-detail', s.detail || '');
+    (function(){var _e=document.getElementById('eco-emoji');if(_e)_e.style.background=({'🟢':'var(--green)','🟡':'var(--amber)','🔴':'var(--red)','⚪':'var(--muted)','🛡️':'var(--gold)','💵':'var(--cyan)'}[s.emoji]||'var(--muted)');})(); set('eco-label', s.label || '—'); set('eco-detail', s.detail || '');
     if (g.move !== null && g.move !== undefined) {
       const gc = g.move > 0 ? 'var(--green)' : (g.move < 0 ? 'var(--red)' : 'var(--muted)');
       const grsi = (g.rsi === null || g.rsi === undefined) ? ''
@@ -5554,6 +5607,74 @@ async function loadAlgoPotential() {
   } catch (_e) {}
 }
 
+// ── จัดหมวดหมู่ tab-monitor: ย้าย section เข้า 4 กลุ่ม collapsible (ตาม id · idempotent · ปลอดภัย appendChild ไม่ทำลาย chart) ──
+const MON_GROUPS = [
+  { id: 'g-now', label: '① ตัดสินใจตอนนี้', ids: ['algo-status-section','tsmom-section','price-chart-section','scenario-section','struct-read-section','algo-signals-section','desk-status-section','cohort-section','manual-range-section','working-orders-section'] },
+  { id: 'g-algo', label: '② Algo & ผลงาน', ids: ['shadow-matrix-section','algo-journal-section','pairlots-section','pairs-section'] },
+  { id: 'g-context', label: '③ บริบทตลาด', ids: ['sr-book-section','tape-flow-section','cluster-map-section','liq-proxy-section','ecosystem-section','smc-section','pair-context-section','gold-regime-section','macro-strip-section','comex-section','cot-section'] },
+  { id: 'g-news', label: '④ ข่าว & Events', ids: ['wm-map-section','ai-sentiment-section','macro-quant-section','macro-radar-section','econ-calendar-section','event-engine-section','event-reaction-section','news-gate-section','impact-calibration-section'] },
+];
+function organizeMonitor() {
+  const host = document.getElementById('tab-monitor');
+  if (!host || host.dataset.organized) return;
+  MON_GROUPS.forEach(g => {
+    const wrap = document.createElement('section'); wrap.className = 'panel-group'; wrap.id = g.id;
+    const head = document.createElement('div'); head.className = 'group-head'; head.textContent = g.label;
+    head.onclick = () => wrap.classList.toggle('collapsed');
+    wrap.appendChild(head);
+    g.ids.forEach(id => { const el = document.getElementById(id); if (el) wrap.appendChild(el); });   // appendChild = ย้าย (ไม่ clone) → chart/listener คงอยู่
+    host.appendChild(wrap);
+  });
+  host.dataset.organized = '1';
+}
+
+// ── Decision Cockpit (Phase 1, display-only) — context board ──
+async function loadCockpit() {
+  try {
+    const d = await (await fetch('/api/cockpit')).json();
+    if (!d || !d.ok) return;
+    const $ = id => document.getElementById(id);
+    const fv = d.fair_value;
+    if (fv) {
+      const cheap = fv.gap_usd < 0;
+      $('ckpt-fv').innerHTML = `$${fv.fair_value} <span class="${cheap ? 'ckpt-cheap' : 'ckpt-rich'}">(${fv.gap_usd > 0 ? '+' : ''}${fv.gap_usd})</span>`;
+      const stale = fv.stale ? ` <span style="color:var(--red)">⚠ ข้อมูล ${fv.as_of} (เก่า—ราคาไม่ใช่ปัจจุบัน)</span>` : (fv.as_of ? ` · ${fv.as_of}` : '');
+      $('ckpt-fv-sub').innerHTML = `spot $${fv.spot} · ${fv.tag} ${Math.abs(fv.gap_pct)}% · z ${fv.z}${stale}`;
+    } else { $('ckpt-fv').textContent = 'n/a'; }
+    const s = d.sentiment || {};
+    $('ckpt-sent').textContent = s.label || s.bias || '—';
+    $('ckpt-sent-sub').textContent = s.summary ? String(s.summary).slice(0, 64) : (s.conf != null ? ('conf ' + s.conf) : '');
+    const lvl = v => (v && typeof v === 'object') ? v.level : v;
+    const tch = v => (v && v.touches) ? (v.touches + ' touches') : '';
+    $('ckpt-sup').textContent = lvl(d.support) ? ('$' + lvl(d.support)) : '—';
+    $('ckpt-sup-sub').textContent = tch(d.support);
+    $('ckpt-res').textContent = lvl(d.resistance) ? ('$' + lvl(d.resistance)) : '—';
+    $('ckpt-res-sub').textContent = tch(d.resistance);
+    if (d.updated_at) $('ckpt-updated').textContent = String(d.updated_at).slice(11, 16);
+  } catch (_e) {}
+}
+
+// Cockpit Phase 2 — manual order (user ตัดสินใจ + confirm → บอท execute). gate COCKPIT_LIVE ฝั่ง server.
+async function submitCockpitOrder(dir) {
+  const sym = document.getElementById('ckpt-sym').value;
+  const lot = document.getElementById('ckpt-lot').value;
+  const msg = document.getElementById('ckpt-order-msg');
+  const ok = await uiConfirm(`วางออเดอร์จริง ${dir} ${sym} lot ${lot || 'default'}? บอทจะคุม SL (structural D1/H4) + TP เอง.`,
+    { title: 'ยืนยันวางออเดอร์ manual', ok: dir, danger: true });
+  if (!ok) return;
+  msg.textContent = 'กำลังส่ง...'; msg.style.color = 'var(--muted)';
+  try {
+    const r = await (await fetch('/api/cockpit/order', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: sym, direction: dir, lot: lot || null })
+    })).json();
+    if (r.ok) {
+      msg.textContent = `✓ ${r.direction} ${r.symbol} @ ${r.price} · SL ${r.sl_pips}p TP ${r.tp_pips}p · #${r.ticket}`;
+      msg.style.color = 'var(--green)';
+    } else { msg.textContent = '✗ ' + (r.reason || 'ไม่สำเร็จ'); msg.style.color = 'var(--red)'; }
+  } catch (_e) { msg.textContent = '✗ เชื่อมต่อไม่ได้'; msg.style.color = 'var(--red)'; }
+}
+
 async function loadShadowMatrix(force) {
   if (!force && Date.now() - _smLast < 25000) return;     // throttle (server cache 30s)
   _smLast = Date.now();
@@ -5593,8 +5714,8 @@ async function loadShadowMatrix(force) {
         <td style="padding:4px 8px">${r.wr == null ? '—' : r.wr}</td>
         <td style="padding:4px 8px;color:${rC(r.exp_R)}">${fx(r.exp_R)}</td>
         <td style="padding:4px 8px;color:${rC(r.sum_R)}">${r.n ? fx(r.sum_R, 1) : '—'}</td>
-        <td style="padding:4px 8px;color:${rC(r.backtest_exp_R)}">${fx(r.backtest_exp_R)}${r.backtest_n ? ` <span style="color:var(--muted);font-size:10px">n${r.backtest_n}·WR${r.backtest_wr}%</span>` : ''}</td>
-        <td style="padding:4px 8px;color:${r.real_n ? rC(r.real_exp_R) : 'var(--muted)'}">${r.real_n ? fx(r.real_exp_R) + ` <span style="color:var(--muted);font-size:10px">n${r.real_n}·WR${r.real_wr}%</span>` : '—'}</td>
+        <td style="padding:4px 8px;color:${rC(r.backtest_exp_R)}">${fx(r.backtest_exp_R)}${r.backtest_n ? ` <span style="color:var(--muted);font-size:10px">n${r.backtest_n}${r.backtest_wr == null ? '' : '·WR' + r.backtest_wr + '%'}</span>` : ''}</td>
+        <td style="padding:4px 8px;color:${r.real_n ? rC(r.real_exp_R) : 'var(--muted)'}">${r.real_n ? fx(r.real_exp_R) + ` <span style="color:var(--muted);font-size:10px">n${r.real_n}${r.real_wr == null ? '' : '·WR' + r.real_wr + '%'}</span>` : '—'}</td>
         <td style="padding:4px 8px;color:${badgeColor[r.badge]};font-weight:600">${r.badge}</td>
         <td style="padding:4px 8px">${execPill(r.exec_mode)}</td>
         <td style="padding:4px 8px">${switchCell(r)}</td>
@@ -5644,7 +5765,7 @@ async function toggleShadowOrders(algo, symbol, key) {
   } catch (_e) { if (box) box.textContent = 'โหลดไม่สำเร็จ'; }
 }
 
-// ── switch cell: combo (MSE, shadow-switch) · regime_gold (LIVE/PAPER↔REGIME_SHADOW_FILL) · tsmom_gold (LIVE/OFF↔TSMOM_LIVE) ──
+// ── switch cell: combo (registry+gold, shadow-switch SHADOW/LIVE/OFF) · pairs (PAIRS_LIVE/SHADOW) · none (reference) ──
 function switchCell(r) {
   const kind = r.switch_kind || (['SHADOW','LIVE','OFF'].includes(r.state) ? 'combo' : 'none');
   const sel = (opts, cur, onch) =>
@@ -5654,12 +5775,9 @@ function switchCell(r) {
   if (kind === 'combo')
     return sel(['SHADOW','LIVE','OFF'], r.switch_state || r.state,
                `setShadowSwitch('${r.algo_id}','${r.symbol}',this.value)`);
-  if (kind === 'regime_gold')   // LIVE→REGIME_SHADOW_FILL=false · PAPER→true
-    return sel(['LIVE','PAPER'], r.switch_state,
-               `setGoldFlag('REGIME_SHADOW_FILL', this.value==='PAPER'?'true':'false', 'regime ทอง → '+this.value)`);
-  if (kind === 'tsmom_gold')    // LIVE→TSMOM_LIVE=true · OFF→false
-    return sel(['LIVE','OFF'], r.switch_state,
-               `setGoldFlag('TSMOM_LIVE', this.value==='LIVE'?'true':'false', 'tsmom ทอง → '+this.value)`);
+  // (regime_gold/tsmom_gold = dead — server ส่ง "combo" ให้ gold ทั้งหมดแล้ว, ลบทิ้งกัน toggle ผิด store)
+  if (kind === 'pairs')         // xau_xag_pairs engine (PAIRS_LIVE/PAIRS_SHADOW) — LIVE/SHADOW/OFF
+    return sel(['LIVE','SHADOW','OFF'], r.switch_state, `setPairsMode(this.value)`);
   return `<span style="color:var(--muted);font-size:11px" title="reference (backtest/real) — ไม่มี live switch">—</span>`;
 }
 
@@ -5674,6 +5792,22 @@ async function setGoldFlag(key, value, label) {
     toast(label + ' (live-reload)', 'ok');
     loadShadowMatrix(true);
     if (typeof loadBacktestResults === 'function') loadBacktestResults();
+  } catch (_e) { toast('เชื่อมต่อ /api/config ไม่ได้', 'err'); }
+}
+
+// ── xau_xag_pairs engine mode (PAIRS_LIVE/PAIRS_SHADOW via /api/config) — LIVE/SHADOW/OFF ──
+async function setPairsMode(mode) {
+  const flags = mode === 'LIVE'   ? { PAIRS_LIVE: 'true' }
+              : mode === 'SHADOW' ? { PAIRS_LIVE: 'false', PAIRS_SHADOW: 'true' }
+              :                     { PAIRS_LIVE: 'false', PAIRS_SHADOW: 'false' };
+  if (mode !== 'LIVE') toast('เตือน: ถ้ามีไม้ 2-leg เปิดอยู่ การ demote จะทิ้งไม้ให้ disaster SL', 'warn');
+  try {
+    const r = await (await fetch('/api/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(flags)
+    })).json();
+    if (r && r.error) { toast('บันทึกไม่สำเร็จ: ' + r.error, 'err'); return; }
+    toast('xau_xag_pairs → ' + mode + ' (live-reload)', 'ok');
+    loadShadowMatrix(true);
   } catch (_e) { toast('เชื่อมต่อ /api/config ไม่ได้', 'err'); }
 }
 
@@ -6703,36 +6837,27 @@ function _esNum(v) {
   return isNaN(n) ? null : n;
 }
 
-// MACD-style histogram of past releases. Hue = direction (green up / red down),
-// shade = momentum (bar |move| ≥ previous bar's → solid; shrinking → faded).
+// UHAS-style progress-bar summary of past releases (แทน MACD histogram ตามที่ user ขอ).
 // reactions: [{date, move_pct(signed), dir}]  (from event_scenarios.json)
 function _esReactionsHtml(reactions) {
   if (!Array.isArray(reactions) || !reactions.length) return '';
-  const H = 34;   // px half-height (zero line at centre)
-  const maxAbs = Math.max.apply(null, reactions.map(r => Math.abs(r.move_pct))) || 1;
-  const bars = reactions.map((r, i) => {
-    const up   = r.dir === 'up';
-    const col  = up ? 'var(--green)' : 'var(--red)';
-    const h    = Math.max(2, Math.abs(r.move_pct) / maxAbs * H);
-    const grow = i === 0 ? true : Math.abs(r.move_pct) >= Math.abs(reactions[i - 1].move_pct);
-    const op   = grow ? 1 : 0.4;
+  const n = reactions.length;
+  const up = reactions.filter(r => r.dir === 'up').length;
+  const down = reactions.filter(r => r.dir === 'down').length;
+  const flat = n - up - down;
+  const upPct = Math.round(up / n * 100), downPct = Math.round(down / n * 100);
+  const avgAbs = (reactions.reduce((a, r) => a + Math.abs(r.move_pct), 0) / n).toFixed(2);
+  const recent = reactions.slice(-6).map(r => {
+    const c = r.dir === 'up' ? 'var(--green)' : r.dir === 'down' ? 'var(--red)' : 'var(--muted)';
     const sign = r.move_pct >= 0 ? '+' : '';
-    const bar  = up
-      ? `<div style="position:absolute;left:1px;right:1px;bottom:50%;height:${h}px;background:${col};opacity:${op};border-radius:2px 2px 0 0"></div>`
-      : `<div style="position:absolute;left:1px;right:1px;top:50%;height:${h}px;background:${col};opacity:${op};border-radius:0 0 2px 2px"></div>`;
-    return `<div title="${r.date} · ${sign}${r.move_pct}%" style="flex:1;position:relative;height:${H * 2}px">${bar}</div>`;
+    return `<span title="${r.date}" style="font-family:var(--mono);font-size:9px;color:${c};padding:1px 5px;border:1px solid ${c};border-radius:3px">${sign}${r.move_pct}%</span>`;
   }).join('');
-  const months = reactions.map(r =>
-    `<div style="flex:1;text-align:center;font-size:7px;color:var(--muted)">${r.date.slice(5, 7)}</div>`
-  ).join('');
   return `
-    <div style="font-size:10px;color:var(--muted);margin-bottom:5px">reaction ต่อการประกาศ 12 ครั้งล่าสุด
-      <span style="font-size:9px">· เขียว=ทองขึ้น แดง=ลง · เข้ม=โมเมนตัมสูงกว่าครั้งก่อน</span></div>
-    <div style="position:relative;display:flex;gap:3px;align-items:stretch;background:rgba(0,0,0,0.18);border-radius:6px;padding:6px 6px 2px">
-      <div style="position:absolute;left:6px;right:6px;top:calc(6px + ${H}px);border-top:1px dashed rgba(255,255,255,0.18)"></div>
-      ${bars}
-    </div>
-    <div style="display:flex;gap:3px;padding:0 6px;margin-top:2px">${months}</div>`;
+    <div style="font-size:10px;color:var(--muted);margin-bottom:5px">reaction ต่อการประกาศ ${n} ครั้งล่าสุด · เฉลี่ยขยับ <b style="color:var(--text-dim)">${avgAbs}%</b></div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;font-family:var(--mono)"><span style="color:var(--green)">▲ ทองขึ้น ${up}/${n} (${upPct}%)</span><span style="color:var(--red)">ลง ${down}/${n} (${downPct}%)${flat ? ' · นิ่ง ' + flat : ''} ▼</span></div>
+    <div style="display:flex;height:9px;border-radius:4px;overflow:hidden;margin-top:3px">
+      <div style="width:${upPct}%;background:var(--green)"></div><div style="width:${downPct}%;background:var(--red)"></div><div style="flex:1;background:var(--surface2)"></div></div>
+    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${recent}<span style="font-size:8px;color:var(--muted);align-self:center">← ล่าสุด</span></div>`;
 }
 
 // Build the FULL scenario detail HTML (countdown + numbers + HOT/COOL + 15y stats
@@ -7837,6 +7962,11 @@ function _scCard(p) {
       <div>คัท <b style="color:var(--red)">${p.sl != null ? p.sl.toFixed(2) : '—'}</b> · เป้า <b style="color:var(--green)">${p.tp != null ? p.tp.toFixed(2) : '—'}</b></div>
       <div>RR <b>${rr != null ? rr.toFixed(2) : '—'}</b>${p.grade ? ' · เกรด ' + p.grade : ''}</div>
     </div>
+    ${(p.bounce != null || p.since != null) ? `<div style="font-size:10px;color:var(--muted);margin-top:6px;border-top:1px solid var(--border2);padding-top:5px">
+      <div>${p.since != null ? `แตะล่าสุด <b style="color:var(--text-dim)">${p.since}</b> แท่ง` : ''}${p.tf ? ' · ' + p.tf : ''}${p.touches != null ? ' · แตะ ' + p.touches + ' ครั้ง' : ''}${p.avgB != null ? ' · เด้งเฉลี่ย <b>$' + Math.round(p.avgB) + '</b>' : ''}</div>
+      ${p.bounce != null ? `<div style="display:flex;justify-content:space-between;font-size:9px;margin-top:5px"><span style="color:var(--green);font-weight:700">เด้ง ${p.bounce}%</span><span style="color:var(--red);font-weight:700">ทะลุ ${p.brk != null ? p.brk : (100 - p.bounce)}%</span></div>
+      <div style="display:flex;height:5px;border-radius:3px;overflow:hidden;margin-top:2px"><div style="width:${p.bounce}%;background:var(--green)"></div><div style="flex:1;background:var(--red)"></div></div>` : ''}
+    </div>` : ''}
     <div style="margin-top:7px">
       <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted)"><span>โอกาส (สัมพัทธ์)</span><span>${p.prob != null ? p.prob + '%' : '—'}</span></div>
       <div style="height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin-top:2px"><div style="height:100%;width:${p.prob || 0}%;background:${dcol}"></div></div>
@@ -7884,14 +8014,16 @@ function _scRender(z, px, trend) {
   const sups = (z.support || []).filter(x => x < px).sort((a, b) => b - a);   // ใกล้ราคาก่อน
   const ress = (z.resistance || []).filter(x => x > px).sort((a, b) => a - b);
   const band = lv => lv * 0.0010, slBuf = lv => lv * 0.0035;   // entry zone 0.10% · SL buffer 0.35% (user 08-12: เดิม SL 0.14% แคบ → โดน wick ก่อนเด้ง; ทอง 0.35%≈15p ให้พ้นไส้เทียน)
+  const _mmDetail = mm => mm ? { bounce: mm.bounce_pct, brk: mm.break_pct, since: mm.bars_since_touch,
+      tf: mm.tf, touches: mm.touches, avgB: mm.avg_bounce } : {};
   const mkBuy = (s, title) => { if (s == null) return null; const mm = _scMeta(_sm, s);
-    return { title, dir: 'BUY', entryLo: s, entryHi: s + band(s), sl: s - slBuf(s), tp: ress[0] || null,
+    return Object.assign({ title, dir: 'BUY', entryLo: s, entryHi: s + band(s), sl: s - slBuf(s), tp: ress[0] || null,
       score: mm && (mm.score || mm.strength), grade: mm && mm.grade,
-      trig: 'รอราคาแตะโซน ' + s.toFixed(2) + ' แล้วแท่ง 15m ปิดกลับเหนือ ' + (s + band(s)).toFixed(2) }; };
+      trig: 'รอราคาแตะโซน ' + s.toFixed(2) + ' แล้วแท่ง 15m ปิดกลับเหนือ ' + (s + band(s)).toFixed(2) }, _mmDetail(mm)); };
   const mkSell = (r, title) => { if (r == null) return null; const mm = _scMeta(_sm, r);
-    return { title, dir: 'SELL', entryLo: r - band(r), entryHi: r, sl: r + slBuf(r), tp: sups[0] || null,
+    return Object.assign({ title, dir: 'SELL', entryLo: r - band(r), entryHi: r, sl: r + slBuf(r), tp: sups[0] || null,
       score: mm && (mm.score || mm.strength), grade: mm && mm.grade,
-      trig: 'รอราคาแตะโซน ' + r.toFixed(2) + ' แล้วแท่ง 15m ปิดกลับใต้ ' + (r - band(r)).toFixed(2) }; };
+      trig: 'รอราคาแตะโซน ' + r.toFixed(2) + ' แล้วแท่ง 15m ปิดกลับใต้ ' + (r - band(r)).toFixed(2) }, _mmDetail(mm)); };
   let plans = (trend.includes('BEAR') || trend.includes('DOWN'))
     ? [mkSell(ress[0], 'แผน ก'), mkSell(ress[1], 'แผน ข'), mkBuy(sups[0], 'แผนพัก (สวนทาง)')]
     : [mkBuy(sups[0], 'แผน ก'), mkBuy(sups[1], 'แผน ข'), mkSell(ress[0], 'แผนพัก (สวนทาง)')];
@@ -7899,6 +8031,16 @@ function _scRender(z, px, trend) {
   const tot = plans.reduce((a, p) => a + (p.score || 0), 0);   // prob สัมพัทธ์จาก score (display เท่านั้น)
   if (tot > 0) plans.forEach(p => p.prob = Math.round((p.score || 0) / tot * 100));
   el.innerHTML = plans.length ? plans.map(_scCard).join('') : '<div class="card" style="flex:1;color:var(--muted);padding:10px">ไม่มี setup ชัด — พัก</div>';
+  // UHAS-style directional-lean bar (โอกาสขึ้น/ลง จากน้ำหนักแนว — display เฉยๆ)
+  const pb = document.getElementById('scenario-prob');
+  if (pb) {
+    const bs2 = plans.filter(p => p.dir === 'BUY').reduce((a, p) => a + (p.score || 0), 0);
+    const ss2 = plans.filter(p => p.dir === 'SELL').reduce((a, p) => a + (p.score || 0), 0);
+    const t2 = bs2 + ss2, up = t2 > 0 ? Math.round(bs2 / t2 * 100) : 50, down = 100 - up;
+    pb.innerHTML = `<div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;font-family:var(--mono)"><span style="color:var(--green)">▲ โอกาสขึ้น ${up}%</span><span style="color:var(--red)">ลง ${down}% ▼</span></div>
+      <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin-top:3px"><div style="width:${up}%;background:var(--green)"></div><div style="flex:1;background:var(--red)"></div></div>
+      <div style="font-size:9px;color:var(--muted);margin-top:2px">เทรนด์ ${trend || '—'} · น้ำหนักจากความแข็งแนว S/R ใกล้ราคา (display)</div>`;
+  }
   try { renderStructuralRead(z, px, trend); } catch (e) {}    // โค้ช: อ่านโครงสร้างสด (ใช้ z/px/trend เดียวกัน)
 }
 async function _scRefreshPrice() {          // ราคาสด → re-render proximity (ทุก ~5 วิ)
@@ -8362,7 +8504,7 @@ async function loadCointegration() {
     const d = await (await fetch('/api/cointegration')).json();
     const rows = (d.rows || []);
     document.getElementById('coint-note').textContent = d.note || '';
-    if (!rows.length) { body.innerHTML = '<tr><td colspan="6" style="color:var(--muted)">—</td></tr>'; return; }
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="6" style="color:var(--muted)">' + (d.error || 'ยังไม่มีผล scan — รอ bot / รัน scripts/cointegration_scan.py') + '</td></tr>'; return; }
     rows.sort((a, b) => (a.adf || 0) - (b.adf || 0));
     body.innerHTML = rows.map(r => {
       const hl = (r.hl == null || !isFinite(r.hl)) ? 'inf' : Math.round(r.hl);
@@ -8692,13 +8834,14 @@ function _bootstrap() {
   loadMacroQuant();
   loadLiquidityProxy();
   loadAlgoJournal();
-  loadShadowMatrix(); loadAlgoPotential(); loadShadowTsmom(); loadRealEdge(); loadAlgoSelector();
+  loadShadowMatrix(); loadAlgoPotential(); loadShadowTsmom(); loadRealEdge(); loadAlgoSelector(); loadCockpit();
   loadRegimeExtra();
   loadRiskRegime();
   loadCotCard();
   loadNewsImpact();
   loadImpactCalibration();
-  loadNewsGate();
+  loadNewsGate(); setInterval(loadNewsGate, 300000);   // F9: refresh cohort ทุก 5 นาที (เดิมรันครั้งเดียว)
+  try { organizeMonitor(); } catch (_e) {}              // Part B: จัด tab-monitor เป็น 4 กลุ่ม collapsible (ครั้งเดียว)
   initWmMap();                                     // WM flat map — วาด SVG แผนที่แบน + จุด (idempotent)
   setInterval(_tickCountdowns, 1000);   // live countdowns in the combined feed
   setInterval(fetchData, 10000);
@@ -8716,7 +8859,7 @@ function _bootstrap() {
   setInterval(loadMacroQuant, 15000);    // Macro/News quant — realtime (news updates per cycle)
   setInterval(loadLiquidityProxy, 15000);   // Liquidity/order-flow proxy — realtime
   setInterval(loadAlgoJournal, 15000);      // Trade score — algo journal — realtime
-  setInterval(loadShadowMatrix, 30000); setInterval(loadAlgoPotential, 30000); setInterval(loadShadowTsmom, 30000); setInterval(loadRealEdge, 30000); setInterval(loadAlgoSelector, 30000);     // Batch B — multi-pair shadow matrix
+  setInterval(loadShadowMatrix, 30000); setInterval(loadAlgoPotential, 30000); setInterval(loadShadowTsmom, 30000); setInterval(loadRealEdge, 30000); setInterval(loadAlgoSelector, 30000); setInterval(loadCockpit, 30000);     // Batch B — multi-pair shadow matrix
   setInterval(loadRegimeAnalytics, 60000);  // regime analytics + ALGO monitor (N-gauge) — compute live, refresh 60s
   setInterval(loadOptionsOi, 1800000);      // options OI walls (GLD→XAU) — OI = daily figure, refresh 30min
   loadSentimentScore(); setInterval(loadSentimentScore, 60000);   // sentiment bias score (LLM cache) — display 60s
@@ -8806,7 +8949,7 @@ async function openSpeechModal(el) {
     if (ph.ok && _spPrevSeries) {
       _spPrevChart.applyOptions({ width: pEl.clientWidth });
       _spPrevSeries.setData(ph.candles);
-      _spPrevSeries.setMarkers([{ time: ph.speech_ts, position: 'aboveBar', color: '#ef4444', shape: 'arrowDown', text: '<svg class="ic"><use href="#ic-mic"/></svg> ' }]);
+      _spPrevSeries.setMarkers([{ time: ph.speech_ts, position: 'aboveBar', color: '#ef4444', shape: 'arrowDown', text: '🎤' }]);   // F6: chart marker text = plain (svg markup print ไม่ได้)
       _spPrevChart.timeScale().fitContent();
       const mv = ph.move_pct, tm = new Date(ph.speech_ts * 1000).toISOString().slice(0, 16).replace('T', ' ');
       if (note) note.innerHTML = `ครั้งก่อน ${tm} UTC` + (mv != null ? ` · ทองขยับ <b style="color:${mv >= 0 ? '#4ade80' : '#ef4444'}">${mv > 0 ? '+' : ''}${mv}%</b> ใน ~5 ชม.` : '');

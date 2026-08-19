@@ -185,7 +185,7 @@ _CONFIG_SPEC: dict[str, str] = {
     "NEWS_AGREE_RELAX": "5", "NEWS_GATE_HARD_FLOOR": "58", "NEWS_GATE_MIN_N": "3",
     "NEWS_GATE_MAX_AGE_MIN": "60",
     # ── Multi-symbol live engine (WTI ฯลฯ) — master gate; ต่อ combo toggle=LIVE ที่ Shadow Matrix ──
-    "MULTI_SYMBOL_LIVE": "false", "ALGO_SL_MULT": "WTIUSD:0.7",
+    "MULTI_SYMBOL_LIVE": "false", "COCKPIT_LIVE": "false", "ALGO_SL_MULT": "WTIUSD:0.7",
     # ── gold engine flags (toggle จาก switch ทองใน Shadow Matrix) ──
     "TSMOM_LIVE": "false", "REGIME_SHADOW_FILL": "false",
     "TSMOM_DIR_MODE": "long", "TSMOM_HEDGE_PENDING": "false",
@@ -205,7 +205,7 @@ _CONFIG_SPEC: dict[str, str] = {
     # ── sentiment bias ──
     "SENTIMENT_BIAS": "true", "SENTIMENT_BLOCK_ABOVE": "60", "SENTIMENT_REFRESH_MIN": "30",
     # ── XAU-XAG pairs (stat-arb 2-leg) ──
-    "PAIRS_LIVE": "false", "PAIRS_SYMBOLS": "XAUUSD:XAGUSD", "PAIRS_WIN": "120",
+    "PAIRS_LIVE": "false", "PAIRS_SHADOW": "false", "PAIRS_REENTRY_COOLDOWN_MIN": "30", "PAIRS_SYMBOLS": "XAUUSD:XAGUSD", "PAIRS_WIN": "120",
     "PAIRS_Z_IN": "2.0", "PAIRS_Z_OUT": "0.5", "PAIRS_Z_STOP": "3.5", "PAIRS_DISASTER_ATR": "6.0",
     # ── profit-target force-close (lock กำไร X% ของ balance) ──
     "FORCE_CLOSE_PROFIT_PCT": "100", "FORCE_CLOSE_MIN_CAPITAL": "20000",
@@ -650,6 +650,16 @@ def api_set_config():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+    try:                                            # refresh dashboard in-memory config ทันที (กัน display เด้งค่าเก่า — process แยกจากบอท)
+        from dotenv import load_dotenv
+        load_dotenv(ENV_FILE, override=True)        # os.environ ← .env ใหม่
+        import config as _cfg
+        _cfg.reload_config()
+        for _k in ("shadow-matrix", "cockpit", "pairs"):   # invalidate cache ที่อ่าน config (pairs = /api/pairs mode)
+            _data_cache.pop(_k, None)
+    except Exception:
+        pass
+
     # ── PM2 restart เฉพาะเมื่อขอ (_restart=true) ─────────────────────
     if want_restart:
         pm2_ok, pm2_msg = _pm2_restart()
@@ -1033,6 +1043,10 @@ def api_pair_moves():
 def api_tsmom():
     """สถานะ TSMOM-D1 directional engine: signal ensemble + position + state (compute-in-code, 0 token)."""
     import config as _cfg
+    try:                                                    # dashboard คนละ process กับบอท → reload กัน live/shadow flag ค้าง (เหมือน algo-status)
+        _cfg.reload_config()
+    except Exception:
+        pass
     vb_years = request.args.get("vb_years", "all")          # toggle: 5 / 10 / all
     _vy = None if vb_years == "all" else float(vb_years)
     out = {"ok": True, "live": bool(getattr(_cfg, "TSMOM_LIVE", False)),
@@ -1502,6 +1516,142 @@ def api_shadow_switch():
     ok = _sw.set_state(algo, symbol, state)
     _data_cache.pop("shadow-matrix", None)            # ให้ matrix สะท้อน state ใหม่ทันที
     return jsonify({"ok": ok, "algo": algo, "symbol": symbol, "state": state})
+
+
+def _fair_value_now():
+    """gold fair-value gap (macro model XAU~DXY/XAG, causal 252d OLS). display-only. คืน dict หรือ None."""
+    import numpy as _np
+    try:
+        DAY = 86400
+        def _dc(fn):
+            with open(os.path.join(_BASE, "..", "data", fn), encoding="utf-8") as f:
+                return {int(r[0]) // DAY: float(r[4]) for r in json.load(f)}
+        xau, dxy, xag = _dc("xau_d1.json"), _dc("drv_dxy_h1.json"), _dc("drv_xag_h1.json")
+        ks = sorted(set(xau) & set(dxy) & set(xag))[-253:]
+        if len(ks) < 60:
+            return None
+        c = _np.array([xau[k] for k in ks], float)
+        F = _np.column_stack([[dxy[k] for k in ks], [xag[k] for k in ks], _np.ones(len(ks))])
+        coef, *_ = _np.linalg.lstsq(F[:-1], c[:-1], rcond=None)
+        resid = c[:-1] - F[:-1] @ coef
+        sd = float(resid.std()) or 1.0
+        hat = float(F[-1] @ coef); spot = float(c[-1])
+        import datetime as _dt
+        as_of_dt = _dt.datetime.utcfromtimestamp(ks[-1] * DAY)
+        age_days = (_dt.datetime.utcnow() - as_of_dt).days
+        return {"fair_value": round(hat, 1), "spot": round(spot, 1), "gap_usd": round(spot - hat, 1),
+                "gap_pct": round((spot - hat) / hat * 100, 2), "z": round((spot - hat) / sd, 2),
+                "tag": "แพงกว่าโมเดล" if spot > hat else "ถูกกว่าโมเดล",
+                "as_of": as_of_dt.strftime("%Y-%m-%d"), "stale": age_days > 3}   # กัน trader เข้าใจว่าเป็นราคา now
+    except Exception:
+        return None
+
+
+def _nearest_sr(z, px):
+    """nearest support (ต่ำกว่าราคา) / resistance (สูงกว่า) จาก sr_meta + zones lists + key_levels. enrich touches/strength."""
+    if not px:
+        return None, None
+    try:
+        px = float(px)
+    except (TypeError, ValueError):
+        return None, None
+    metas = {}
+    for m in (z.get("sr_meta") or []):
+        lv = m.get("level")
+        if lv is not None:
+            try:
+                metas[round(float(lv), 2)] = m
+            except (TypeError, ValueError):
+                pass
+    levels = set(metas)
+    for lst in (z.get("support"), z.get("resistance")):
+        for lv in (lst or []):
+            try:
+                levels.add(round(float(lv), 2))
+            except (TypeError, ValueError):
+                pass
+    kl = z.get("key_levels") or {}
+    for k in ("pdh", "pdl"):
+        if kl.get(k):
+            try:
+                levels.add(round(float(kl[k]), 2))
+            except (TypeError, ValueError):
+                pass
+    for lv in (kl.get("round_numbers") or []):                # round levels = แนวรับ/ต้านจิตวิทยา (โดยเฉพาะตอนราคาเหนือ S/R อื่นหมด = ATH)
+        try:
+            levels.add(round(float(lv), 2))
+        except (TypeError, ValueError):
+            pass
+    below = sorted((v for v in levels if v < px), reverse=True)
+    above = sorted(v for v in levels if v > px)
+
+    def _mk(lv):
+        if lv is None:
+            return None
+        m = metas.get(lv) or {}
+        return {"level": lv, "touches": m.get("touches"), "strength": m.get("strength"), "tf": m.get("tf")}
+    return _mk(below[0] if below else None), _mk(above[0] if above else None)
+
+
+@app.route("/api/cockpit")
+def api_cockpit():
+    """Discretion Cockpit Phase 1 — context board รวมจุดเดียว (display-only, 0 order, 0 token).
+    fair-value gap (computed) + context จาก bot_status (sentiment/zones/liquidity/volume). ไม่มี order path."""
+    def _build():
+        try:
+            with open(os.path.join(_BASE, "..", "logs", "bot_status.json"), encoding="utf-8") as f:
+                bs = json.load(f)
+        except Exception:
+            bs = {}
+        z = bs.get("zones") or {}
+        px = (bs.get("price_info") or {}).get("price") or (bs.get("price_info") or {}).get("bid")
+        # FIX: zones.support/resistance = list ตัวเลข (ไม่ใช่ object) → หา nearest จาก sr_meta (รวย level/strength/touches) เทียบราคา
+        nsup, nres = _nearest_sr(z, px)
+        return {"ok": True, "updated_at": bs.get("updated_at"), "price": px,
+                "fair_value": _fair_value_now(),
+                "sentiment": {"bias": bs.get("sent_bias"), "conf": bs.get("sent_conf"),
+                              "label": bs.get("sentiment"), "summary": bs.get("sent_summary")},
+                "support": nsup, "resistance": nres,
+                "sr_meta": z.get("sr_meta"), "htf_zone": z.get("htf_zone"),
+                "liquidity": bs.get("liquidity_pools"), "volume": bs.get("volume_profile"),
+                "market": bs.get("market")}
+    return jsonify(_cached("cockpit", _build, ttl=20))
+
+
+@app.route("/api/cockpit/order", methods=["POST"])
+def api_cockpit_order():
+    """Cockpit Phase 2 — วางออเดอร์ manual (user ตัดสินใจ). gate COCKPIT_LIVE (default OFF → ปฏิเสธ).
+    reuse cockpit_executor.place_manual → open_order (guard ครบ: LONG_ONLY_ALL/cap/structural-SL). live money."""
+    import config as _cfg
+    try:
+        _cfg.reload_config()
+    except Exception:
+        pass
+    if not getattr(_cfg, "COCKPIT_LIVE", False):
+        return jsonify({"ok": False, "reason": "COCKPIT_LIVE=off — เปิด flag ใน Config panel ก่อนถึงจะวางจริง"}), 200
+    if not (_MT5_AVAILABLE and _ensure_mt5()):
+        return jsonify({"ok": False, "reason": "MT5 ไม่พร้อม"}), 200
+    body = request.get_json(silent=True) or {}
+    symbol = (body.get("symbol") or "XAUUSD").strip()
+    direction = (body.get("direction") or "").strip().upper()
+    if direction not in ("BUY", "SELL"):
+        return jsonify({"ok": False, "reason": "direction ต้อง BUY/SELL"}), 400
+    try:
+        lot = float(body["lot"]) if body.get("lot") not in (None, "") else None
+        sl_mult = float(body.get("sl_atr_mult") or 1.5)
+        rr = float(body.get("rr") or 2.0)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "reason": "lot/sl_atr_mult/rr ต้องเป็นตัวเลข"}), 400
+    if not (0.2 <= sl_mult <= 5.0):                         # กัน fat-finger: SL กว้างเกิน = risk บวม (F1)
+        return jsonify({"ok": False, "reason": "sl_atr_mult ต้องอยู่ 0.2–5.0"}), 400
+    if not (0.5 <= rr <= 10.0):                             # กัน rr เพี้ยน/ติดลบ (F2)
+        return jsonify({"ok": False, "reason": "rr ต้องอยู่ 0.5–10"}), 400
+    if lot is not None and not (0 < lot <= 100):
+        return jsonify({"ok": False, "reason": "lot ต้อง > 0"}), 400
+    with _MT5_LOCK:
+        from agents.cockpit_executor import place_manual
+        res = place_manual(symbol, direction, lot=lot, sl_atr_mult=sl_mult, rr=rr)
+    return jsonify(res)
 
 
 @app.route("/api/real-edge")
@@ -2187,18 +2337,53 @@ def api_equity_curve():
     return jsonify(_cached("equity-curve", _c, ttl=120))
 
 
+_COINT_SCAN = {"running": False}
+
+
+def _coint_bg_scan():
+    """heavy cointegration scan ใน background thread → เขียน data/cointegration.json. ไม่ block request (กัน timeout)."""
+    try:
+        if _MT5_AVAILABLE and _ensure_mt5():
+            with _MT5_LOCK:
+                from scripts.cointegration_scan import run
+                run(tf_name="H1", count=4000, manage_mt5=False)   # count ลด = เร็วขึ้น; manage_mt5=False = ไม่ shutdown connection ร่วม
+    except Exception:
+        pass
+    finally:
+        _COINT_SCAN["running"] = False
+
+
 @app.route("/api/cointegration")
 def api_cointegration():
-    """cointegration monitor (ADF/Hurst/half-life ทุกคู่). heavy (MT5 scan) → cache 1hr. 0 token."""
-    def _c():
-        try:
-            from scripts.cointegration_scan import run
-            rows = run(tf_name="H1", count=8000) or []
-            return {"ok": True, "rows": rows,
-                    "note": "ADF<-2.86(5%)+Hurst<0.5+split-half = cointegrated. 55คู่→false-pos ~2.8 (multiple-testing)"}
-        except Exception as e:
-            return {"ok": False, "error": str(e)}
-    return jsonify(_cached("cointegration", _c, ttl=3600))
+    """cointegration monitor (ADF/Hurst/half-life ทุกคู่). heavy scan → background thread → อ่านไฟล์. 0 token."""
+    import time as _time
+    _NOTE = "ADF<-2.86(5%)+Hurst<0.5+split-half = cointegrated. 55คู่→false-pos ~2.8 (multiple-testing)"
+    _p = os.path.join(_BASE, "..", "data", "cointegration.json")
+
+    def _from_file(stale_ok=False):
+        if not os.path.exists(_p):
+            return None
+        age_h = (_time.time() - os.path.getmtime(_p)) / 3600.0
+        if not stale_ok and age_h >= 25:
+            return None
+        with open(_p, encoding="utf-8") as f:
+            d = json.load(f, parse_constant=lambda _x: None)   # NaN/Infinity → None: กัน browser JSON.parse reject → "ต่อไม่ได้"
+        return {"ok": True, "rows": d.get("rows", []),
+                "note": _NOTE + (f" · cache {age_h:.0f}hr ก่อน" if stale_ok else "")}
+
+    # อ่านไฟล์เท่านั้น (ไม่ scan sync ใน request = กัน timeout). scan หนัก → background thread เขียนไฟล์
+    fresh = _from_file()
+    if fresh is not None:
+        return jsonify(fresh)
+    if not _COINT_SCAN["running"]:                        # kick background scan ครั้งเดียว (ไม่ block)
+        _COINT_SCAN["running"] = True
+        import threading
+        threading.Thread(target=_coint_bg_scan, daemon=True).start()
+    stale = _from_file(stale_ok=True)                     # โชว์ cache เก่าระหว่าง re-scan (ถ้ามี)
+    if stale is not None:
+        return jsonify(stale)
+    return jsonify({"ok": True, "rows": [],
+                    "note": _NOTE + " · กำลัง scan ครั้งแรก (หนัก ~1 นาที) — รีเฟรชอีกครั้ง"})
 
 
 @app.route("/api/options-oi")
