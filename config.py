@@ -354,6 +354,7 @@ LOSS_STREAK_RECHECK = int(os.getenv("LOSS_STREAK_RECHECK") or 3)                
 LOSS_ADAPTIVE_COOLDOWN_MIN = int(os.getenv("LOSS_ADAPTIVE_COOLDOWN_MIN") or 240)
 ALGO_ROUTER_ENABLE = os.getenv("ALGO_ROUTER_ENABLE", "false").lower() == "true"   # เปิด LLM router (ใช้ token)
 ALGO_ROUTER_LIVE   = os.getenv("ALGO_ROUTER_LIVE", "false").lower() == "true"     # true=สลับ switch จริง; false=log
+ALGO_ROUTER_ALLOW_PROMOTE = os.getenv("ALGO_ROUTER_ALLOW_PROMOTE", "false").lower() == "true"  # LLM ห้าม promote LIVE เอง (demote-only)
 ALGO_ROUTER_EVERY_HRS = float(os.getenv("ALGO_ROUTER_EVERY_HRS") or 6)
 ALGO_ROUTER_MIN_GAP_MIN = int(os.getenv("ALGO_ROUTER_MIN_GAP_MIN") or 60)
 ALGO_ROUTER_MODEL = os.getenv("ALGO_ROUTER_MODEL", "claude-sonnet-4-6")
@@ -620,12 +621,13 @@ def reload_config():
     EVENT_ENGINE_LIVE        = os.getenv("EVENT_ENGINE_LIVE", "false").lower() == "true"
     EVENT_PRE_MIN            = int(os.getenv("EVENT_PRE_MIN") or 30)
     EVENT_POST_MIN           = int(os.getenv("EVENT_POST_MIN") or 120)
-    global LOSS_ADAPTIVE_LIVE, LOSS_STREAK_RECHECK, LOSS_ADAPTIVE_COOLDOWN_MIN, ALGO_ROUTER_ENABLE, ALGO_ROUTER_LIVE, ALGO_ROUTER_EVERY_HRS, ALGO_ROUTER_MIN_GAP_MIN, ALGO_ROUTER_MODEL
+    global LOSS_ADAPTIVE_LIVE, LOSS_STREAK_RECHECK, LOSS_ADAPTIVE_COOLDOWN_MIN, ALGO_ROUTER_ENABLE, ALGO_ROUTER_LIVE, ALGO_ROUTER_ALLOW_PROMOTE, ALGO_ROUTER_EVERY_HRS, ALGO_ROUTER_MIN_GAP_MIN, ALGO_ROUTER_MODEL
     LOSS_ADAPTIVE_LIVE       = os.getenv("LOSS_ADAPTIVE_LIVE", "false").lower() == "true"
     LOSS_STREAK_RECHECK      = int(os.getenv("LOSS_STREAK_RECHECK") or 3)
     LOSS_ADAPTIVE_COOLDOWN_MIN = int(os.getenv("LOSS_ADAPTIVE_COOLDOWN_MIN") or 240)
     ALGO_ROUTER_ENABLE       = os.getenv("ALGO_ROUTER_ENABLE", "false").lower() == "true"
     ALGO_ROUTER_LIVE         = os.getenv("ALGO_ROUTER_LIVE", "false").lower() == "true"
+    ALGO_ROUTER_ALLOW_PROMOTE = os.getenv("ALGO_ROUTER_ALLOW_PROMOTE", "false").lower() == "true"
     ALGO_ROUTER_EVERY_HRS    = float(os.getenv("ALGO_ROUTER_EVERY_HRS") or 6)
     ALGO_ROUTER_MIN_GAP_MIN  = int(os.getenv("ALGO_ROUTER_MIN_GAP_MIN") or 60)
     ALGO_ROUTER_MODEL        = os.getenv("ALGO_ROUTER_MODEL", "claude-sonnet-4-6")

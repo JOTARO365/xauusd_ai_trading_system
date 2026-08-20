@@ -167,18 +167,27 @@ def tick():
         ctx = _context()
         parsed, usage = _decide(ctx)
         live = bool(_cfg("ALGO_ROUTER_LIVE", False))
+        allow_promote = bool(_cfg("ALGO_ROUTER_ALLOW_PROMOTE", False))  # LLM ห้าม auto-promote LIVE (roster-drift guard)
         applied = []
         for sw_ in parsed.swaps:
             act = (sw_.action or "").upper()
             if act not in ("LIVE", "SHADOW"):
                 continue
-            rec = {"algo": sw_.algo, "pair": sw_.pair, "action": act, "reason": sw_.reason, "live": live, "trigger": why}
-            if live:
+            # roster-drift guard: promote → LIVE = เงินจริง; LLM ตัดสิน exp_R จิ๋ว/regime สด ไม่พอ (silver tsmom −EV จริง t−2.89).
+            # promote ต้องผ่าน validation/มนุษย์ → block เว้น ALGO_ROUTER_ALLOW_PROMOTE. demote (→SHADOW) ทำได้เสมอ (ปลอดภัย)
+            promote_blocked = (act == "LIVE" and not allow_promote)
+            wrote = bool(live and not promote_blocked)
+            rec = {"algo": sw_.algo, "pair": sw_.pair, "action": act, "reason": sw_.reason,
+                   "live": live, "trigger": why, "applied": wrote, "promote_blocked": promote_blocked}
+            if wrote:
                 try:
                     from agents import shadow_switches as swm
                     swm.set_state(sw_.algo, sw_.pair, act)
                 except Exception:
                     pass
+            elif promote_blocked:
+                logger.info("[ALGO-ROUTER] promote %s:%s → LIVE ถูก block (demote-only) — suggestion เท่านั้น"
+                            % (sw_.algo, sw_.pair))
             _journal(rec); applied.append(rec)
         state["summary"] = parsed.summary
         state["at"] = datetime.now(timezone.utc).isoformat()
