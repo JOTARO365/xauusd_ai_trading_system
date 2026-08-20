@@ -167,6 +167,13 @@ def _tick() -> None:
         from agents.algo_exit import sr_tp_pips                    # P-D: TP ตามแนว S/R (flag OFF → RR2 เดิม)
         from agents.algo_sizing import algo_lot                    # P-E: lot risk-based (flag OFF → fixed เดิม)
         _entry_px = tick.ask if d == "BUY" else tick.bid
+        from agents import sr_entry_gate as _srg                  # risk-shape gate: กัน BUY ชนแนวต้าน/SELL ชนแนวรับ (allowlist)
+        _blk, _why = _srg.blocks_live_gold("regime_momentum", d, _entry_px, float(_cache.get("atr") or 0), tf="H1")
+        if _blk:                                                  # ชนแนวแข็งใกล้ยังไม่ทะลุ → รอราคาออกจากโซน (skip ชม.นี้)
+            logger.info(f"[REGIME-TICK] SR-GATE-SKIP {d}: {_why}")
+            from agents.algo_state import write_state
+            write_state("SR-GATE-SKIP", regime="TREND", via="tick", detail=_why)
+            return
         _tp_pips = sr_tp_pips(d, _entry_px, _cache["sl_pips"], _cache["tp_pips"])
         from agents.regime_executor import _structural_sl_gold
         _sl_pips, _tp_pips, _force_min = _structural_sl_gold(d, _entry_px, _cache.get("atr"),

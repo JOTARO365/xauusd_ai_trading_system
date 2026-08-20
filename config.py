@@ -381,7 +381,10 @@ SR_MIN_TOUCHES  = int(os.getenv("SR_MIN_TOUCHES") or 2)      # แนวต้�
 SR_LOOKBACK     = int(os.getenv("SR_LOOKBACK") or 60)        # หา swing pivot กี่แท่งย้อนหลัง
 SR_PIVOT        = int(os.getenv("SR_PIVOT") or 3)            # pivot = local extreme ±กี่แท่ง
 SR_CLUSTER_ATR  = float(os.getenv("SR_CLUSTER_ATR") or 0.3)  # merge แนวห่าง ≤ นี้×ATR เป็นแนวเดียว
-SR_BREAKOUT_ALGOS = os.getenv("SR_BREAKOUT_ALGOS", "regime_momentum,regime_momentum_fvg,macro_momentum,confluence_15m,tsmom_d1")  # algo ยกเว้น gate (คิดตาม breakout ต้องทะลุแนวได้); ที่เหลือ gate ทุกคู่
+SR_BREAKOUT_ALGOS = os.getenv("SR_BREAKOUT_ALGOS", "regime_momentum,regime_momentum_fvg,macro_momentum,confluence_15m,tsmom_d1")  # algo ยกเว้น gate (คิดตาม breakout); ใช้เฉพาะ legacy mode = SR_GATE_COMBOS ว่าง
+# allowlist combo ที่ให้ S/R gate (comma "algo|SYMBOL"). ตั้ง = allowlist mode: gate เฉพาะที่ list (breakout-tag ไม่เกี่ยว).
+# ว่าง = fallback data/sr_gate_combos.json (ตัวผ่าน validation) → ถ้าว่างอีก = legacy (gate ทุกตัวยกเว้น breakout).
+SR_GATE_COMBOS  = os.getenv("SR_GATE_COMBOS", "")
 # CDC Action Zone (อ.โฉลก) — ทิศ cdc_zone algo: long (BUY เท่านั้น, default) / short / both. SELL leg −EV → long
 CDC_DIR_MODE = (os.getenv("CDC_DIR_MODE") or "long").lower()
 # pullback entry (โฉลก wave-2/4: เข้าตอนย่อ ไม่ไล่ราคา) — validated: ดัน XAUUSD t1.99→2.05 (RSI filter พังของดี)
@@ -650,8 +653,9 @@ def reload_config():
     SR_LOOKBACK     = int(os.getenv("SR_LOOKBACK") or 60)
     SR_PIVOT        = int(os.getenv("SR_PIVOT") or 3)
     SR_CLUSTER_ATR  = float(os.getenv("SR_CLUSTER_ATR") or 0.3)
-    global SR_BREAKOUT_ALGOS, CDC_DIR_MODE, CDC_PULLBACK_MIN, CDC_PULLBACK_LB, CDC_PYRAMID, CDC_MAX_UNITS, CDC_ADD_HALF_N
+    global SR_BREAKOUT_ALGOS, SR_GATE_COMBOS, CDC_DIR_MODE, CDC_PULLBACK_MIN, CDC_PULLBACK_LB, CDC_PYRAMID, CDC_MAX_UNITS, CDC_ADD_HALF_N
     SR_BREAKOUT_ALGOS = os.getenv("SR_BREAKOUT_ALGOS", "regime_momentum,regime_momentum_fvg,macro_momentum,confluence_15m,tsmom_d1")
+    SR_GATE_COMBOS  = os.getenv("SR_GATE_COMBOS", "")
     CDC_DIR_MODE = (os.getenv("CDC_DIR_MODE") or "long").lower()
     CDC_PULLBACK_MIN = float(os.getenv("CDC_PULLBACK_MIN") or 0.005)
     CDC_PULLBACK_LB  = int(os.getenv("CDC_PULLBACK_LB") or 20)

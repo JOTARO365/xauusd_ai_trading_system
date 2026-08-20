@@ -90,6 +90,7 @@ def params_from_config():
 
 
 # breakout/momentum algo = ปล่อยผ่าน gate (edge = ทะลุแนว). ที่เหลือ (fade/reversal) = gate ทุกคู่.
+# ⚠️ ใช้เฉพาะ legacy mode (allowlist ว่าง). ถ้าตั้ง allowlist (SR_GATE_COMBOS/ไฟล์) → allowlist ตัดสิน, breakout-tag ไม่เกี่ยว.
 _BREAKOUT_DEFAULT = "regime_momentum,regime_momentum_fvg,macro_momentum,confluence_15m,tsmom_d1"
 
 
@@ -103,16 +104,58 @@ def _breakout_algos():
     return {a.strip() for a in str(raw).split(",") if a.strip()}
 
 
+import os as _os
+import time as _time
+import json as _json
+
+_ALLOW_CACHE = {"set": None, "ts": 0.0}                    # cache allowlist (config/ไฟล์) 30s กัน read ถี่ต่อ tick
+
+
+def _allowlist():
+    """set ของ combo "algo|SYMBOL" ที่ให้ gate. มา 2 ทาง (config ก่อน, ไฟล์รอง):
+      1. config.SR_GATE_COMBOS (comma "algo|SYM") — opt-in มือ (รวม risk-shape combo ที่ backtest ไม่ผ่านนัยสำคัญ)
+      2. data/sr_gate_combos.json "combos" — ตัวที่ผ่าน validation อัตโนมัติ (sr_gate_backtest)
+    ว่างทั้งคู่ → คืน set() = legacy mode (blocks_live gate ทุกตัวยกเว้น breakout). cache 30s."""
+    now = _time.time()
+    if _ALLOW_CACHE["set"] is not None and now - _ALLOW_CACHE["ts"] < 30:
+        return _ALLOW_CACHE["set"]
+    out = set()
+    try:
+        import config as _c
+        raw = getattr(_c, "SR_GATE_COMBOS", "") or ""
+        out = {x.strip() for x in str(raw).split(",") if x.strip()}
+    except Exception:
+        out = set()
+    if not out:                                            # config ว่าง → fallback ไฟล์ validation
+        try:
+            _base = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+            with open(_os.path.join(_base, "data", "sr_gate_combos.json"), encoding="utf-8") as f:
+                out = {str(x).strip() for x in (_json.load(f).get("combos") or []) if str(x).strip()}
+        except Exception:
+            out = set()
+    _ALLOW_CACHE["set"] = out; _ALLOW_CACHE["ts"] = now
+    return out
+
+
+def _gated(algo_id, symbol):
+    """combo นี้ควรโดน gate ไหม. allowlist mode (มี allowlist) → เฉพาะที่อยู่ใน list.
+    legacy mode (allowlist ว่าง) → gate ทุกตัวยกเว้น breakout-tag."""
+    al = _allowlist()
+    if al:                                                 # allowlist mode: list ตัดสินอย่างเดียว (breakout-tag ไม่เกี่ยว)
+        return bool(algo_id and symbol and f"{algo_id}|{symbol}" in al)
+    return not (algo_id and algo_id in _breakout_algos())  # legacy: gate all except breakout
+
+
 def blocks_live(bars, direction, price, atr, algo_id=None, symbol=None):
     """live wrapper: เรียกจาก executor. คืน (block: bool, reason: str).
-    เคารพ flag SR_ENTRY_GATE. gate ทุกคู่ ยกเว้น breakout algo (SR_BREAKOUT_ALGOS)."""
+    เคารพ flag SR_ENTRY_GATE + allowlist (SR_GATE_COMBOS/sr_gate_combos.json)."""
     try:
         import config as _c
         if not getattr(_c, "SR_ENTRY_GATE", False):
             return False, ""
     except Exception:
         return False, ""
-    if algo_id and algo_id in _breakout_algos():           # breakout algo → ปล่อยผ่าน (ต้องทะลุแนวได้)
+    if not _gated(algo_id, symbol):                        # ไม่อยู่ allowlist (หรือ breakout ใน legacy) → ปล่อยผ่าน
         return False, ""
     try:
         h, l, c = bars[0], bars[1], bars[2]
@@ -126,3 +169,30 @@ def blocks_live(bars, direction, price, atr, algo_id=None, symbol=None):
     except Exception:
         return False, ""
     return False, ""
+
+
+def blocks_live_gold(algo_id, direction, price, atr, tf="H1", symbol="XAUUSD"):
+    """entry-path wrapper สำหรับ path ทองที่**ไม่มี h/l/c array อยู่แล้ว** (regime_tick, tsmom_manager).
+    fetch บาร์ broker บน tf เอง → เรียก blocks_live. fail-open (error = ไม่ block, live-money ปลอดภัยฝั่งไม่ค้าง).
+    เช็ค flag+allowlist ก่อน fetch (ไม่อยู่ allowlist → ไม่เสีย MT5 call)."""
+    try:
+        import config as _c
+        if not getattr(_c, "SR_ENTRY_GATE", False):
+            return False, ""
+        if not _gated(algo_id, symbol):                    # ข้าม fetch ถ้า combo นี้ไม่ถูก gate
+            return False, ""
+        import MetaTrader5 as mt5
+        from connectors.price_feed import get_ohlcv
+        p = params_from_config()
+        n = int(p[0]) + int(p[1]) + 5                      # lookback+pivot+buffer พอสำหรับ swing
+        tfmap = {"M15": mt5.TIMEFRAME_M15, "H1": mt5.TIMEFRAME_H1, "H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1}
+        broker = getattr(_c, "SYMBOL", symbol)
+        r = get_ohlcv(broker, tfmap.get(str(tf).upper(), mt5.TIMEFRAME_H1), n)
+        if not r or len(r) < 10:
+            return False, ""
+        h = [float(x["high"]) for x in r]
+        l = [float(x["low"]) for x in r]
+        c = [float(x["close"]) for x in r]
+        return blocks_live((h, l, c), direction, price, atr, algo_id, symbol)
+    except Exception:
+        return False, ""

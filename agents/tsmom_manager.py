@@ -90,6 +90,20 @@ def _open(direction, atr, shadow):
                 logger.info(f"[TSMOM] สวน sentiment (score {_sb['score']}) → lot ×{_sb['lot_mult']} = {lot}")
         except Exception:
             pass
+    if not shadow:                                          # risk-shape gate (allowlist): กัน BUY ชนแนวต้าน/SELL ชนแนวรับ
+        try:
+            from agents import sr_entry_gate as _srg
+            import MetaTrader5 as mt5
+            _tk = mt5.symbol_info_tick(getattr(_cfg, "SYMBOL", "XAUUSD"))
+            _px = (_tk.ask if direction == "BUY" else _tk.bid) if _tk else None
+            if _px:
+                _blk, _why = _srg.blocks_live_gold("tsmom_d1", direction, float(_px), float(atr or 0), tf="D1")
+                if _blk:                                    # รอราคาออกจากโซน (return False → ไม่ mark bar → retry รอบหน้า)
+                    logger.info(f"[TSMOM] SR-GATE-SKIP {direction}: {_why}")
+                    _state("SR-GATE-SKIP", f"{direction} · {_why}")
+                    return False
+        except Exception:
+            pass
     res = open_order(direction, sl_pips, tp_pips, comment=COMMENT, lot=lot, shadow=shadow)
     ok = True if shadow else bool(isinstance(res, dict) and res.get("success"))
     logger.warning(f"[TSMOM] {'SHADOW ' if shadow else ''}OPEN {direction} SL={sl_pips}p ({sl_src}) lot={lot} → {res}")
