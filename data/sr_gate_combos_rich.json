@@ -1,0 +1,18 @@
+{
+ "generated_utc": "2026-08-21T01:32:21+00:00",
+ "params": {
+  "lookback": 60,
+  "pivot": 3,
+  "block_atr": 0.5,
+  "min_touches": 2,
+  "cluster_atr": 0.3
+ },
+ "rich": {
+  "min_bounce": 55.0,
+  "min_tests": 3
+ },
+ "criteria": "exp_R>0 · OOS≥0 · t≥2 · n≥80 · exp_R_on≥exp_R_off · n_on≥0.15·n_off",
+ "combos": [
+  "macro_momentum|XAUUSD"
+ ]
+}

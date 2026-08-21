@@ -390,6 +390,10 @@ SR_GATE_COMBOS  = os.getenv("SR_GATE_COMBOS", "")
 SR_GATE_ALL     = (os.getenv("SR_GATE_ALL") or "false").lower() == "true"
 # ยกเว้น gate เสมอ (หลักฐานว่า gate ทำแย่) — comma "algo" หรือ "algo|SYMBOL". pullback_buy: gate บล็อก dip กำไร
 SR_GATE_EXCLUDE = os.getenv("SR_GATE_EXCLUDE", "pullback_buy")
+# rich-zone block (user 08-21): block เฉพาะโซนที่ 'เด้งมีนัยสถิติ' (causal bounce_pct≥min, tests≥min) ไม่ใช่แค่มี swing
+SR_RICH_ZONE     = (os.getenv("SR_RICH_ZONE") or "false").lower() == "true"
+SR_RICH_MIN_BOUNCE = float(os.getenv("SR_RICH_MIN_BOUNCE") or 55)   # โซนต้องเด้ง ≥ นี้% (จาก causal test) ถึง block
+SR_RICH_MIN_TESTS  = int(os.getenv("SR_RICH_MIN_TESTS") or 3)       # ต้องมี test ≥ นี้ครั้ง (มีนัย)
 # CDC Action Zone (อ.โฉลก) — ทิศ cdc_zone algo: long (BUY เท่านั้น, default) / short / both. SELL leg −EV → long
 CDC_DIR_MODE = (os.getenv("CDC_DIR_MODE") or "long").lower()
 # pullback entry (โฉลก wave-2/4: เข้าตอนย่อ ไม่ไล่ราคา) — validated: ดัน XAUUSD t1.99→2.05 (RSI filter พังของดี)
@@ -659,11 +663,14 @@ def reload_config():
     SR_LOOKBACK     = int(os.getenv("SR_LOOKBACK") or 60)
     SR_PIVOT        = int(os.getenv("SR_PIVOT") or 3)
     SR_CLUSTER_ATR  = float(os.getenv("SR_CLUSTER_ATR") or 0.3)
-    global SR_BREAKOUT_ALGOS, SR_GATE_COMBOS, SR_GATE_ALL, SR_GATE_EXCLUDE, CDC_DIR_MODE, CDC_PULLBACK_MIN, CDC_PULLBACK_LB, CDC_PYRAMID, CDC_MAX_UNITS, CDC_ADD_HALF_N
+    global SR_BREAKOUT_ALGOS, SR_GATE_COMBOS, SR_GATE_ALL, SR_GATE_EXCLUDE, SR_RICH_ZONE, SR_RICH_MIN_BOUNCE, SR_RICH_MIN_TESTS, CDC_DIR_MODE, CDC_PULLBACK_MIN, CDC_PULLBACK_LB, CDC_PYRAMID, CDC_MAX_UNITS, CDC_ADD_HALF_N
     SR_BREAKOUT_ALGOS = os.getenv("SR_BREAKOUT_ALGOS", "regime_momentum,regime_momentum_fvg,macro_momentum,confluence_15m,tsmom_d1")
     SR_GATE_COMBOS  = os.getenv("SR_GATE_COMBOS", "")
     SR_GATE_ALL     = (os.getenv("SR_GATE_ALL") or "false").lower() == "true"
     SR_GATE_EXCLUDE = os.getenv("SR_GATE_EXCLUDE", "pullback_buy")
+    SR_RICH_ZONE     = (os.getenv("SR_RICH_ZONE") or "false").lower() == "true"
+    SR_RICH_MIN_BOUNCE = float(os.getenv("SR_RICH_MIN_BOUNCE") or 55)
+    SR_RICH_MIN_TESTS  = int(os.getenv("SR_RICH_MIN_TESTS") or 3)
     CDC_DIR_MODE = (os.getenv("CDC_DIR_MODE") or "long").lower()
     CDC_PULLBACK_MIN = float(os.getenv("CDC_PULLBACK_MIN") or 0.005)
     CDC_PULLBACK_LB  = int(os.getenv("CDC_PULLBACK_LB") or 20)

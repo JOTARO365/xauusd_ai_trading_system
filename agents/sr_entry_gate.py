@@ -48,9 +48,38 @@ def _cluster(levels, tol):
     return merged
 
 
-def blocks_at(h, l, i, px, d, atr, params=DEFAULTS):
+def _zone_bounce_stat(h, l, c, i, level, side_sign, tol, fwd=10):
+    """causal: ที่ level นี้ ในอดีต (บาร์ < i, outcome resolved ก่อน i) ราคาเด้งกี่ครั้ง/ทะลุกี่ครั้ง.
+    คืน (bounce_pct, n_tests). side_sign>0 = resistance (ทะลุ=ปิดเหนือ) · <0 = support (ทะลุ=ปิดใต้).
+    debounce: หลัง touch ข้าม fwd แท่ง. None ถ้าไม่มี test/ไม่มี close. = ชั้น 'เด้งมีนัยสถิติ' แบบ causal (parity-safe)."""
+    if c is None:
+        return None, 0
+    bounces = brk = 0
+    k = 0
+    kmax = i - fwd - 1                                 # ต้องมี outcome window ครบก่อน i (causal)
+    while k <= kmax:
+        if (float(h[k]) >= level - tol) and (float(l[k]) <= level + tol):   # touch โซน
+            broke = False
+            for j in range(k + 1, min(k + 1 + fwd, i)):
+                cj = float(c[j])
+                if (side_sign > 0 and cj > level + tol) or (side_sign < 0 and cj < level - tol):
+                    broke = True; break
+            brk += 1 if broke else 0
+            bounces += 0 if broke else 1
+            k += fwd                                   # ข้าม window กัน double-count touch เดียว
+        else:
+            k += 1
+    nt = bounces + brk
+    if nt == 0:
+        return None, 0
+    return round(100.0 * bounces / nt, 1), nt
+
+
+def blocks_at(h, l, i, px, d, atr, params=DEFAULTS, c=None, rich=None):
     """True = block entry. h,l = high/low arrays (newest last). i = signal-bar index. px = entry price.
-    d = +1 BUY / -1 SELL. atr = ATR ที่ bar นั้น. params = DEFAULTS หรือ params_from_config()."""
+    d = +1 BUY / -1 SELL. atr = ATR ที่ bar นั้น. params = DEFAULTS หรือ params_from_config().
+    rich=(min_bounce_pct, min_tests): เปิด rich-zone mode — block เฉพาะโซนที่ **เด้งมีนัยสถิติ** (causal
+    bounce_pct ≥ min_bounce, tests ≥ min_tests) นอกจากใกล้+touches. ต้องมี c (close). None = simple mode."""
     if atr is None or atr <= 0:
         return False
     lookback, pivot, block_atr, min_touches, cluster_atr = params
@@ -59,17 +88,26 @@ def blocks_at(h, l, i, px, d, atr, params=DEFAULTS):
     res, sup = _swing_levels(h, l, i, lookback, pivot)
     tol = cluster_atr * atr
     thresh = block_atr * atr
+
+    def _rich_ok(lv):
+        """rich gate: โซนต้องเด้งมีนัยสถิติ (causal) ถึงจะ block. simple mode (rich None) = ผ่านเสมอ."""
+        if rich is None:
+            return True
+        mb, mt = rich
+        bp, nt = _zone_bounce_stat(h, l, c, i, lv, d, tol)
+        return bp is not None and nt >= mt and bp >= mb
+
     if d > 0:                                          # BUY: แนวต้านแข็งที่ขวางเหนือราคา + ยังไม่ทะลุ
         cand = [(lv, ct) for lv, ct in _cluster(res, tol) if lv > px]
         if cand:
             lv, ct = min(cand, key=lambda t: t[0])     # ต้านใกล้สุดเหนือราคา
-            if (lv - px) < thresh and ct >= min_touches:
+            if (lv - px) < thresh and ct >= min_touches and _rich_ok(lv):
                 return True
     else:                                              # SELL: แนวรับแข็งที่รองใต้ราคา + ยังไม่ทะลุ
         cand = [(lv, ct) for lv, ct in _cluster(sup, tol) if lv < px]
         if cand:
             lv, ct = max(cand, key=lambda t: t[0])     # รับใกล้สุดใต้ราคา
-            if (px - lv) < thresh and ct >= min_touches:
+            if (px - lv) < thresh and ct >= min_touches and _rich_ok(lv):
                 return True
     return False
 
@@ -183,12 +221,27 @@ def blocks_live(bars, direction, price, atr, algo_id=None, symbol=None):
             return False, ""
         d = 1 if str(direction).upper() == "BUY" else -1
         i = len(c) - 1
-        if blocks_at(h, l, i, float(price), d, float(atr or 0), params_from_config()):
+        if blocks_at(h, l, i, float(price), d, float(atr or 0), params_from_config(), c=c, rich=_rich_params()):
             side = "แนวต้าน" if d > 0 else "แนวรับ"
-            return True, f"S/R gate: {direction} ชน{side}แข็งใกล้ (≤{params_from_config()[2]}×ATR ยังไม่ทะลุ)"
+            _rp = _rich_params()
+            _why = f"S/R gate: {direction} ชน{side}แข็งใกล้ (≤{params_from_config()[2]}×ATR ยังไม่ทะลุ)"
+            if _rp:
+                _why += f" · เด้งมีนัยสถิติ (≥{_rp[0]:.0f}% / {_rp[1]}+ tests)"
+            return True, _why
     except Exception:
         return False, ""
     return False, ""
+
+
+def _rich_params():
+    """rich-zone params จาก config: (min_bounce_pct, min_tests) ถ้า SR_RICH_ZONE on, else None (simple mode)."""
+    try:
+        import config as _c
+        if not getattr(_c, "SR_RICH_ZONE", False):
+            return None
+        return (float(getattr(_c, "SR_RICH_MIN_BOUNCE", 55.0)), int(getattr(_c, "SR_RICH_MIN_TESTS", 3)))
+    except Exception:
+        return None
 
 
 def blocks_live_gold(algo_id, direction, price, atr, tf="H1", symbol="XAUUSD"):
