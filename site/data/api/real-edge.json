@@ -1,5 +1,5 @@
 {
- "generated": "2026-08-12T11:59Z",
+ "generated": "2026-08-21T05:16Z",
  "note": "real closed-money edge (net จริง). n น้อย = ยังไม่พอตัดสิน (validated-or-off: n≥100 + gauntlet). ไม่กรอง entry — display เทียบ shadow paper.",
  "ok": true,
  "rows": [
@@ -18,10 +18,10 @@
    "algo_id": "confluence_15m",
    "by_regime": {},
    "by_session": {},
-   "exp_R": 0.379,
-   "n": 1,
-   "n_R": 1,
-   "sum_R": 0.38,
+   "exp_R": 0.253,
+   "n": 2,
+   "n_R": 2,
+   "sum_R": 0.51,
    "symbol": "XAUUSD",
    "wr": 100.0
   },
@@ -29,10 +29,21 @@
    "algo_id": "macro_momentum",
    "by_regime": {},
    "by_session": {},
-   "exp_R": -0.475,
-   "n": 2,
-   "n_R": 2,
-   "sum_R": -0.95,
+   "exp_R": 0.474,
+   "n": 4,
+   "n_R": 4,
+   "sum_R": 1.9,
+   "symbol": "BTCUSD",
+   "wr": 75.0
+  },
+  {
+   "algo_id": "macro_momentum",
+   "by_regime": {},
+   "by_session": {},
+   "exp_R": -0.315,
+   "n": 6,
+   "n_R": 6,
+   "sum_R": -1.89,
    "symbol": "XAUUSD",
    "wr": 50.0
   },
@@ -84,12 +95,12 @@
    "algo_id": "sweep_reversal",
    "by_regime": {},
    "by_session": {},
-   "exp_R": 0.184,
-   "n": 3,
-   "n_R": 3,
-   "sum_R": 0.55,
+   "exp_R": 0.162,
+   "n": 6,
+   "n_R": 6,
+   "sum_R": 0.97,
    "symbol": "BTCUSD",
-   "wr": 66.7
+   "wr": 50.0
   },
   {
    "algo_id": "sweep_reversal",
@@ -118,12 +129,12 @@
      "wr": 44.4
     }
    },
-   "exp_R": -0.062,
-   "n": 10,
-   "n_R": 10,
-   "sum_R": -0.62,
+   "exp_R": -0.131,
+   "n": 14,
+   "n_R": 14,
+   "sum_R": -1.84,
    "symbol": "BTCUSD",
-   "wr": 20.0
+   "wr": 14.3
   },
   {
    "algo_id": "tsmom_d1",
@@ -152,24 +163,24 @@
    "algo_id": "tsmom_d1",
    "by_regime": {
     "—": {
-     "exp_R": -0.023,
-     "n": 26,
-     "wr": 38.5
+     "exp_R": -0.104,
+     "n": 29,
+     "wr": 34.5
     }
    },
    "by_session": {
     "—": {
-     "exp_R": -0.023,
-     "n": 26,
-     "wr": 38.5
+     "exp_R": -0.104,
+     "n": 29,
+     "wr": 34.5
     }
    },
-   "exp_R": -0.023,
-   "n": 26,
-   "n_R": 26,
-   "sum_R": -0.6,
+   "exp_R": -0.104,
+   "n": 29,
+   "n_R": 29,
+   "sum_R": -3.0,
    "symbol": "XAUUSD",
-   "wr": 30.8
+   "wr": 27.6
   },
   {
    "algo_id": "tsmom_d1",
@@ -198,21 +209,21 @@
    "algo_id": "tsmom_d1",
    "by_regime": {},
    "by_session": {},
-   "exp_R": 0.142,
-   "n": 1,
-   "n_R": 1,
-   "sum_R": 0.14,
+   "exp_R": -0.179,
+   "n": 5,
+   "n_R": 5,
+   "sum_R": -0.9,
    "symbol": "WTIUSD",
-   "wr": 100.0
+   "wr": 20.0
   },
   {
    "algo_id": "tsmom_d1",
    "by_regime": {},
    "by_session": {},
-   "exp_R": -0.083,
-   "n": 2,
-   "n_R": 2,
-   "sum_R": -0.17,
+   "exp_R": -0.147,
+   "n": 8,
+   "n_R": 8,
+   "sum_R": -1.18,
    "symbol": "XAGUSD",
    "wr": 0.0
   }

@@ -1,48 +1,48 @@
 {
  "combined": {
-  "avg_mae_R": -1.34,
+  "avg_mae_R": -1.41,
   "avg_mfe_R": 0.35,
   "by_result": {
-   "SL": 2562,
+   "SL": 3285,
    "TIMEOUT": 0,
-   "TP": 32
+   "TP": 41
   },
-  "exp_R": -0.989,
-  "n_closed": 2594,
+  "exp_R": -0.987,
+  "n_closed": 3326,
   "n_open": 1,
-  "sigma_R": 0.33,
-  "sum_R": -2566.01,
+  "sigma_R": 0.351,
+  "sum_R": -3283.82,
   "win_rate": 0.012
  },
  "fade": {
-  "avg_mae_R": -1.35,
+  "avg_mae_R": -1.41,
   "avg_mfe_R": 0.35,
   "by_result": {
-   "SL": 2552,
+   "SL": 3273,
    "TIMEOUT": 0,
-   "TP": 29
+   "TP": 38
   },
-  "exp_R": -0.993,
-  "n_closed": 2581,
+  "exp_R": -0.99,
+  "n_closed": 3311,
   "n_open": 1,
-  "sigma_R": 0.315,
-  "sum_R": -2561.85,
+  "sigma_R": 0.341,
+  "sum_R": -3277.63,
   "win_rate": 0.011
  },
  "momentum": {
-  "avg_mae_R": -0.9,
-  "avg_mfe_R": 1.09,
+  "avg_mae_R": -0.91,
+  "avg_mfe_R": 1.03,
   "by_result": {
-   "SL": 10,
+   "SL": 12,
    "TIMEOUT": 0,
    "TP": 3
   },
-  "exp_R": -0.32,
-  "n_closed": 13,
+  "exp_R": -0.413,
+  "n_closed": 15,
   "n_open": 0,
-  "sigma_R": 1.316,
-  "sum_R": -4.16,
-  "win_rate": 0.231
+  "sigma_R": 1.243,
+  "sum_R": -6.19,
+  "win_rate": 0.2
  },
  "needed_n": {
   "δ=0.2": 389,
@@ -51,23 +51,23 @@
  "note": "counterfactual (signal) + pending (lifecycle จริง placed→fill→TP/SL) net cost 30p",
  "ok": true,
  "pending": {
-  "avg_mae_R": -1.34,
-  "avg_mfe_R": 0.69,
+  "avg_mae_R": -1.26,
+  "avg_mfe_R": 0.53,
   "by_mode": {
-   "FADE": 5,
+   "FADE": 7,
    "STOP": 0
   },
   "by_result": {
-   "SL": 5,
+   "SL": 7,
    "TIMEOUT": 0,
    "TP": 0
   },
-  "exp_R": -1.036,
-  "expired": 6,
-  "n_closed": 5,
-  "n_open": 1,
-  "sigma_R": 0.003,
-  "sum_R": -5.18,
+  "exp_R": -1.033,
+  "expired": 10,
+  "n_closed": 7,
+  "n_open": 0,
+  "sigma_R": 0.005,
+  "sum_R": -7.23,
   "win_rate": 0.0
  }
 }

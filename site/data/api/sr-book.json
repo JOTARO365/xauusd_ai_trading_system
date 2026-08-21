@@ -2,77 +2,56 @@
  "ok": true,
  "rows": [
   {
-   "atr": 15.27,
+   "atr": 17.23,
    "momentum": "flat",
    "near": false,
-   "price": 4412.83,
+   "price": 4535.06,
    "resistance": null,
    "support": {
-    "dist_atr": 2.78,
-    "level": 4370.44,
+    "dist_atr": 2.62,
+    "level": 4489.95,
     "touches": 7
    },
    "symbol": "XAUUSD"
   },
   {
-   "atr": 0.0,
+   "atr": 0.49,
    "momentum": "flat",
-   "near": true,
-   "price": 1.15,
-   "resistance": {
-    "dist_atr": 0.13,
-    "level": 1.15,
-    "touches": 8
-   },
-   "support": {
-    "dist_atr": 0.12,
-    "level": 1.15,
-    "touches": 12
-   },
-   "symbol": "EURUSD"
-  },
-  {
-   "atr": 198.77,
-   "momentum": "up",
-   "near": true,
-   "price": 64218.05,
-   "resistance": {
-    "dist_atr": 0.27,
-    "level": 64271.26,
-    "touches": 8
-   },
-   "support": {
-    "dist_atr": 0.48,
-    "level": 64122.18,
-    "touches": 8
-   },
-   "symbol": "BTCUSD"
-  },
-  {
-   "atr": 0.64,
-   "momentum": "up",
    "near": false,
-   "price": 83.99,
+   "price": 87.12,
    "resistance": null,
    "support": {
-    "dist_atr": 2.52,
-    "level": 82.38,
-    "touches": 6
+    "dist_atr": 3.02,
+    "level": 85.63,
+    "touches": 7
    },
    "symbol": "WTIUSD"
   },
   {
-   "atr": 12.46,
-   "momentum": "down",
+   "atr": 13.48,
+   "momentum": "flat",
    "near": false,
-   "price": 3822.64,
+   "price": 3878.23,
    "resistance": null,
    "support": {
-    "dist_atr": 3.0,
-    "level": 3785.32,
+    "dist_atr": 2.89,
+    "level": 3839.32,
     "touches": 6
    },
    "symbol": "XAUEUR"
+  },
+  {
+   "atr": 695.18,
+   "momentum": "up",
+   "near": false,
+   "price": 75289.65,
+   "resistance": null,
+   "support": {
+    "dist_atr": 15.37,
+    "level": 64605.09,
+    "touches": 6
+   },
+   "symbol": "BTCUSD"
   }
  ]
 }

@@ -1,7 +1,33 @@
 {
- "n_closed": 0,
- "n_open": 0,
+ "n_closed": 98,
+ "n_open": 1,
  "ok": true,
- "recent": [],
- "wr": null
+ "recent": [
+  {
+   "closed": true,
+   "dir": "BUY",
+   "time": "2026-08-20T23:06"
+  },
+  {
+   "closed": true,
+   "dir": "BUY",
+   "time": "2026-08-20T21:47"
+  },
+  {
+   "closed": true,
+   "dir": "BUY",
+   "time": "2026-08-20T08:02"
+  },
+  {
+   "closed": true,
+   "dir": "SELL",
+   "time": "2026-08-07T18:33"
+  },
+  {
+   "closed": true,
+   "dir": "SELL",
+   "time": "2026-08-07T15:34"
+  }
+ ],
+ "wr": 26.5
 }

@@ -1,16 +1,16 @@
 {
  "collecting": false,
- "max_dd_days": 1.0,
- "max_dd_pct": 55.2,
- "n": 15,
+ "max_dd_days": 15.3,
+ "max_dd_pct": 120.7,
+ "n": 486,
  "note": "SAT ch12/13 · net ไม้ปิดจริง · VaR สมมติ normal (understate tail) → ดู maxDD ควบ",
  "ok": true,
- "sharpe": 6.37,
- "span_days": 1.0,
- "trades_per_year": 4741.0,
- "var95_hist": 664.1,
- "var95_param": 1006.26,
- "var99_hist": 890.98,
- "var99_param": 1415.22,
- "wr": 46.7
+ "sharpe": 2.98,
+ "span_days": 23.0,
+ "trades_per_year": 7575.0,
+ "var95_hist": 2228.81,
+ "var95_param": 6298.4,
+ "var99_hist": 5605.51,
+ "var99_param": 8919.42,
+ "wr": 45.7
 }

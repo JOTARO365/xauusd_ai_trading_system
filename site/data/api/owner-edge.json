@@ -2,49 +2,49 @@
  "by_dir": [
   {
    "key": "BUY",
-   "n": 8,
-   "pf": 1.68,
-   "top3_pct": 246,
-   "win_rate": 0.5,
-   "wins": 4
+   "n": 231,
+   "pf": 1.6,
+   "top3_pct": 116,
+   "win_rate": 0.519,
+   "wins": 120
   },
   {
    "key": "SELL",
-   "n": 7,
-   "pf": 0.24,
+   "n": 234,
+   "pf": 0.64,
    "top3_pct": null,
-   "win_rate": 0.429,
-   "wins": 3
+   "win_rate": 0.423,
+   "wins": 99
   }
  ],
  "by_regime": [
   {
    "key": "RANGE",
-   "n": 15,
-   "pf": 0.92,
-   "top3_pct": null,
-   "win_rate": 0.467,
-   "wins": 7
+   "n": 465,
+   "pf": 1.07,
+   "top3_pct": 476,
+   "win_rate": 0.471,
+   "wins": 219
   }
  ],
  "by_vol": [
   {
    "key": "mid-vol",
-   "n": 15,
-   "pf": 0.92,
-   "top3_pct": null,
-   "win_rate": 0.467,
-   "wins": 7
+   "n": 465,
+   "pf": 1.07,
+   "top3_pct": 476,
+   "win_rate": 0.471,
+   "wins": 219
   }
  ],
- "n_manual": 15,
- "n_mapped": 15,
+ "n_manual": 465,
+ "n_mapped": 465,
  "ok": true,
  "overall": {
-  "n": 15,
-  "pf": 0.92,
-  "top3_pct": null,
-  "win_rate": 0.467,
-  "wins": 7
+  "n": 465,
+  "pf": 1.07,
+  "top3_pct": 476,
+  "win_rate": 0.471,
+  "wins": 219
  }
 }

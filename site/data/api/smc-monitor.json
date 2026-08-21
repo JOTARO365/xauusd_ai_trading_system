@@ -1,119 +1,133 @@
 {
  "fvg": [
   {
-   "age_bars": 0,
-   "bot": 4383.5,
+   "age_bars": 2,
+   "bot": 4494.67,
    "dir": "bull",
-   "mid": 4383.66,
-   "size_pips": 31,
+   "mid": 4501.16,
+   "size_pips": 1297,
    "tf": "H4",
-   "top": 4383.81
+   "top": 4507.64
   },
   {
    "age_bars": 9,
-   "bot": 4349.85,
+   "bot": 4363.12,
    "dir": "bull",
-   "mid": 4350.68,
-   "size_pips": 165,
+   "mid": 4393.72,
+   "size_pips": 6119,
    "tf": "H4",
-   "top": 4351.5
+   "top": 4424.31
   },
   {
-   "age_bars": 17,
-   "bot": 4268.87,
+   "age_bars": 58,
+   "bot": 4268.99,
    "dir": "bull",
-   "mid": 4284.9,
-   "size_pips": 3206,
+   "mid": 4285.34,
+   "size_pips": 3271,
    "tf": "H4",
-   "top": 4300.93
+   "top": 4301.7
   },
   {
-   "age_bars": 18,
-   "bot": 4252.98,
+   "age_bars": 59,
+   "bot": 4253.1,
    "dir": "bull",
-   "mid": 4257.36,
+   "mid": 4257.48,
    "size_pips": 876,
    "tf": "H4",
-   "top": 4261.74
+   "top": 4261.86
   },
   {
-   "age_bars": 9,
-   "bot": 4374.25,
+   "age_bars": 13,
+   "bot": 4477.02,
    "dir": "bull",
-   "mid": 4376.23,
-   "size_pips": 396,
+   "mid": 4478.91,
+   "size_pips": 378,
    "tf": "H1",
-   "top": 4378.21
+   "top": 4480.8
   },
   {
-   "age_bars": 41,
-   "bot": 4339.64,
+   "age_bars": 37,
+   "bot": 4374.07,
    "dir": "bull",
-   "mid": 4341.41,
-   "size_pips": 353,
+   "mid": 4399.19,
+   "size_pips": 5024,
    "tf": "H1",
-   "top": 4343.17
+   "top": 4424.31
+  },
+  {
+   "age_bars": 42,
+   "bot": 4349.34,
+   "dir": "bull",
+   "mid": 4350.18,
+   "size_pips": 168,
+   "tf": "H1",
+   "top": 4351.02
   }
  ],
  "liquidity": [
   {
-   "dist_pips": 283,
-   "level": 4410.0,
-   "name": "R4410",
-   "side": "below"
-  },
-  {
-   "dist_pips": 717,
-   "level": 4420.0,
-   "name": "R4420",
+   "dist_pips": 494,
+   "level": 4540.0,
+   "name": "R4540",
    "side": "above"
   },
   {
-   "dist_pips": 1283,
-   "level": 4400.0,
-   "name": "R4400",
+   "dist_pips": 506,
+   "level": 4530.0,
+   "name": "R4530",
    "side": "below"
   },
   {
-   "dist_pips": 1717,
-   "level": 4430.0,
-   "name": "R4430",
-   "side": "above"
-  },
-  {
-   "dist_pips": 2212,
-   "level": 4434.95,
+   "dist_pips": 587,
+   "level": 4540.93,
    "name": "PDH",
    "side": "above"
   },
   {
-   "dist_pips": 2283,
-   "level": 4390.0,
-   "name": "R4390",
-   "side": "below"
-  },
-  {
-   "dist_pips": 3717,
-   "level": 4450.0,
-   "name": "R4450",
+   "dist_pips": 1494,
+   "level": 4550.0,
+   "name": "R4550",
    "side": "above"
   },
   {
-   "dist_pips": 5634,
-   "level": 4356.49,
-   "name": "PDL",
+   "dist_pips": 1506,
+   "level": 4520.0,
+   "name": "R4520",
    "side": "below"
   },
   {
-   "dist_pips": 6283,
-   "level": 4350.0,
-   "name": "R4350",
+   "dist_pips": 2494,
+   "level": 4560.0,
+   "name": "R4560",
+   "side": "above"
+  },
+  {
+   "dist_pips": 3506,
+   "level": 4500.0,
+   "name": "R4500",
+   "side": "below"
+  },
+  {
+   "dist_pips": 6494,
+   "level": 4600.0,
+   "name": "R4600",
+   "side": "above"
+  },
+  {
+   "dist_pips": 8451,
+   "level": 4450.55,
+   "name": "PDL",
    "side": "below"
   }
  ],
  "note": "SMC = บริบท/เฝ้าดูเท่านั้น ไม่ป้อน entry (backtest: ไม่มี edge หลัง cost)",
  "ok": true,
- "price": 4412.83,
+ "price": 4535.06,
  "regime": "NEUTRAL",
- "sweep": null
+ "sweep": {
+  "dir": "swept_high",
+  "level": "PDH",
+  "note": "แตะเหนือ PDH แล้วปิดกลับ — sweep บน. research: มัก continuation อย่า fade",
+  "price": 4540.93
+ }
 }

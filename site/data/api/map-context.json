@@ -8,21 +8,30 @@
  "events": [
   {
    "ccy": "USD",
-   "forecast": "0.2%",
+   "forecast": "—",
    "impact": "high",
    "lat": 38.8928,
    "lng": -77.0455,
-   "name": "Core CPI m/m",
-   "ts": "2026-08-12T08:30:00-04:00"
+   "name": "FOMC Meeting Minutes",
+   "ts": "2026-08-19T14:00:00-04:00"
   },
   {
    "ccy": "GBP",
-   "forecast": "0.0%",
-   "impact": "high",
+   "forecast": "-0.5%",
+   "impact": "medium",
    "lat": 51.5142,
    "lng": -0.0882,
-   "name": "GDP m/m",
-   "ts": "2026-08-13T02:00:00-04:00"
+   "name": "Retail Sales m/m",
+   "ts": "2026-08-21T02:00:00-04:00"
+  },
+  {
+   "ccy": "EUR",
+   "forecast": "50.1",
+   "impact": "medium",
+   "lat": 50.1096,
+   "lng": 8.7033,
+   "name": "French Flash Manufacturing PMI",
+   "ts": "2026-08-21T03:15:00-04:00"
   }
  ],
  "ok": true

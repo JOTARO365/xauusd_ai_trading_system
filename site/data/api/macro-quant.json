@@ -1,26 +1,25 @@
 {
- "as_of": "2026-08-12T11:59:36.406487+00:00",
- "bias": "NEUTRAL",
+ "as_of": "2026-08-21T05:16:08.465304+00:00",
+ "bias": "BEARISH",
  "components": {
-  "cot": 0.0652,
+  "cot": 0.0768,
   "dxy": -0.0527,
   "fed": 0.0,
-  "gsr": 0.0107,
-  "news": 0.0,
+  "gsr": -0.0114,
+  "news": -0.0726,
   "real_yield": -0.111,
   "real_yield_chg": -0.0711,
   "risk_regime": 0.03,
-  "vix": -0.0291,
+  "vix": 0.0085,
   "y10": 0.008
  },
- "confidence": 0.66,
+ "confidence": 0.71,
  "coverage": "10/11",
  "driver": "real_yield",
  "ok": true,
- "score": -13,
+ "score": -17,
  "stale": [
-  "news",
   "macro"
  ],
- "stance": "two-sided / neutral"
+ "stance": "gold-headwind"
 }

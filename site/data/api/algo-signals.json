@@ -45,15 +45,17 @@
   },
   {
    "algo": "cdc_zone",
-   "dir": "BUY",
-   "entry": 4368.02,
-   "no_tp": true,
-   "reason": "risk/ไม้ > cap (ทุนน้อยเกิน SL)",
-   "sl": 4175.86,
-   "sl_pips": 19216,
-   "status": "BLOCKED",
-   "tf": "D1",
-   "tp": null
+   "dir": null,
+   "reason": "ยังไม่มีสัญญาณ",
+   "status": "NO_SIGNAL",
+   "tf": "D1"
+  },
+  {
+   "algo": "pullback_buy",
+   "dir": null,
+   "reason": "ยังไม่มีสัญญาณ",
+   "status": "NO_SIGNAL",
+   "tf": "H1"
   }
  ],
  "symbol": "XAUUSD"

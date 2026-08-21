@@ -1,8 +1,11 @@
 {
- "beta": 40.83,
- "entry_z": null,
- "live": true,
+ "beta": 38.28,
+ "entry_z": 2.17,
+ "live": false,
+ "mode": "shadow",
  "ok": true,
- "position": null,
- "z": -0.72
+ "position": "short_spread",
+ "shadow_entry_z": null,
+ "shadow_position": null,
+ "z": -0.52
 }

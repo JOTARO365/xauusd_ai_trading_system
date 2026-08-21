@@ -1,6 +1,6 @@
 {
  "bot_status": {
-  "cycle": 5478,
+  "cycle": 1811,
   "decision": "SKIP",
   "last_signal": {
    "action": "SKIP",
@@ -9,305 +9,223 @@
    "entry_type": "NONE",
    "reason": "",
    "sr_zone": "NONE",
-   "time": "2026-08-12T18:59:30",
+   "time": "2026-08-21T12:16:07",
    "trend": "BULLISH"
   },
   "liquidity_pools": {
    "buy_side": [],
-   "sell_side": [
-    {
-     "count": 2,
-     "dist_pct": 1.26,
-     "level": 4358.3
-    },
-    {
-     "count": 2,
-     "dist_pct": 2.24,
-     "level": 4314.9
-    },
-    {
-     "count": 2,
-     "dist_pct": 4.25,
-     "level": 4226.36
-    }
-   ]
+   "sell_side": []
   },
   "market": {
    "d1_trend": "BULLISH",
-   "fast_move_pips": 628.0,
+   "fast_move_pips": -1001.0,
    "momentum_tf": {
     "h1": {
      "direction": "UP",
-     "strength": "STRONG"
+     "strength": "MODERATE"
     },
     "h4": {
      "direction": "UP",
      "strength": "MODERATE"
     },
     "m15": {
-     "direction": "DOWN",
+     "direction": "UP",
      "strength": "MODERATE"
     }
    },
-   "rsi": 61.638,
+   "rsi": 63.0931,
    "trend": "BULLISH"
   },
   "plan": {
-   "buy_sl_pips": 3424,
-   "sell_sl_pips": 3424,
+   "buy_sl_pips": 3500,
+   "sell_sl_pips": 3500,
    "tp_pips": 1500
   },
   "price_info": {
-   "ask": 4413.4,
-   "bid": 4412.86,
-   "change_pct": 0.008,
-   "spread": 0.54
+   "ask": 4535.45,
+   "bid": 4535.16,
+   "change_pct": -0.118,
+   "spread": 0.29
   },
   "ready_mode": {
-   "active": true,
-   "set_at": "2026-08-12T18:57:41.990200",
-   "zone": {
-    "dist_pct": 0.248,
-    "level": 4402.99,
-    "tf": "W1",
-    "zone_type": "SUPPORT"
-   }
+   "active": false,
+   "set_at": null,
+   "zone": null
   },
-  "sent_bias": "NEUTRAL",
-  "sent_conf": 0,
-  "sent_summary": "",
-  "sent_tweets": 75,
-  "sentiment": "NEUTRAL",
+  "sent_bias": "BUY",
+  "sent_conf": 52,
+  "sent_summary": "PMI cluster pending; soft-growth bias + DXY breakdown = gold bid",
+  "sent_tweets": 15,
+  "sentiment": "BULLISH",
   "signals": {
    "double_pattern": null,
-   "fvg": [
-    {
-     "bottom": 4390.33,
-     "dist_pct": -0.49,
-     "mid": 4392.31,
-     "size_pips": 395,
-     "top": 4394.28,
-     "type": "bull"
-    }
-   ],
+   "fvg": [],
    "market_structure": {
-    "last_high": 4415.81,
-    "last_low": 4383.81,
+    "last_high": 4540.93,
+    "last_low": 4508.74,
     "state": "UPTREND",
     "why": "HH + HL"
    },
-   "retrace_entry": null,
-   "reversal_confirm": null
+   "retrace_entry": {
+    "close_sl_pips": 436,
+    "direction": "SELL",
+    "sl_tighter_pct": 47,
+    "suggested_entry": 4538.81,
+    "tight_sl": 4541.12,
+    "wick_sl_pips": 231
+   },
+   "reversal_confirm": {
+    "direction": "SELL",
+    "note": "แท่งล่าสุดยืนยันทิศ reversal แล้ว",
+    "status": "confirmed"
+   }
   },
   "skip_ai": true,
-  "updated_at": "2026-08-12T18:59:30",
+  "updated_at": "2026-08-21T12:16:07",
   "zones": {
-   "htf_zone": {
-    "dist_pct": 0.248,
-    "level": 4402.99,
-    "tf": "W1",
-    "zone_type": "SUPPORT"
-   },
+   "htf_zone": null,
    "key_levels": {
-    "pdh": 4303.88,
-    "pdl": 4018.85,
+    "pdh": 4449.72,
+    "pdl": 4310.97,
     "round_numbers": [
-     4250,
-     4300,
-     4350,
      4400,
      4450,
      4500,
-     4550
+     4550,
+     4600,
+     4650,
+     4700
     ]
    },
    "resistance": [
-    4434.95,
-    4415.81,
-    4434.95
+    4540.93
    ],
    "setups": [
     {
-     "direction": "BUY",
-     "level": 4400,
-     "score": 100,
+     "direction": "SELL",
+     "level": 4550,
+     "score": 88,
      "tf": "H4",
      "type": "SR_ZONE"
     },
     {
      "direction": "SELL",
-     "level": 4415.81,
-     "score": 93,
+     "level": 4540.93,
+     "score": 91,
      "tf": "H1",
      "type": "SR_ZONE"
     }
    ],
    "sr_meta": [
     {
-     "avg_bounce": 78.5,
-     "bars_since_touch": 0,
-     "bounce_pct": null,
-     "break_hold": null,
-     "break_pct": null,
-     "confluence": {
-      "count": 1,
-      "with": [
-       "H1 R"
-      ]
-     },
-     "grade": "A",
-     "level": 4434.95,
-     "n_tests": 1,
-     "score": 89,
-     "side": "R",
-     "strength": 75,
-     "tf": "H4",
-     "touches": 2,
-     "why": "H4 swing · แตะ 2 ครั้ง (proven)"
-    },
-    {
-     "avg_bounce": 114.5,
-     "bars_since_touch": 23,
-     "bounce_pct": null,
-     "break_hold": null,
-     "break_pct": null,
-     "confluence": {
-      "count": 1,
-      "with": [
-       "H1 S"
-      ]
-     },
-     "grade": "A",
-     "level": 4223.22,
-     "n_tests": 2,
-     "score": 85,
-     "side": "S",
-     "strength": 75,
-     "tf": "H4",
-     "touches": 2,
-     "why": "H4 swing · แตะ 2 ครั้ง (proven)"
-    },
-    {
-     "avg_bounce": 100.9,
-     "bars_since_touch": 41,
-     "bounce_pct": 53,
-     "break_hold": null,
-     "break_pct": 47,
-     "grade": "A",
-     "level": 4021.81,
-     "n_tests": 15,
-     "score": 83,
-     "side": "S",
-     "strength": 75,
-     "tf": "H4",
-     "touches": 15,
-     "why": "H4 swing · แตะ 15 ครั้ง — ใกล้สึก/เสี่ยงทะลุ · ตรงโซน D1 · ≈PDL"
-    },
-    {
-     "avg_bounce": 95.4,
-     "bars_since_touch": 59,
-     "bounce_pct": 50,
-     "break_hold": null,
-     "break_pct": 50,
-     "grade": "A",
-     "level": 3995.75,
-     "n_tests": 6,
-     "score": 94,
-     "side": "S",
-     "strength": 88,
-     "tf": "H4",
-     "touches": 6,
-     "why": "H4 swing · แตะ 6 ครั้ง (proven) · ตรงโซน D1"
-    },
-    {
-     "avg_bounce": 111.8,
-     "bars_since_touch": 105,
-     "bounce_pct": 50,
-     "break_hold": null,
-     "break_pct": 50,
-     "grade": "B",
-     "level": 3983.34,
-     "n_tests": 6,
-     "score": 74,
-     "side": "S",
-     "strength": 68,
-     "tf": "H4",
-     "touches": 6,
-     "why": "H4 swing · แตะ 6 ครั้ง (proven)"
-    },
-    {
-     "avg_bounce": 118.3,
-     "bars_since_touch": 108,
+     "avg_bounce": 134.1,
+     "bars_since_touch": 15,
      "bounce_pct": 100,
      "break_hold": null,
      "break_pct": 0,
      "grade": "A",
-     "level": 3960.02,
-     "n_tests": 5,
-     "score": 98,
+     "level": 4324.59,
+     "n_tests": 3,
+     "score": 83,
      "side": "S",
-     "strength": 88,
+     "strength": 75,
      "tf": "H4",
-     "touches": 5,
-     "why": "H4 swing · แตะ 5 ครั้ง (proven) · ตรงโซน D1"
+     "touches": 3,
+     "why": "H4 swing · แตะ 3 ครั้ง (proven)"
     },
     {
-     "avg_bounce": 49.0,
-     "bars_since_touch": 9,
+     "avg_bounce": 107.0,
+     "bars_since_touch": 31,
+     "bounce_pct": 80,
+     "break_hold": null,
+     "break_pct": 20,
+     "grade": "A",
+     "level": 4310.97,
+     "n_tests": 5,
+     "score": 100,
+     "side": "S",
+     "strength": 93,
+     "tf": "H4",
+     "touches": 5,
+     "why": "H4 swing · แตะ 5 ครั้ง (proven) · ตรงโซน D1 · ≈PDL"
+    },
+    {
+     "avg_bounce": 114.6,
+     "bars_since_touch": 64,
+     "bounce_pct": null,
+     "break_hold": null,
+     "break_pct": null,
+     "grade": "A",
+     "level": 4223.33,
+     "n_tests": 2,
+     "score": 77,
+     "side": "S",
+     "strength": 75,
+     "tf": "H4",
+     "touches": 2,
+     "why": "H4 swing · แตะ 2 ครั้ง (proven)"
+    },
+    {
+     "avg_bounce": 100.8,
+     "bars_since_touch": 82,
+     "bounce_pct": 55,
+     "break_hold": null,
+     "break_pct": 45,
+     "grade": "A",
+     "level": 4021.97,
+     "n_tests": 11,
+     "score": 78,
+     "side": "S",
+     "strength": 70,
+     "tf": "H4",
+     "touches": 11,
+     "why": "H4 swing · แตะ 11 ครั้ง — ใกล้สึก/เสี่ยงทะลุ · ตรงโซน D1"
+    },
+    {
+     "avg_bounce": 88.4,
+     "bars_since_touch": 100,
      "bounce_pct": 67,
+     "break_hold": null,
+     "break_pct": 33,
+     "grade": "A",
+     "level": 3995.88,
+     "n_tests": 3,
+     "score": 100,
+     "side": "S",
+     "strength": 95,
+     "tf": "H4",
+     "touches": 3,
+     "why": "H4 swing · แตะ 3 ครั้ง (proven) · ตรงโซน D1"
+    },
+    {
+     "avg_bounce": 41.4,
+     "bars_since_touch": 6,
+     "bounce_pct": 100,
      "break_hold": {
       "closes": 0,
       "status": "wick"
      },
-     "break_pct": 33,
-     "grade": "A",
-     "level": 4415.81,
-     "n_tests": 3,
-     "score": 90,
-     "side": "R",
-     "strength": 85,
-     "tf": "H1",
-     "touches": 3,
-     "why": "H1 swing · แตะ 3 ครั้ง (proven) · ตรงโซน W1"
-    },
-    {
-     "avg_bounce": 53.3,
-     "bars_since_touch": 2,
-     "bounce_pct": null,
-     "break_hold": null,
-     "break_pct": null,
-     "confluence": {
-      "count": 1,
-      "with": [
-       "H4 R"
-      ]
-     },
-     "grade": "A",
-     "level": 4434.95,
-     "n_tests": 2,
-     "score": 79,
+     "break_pct": 0,
+     "grade": "B",
+     "level": 4540.93,
+     "n_tests": 4,
+     "score": 74,
      "side": "R",
      "strength": 65,
      "tf": "H1",
-     "touches": 2,
-     "why": "H1 swing · แตะ 2 ครั้ง (proven)"
+     "touches": 4,
+     "why": "H1 swing · แตะ 4 ครั้ง (proven)"
     },
     {
-     "avg_bounce": 32.9,
-     "bars_since_touch": 7,
-     "bounce_pct": 40,
+     "avg_bounce": 27.5,
+     "bars_since_touch": 14,
+     "bounce_pct": 20,
      "break_hold": null,
-     "break_pct": 60,
-     "confluence": {
-      "count": 1,
-      "with": [
-       "fib 38.2% H1"
-      ]
-     },
+     "break_pct": 80,
      "grade": "B",
-     "level": 4383.81,
+     "level": 4508.74,
      "n_tests": 5,
-     "score": 70,
+     "score": 60,
      "side": "S",
      "strength": 58,
      "tf": "H1",
@@ -315,35 +233,29 @@
      "why": "H1 swing · แตะ 5 ครั้ง (proven)"
     },
     {
-     "avg_bounce": 45.8,
-     "bars_since_touch": 17,
-     "bounce_pct": 50,
+     "avg_bounce": 29.9,
+     "bars_since_touch": 27,
+     "bounce_pct": null,
      "break_hold": null,
-     "break_pct": 50,
-     "confluence": {
-      "count": 1,
-      "with": [
-       "fib 61.8% H1"
-      ]
-     },
-     "grade": "A",
-     "level": 4360.11,
-     "n_tests": 8,
-     "score": 76,
+     "break_pct": null,
+     "grade": "B",
+     "level": 4484.53,
+     "n_tests": 2,
+     "score": 67,
      "side": "S",
-     "strength": 60,
+     "strength": 65,
      "tf": "H1",
-     "touches": 8,
-     "why": "H1 swing · แตะ 8 ครั้ง — ใกล้สึก/เสี่ยงทะลุ · ตรงโซน D1"
+     "touches": 2,
+     "why": "H1 swing · แตะ 2 ครั้ง (proven)"
     },
     {
-     "avg_bounce": 52.1,
-     "bars_since_touch": 46,
+     "avg_bounce": 55.7,
+     "bars_since_touch": 19,
      "bounce_pct": 100,
      "break_hold": null,
      "break_pct": 0,
      "grade": "B",
-     "level": 4316.53,
+     "level": 4472.0,
      "n_tests": 5,
      "score": 68,
      "side": "S",
@@ -353,51 +265,45 @@
      "why": "H1 swing · แตะ 5 ครั้ง (proven)"
     },
     {
-     "avg_bounce": 66.2,
-     "bars_since_touch": 56,
-     "bounce_pct": 67,
-     "break_hold": null,
-     "break_pct": 33,
-     "grade": "A",
-     "level": 4300.93,
-     "n_tests": 3,
-     "score": 78,
-     "side": "S",
-     "strength": 73,
-     "tf": "H1",
-     "touches": 3,
-     "why": "H1 swing · แตะ 3 ครั้ง (proven) · ≈PDH · เลขกลม"
-    },
-    {
-     "avg_bounce": 38.8,
-     "bars_since_touch": 88,
+     "avg_bounce": 83.8,
+     "bars_since_touch": 16,
      "bounce_pct": null,
      "break_hold": null,
      "break_pct": null,
-     "confluence": {
-      "count": 1,
-      "with": [
-       "H4 S"
-      ]
-     },
      "grade": "A",
-     "level": 4229.51,
+     "level": 4450.55,
      "n_tests": 2,
      "score": 75,
      "side": "S",
-     "strength": 65,
+     "strength": 73,
      "tf": "H1",
      "touches": 2,
-     "why": "H1 swing · แตะ 2 ครั้ง (proven)"
+     "why": "H1 swing · แตะ 2 ครั้ง (proven) · ≈PDH · เลขกลม"
+    },
+    {
+     "avg_bounce": 47.1,
+     "bars_since_touch": 39,
+     "bounce_pct": 20,
+     "break_hold": null,
+     "break_pct": 80,
+     "grade": "B",
+     "level": 4397.9,
+     "n_tests": 5,
+     "score": 63,
+     "side": "S",
+     "strength": 61,
+     "tf": "H1",
+     "touches": 5,
+     "why": "H1 swing · แตะ 5 ครั้ง (proven) · เลขกลม"
     }
    ],
    "support": [
-    4223.22,
-    4021.81,
-    3995.75,
-    3983.34,
-    3960.02,
-    4383.81
+    4324.59,
+    4310.97,
+    4223.33,
+    4021.97,
+    3995.88,
+    4508.74
    ]
   }
  },
@@ -407,61 +313,41 @@
    {
     "comment": "",
     "expiry": null,
-    "price": 4425.0,
+    "price": 4636.47,
     "sl": null,
     "tag": "AP",
     "tp": null,
     "type": "SELL_LIMIT"
-   }
-  ],
-  "WK": [
-   {
-    "comment": "WK-BUY Core CPI m",
-    "expiry": "2026-08-18T05:43:00",
-    "price": 4595.04,
-    "sl": 4585.04,
-    "tag": "WK",
-    "tp": 4625.04,
-    "type": "BUY_STOP"
    },
    {
-    "comment": "WK-SELL Core CPI m",
-    "expiry": "2026-08-18T05:43:00",
-    "price": 3992.65,
-    "sl": 4002.65,
-    "tag": "WK",
-    "tp": 3950.93,
-    "type": "SELL_STOP"
+    "comment": "",
+    "expiry": null,
+    "price": 4481.08,
+    "sl": null,
+    "tag": "AP",
+    "tp": null,
+    "type": "BUY_LIMIT"
    }
   ]
  },
  "pending_orders": [
   {
-   "comment": "WK-BUY Core CPI m",
-   "expiry": "2026-08-18T05:43:00",
-   "price": 4595.04,
-   "sl": 4585.04,
-   "tag": "WK",
-   "tp": 4625.04,
-   "type": "BUY_STOP"
-  },
-  {
-   "comment": "WK-SELL Core CPI m",
-   "expiry": "2026-08-18T05:43:00",
-   "price": 3992.65,
-   "sl": 4002.65,
-   "tag": "WK",
-   "tp": 3950.93,
-   "type": "SELL_STOP"
-  },
-  {
    "comment": "",
    "expiry": null,
-   "price": 4425.0,
+   "price": 4636.47,
    "sl": null,
    "tag": "AP",
    "tp": null,
    "type": "SELL_LIMIT"
+  },
+  {
+   "comment": "",
+   "expiry": null,
+   "price": 4481.08,
+   "sl": null,
+   "tag": "AP",
+   "tp": null,
+   "type": "BUY_LIMIT"
   }
  ]
 }

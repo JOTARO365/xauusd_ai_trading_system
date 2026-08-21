@@ -2,54 +2,99 @@
  "algos": [
   {
    "algo": "regime_momentum",
-   "buy": 4424.09,
-   "dir_mode": "both",
+   "buy": 4547.85,
+   "dir_mode": "long",
    "name": "Momentum Breakout",
    "note": "Donchian breakout · NEUTRAL→standby (เข้าเฉพาะ TREND)",
    "regime": "NEUTRAL",
-   "sell": 4360.11
+   "sell": 4450.55
   },
   {
    "algo": "regime_momentum_fvg",
-   "buy": 4424.09,
-   "dir_mode": "both",
+   "buy": 4547.85,
+   "dir_mode": "long",
    "name": "Momentum + FVG",
    "note": "breakout + FVG confirm · NEUTRAL→standby (เข้าเฉพาะ TREND)",
    "regime": "NEUTRAL",
-   "sell": 4360.11
+   "sell": 4450.55
   },
   {
    "algo": "mean_reversion",
-   "buy": 4370.04,
+   "buy": 4484.15,
    "dir_mode": "both",
    "name": "Mean-Reversion (z-fade)",
    "note": "fade z±1.25",
    "regime": "NEUTRAL",
-   "sell": 4410.05
+   "sell": 4538.15
   },
   {
    "algo": "sweep_reversal",
-   "buy": 4356.49,
+   "buy": 4450.55,
    "dir_mode": "both",
    "name": "Sweep Reversal",
    "note": "fade prior-day H/L",
    "regime": "NEUTRAL",
-   "sell": 4434.95
+   "sell": 4540.93
   },
   {
    "algo": "tsmom_d1",
    "buy": null,
-   "dir_mode": "both",
-   "flip_buy": 4652.0,
-   "flip_sell": 3316.0,
+   "dir_mode": "long",
+   "flip_buy": 4568.0,
+   "flip_sell": 3417.0,
    "kind": "flip",
    "name": "TSMOM-D1",
    "note": "เข้า market เมื่อ D1 vote พลิก (vote ตอนนี้ SELL)",
    "regime": "D1",
    "sell": null,
    "tsmom_vote": "SELL"
+  },
+  {
+   "algo": "macro_momentum",
+   "buy": 4540.93,
+   "dir_mode": "long",
+   "name": "macro_momentum",
+   "note": "H4 breakout + DXY/EURUSD ยืนยันทิศ",
+   "regime": "NEUTRAL",
+   "sell": 4324.59
+  },
+  {
+   "algo": "confluence_15m",
+   "buy": 4547.85,
+   "dir_mode": "long",
+   "name": "confluence_15m",
+   "note": "M15 breakout + H1+H4+DXY+volume (NY 13-21)",
+   "regime": "NEUTRAL",
+   "sell": 4518.13
+  },
+  {
+   "algo": "cdc_zone",
+   "buy": null,
+   "dir_mode": "long",
+   "name": "cdc_zone",
+   "note": "D1 zone: เขียว (bull) · long เมื่อพลิกเขียว (exit เมื่อพลิกแดง)",
+   "regime": "NEUTRAL",
+   "sell": null
+  },
+  {
+   "algo": "pullback_buy",
+   "buy": 4516.42,
+   "dir_mode": "both",
+   "name": "pullback_buy",
+   "note": "ซื้อย่อ: D1↑ + reclaim EMA20-H1 (long-only, SL แคบ)",
+   "regime": "NEUTRAL",
+   "sell": null
+  },
+  {
+   "algo": "xau_xag_pairs",
+   "buy": null,
+   "dir_mode": "both",
+   "name": "xau_xag_pairs",
+   "note": "spread z=-0.52 · เข้าเมื่อ |z|≥2.0 (2-leg XAU–XAG) · shadow",
+   "regime": "market-neutral",
+   "sell": null
   }
  ],
  "ok": true,
- "price": 4412.85
+ "price": 4535.09
 }

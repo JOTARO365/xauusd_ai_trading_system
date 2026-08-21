@@ -1,6 +1,8 @@
 {
- "generated": "2026-08-12T11:59:41.866494+00:00",
- "n": 0,
+ "decay": null,
+ "exp_R": null,
+ "generated": "2026-08-21T05:16:13.535662+00:00",
+ "n": 186,
  "needed": {
   "δ=0.15": 692,
   "δ=0.2": 389,
@@ -9,5 +11,6 @@
  "ok": true,
  "sigma_R": 1.41,
  "strategy": "momentum_breakout (TREND)",
- "verdict": "ยังไม่มีไม้ ALGO — เปิด REGIME_LIVE แล้วรอเก็บ"
+ "verdict": "ยังไม่พอตัดสิน — มี 186 ไม้ / ต้องการ ~389 (แยก edge δ=0.2R). ห้ามจูน (= noise)",
+ "wr": 0.435
 }

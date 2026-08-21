@@ -1,5 +1,5 @@
 {
- "generated": "2026-08-12T11:59:41.844244+00:00",
+ "generated": "2026-08-21T05:16:13.510765+00:00",
  "historical": {
   "bars": 70000,
   "cost_pips": 30,
@@ -51,7 +51,57 @@
  "ok": true,
  "verdict": "ยังไม่มี regime ไหนมี edge (ทุกตัว −EV หลัง cost) — เก็บ shadow ต่อก่อน flip live",
  "weekly": {
-  "note": "ยังไม่มีไม้ ALGO ปิดจริง (หรือ MT5 ไม่พร้อม)",
-  "weeks": []
+  "note": "real closed ALGO trades (MT5 deals)",
+  "total": 186,
+  "weeks": [
+   {
+    "n": 8,
+    "week": "2026-W22",
+    "wins": 0,
+    "wr": 0.0
+   },
+   {
+    "n": 1,
+    "week": "2026-W23",
+    "wins": 0,
+    "wr": 0.0
+   },
+   {
+    "n": 2,
+    "week": "2026-W24",
+    "wins": 0,
+    "wr": 0.0
+   },
+   {
+    "n": 5,
+    "week": "2026-W27",
+    "wins": 3,
+    "wr": 0.6
+   },
+   {
+    "n": 7,
+    "week": "2026-W30",
+    "wins": 3,
+    "wr": 0.43
+   },
+   {
+    "n": 7,
+    "week": "2026-W31",
+    "wins": 0,
+    "wr": 0.0
+   },
+   {
+    "n": 6,
+    "week": "2026-W32",
+    "wins": 0,
+    "wr": 0.0
+   },
+   {
+    "n": 1,
+    "week": "2026-W34",
+    "wins": 0,
+    "wr": 0.0
+   }
+  ]
  }
 }
