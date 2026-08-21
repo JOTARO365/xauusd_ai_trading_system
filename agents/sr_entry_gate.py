@@ -137,9 +137,29 @@ def _allowlist():
     return out
 
 
+def _excluded(algo_id, symbol):
+    """combo/algo ที่ยกเว้น gate เสมอ (มีหลักฐานว่า gate ทำแย่ เช่น pullback_buy: บล็อก dip กำไร).
+    config.SR_GATE_EXCLUDE (comma "algo" หรือ "algo|SYMBOL")."""
+    try:
+        import config as _c
+        raw = getattr(_c, "SR_GATE_EXCLUDE", "") or ""
+    except Exception:
+        raw = ""
+    ex = {x.strip() for x in str(raw).split(",") if x.strip()}
+    return bool(algo_id and (algo_id in ex or (symbol and f"{algo_id}|{symbol}" in ex)))
+
+
 def _gated(algo_id, symbol):
-    """combo นี้ควรโดน gate ไหม. allowlist mode (มี allowlist) → เฉพาะที่อยู่ใน list.
-    legacy mode (allowlist ว่าง) → gate ทุกตัวยกเว้น breakout-tag."""
+    """combo นี้ควรโดน gate ไหม.
+    priority: exclude (หลักฐานว่าแย่) → SR_GATE_ALL (ทุก algo มองโซนก่อน action) → allowlist → legacy."""
+    if _excluded(algo_id, symbol):                         # หลักฐาน gate ทำแย่ (เช่น pullback) → ไม่ gate เด็ดขาด
+        return False
+    try:
+        import config as _c
+        if getattr(_c, "SR_GATE_ALL", False):              # user 08-21: ทุก algo มองโซนก่อนเข้า (block-only, momentum-aware)
+            return True
+    except Exception:
+        pass
     al = _allowlist()
     if al:                                                 # allowlist mode: list ตัดสินอย่างเดียว (breakout-tag ไม่เกี่ยว)
         return bool(algo_id and symbol and f"{algo_id}|{symbol}" in al)

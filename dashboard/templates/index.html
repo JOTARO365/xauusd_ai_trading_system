@@ -7427,8 +7427,8 @@ async function toggleSrDetail(id, sym, lv, kind) {
     const d = await (await fetch(`/api/sr-level-stats?symbol=${encodeURIComponent(sym)}&price=${lv}&side=${kind}`)).json();
     if (!d || d.error) { el.innerHTML = `<span style="color:var(--muted)">${(d && d.error) || 'no data'}</span>`; return; }
     el.dataset.loaded = '1';
-    const rec = (d.recent || []).map(r => r.broke
-      ? '<span style="color:var(--red)">ทะลุ</span>' : '<span style="color:var(--green)">เด้ง</span>').join(' ');
+    const rec = (d.recent || []).map(r => `<span style="opacity:.6">${r.when || ''}</span> `
+      + (r.broke ? '<span style="color:var(--red)">ทะลุ</span>' : '<span style="color:var(--green)">เด้ง</span>')).join(' · ');
     const sess = Object.entries(d.by_session || {})
       .map(([s, v]) => `${s} <b>${v.hold_pct}%</b>(${v.n})`).join(' · ');
     el.innerHTML =
@@ -7492,12 +7492,8 @@ function _srLadderHTML(z, px, pipDiv, sym) {     // ladder HTML ใช้ร่�
     const sc = scoreFor(lv), m = metaFor(lv);
     const st = Math.max(sc || 0, (m && m.strength) || 0) || null;
     const bar = st ? `<div style="height:4px;width:${Math.min(st, 100)}%;background:${color};border-radius:2px;opacity:.7"></div>` : '';
-    const htfTag = (htf && htf.level && Math.abs(htf.level - lv) / lv < 0.003)
-      ? ` <span style="color:var(--gold);font-size:9px;font-weight:700"><svg class="ic"><use href="#ic-star"/></svg> ${htf.tf}</span>` : '';
-    // C (คลิป): confluence — แนวโครงสร้างชนกันหลายที่ = โซนแข็ง
-    const cf = m && m.confluence;
-    const confTag = cf
-      ? ` <span title="${cf.with.join(' + ')}" style="color:var(--gold);font-size:9px;font-weight:800"><svg class="ic"><use href="#ic-zap"/></svg> ×${cf.count}</span>` : '';
+    // cross-TF confirmation (HTF star + confluence ×count) ถอดออกจากจอ — วัดผลแล้วไม่หนุน (user 08-21).
+    // หมายเหตุ: confluence ยังอยู่ใน sr_meta/score (feeds TP/significance); เอาออกแค่การแสดงผล
     // B (คลิป): ยืนยันเบรก — ปิดยืนข้ามแนว vs แค่ไส้เทียน
     const bh = m && m.break_hold;
     const holdTag = bh
@@ -7524,7 +7520,7 @@ function _srLadderHTML(z, px, pipDiv, sym) {     // ladder HTML ใช้ร่�
       <span style="width:72px;color:${color};font-weight:700">${lv.toFixed(2)}</span>
       <span style="width:52px;color:var(--muted);font-size:10px">${dist}</span>
       <span style="width:40px;color:var(--muted);font-size:10px">${st ? st + '%' : ''}</span>
-      <div style="flex:1">${bar}</div>${scoreTag}${confTag}${holdTag}${htfTag}${volTagFor(lv)}${oiTagFor(lv)}<span style="color:var(--muted);font-size:9px">▾</span></div>${whyLine}
+      <div style="flex:1">${bar}</div>${scoreTag}${holdTag}${volTagFor(lv)}${oiTagFor(lv)}<span style="color:var(--muted);font-size:9px">▾</span></div>${whyLine}
       <div id="${rid}" style="display:none;padding:2px 0 8px 82px;font-size:10px;color:var(--dim);line-height:1.7"></div>`;
   };
   const res = (z.resistance || []).slice().sort((a, b) => b - a);

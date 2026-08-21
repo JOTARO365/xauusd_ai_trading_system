@@ -820,17 +820,15 @@ def detect_double_pattern(df, window=3, lookback=80, eq_pct=0.0015):
 
 def _score_zone(m):
     """B: fold signals ของ zone → 0-100 unified score + grade (แทนการอ่าน 5 ค่าแยก บน ladder).
-    base strength + confluence + touches (proven) + bounce bias + recency."""
+    base strength + confluence + touches (proven) + bounce bias.
+    ⚠️ recency (bars_since_touch) = display-only เท่านั้น ไม่เข้า score (วัดแล้วไม่หนุนการจัดอันดับ, user 08-21)."""
     s = float(m.get("strength") or 40)
     if m.get("confluence"):
         s += 8
     s += min(int(m.get("touches") or 0), 8)
     bp = m.get("bounce_pct")
     if bp is not None:
-        s += (bp - 50) * 0.10          # เด้งบ่อย = แข็ง
-    bst = m.get("bars_since_touch")
-    if bst is not None and bst <= 5:
-        s += 4                          # เพิ่งแตะ = สด
+        s += (bp - 50) * 0.10          # เด้งบ่อย(มีนัยสถิติ) = แข็ง
     score = max(0, min(100, round(s)))
     return score, ("A" if score >= 75 else "B" if score >= 55 else "C")
 
