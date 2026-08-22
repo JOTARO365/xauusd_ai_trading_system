@@ -407,6 +407,10 @@ METALS_LONG_ONLY = (os.getenv("METALS_LONG_ONLY") or "false").lower() == "true"
 # LONG_ONLY_ALL: block ทุก SELL **ทุกคู่** (superset ของ metals) — หลักฐาน 3 ชั้น: DB BUY+86k/SELL−79k · บัญชี 381706956
 # BUY+2417/SELL−2440 · real-edge short=ตัวเสียหลัก. ⚠️ regime-dependent (bull 24-25) → kill switch = false ถ้าตลาดพลิกหมี
 LONG_ONLY_ALL = (os.getenv("LONG_ONLY_ALL") or "false").lower() == "true"
+# TREND_BLOCK_NEUTRAL (gold-fit 08-22): block momentum breakout ทองตอน D1-drift NEUTRAL (choppy = slice เจ๊ง −0.199R
+# t−2.62 ทุก quartile). block-only. SHADOW=true → log-only. ⚠️ drift-harvest ไม่ใช่ alpha (t0.93). kill = TREND_BLOCK_NEUTRAL=false
+TREND_BLOCK_NEUTRAL = (os.getenv("TREND_BLOCK_NEUTRAL") or "false").lower() == "true"
+TREND_BLOCK_NEUTRAL_SHADOW = (os.getenv("TREND_BLOCK_NEUTRAL_SHADOW") or "true").lower() == "true"
 # Pullback-buy (dip-buyer SL แคบ) — เข้าย่อในเทรนด์ขึ้นด้วย SL เล็ก (~0.7% risk; ต่าง cdc 2N=15.5%). long-only. SHADOW default
 PULLBACK_EMA        = int(os.getenv("PULLBACK_EMA") or 20)          # H1 EMA ที่ reclaim
 PULLBACK_D1_EMA     = int(os.getenv("PULLBACK_D1_EMA") or 20)       # D1 EMA trend filter
@@ -660,6 +664,9 @@ def reload_config():
     METALS_LONG_ONLY = (os.getenv("METALS_LONG_ONLY") or "false").lower() == "true"
     global LONG_ONLY_ALL
     LONG_ONLY_ALL = (os.getenv("LONG_ONLY_ALL") or "false").lower() == "true"
+    global TREND_BLOCK_NEUTRAL, TREND_BLOCK_NEUTRAL_SHADOW
+    TREND_BLOCK_NEUTRAL = (os.getenv("TREND_BLOCK_NEUTRAL") or "false").lower() == "true"
+    TREND_BLOCK_NEUTRAL_SHADOW = (os.getenv("TREND_BLOCK_NEUTRAL_SHADOW") or "true").lower() == "true"
     global PULLBACK_EMA, PULLBACK_D1_EMA, PULLBACK_SWING_LB, PULLBACK_SL_BUF_ATR, PULLBACK_SL_CAP_ATR, PULLBACK_RR
     PULLBACK_EMA        = int(os.getenv("PULLBACK_EMA") or 20)
     PULLBACK_D1_EMA     = int(os.getenv("PULLBACK_D1_EMA") or 20)

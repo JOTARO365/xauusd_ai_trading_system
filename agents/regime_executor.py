@@ -186,6 +186,15 @@ def run_regime_executor():
                 return None
         except Exception:
             _sent = None
+    try:                                                     # gold-fit: block momentum ตอน D1-drift NEUTRAL (choppy = slice เจ๊ง)
+        from agents import gold_regime_filter as _grf
+        _nblk, _nwhy = _grf.blocks_neutral("XAUUSD")
+        if _nblk:
+            _last_bar = rec["bar_ts"]
+            _hb("NEUTRAL-SKIP", _nwhy, regime="TREND")
+            return None
+    except Exception:
+        pass
     _hb("ENTER", f"{sig.get('dir')} SL={sig.get('sl_pips')}p TP={sig.get('tp_pips')}p → ส่งคำสั่ง", regime="TREND")
     _last_bar = rec["bar_ts"]
     from connectors.mt5_connector import open_order

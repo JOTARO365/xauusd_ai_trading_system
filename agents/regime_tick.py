@@ -174,6 +174,13 @@ def _tick() -> None:
             from agents.algo_state import write_state
             write_state("SR-GATE-SKIP", regime="TREND", via="tick", detail=_why)
             return
+        from agents import gold_regime_filter as _grf             # gold-fit: block momentum ตอน D1-drift NEUTRAL (choppy = slice เจ๊ง)
+        _nblk, _nwhy = _grf.blocks_neutral("XAUUSD")
+        if _nblk:
+            logger.info(f"[REGIME-TICK] NEUTRAL-SKIP {d}: {_nwhy}")
+            from agents.algo_state import write_state
+            write_state("NEUTRAL-SKIP", regime="TREND", via="tick", detail=_nwhy)
+            return
         _tp_pips = sr_tp_pips(d, _entry_px, _cache["sl_pips"], _cache["tp_pips"])
         from agents.regime_executor import _structural_sl_gold
         _sl_pips, _tp_pips, _force_min = _structural_sl_gold(d, _entry_px, _cache.get("atr"),
