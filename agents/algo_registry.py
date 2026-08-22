@@ -4,11 +4,17 @@ An algo maps (symbol, bars, ctx) → VirtualOrder | None. NO LLM, NO order, NO p
 entry is a real closed-bar price, SL/TP are pip offsets computed from data — CORE INVARIANT preserved.
 The multi-pair shadow engine (T-04) iterates ALGO_REGISTRY × eligible pairs × SHADOW switch state.
 
-v1 ships ONE validated algo: `regime_momentum` — a thin wrapper over the existing, live-proven
-regime router (regime_shadow.compute_shadow_signal → regime_lib momentum_breakout in TREND). No new
-strategy is introduced here; a new non-XAUUSD algo is Batch D, only after shadow evidence proves out.
-
 Frozen interfaces — docs/ARCHITECTURE_batchB.md §4.1/§4.2.
+
+⚠️ 2026-08-22 — AUDIT #5 (Fable, docs/AUDIT_quant.md L549-711) CUT 5 algos ใต้ battery ใหม่
+   (drift-null + driftless synthetic-stress + cost×2 + multiple-testing). ลองแก้ทุกตัวก่อนลบ — fix fail หมด:
+     - mean_reversion      : −0.070 t−3.55 · forward −0.466 · BUY-only fix cost×2 −0.100
+     - regime_momentum_fvg : sign พลิกตาม window · FVG filter value≈0 บน base ที่ null แล้ว (#4)
+     - sweep_reversal      : −0.056 t−1.91 (fade WR-trap) · BUY-only fix cost×2 −0.116
+     - confluence_15m      : +0.076 t0.69 ตาย cost×2 · BUY leg (ตัวเดียว live ยอม)=−EV · long-only fix −0.088
+     - pullback_buy        : claim t3.88 = stat bug (นับ overlap เป็นอิสระ; dedup t1.65) · trigger p0.570 ไม่มี info
+   เหลือ 4: regime_momentum / tsmom_d1 / macro_momentum (LIVE, AUDIT #4 = beta/drift-harvest ไม่ใช่ alpha แต่ user
+   คง live) + cdc_zone (SHADOW, declared beta — promote ผ่าน forward n≥20 vs drift benchmark เท่านั้น).
 """
 from datetime import datetime, timezone
 
@@ -88,40 +94,6 @@ class RegimeMomentumAlgo(Algo):
             "regime":  rec["regime"],
             "bar_ts":  rec["bar_ts"],                    # dedup key: one signal per (algo,symbol,bar)
             "klass":   self.klass,
-        }
-
-
-class MeanReversionAlgo(Algo):
-    """RANGE z-score fade (regime_lib.algo_mean_reversion) — เข้าเฉพาะ regime=RANGE. cut จาก live (P2 −EV OOS)
-    แต่ shadow ไว้เก็บ data ว่ากำไรใน RANGE/คู่ไหนบ้าง. symbol-param ผ่าน point (pip ต่อคู่)."""
-    algo_id = "mean_reversion"
-    version = 1
-    klass = "scalp"
-    eligible_pairs = UNIVERSE
-
-    def evaluate(self, symbol, bars, ctx=None, point=None):
-        high, low, close, times = bars
-        n = len(close)
-        if n < _MIN_BARS:
-            return None
-        er = R.efficiency_ratio(close); adx_v = R.adx(high, low, close)
-        volpct = R.vol_percentile(close); atr_v = R.atr(high, low, close)
-        i = n - 2                                          # last CLOSED bar (เหมือน momentum)
-        if R.detect_regime(er[i], adx_v[i], volpct[i]) != "RANGE":
-            return None                                    # mean-reversion เข้าเฉพาะ RANGE
-        sig = R.algo_mean_reversion(i, close, atr_v, point=point)
-        if not sig:
-            return None
-        bar_ts = None
-        try:
-            from datetime import datetime, timezone
-            bar_ts = datetime.fromtimestamp(int(times[i]), timezone.utc).isoformat()
-        except Exception:
-            return None
-        return {
-            "algo_id": self.algo_id, "symbol": symbol, "dir": sig["dir"],
-            "entry": float(close[i]), "sl_pips": sig["sl_pips"], "tp_pips": sig["tp_pips"],
-            "regime": "RANGE", "bar_ts": bar_ts, "klass": self.klass,
         }
 
 
@@ -233,116 +205,6 @@ class TSMOMDailyAlgo(Algo):
         }
 
 
-class MomentumFVGAlgo(Algo):
-    """SMC candidate (IMPROVED momentum) — momentum_breakout + FVG confluence filter.
-    เข้าเมื่อ momentum ให้สัญญาณ TREND *และ* มี Fair-Value-Gap (imbalance 3 แท่ง) หนุนทิศ
-    ภายใน FVG_LOOKBACK แท่งล่าสุด. FVG = gap-only (bars ไม่มี open): bull low[j]>high[j-2] / bear high[j]<low[j-2].
-
-    ⚠️ SHADOW-ONLY: backtest (scripts/smc_backtest.py) = in-sample ดีขึ้นแต่ไม่รอด OOS (window bias) →
-    ไม่มี edge พิสูจน์แล้ว. เปิด shadow เพื่อเก็บ forward-OOS เทียบ regime_momentum เฉยๆ. ไม่ live."""
-    algo_id = "regime_momentum_fvg"
-    version = 1
-    klass = "scalp"
-    eligible_pairs = UNIVERSE
-    FVG_LOOKBACK = 6
-
-    def evaluate(self, symbol, bars, ctx=None, point=None):
-        high, low, close, times = bars
-        rec = compute_shadow_signal(high, low, close, times, point=point)
-        if not rec:
-            return None
-        sig = rec.get("signal")
-        if not sig or sig.get("algo") != "momentum_breakout":
-            return None
-        n = len(close); i = n - 2
-        d = sig["dir"]; ok = False
-        for j in range(max(2, i - self.FVG_LOOKBACK), i + 1):     # FVG confluence หนุนทิศ
-            if d == "BUY" and low[j] > high[j - 2]:
-                ok = True; break
-            if d == "SELL" and high[j] < low[j - 2]:
-                ok = True; break
-        if not ok:
-            return None                                          # ไม่มี FVG หนุน → ข้าม (นี่คือ "filter")
-        return {
-            "algo_id": self.algo_id, "symbol": symbol, "dir": d,
-            "entry": rec["close"], "sl_pips": sig["sl_pips"], "tp_pips": sig["tp_pips"],
-            "regime": rec["regime"], "bar_ts": rec["bar_ts"], "klass": self.klass,
-        }
-
-
-class SweepReversalAlgo(Algo):
-    """SMC candidate (NEW algo) — liquidity-sweep reversal: fade การ sweep prior-day H/L
-    ที่ปิดกลับเข้าใน เฉพาะ regime NEUTRAL/RANGE (ไม่ fade TREND). SL เลยปลาย sweep + BUF×ATR, TP = RR×SL.
-    prior-day H/L คำนวณจากแท่ง H1 เอง (bucket UTC วันก่อนหน้า) — causal, ไม่ต้องพึ่ง D1.
-
-    ⚠️ SHADOW-ONLY: backtest = −EV (WR สูง/RR ต่ำ = กับดัก; fade สู้ cascade). เปิด shadow เก็บ forward
-    เพื่อยืนยัน/หักล้าง. ไม่ live."""
-    algo_id = "sweep_reversal"
-    version = 1
-    klass = "scalp"
-    eligible_pairs = UNIVERSE
-    BUF_ATR = 0.5
-    RR = 1.5
-
-    def _prior_day_hl(self, high, low, times, i):
-        """H/L ของวัน UTC ก่อนหน้าล่าสุด (ปิดแล้ว) จากแท่ง H1. คืน (pdh, pdl) หรือ (None,None)."""
-        di = datetime.fromtimestamp(int(times[i]), timezone.utc).date()
-        pdh = pdl = None; prev_date = None
-        for j in range(i - 1, max(-1, i - 300), -1):
-            dj = datetime.fromtimestamp(int(times[j]), timezone.utc).date()
-            if dj >= di:
-                continue
-            if prev_date is None:
-                prev_date = dj
-            if dj == prev_date:
-                pdh = high[j] if pdh is None else max(pdh, high[j])
-                pdl = low[j] if pdl is None else min(pdl, low[j])
-            else:
-                break                                            # ข้ามไปวันก่อนหน้านั้น → พอ
-        return pdh, pdl
-
-    def evaluate(self, symbol, bars, ctx=None, point=None):
-        high, low, close, times = bars
-        n = len(close)
-        if n < _MIN_BARS or not point:
-            return None
-        er = R.efficiency_ratio(close); adx_v = R.adx(high, low, close)
-        volpct = R.vol_percentile(close); atr_v = R.atr(high, low, close)
-        i = n - 2
-        reg = R.detect_regime(er[i], adx_v[i], volpct[i])
-        if reg not in ("NEUTRAL", "RANGE"):                      # ไม่ fade ใน TREND
-            return None
-        av = float(atr_v[i]) if atr_v[i] == atr_v[i] else 0.0
-        if av <= 0:
-            return None
-        pdh, pdl = self._prior_day_hl(high, low, times, i)
-        if pdh is None or pdl is None:
-            return None
-        d = swept = None
-        if high[i] > pdh and close[i] < pdh:
-            d, swept = "SELL", high[i]
-        elif low[i] < pdl and close[i] > pdl:
-            d, swept = "BUY", low[i]
-        if d is None:
-            return None
-        sign = 1 if d == "BUY" else -1
-        from agents import algo_pair_config as _apc            # per-pair tune (default=global)
-        _buf = float(_apc.get(self.algo_id, symbol, "BUF_ATR", self.BUF_ATR))
-        _rr = float(_apc.get(self.algo_id, symbol, "RR", self.RR))
-        sl_pips = abs(float(close[i]) - (swept - sign * _buf * av)) / point
-        if sl_pips <= 0:
-            return None
-        try:
-            bar_ts = datetime.fromtimestamp(int(times[i]), timezone.utc).isoformat()
-        except Exception:
-            return None
-        return {
-            "algo_id": self.algo_id, "symbol": symbol, "dir": d,
-            "entry": float(close[i]), "sl_pips": sl_pips, "tp_pips": sl_pips * _rr,
-            "regime": reg, "bar_ts": bar_ts, "klass": self.klass,
-        }
-
-
 class MacroMomAlgo(Algo):
     """Macro-aligned momentum (research 08-07) — Donchian breakout + DXY-proxy(EURUSD) ยืนยันทิศ, ไม่มี TREND gate.
     แก้ 2 ปัญหา: (1) เข้า ณ จุดสำคัญ = breakout (2) ไม่สวน macro/sentiment = เข้าเฉพาะทิศที่ DXY หนุน
@@ -421,114 +283,16 @@ class MacroMomAlgo(Algo):
                 "bar_ts": bar_ts, "klass": self.klass}
 
 
-class ConfluenceVol15m(Algo):
-    """15m confluence + order-flow (research 08-07): 15m Donchian breakout เข้าเฉพาะเมื่อ
-    H1 trend + H4 trend + macro(DXY) ตรงทิศ**ทั้งหมด** + tick-volume surge (order-flow หนุน).
-    selective สุด (5 เงื่อนไข) = กรอง noise ที่ฆ่า scalp ทุกตัว. backtest gold M15: exp_R+0.035 OOS+0.199
-    (confluence เฉยๆ −EV → เติม volume พลิก +EV). fire ~166/ปี = small-TF ที่ถี่. gold-only (DXY driver ตรง)."""
-    algo_id = "confluence_15m"
-    version = 1
-    klass = "scalp"
-    timeframe = "M15"
-    mgmt = "managed"
-    eligible_pairs = UNIVERSE                          # ทุกคู่ (backtest แล้ว; +EV=XAU/BTC → LIVE, ที่เหลือ SHADOW)
-    BRK = 12
-    RR = 2.0
-    SL_ATR = 1.0
-    VK = 1.5                                            # volume surge (× median)
-    MACRO = "EURUSD"
-
-    def _ctx_live(self, symbol):
-        """ทิศ H1/H4 (EMA50 slope) + macro(DXY) momentum + volume surge ของ **คู่ที่เทรด** (ไม่ hardcode ทอง).
-        macro = EURUSD (DXY-proxy) เสมอ. คืน dict หรือ None."""
-        try:
-            import MetaTrader5 as mt5
-            from connectors.pair_collector import _broker_map
-            bm = _broker_map() or {}
-            brk = bm.get(symbol, symbol); eb = bm.get(self.MACRO, self.MACRO)
-
-            def _slope(sym_or_broker, tf):
-                r = mt5.copy_rates_from_pos(sym_or_broker, tf, 0, 120)
-                if r is None or len(r) < 60:
-                    return 0
-                c = r["close"].astype(float)
-                k = 2 / 51; e = c[0]
-                es = []
-                for v in c:
-                    e = v * k + e * (1 - k); es.append(e)
-                return 1 if es[-2] > es[-5] else -1 if es[-2] < es[-5] else 0
-            h1 = _slope(brk, mt5.TIMEFRAME_H1); h4 = _slope(brk, mt5.TIMEFRAME_H4)
-            em = mt5.copy_rates_from_pos(eb, mt5.TIMEFRAME_M15, 0, 60)
-            mac = 0
-            if em is not None and len(em) >= 26:
-                ec = em["close"].astype(float); mac = 1 if ec[-2] > ec[-26] else -1
-            mv = mt5.copy_rates_from_pos(brk, mt5.TIMEFRAME_M15, 0, 260)
-            vsurge = False
-            if mv is not None and len(mv) >= 210:
-                tv = mv["tick_volume"].astype(float); med = float(np.median(tv[-201:-1])) or 1
-                vsurge = tv[-2] >= self.VK * med and tv[-2] <= 2.0 * med   # surge แต่ไม่ใช่ข่าว (spike สุด)
-            return {"h1": h1, "h4": h4, "mac": mac, "vsurge": vsurge}
-        except Exception:
-            return None
-
-    def evaluate(self, symbol, bars, ctx=None, point=None):
-        high, low, close, times = bars
-        n = len(close)
-        if n < max(self.BRK, 50) + 5 or not point:
-            return None
-        i = n - 2
-        # session filter (gold-only): เทรดเฉพาะ NY/London (ทองวิ่ง) ตัด Asian chop → exp_R ~1.7× + OOS ดีขึ้น (backtest 08-07).
-        # BTC/crypto = 24/7 ไม่กรอง. config CONF15M_SESSION="13-21" (UTC); ว่าง=ทุกชม.
-        from agents import algo_pair_config as _apc            # per-pair tune (default=global)
-        brk = int(_apc.get(self.algo_id, symbol, "BRK", self.BRK))
-        sl_atr = float(_apc.get(self.algo_id, symbol, "SL_ATR", self.SL_ATR))
-        rr = float(_apc.get(self.algo_id, symbol, "RR", self.RR))
-        if symbol and symbol.upper().startswith("XAU"):
-            import config as _cfg
-            sess = str(_apc.get(self.algo_id, symbol, "session",
-                                getattr(_cfg, "CONF15M_SESSION", "13-21")) or "").strip()
-            if sess and "-" in sess:
-                try:
-                    lo_h, hi_h = (int(x) for x in sess.split("-"))
-                    from datetime import datetime, timezone
-                    hr = datetime.fromtimestamp(int(times[i]), timezone.utc).hour
-                    if not (lo_h <= hr < hi_h):
-                        return None
-                except Exception:
-                    pass
-        atr = R.atr(high, low, close); av = float(atr[i]) if atr[i] == atr[i] else 0.0
-        if av <= 0:
-            return None
-        px = float(close[i]); hh = float(high[i - brk:i].max()); ll = float(low[i - brk:i].min())
-        d = "BUY" if px > hh else ("SELL" if px < ll else None)     # 15m breakout = จุดสำคัญ
-        if d is None:
-            return None
-        cx = ctx if (ctx and "h1" in ctx) else self._ctx_live(symbol)
-        if not cx:
-            return None
-        sign = 1 if d == "BUY" else -1
-        if cx["h1"] != sign or cx["h4"] != sign or cx["mac"] != sign or not cx["vsurge"]:
-            return None                                    # ต้อง H1+H4+macro+volume ตรงหมด (order-flow confluence)
-        if _season_block(symbol, d, times, i):             # ทอง: ไม่สวน seasonal แรง
-            return None
-        try:
-            from datetime import datetime, timezone
-            bar_ts = datetime.fromtimestamp(int(times[i]), timezone.utc).isoformat()
-        except Exception:
-            return None
-        slp = round(sl_atr * av / point)
-        return {"algo_id": self.algo_id, "symbol": symbol, "dir": d, "entry": px,
-                "sl_pips": slp, "tp_pips": round(slp * rr), "regime": "CONF15M",
-                "bar_ts": bar_ts, "klass": self.klass}
-
-
 class CDCZoneAlgo(Algo):
     """CDC Action Zone (อ.โฉลก สัมพันธารักษ์) — trend-follow ถือยาว (let winners run).
     close→EMA2→Fast EMA12 / Slow EMA26. เข้าตาม zone (bull=BUY), ออกเมื่อ zone พลิก (mgmt=cdc_flip,
     ไม่มี TP). long-only default (CDC_DIR_MODE; SELL leg −EV เหมือน algo อื่น). D1. disaster SL 2×ATR (Turtle 2N).
-    eligible = gold-complex + BTC (backtest ดีสุด). validated scripts/cdc_backtest.py:
-    XAUUSD exp_R +0.88 t1.99 OOS+2.38 WR38 (ชนะ tsmom ~5×) — แต่ n53 (position algo ไม้น้อย) ยังไม่ผ่าน n≥80
-    → SHADOW จนเก็บ forward พอ. klass=swing (promotion n≥20)."""
+    eligible = gold-complex + BTC (backtest ดีสุด).
+
+    ⚠️ 2026-08-22 AUDIT #5: reproduce claim (n48 +0.945 t2.01) แต่ = **declared BETA ไม่ใช่ alpha** —
+    random-long matched null +0.549R p0.105 · driftless survival 58% (0 timing) · drop-best-2 t1.46 · full-window
+    p0.015 ตาย ≥30-trial Šidák. W1-CDC-bull gate = beta ที่ดีกว่า (t2.78 รอด cost×2) แต่ยังไม่ผ่าน trials/driftless.
+    → คง SHADOW เก็บ forward; promote ผ่าน forward n≥20 vs **drift benchmark** เท่านั้น (ห้าม zero-null). klass=swing."""
     algo_id = "cdc_zone"
     version = 1
     klass = "swing"
@@ -585,92 +349,16 @@ class CDCZoneAlgo(Algo):
         }
 
 
-class PullbackBuyAlgo(Algo):
-    """Dip-buyer (trend-pullback, SL แคบ) — เข้า "ย่อ" ในเทรนด์ขึ้นด้วย SL เล็ก (ต่าง cdc: cdc SL 2N=$192=15.5% risk
-    บน 41k เข้าไม่ได้; ตัวนี้ SL=ก้นดิพ cap 2×ATR_H1 ~$8 = ~0.7% risk เข้าได้จริง). long-only (เข้า METALS_LONG_ONLY).
-    entry: D1 ขาขึ้น (close_D1>EMA_D1) + H1 reclaim EMA20 หลังย่อ (close[i]>EMA · close[i-1]≤EMA = จุดกลับดิพ).
-    SL=swing-low k แท่ง − buffer, cap. TP=RR×SL (managed: BE+trailing). validated scripts/pullback_buy_backtest.py:
-    XAUUSD OOS+0.278 t3.88 · XAUEUR OOS+0.138 t2.05 (RR3) — แต่ IS อ่อน (edge กระจุก gold-bull) → SHADOW เก็บ forward ก่อน."""
-    algo_id = "pullback_buy"
-    version = 1
-    klass = "intraday"
-    timeframe = "H1"
-    mgmt = "managed"
-    eligible_pairs = ["XAUUSD", "XAUEUR"]              # OOS+ บน gold; คู่อื่น = ไม่ eligible (ไม่มี edge)
-
-    @staticmethod
-    def _ema(x, n):
-        import numpy as np
-        e = np.zeros_like(x, float); e[0] = x[0]; k = 2.0 / (n + 1)
-        for j in range(1, len(x)):
-            e[j] = x[j] * k + e[j - 1] * (1 - k)
-        return e
-
-    def _p(self, key, default):
-        import config as _c
-        return getattr(_c, key, default)
-
-    def _d1_up(self, symbol, ts):
-        """True = D1 ขาขึ้น (close_D1 > EMA_D1) ณ D1 แท่งปิดล่าสุดก่อน ts (causal). None = ข้อมูลไม่พอ → ไม่เข้า."""
-        try:
-            import MetaTrader5 as mt5, numpy as np
-            dn = int(self._p("PULLBACK_D1_EMA", 20))
-            r = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_D1, 0, 300)
-            if r is None or len(r) < dn + 3:
-                return None
-            dc = r["close"].astype(float); dt = r["time"].astype(np.int64)
-            e = self._ema(dc, dn)
-            idx = int(np.clip(np.searchsorted(dt, ts, side="right") - 2, 0, len(dc) - 1))
-            return bool(dc[idx] > e[idx])
-        except Exception:
-            return None
-
-    def evaluate(self, symbol, bars, ctx=None, point=None):
-        import numpy as np
-        high, low, close, times = bars
-        emaN = int(self._p("PULLBACK_EMA", 20)); lb = int(self._p("PULLBACK_SWING_LB", 8))
-        n = len(close)
-        if n < max(emaN, lb) + 30 or not point:
-            return None
-        i = n - 2                                          # H1 บาร์ปิดล่าสุด
-        ema = self._ema(np.asarray(close, float), emaN)
-        if not (close[i] > ema[i] and close[i - 1] <= ema[i - 1]):   # reclaim EMA หลังย่อ = จุดกลับดิพ
-            return None
-        up = self._d1_up(symbol, int(times[i]))            # D1 ต้องขาขึ้น (ซื้อดิพในเทรนด์ ไม่รับมีดตลาดหมี)
-        if not up:
-            return None
-        if _season_block(symbol, "BUY", times, i):
-            return None
-        atr = R.atr(high, low, close)
-        av = float(atr[i]) if atr[i] == atr[i] else 0.0
-        if av <= 0:
-            return None
-        swing_low = float(np.asarray(low[i - lb:i + 1], float).min())
-        sl_dist = (float(close[i]) - swing_low) + float(self._p("PULLBACK_SL_BUF_ATR", 0.25)) * av
-        sl_dist = min(sl_dist, float(self._p("PULLBACK_SL_CAP_ATR", 2.0)) * av)
-        if sl_dist <= 0:
-            return None
-        sl_pips = sl_dist / point
-        rr = float(self._p("PULLBACK_RR", 3.0))
-        try:
-            from datetime import datetime, timezone
-            bar_ts = datetime.fromtimestamp(int(times[i]), timezone.utc).isoformat()
-        except Exception:
-            return None
-        return {
-            "algo_id": self.algo_id, "symbol": symbol, "dir": "BUY",
-            "entry": float(close[i]), "sl_pips": sl_pips, "tp_pips": sl_pips * rr,
-            "regime": "PULLBACK", "bar_ts": bar_ts, "klass": self.klass,
-        }
-
-
 ALGO_REGISTRY = {a.algo_id: a for a in (
-    RegimeMomentumAlgo(), MeanReversionAlgo(), TSMOMDailyAlgo(),
-    MomentumFVGAlgo(), SweepReversalAlgo(), MacroMomAlgo(), ConfluenceVol15m(),
-    CDCZoneAlgo(), PullbackBuyAlgo(),
+    RegimeMomentumAlgo(), TSMOMDailyAlgo(), MacroMomAlgo(), CDCZoneAlgo(),
 )}
-# sr_fade (S/R Book fade) ถูก CUT 2026-08-07: backtest −EV ทุกคู่/ทุก variant (t−4..−22, OOS ลบ) —
-# naive S/R fade ไม่มี edge (เหมือน mean_reversion). หลักฐาน: scripts/sr_fade_backtest.py
+# CUT log (backtest หลักฐาน = docs/AUDIT_quant.md):
+#   sr_fade            2026-08-07 : −EV ทุกคู่/variant (t−4..−22) — naive S/R fade ไม่มี edge (scripts/sr_fade_backtest.py)
+#   mean_reversion     2026-08-22 : AUDIT #5 −0.070 t−3.55 · forward −0.466 (RANGE z-fade ไม่มี edge)
+#   regime_momentum_fvg 2026-08-22: AUDIT #5 sign พลิกตาม window · FVG filter value≈0 บน base null (#4)
+#   sweep_reversal     2026-08-22 : AUDIT #5 −0.056 t−1.91 (fade WR-trap สู้ cascade ไม่ได้)
+#   confluence_15m     2026-08-22 : AUDIT #5 +0.076 t0.69 ตาย cost×2 · BUY leg (live) = −EV
+#   pullback_buy       2026-08-22 : AUDIT #5 claim t3.88 = stat bug (overlap นับอิสระ; dedup t1.65) · trigger p0.570
 
 
 def get(algo_id):

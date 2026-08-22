@@ -356,3 +356,356 @@ Commands/artifacts: `scratchpad/attack1_tiebreak.py` (tie-break × cost grid re-
 `attack3_families.py` (volume/VWAP/ORB/session), `attack5_robust.py` (hold/entry/gap/overlap/cost-curve/
 seeds/neighbors), all under the session scratchpad; interpreter
 `C:/Users/pornnatcha/AppData/Local/Programs/Python/Python311/python.exe` (numpy).
+
+---
+
+# AUDIT #4 (2026-08-22) — live-algo audit + tuning
+
+Auditor: quant-adversarial pass (Fable 5) on the CURRENTLY-LIVE roster, using the new battery
+(driftless synthetic stress, matched drift-nulls, CVaR/Sortino, trials-correction). Read-only; 0 orders;
+MT5 used for `copy_rates` data fetch only. Posture: REFUTE each live edge.
+
+**Live roster audited** (`data/algo_switches.json:2,30,41`; BTC shadow `:13`):
+`regime_momentum:XAUUSD` (LIVE), `macro_momentum:XAUUSD` (LIVE), `tsmom_d1:WTIUSD` (LIVE),
+`tsmom_d1:BTCUSD` (SHADOW, allowlisted).
+
+**Structural fact that changes what "the live strategy" is:** ALL live combos are long-only.
+`data/algo_dir_mode.json` sets tsmom_d1/macro_momentum/regime_momentum = "long", and
+`LONG_ONLY_ALL=true` (`.env:61`) blocks every SELL at `mt5_connector.py:898-900`. Exit-on-flip
+*closes* are not SELL orders, so tsmom long positions still exit on signal flip. Every backtest below is
+therefore run in **live parity = long-leg only + live gates**, not the symmetric algo the older claims
+were measured on. Live configs: WTI SL×0.7 (`.env:71`, applied `multi_symbol_executor.py:714` → disaster
+SL 2.1×ATR), TSMOM lookbacks 21/63/126 + confirm 21 (`.env:176-177`), macro RR=4.0 override
+(`data/algo_pair_config.json` macro_momentum.XAUUSD), SR-gate allowlist = the 3 gold/XAU combos
+(`.env:386`), block-NEUTRAL live (`.env:62-63`, `agents/gold_regime_filter.py:43-80`).
+
+Interpreter for all runs: `C:/Users/pornnatcha/AppData/Local/Programs/Python/Python311/python.exe`.
+
+## A. tsmom_d1:WTIUSD — **VERDICT: NULL (no edge). DEMOTE to SHADOW.**
+
+The key open question of this audit. The founding claim (memory 07-25: "WTI momentum SL×0.7 = edge แท้,
+exp_R +2.4R, t-stat 15") predates the drift-null discipline and was **already flagged internally** as
+window-bias/logic-mismatch (`.claude/context/continue.md:6767`: "plan อ้าง WTI t15 = window bias (recent
+20k) / logic mismatch"). It was never re-validated; the user kept WTI live on the strength of that stale
+number (`continue.md:60`).
+
+Re-derivation on `data/wti_d1.json` (MT5 futures OHLC, 4,275 D1 bars 2010-08→2026-08), live spec parity
+(`algo_registry.py:135-233` + `backtest_all.py:190-219` accounting, intrabar SL, cost 0.05 $/rt):
+
+| variant | n | exp_R | t | OOS(30%) | notes |
+|---|---|---|---|---|---|
+| both-dir (algo signal) | 173 | +0.161 | **+1.17** | +0.39 | nowhere near t15 |
+| **LONG-leg (live parity)** | 83 | +0.214 | **+1.09** | +0.76 | expo 50% of days, mean hold 26d |
+| long-leg drop-best-1/2/3 | 82/81/80 | +0.093 / **+0.008** / **−0.066** | +0.60/+0.06/−0.60 | edge = 2–3 trades in 16 years |
+
+Nulls (all fail):
+- **Random-long matched-exposure** (same number of spans, same span lengths, random placement, same
+  2.1×ATR SL accounting, 1500 sims): null mean +0.034, 95pct **+0.219** vs real +0.214 → **p=0.056**
+  (p on sumR 0.055). The live combo does not beat "hold WTI long the same fraction of days at random".
+- Daily accounting: strat mean +0.034%/d (t+0.99); matched-exposure random-sign (P_long=0.43, 2000 sims)
+  **p=0.161**; block-persistent (7d runs) p=0.159; on the demeaned real path p=0.191.
+- **Driftless synthetic stress with the LIVE lookbacks** (21/63/126+confirm21, 300 sims/mode):
+  GBM-0drift survival 52.7% p0.467; block-boot-demean 52.7% p0.427; regime-0drift 47.3% p0.550 —
+  **NO-EDGE in all three modes** (contrast BTC below, which at least survives block-boot).
+- Independent confirmations: `scripts/wti_momentum_audit.py` (Donchian style, 16y): exp_R +0.0155,
+  t+0.26, OOS −0.023, matched-null p=0.057. `scripts/tsmom_btc_wti_backtest.py` (40y AV spot,
+  63/126/252): Sharpe +0.12, matched-exposure p=0.118, halves unstable.
+
+Cost is not the issue (cost 0→0.10 moves exp_R only +0.23→+0.20): **the issue is that there is no
+timing signal at all** — four independent null formulations, two datasets, two signal variants, all
+p≥0.055, and the entire positive mean sits in 2–3 outlier trades. CVaR5 −1.02R / PF 1.62 / maxDD 7.5R
+(tail well-capped by the disaster SL — risk plumbing is fine; the edge is absent).
+
+**Go/no-go: NO-GO — demote `tsmom_d1:WTIUSD` to SHADOW now.** This is live real money on a claim whose
+own repo history calls it window-biased and which fails every test in the new battery.
+
+## B. macro_momentum:XAUUSD — **VERDICT: OVERFIT / drift-harvest (INSUFFICIENT-EVIDENCE as alpha).**
+
+Claim trail (three different numbers for the same combo — already a red flag):
+`continue.md:7078` t1.91→2.00 n589 · `docs/reviews/sr-gate-eval.md:9` (regenerated 08-20) +0.235/t2.08/
+n354 → +0.254/t2.21/n349 · today's re-run of the **same code path** (`backtest_all.bt_macro` RR4 + same
+`sr_entry_gate.blocks_at`, MT5 gold H4 20000 bars + EURUSD H4): **n327 +0.210/t1.79 → n322 +0.229/t1.93.
+The recorded pass (t≥2) no longer holds two days later on refreshed data.** The authorization record
+`data/sr_gate_combos.json` (criteria `t≥2`) is stale — the pass was a knife-edge, not a plateau.
+
+Live-parity re-derivation (RR4 + long-only + SR-gate, cost 30, MT5 full data; offline DXY-proxy run
+agrees in sign on its 27%-coverage subsample):
+
+- LIVE config: n=211, exp_R **+0.317, t+2.11**, OOS +0.66, survives cost×2 (t1.95) and drop-best-3
+  (t1.77). Sortino +0.31, CVaR5 −1.05R, maxDD 9.7R. Looks good — until the nulls:
+- **Random-dir at the same signal bars** (RR2 both, 300 sims): p=**0.273** → the macro-confirmed
+  *direction choice carries no information* beyond coin-flip at those bars.
+- **SELL leg is −EV** (n224, −0.087, t−0.93; RR2): all of the combo's positivity is the BUY leg —
+  i.e. long gold 2013→2026. The live long-only block is what "fixed" this combo, and that is beta.
+- **Random-LONG matched-n drift null** (RR4, 300 sims): p=**0.020** single-test. Same family and same
+  ballpark as AUDIT #2's long-Donchian p=0.019–0.043 — which died under trials correction. This
+  hypothesis family (long gold breakout × {BRK,MLB,RR,SL,gate}) has had ≥100 session trials (AUDIT #2
+  count 89 + the 6-RR exit sweep `docs/reviews/momentum-exit.md:11-16` that *selected* the live RR4 +
+  this audit's 18 neighbors). Šidák at even a charitable N=10: 1−(1−0.02)^10 ≈ **0.18. FAIL.**
+- **The macro filter subtracts value**: identical long-breakout with NO macro filter = n298, +0.395,
+  **t+3.06** > with-macro +0.317/t2.11. The "macro-aligned" story is storytelling (sin #4) — the filter
+  the algo is named after makes the result *worse*. What remains is exactly AUDIT #2's refuted object:
+  long-only gold H4 breakout + convex exit on a +108% Q4 (quartiles: Q1 +0.03, Q4 +0.64; OOS window =
+  the 2023-26 blow-off).
+- Neighbor sweep is a smooth plateau (12 BRK×MLB configs t1.70–3.41) — but a plateau in a
+  drift-dominated statistic is drift's plateau, not signal (AUDIT #2: 84% of pure-drift nulls "STABLE").
+
+**Go/no-go: NO-GO as a validated alpha.** As a *declared* gold-drift-harvest vehicle (beta + loss
+shaping) it is the least-bad gold expression the system has: SELL-leg blocked, best Sortino/recovery of
+the gold combos, tail capped. If the user knowingly wants long-gold beta, keep it live **re-labeled as
+beta, minimum size, max 1 position** — but the system must stop citing t≥2 as its justification, and
+the stale `sr_gate_combos.json` pass should be re-run (it fails its own criterion today).
+
+## C. regime_momentum:XAUUSD — **VERDICT: NULL (loss-shaped drift). DEMOTE to SHADOW.**
+
+Live parity = H1 Donchian(20) TREND-gated breakout (`regime_lib.py:178-189`) + BUY-only + block-NEUTRAL
++ SR-gate. Reproduction on `data/xau_h1.json` (70,000 bars 2014→2026, `regime_backtest` parity, cost 30):
+
+| variant | n | exp_R | t | notes |
+|---|---|---|---|---|
+| baseline algo (both-dir) | 1575 | −0.054 | −1.52 | reproduces `trend_filter_backtest.py` to the digit |
+| BUY + block-NEUTRAL | 823 | +0.047 | +0.93 | = the claimed "gold-fit" number, reproduced exactly |
+| **LIVE parity (+SR-gate)** | 818 | **+0.054** | **+1.06** | PSR₀ = **0.858** (< 0.95) |
+| LIVE at cost×2 (60) | 818 | **+0.011** | +0.22 | edge dies inside the cost error-bar |
+
+- Random-long at matched TREND/non-NEUTRAL bars (matched-n 818, 400 sims): null mean +0.011,
+  95pct +0.062, real +0.054 → **p=0.102. Fails.**
+- Quartiles unstable: Q1 −0.50, Q2 +0.35, Q3 −0.25, Q4 +0.15 — sign flips across regimes.
+- This matches the system's own labels: `config.py:410-412` documents block-NEUTRAL as loss-reduction
+  ("drift-harvest ไม่ใช่ alpha, t0.93"), and `gold_regime_filter.py:5` says the same. The audit
+  confirms those labels are accurate: the gates turned −0.054 into +0.054 by *deleting losing slices*
+  (valid risk-shaping), not by adding signal. At realistic doubled cost the residual is +0.01R ≈ 0.
+
+**Go/no-go: NO-GO as an edge — demote to SHADOW.** Consistent with the system prior (12+ failed gold
+directional strategies): gold direction remains unpredictable; keep collecting shadow data. If the user
+keeps it live as deliberate drift-harvest, it is strictly dominated by macro_momentum (B) — running both
+= two correlated long-gold-breakout tickets; keep at most one.
+
+## D. tsmom_d1:BTCUSD (SHADOW) — **VERDICT: INSUFFICIENT-EVIDENCE — keep SHADOW (current state is correct).**
+
+Reproduced `scripts/synthetic_stress.py` to the digit: driftless survival — GBM 50.2% (p0.455),
+**block-boot-demean 94.2% (p0.052)**, regime 46.2% (p0.480) → edge exists only where autocorrelation is
+preserved, and at borderline significance. Reproduced `scripts/tsmom_btc_wti_backtest.py`: real-path
+matched-exposure p=0.000, halves stable (1.43/0.63) but short leg ≈ 0 (Sharpe +0.03) and prior bar-level
+gates unmet (n<100 per memory 08-18). This is the only roster member with any driftless-null signal at
+all. Do not promote on this; pre-freeze the config and let shadow-forward decide.
+
+## Tuning recommendations (risk/exit envelope only — gold entry has no edge to tune)
+
+Ranked by impact; tags: **[risk]** = correctness/risk-shaping, safe to apply; **[alpha]** = claims new
+edge, requires the full battery (driftless null + trials-corrected p + OOS + cost×2) before live.
+
+1. **[risk] DEMOTE `tsmom_d1:WTIUSD` → SHADOW** (`data/algo_switches.json:41`). Highest impact: it is
+   the largest unproven live exposure (D1 swing, 26-day mean hold, 50% time-in-market on oil). Every
+   null fails (p 0.055–0.19); the t15 authorization is documented window-bias. Nothing to tune — the
+   edge does not exist. Shadow costs nothing and preserves the forward test.
+2. **[risk] Collapse the two live gold combos into one declared-beta ticket.** regime_momentum:XAUUSD
+   (H1) and macro_momentum:XAUUSD (H4) are the same long-gold-breakout bet at two frequencies; the H1
+   one has PSR₀ 0.858 and dies at cost×2, the H4 one is stronger on every downside metric (Sortino
+   +0.31 vs +0.05, maxDD 9.7R vs 58R, recovery 6.9 vs 0.75, and 211 vs 818 trades → ~4× less cost
+   bleed). **Demote regime_momentum:XAUUSD to SHADOW; keep macro_momentum:XAUUSD only, re-labeled
+   drift-harvest/beta, max 1 position, minimum lot.** If instead both stay, cap combined gold-algo
+   at-risk positions to 1.
+3. **[risk] Pre-declared downside budget + CVaR gate for whatever stays live.** Live parity numbers to
+   anchor it: macro live WR 28% (RR4) → long loss streaks are structurally certain (~16 trades/yr);
+   CVaR5 ≈ −1.05R. Declare before the forward run: e.g. "demote mechanically at 12R drawdown or a
+   15-loss streak" (≈ 95th-pct null path), so the demote decision is data-triggered, not narrative.
+   Wire `quant_metrics.panel` (already built) into the shadow report so CVaR5/Sortino/recovery are
+   logged per combo alongside t.
+4. **[risk] Refresh stale pass records on every re-validation cycle.** `data/sr_gate_combos.json`
+   (generated 08-20) authorizes the SR-gate on a t2.08→2.21 result that re-runs at t1.79→1.93 today.
+   Rule: any `t≥2` authorization must be re-derived on current data before the combo stays live —
+   knife-edge passes (2.0–2.2) should require a margin (e.g. t≥2.5) given the documented window drift.
+5. **[alpha — do NOT apply without full validation] Macro-filter removal / RR retune.** The no-macro
+   long breakout backtests better (t3.06) and RR5 better than RR4 — but both are best-of-N selections
+   inside a 100+-trial family whose drift-null-corrected p is ~1. Explicitly do not chase these;
+   they are listed only to document that the "macro" and "RR4" components carry no validated signal.
+6. **[risk] WTI/BTC tsmom mechanics if ever re-promoted:** keep SL×0.7 (2.1×ATR) — CVaR5 −1.02R shows
+   the tail cap works; keep confirm-21 (stand-down, not reversal); keep exit-on-flip closes exempt from
+   LONG_ONLY (verified: closes route via `tsmom_flip` mgmt, not `open_order`, so no stuck-position bug).
+
+## Which live combos should be demoted NOW
+
+| combo | today | evidence-based state | action |
+|---|---|---|---|
+| tsmom_d1:WTIUSD | LIVE | NULL (all nulls p≥0.055; 2-outlier-trade mean; t15 = documented window bias) | **DEMOTE → SHADOW now** |
+| regime_momentum:XAUUSD | LIVE | NULL (PSR₀ 0.858; +0.011R at cost×2; null p=0.102) | **DEMOTE → SHADOW** (or fold into tuning #2) |
+| macro_momentum:XAUUSD | LIVE | drift-harvest beta, not alpha (dir-choice p=0.273; drift-null p=0.020 pre-correction ≈ 0.18+ corrected; macro filter negative value; pass record stale) | keep only as **declared beta, min size, 1 position**, else demote |
+| tsmom_d1:BTCUSD | SHADOW | borderline autocorr-dependent signal (p0.052 block-boot) | keep SHADOW, pre-frozen config |
+
+Honest ceiling, restated: **gold = risk-shaping only** (three audits, 12+ strategies, and this one all
+agree — the gates cut losses, they do not find direction); **WTI fails the new battery outright**;
+**BTC is the only hypothesis left alive, and only in shadow.** No live combo currently passes
+`VALIDATED` (OOS + driftless-null + cost + PSR>0.95 + trials-corrected); real-money exposure today
+rests on drift plus two stale pass records.
+
+Commands/artifacts (session scratchpad): `audit4_wti.py` (live-parity both/long/short + daily
+matched-exposure + driftless synthetic with live lookbacks), `audit4_wti_long.py` (long-leg parity +
+random-long matched-exposure null + drop-best-k), `audit4_macro.py` (offline DXY-proxy),
+`audit4_macro_mt5.py` (full-data reproduction + both nulls), `audit4_macro_neighbors.py` (neighbor
+plateau + no-macro ablation), `audit4_regime.py` (live-gate parity + PSR₀ + TREND-bar random-long
+null); plus re-runs of `scripts/wti_momentum_audit.py`, `scripts/synthetic_stress.py`,
+`scripts/tsmom_btc_wti_backtest.py`, `scripts/trend_filter_backtest.py` (all reproduced to the digit).
+
+# AUDIT #5 (2026-08-22) — full-registry audit (6 shadow algos) + fix attempts
+
+Auditor: quant-adversarial pass (Fable 5) on the 6 NOT-yet-audited registry algos
+(`agents/algo_registry.py`: mean_reversion:94, regime_momentum_fvg:236, sweep_reversal:273,
+confluence_15m:424, cdc_zone:525, pullback_buy:588). Battery = AUDIT #4 discipline: matched
+drift-null (random-entry-same-exit-same-exposure, NOT zero), look-ahead/causality code read,
+driftless synthetic stress, trials correction, honest OOS, cost×2. Per user directive, each failing
+algo got ONE fix attempt (risk-shaping only) re-tested under the same battery. All runs offline on
+cached data (`data/xau_{d1,h1,h4,m15,w1}.json`, `data/drv_eurusd_m15.json`, BTC AV cache); 0 orders;
+read-only except this report. Scratch scripts (session scratchpad): `s1_cdc.py`, `s1b_cdc.py`,
+`s2_pullback.py`, `s3_conf15m.py`, `s4_dead3.py`.
+
+Reproduction baseline: `data/backtest_results.json` (matrix 08-12) reproduced to the digit where
+windows match — e.g. cdc XAUUSD last-3000-D1 = n48 exp+0.945 t+2.01 OOS+2.481 vs matrix n47
++0.983/t2.05/OOS+2.478 (data refresh); mean_reversion/sweep/fvg within refresh noise. The engines are
+faithful; the *claims* are what fail below.
+
+## A. cdc_zone — **VERDICT: NULL as alpha (gold drift-harvest, same family as macro_momentum). KEEP-SHADOW only if relabeled beta; do not promote on backtest.**
+
+Claim (`algo_registry.py:529-531`): XAUUSD exp_R+0.88 t1.99 OOS+2.38 n53. Reproduced (n48 +0.945
+t2.01). Refutation results (XAU D1, cost 30 pips, `s1_cdc.py`/`s1b_cdc.py`):
+
+- **Matched-exposure random-long drift-null**: same span-count/lengths/2N-SL accounting, 1000 sims.
+  Last-3000 window (the claim's window): null mean **+0.549R/trade** (random long placement on gold
+  earns half the claim by itself), real +0.945 → **p=0.105. FAIL.** Full-6000 (2003-2026): p=0.015
+  single-test — but the cdc family counts ≥30 trials (modes long/both/long+W1 × 5 pairs ×
+  src close/ohlc4 × pullback variants + phase-2 Turtle/Fib): Šidák 1−(1−0.015)^30 ≈ **0.37. FAIL.**
+- **Driftless synthetic stress** (long/flat cdc on mu=0 GBM + block-boot-demean paths, 300 sims):
+  survival 58.7%, vs-random p **0.493 / 0.447** → **zero timing skill without drift**. The full-window
+  p=0.015 is drift × convexity (cut-loss/let-run on a rising asset) = beta, exactly AUDIT #4's
+  macro_momentum verdict.
+- **Honesty ladder**: the parity engine (`backtest_all.py:138-139`) uses a close-based disaster SL
+  that *truncates* the recorded loss to −1R even when the close-loss is worse; honest accounting
+  (intrabar low SL + next-open fill): exp +0.945 → **+0.755, t1.78**, null p=0.168.
+- **Outlier concentration**: drop-best-2 of 48 → exp+0.414 t1.46; best 3 trades = +16.4R, +9.9R,
+  +7.5R. The "edge" is 2-3 trades.
+- n=48 << 80 (its own MIN_N), and forward shadow so far: 1 resolved trade, −1.0R
+  (`logs/shadow/cdc_zone__XAUEUR.jsonl`).
+- BTCUSD leg: window-dependent (last-3000 null p=0.008 but full-2010-2026 p=0.447, matrix OOS only
+  +0.14) — INSUFFICIENT, and BTC momentum is already covered by tsmom_d1:BTCUSD shadow.
+- **FIX ATTEMPTED — W1 CDC bull gate** (the existing `cdc_backtest.py` long+W1 variant): full-window
+  exp+1.006 t2.78, survives cost×2 (t2.74), null p=0.011 single-test — but same ≥30-trial family
+  (corrected ≈0.28) and same driftless-stress failure. **Fix improves the beta expression; it does
+  not create alpha.** Claim-window (last3000) p=0.063 — still FAIL.
+
+Recommendation: **KEEP-SHADOW (relabeled drift-harvest/beta)** — it is the honest D1 expression of
+the long-gold thesis and shadow costs nothing — but the t1.99/OOS+2.38 numbers must stop being cited
+as validation, and promotion must come from forward shadow n≥20 vs a drift benchmark, not this
+backtest. If the registry is to be thinned aggressively: it is redundant with macro_momentum (same
+beta, lower frequency).
+
+## B. pullback_buy — **VERDICT: NULL + statistically invalid claim (overlap-inflated t). REMOVE-FROM-REGISTRY (or shadow only with corrected stats).**
+
+Claim (`algo_registry.py:592-593`): XAUUSD OOS+0.278 t3.88, XAUEUR OOS+0.138 t2.05. Two independent
+kills (`s2_pullback.py`):
+
+1. **The t3.88 is pseudo-replication.** `scripts/pullback_buy_backtest.py:70-91` collects EVERY
+   trigger bar (`i += 1`, no dedup) and resolves each 72-bar trade independently → overlapping trades
+   counted as independent samples. Reproduced exactly: report-style overlap = OOS n649 exp+0.255
+   **t+3.56** (report: n650 +0.270 t3.76); the registry-parity engine (`backtest_all.py:168-187`,
+   sequential non-overlap, same data) = OOS n203 exp+0.207 **t+1.65**. Same signal, half the claimed
+   t once the double-counting is removed. The XAUEUR "t2.05" is the same construction — and its own
+   IS is *negative* (−0.012, `docs/reviews/pullback-buy.md`): the classic OOS-window artifact this
+   session already condemned.
+2. **The trigger carries zero information beyond drift.** Matched-n random-long at D1-uptrend bars
+   (same SL-in-ATR distribution, RR3, mh72, 400 sims): ALL n1000 real +0.055 vs null +0.064 →
+   **p=0.570**; OOS-only real +0.178 vs null +0.186 → **p=0.532**. The EMA20-reclaim entry performs
+   *identically* to buying at random moments in a D1 uptrend. IS honest = +0.002 (t0.03); cost×2 IS
+   = −0.048. Yearly segmentation: sign flips 2015-2022 (−0.18…+0.20), positive only 2023-2025 =
+   the gold parabola.
+- **FIX ATTEMPTED — RISK-OFF vol gate** (block vol_percentile ≥ 0.8, structural `regime_lib`
+  threshold): OOS t1.65→1.94, cost×2 OOS +0.187 — looks better, but drift-null on the fixed variant:
+  **p=0.410**. The fix shapes the same beta; still no information in the trigger. FAIL.
+- Wiring note: despite registration 08-15 there is **no `logs/shadow/pullback_buy__*.jsonl`** —
+  either the H1 shadow engine never fires it or it is not wired; worth checking before trusting any
+  forward stats.
+
+Recommendation: **REMOVE-FROM-REGISTRY** (like sr_fade). If kept for data collection, the registry
+docstring must be corrected to "t1.65 non-overlap, drift-null p=0.53 = indistinguishable from random
+long in uptrend" — the current numbers are wrong, not merely optimistic.
+
+## C. confluence_15m — **VERDICT: NULL / OVERFIT — and the live-tradeable leg is NEGATIVE. REMOVE-FROM-REGISTRY (gold); BTC/other legs already −EV in matrix.**
+
+Claim (`algo_registry.py:427-428`): gold M15 exp_R+0.035 OOS+0.199, ~166 fires/yr. The claim is
+already unstable in the repo's own records: +0.035 (registry) vs OOS 0.006 (`continue.md:287`) vs
++0.1285/t1.34 (matrix 08-12). Offline live-parity re-derivation (M15 100k bars, EURUSD-macro
+coverage 2024-02→2026-07, session 13-21, BRK12 RR2 SL1×ATR vk1.5; `s3_conf15m.py`):
+
+- Parity: n176, exp **+0.076 t+0.69**, fires/yr ≈ 73 (not 166). **Cost×2: exp +0.018 t+0.16 — dead
+  at cost stress** (median cost share 0.053R/trade at SL≈$5.6).
+- **Direction-info null** (random ±1 at the same signal bars): p=**0.237** — the 5-condition
+  confluence direction choice is indistinguishable from a coin flip. Random-bar matched null:
+  p=0.073.
+- **Leg split is perverse: BUY n123 exp −0.025 (t−0.20, in the biggest gold bull ever); SELL n53
+  exp +0.310 (t1.49, noise-n).** Live has `LONG_ONLY_ALL=true` (`.env:61`) → the deployed combo can
+  ONLY trade the negative leg. All backtest positivity sits in a leg the system blocks.
+- Trials: `tune_confluence.py` alone = 54 gold configs (6 sessions × 3 SL × 3 RR) + 27 BTC + the
+  original research_15m family → any p here is uninterpretable without correction; none is near
+  passing even uncorrected.
+- **FIX ATTEMPTED — long-only (live parity)**: exp −0.025, cost×2 −0.088, vs random-long null
+  p=0.443. FAIL — the fix that live enforces makes it strictly worse.
+- Matrix cross-section (`data/backtest_results.json`): −EV on 8/11 pairs (t to −3.2); forward shadow
+  gold legs: XAUUSD 0 resolved, XAUEUR −1.04 (n2). (FX-pair forward blips like EURUSD n10 +1.7 are
+  3-week small-n noise on legs the matrix scores −EV.)
+
+Recommendation: **REMOVE-FROM-REGISTRY.** It is an 80+-trial artifact whose tradeable projection is
+−EV; keeping it in shadow only spends cycles collecting data on a signal with a coin-flip direction
+p.
+
+## D. mean_reversion — **VERDICT: NULL (confirmed −EV; fix fails). REMOVE-FROM-REGISTRY.**
+
+Already cut from live routing 07-19 (P2 OOS −EV 0/27, `regime_lib.py:14-15`). Re-derived XAUUSD H1
+70k bars (`s4_dead3.py`): exp −0.070 t−3.55 OOS −0.056 (matrix: −EV all 11 pairs, t to −19.9).
+Forward shadow confirms: XAUUSD n22 mean −0.466 t−2.40; XAUEUR −0.584; XAUJPY −0.779
+(`logs/shadow/mean_reversion__*.jsonl`). **FIX ATTEMPTED — BUY-only (drift-aligned fade):** exp
+−0.045 t−1.63, cost×2 −0.100 t−3.59. Still structurally negative; fading gold H1 loses in both
+directions. Recommendation: **REMOVE** (it has now failed backtest, P2 OOS, AND forward shadow —
+three independent datasets; nothing left to learn).
+
+## E. sweep_reversal — **VERDICT: NULL (−EV as designed; "less bad than random" is not a trade). REMOVE-FROM-REGISTRY.**
+
+Self-documented −EV (`algo_registry.py:278`). Reproduced XAUUSD H1: exp −0.056 t−1.91 OOS −0.040;
+matrix −EV 10/11 pairs; forward shadow XAUUSD n16 −0.16. **FIX ATTEMPTED — BUY-only (fade prior-day-
+low sweep only):** exp −0.057, cost×2 −0.116 t−3.00. FAIL. Curiosity worth recording: BUY-only sweep
+bars beat matched random-longs at NEUTRAL/RANGE bars (p=0.003) — the sweep-reclaim bar is a *less
+bad* long location, but its absolute EV is still negative after cost, so there is no trade; at most
+this is a future entry-timing refinement for some other +EV strategy. Recommendation: **REMOVE**
+(keep the p=0.003 note in the graveyard doc, not a live registry slot).
+
+## F. regime_momentum_fvg — **VERDICT: NULL / window-noise; filter adds nothing. REMOVE-FROM-REGISTRY (redundant).**
+
+Self-documented "no OOS edge / window bias" (`algo_registry.py:241-242`) — confirmed and worse: the
+sign itself is window-dependent (full 70k H1: exp **−0.107 t−1.98**; last 50k: −0.011 t−0.18; matrix
+08-12 window: +0.046 t0.69). **FIX ATTEMPTED — BUY-only (live LONG_ONLY parity):** −0.047 t−0.65,
+cost×2 −0.093; and the marginal value of the FVG filter vs plain momentum BUY-only on the same window
+is +0.057 vs +0.047 (both t<0.8) — i.e. the filter's contribution is statistically zero. Its base
+algo (regime_momentum) was itself ruled NULL in AUDIT #4. A filter with no marginal value on top of a
+null base = two registry slots for one dead hypothesis. Recommendation: **REMOVE** (regime_momentum
+shadow already collects the base data).
+
+## Ranked disposition (registry proposal — NOT applied; registry untouched)
+
+| rank | algo | verdict | fix result | action |
+|---|---|---|---|---|
+| 1 | confluence_15m | NULL/OVERFIT; live-tradeable leg −EV; dead at cost×2 | long-only fix FAIL (−0.025→−0.088) | **REMOVE now** (all pairs) |
+| 2 | pullback_buy | NULL; claimed t3.88 = overlap-inflation (true t1.65, drift-null p0.53) | RISK-OFF gate FAIL (p0.41) | **REMOVE now** (+ fix stale docstring if kept) |
+| 3 | mean_reversion | NULL (3 independent datasets negative) | BUY-only FAIL | **REMOVE now** |
+| 4 | regime_momentum_fvg | NULL; window-noise; zero marginal filter value | BUY-only FAIL | **REMOVE now** (redundant) |
+| 5 | sweep_reversal | NULL (−EV; sweep-bar timing note archived) | BUY-only FAIL | **REMOVE** (archive p=0.003 timing note) |
+| 6 | cdc_zone | NULL as alpha; honest beta (drift-harvest), W1 fix helps the beta (t2.74 @cost×2) but trials-corrected p≈0.28 | W1 gate: improves, does not validate | **KEEP-SHADOW, relabeled beta**; promotion only via forward n≥20 vs drift benchmark |
+
+**Go/no-go per edge: NO-GO for live enablement for all six.** None passes VALIDATED (OOS + matched
+drift-null + cost×2 + trials-corrected). No LIVE flag currently enables any of the six
+(`data/algo_switches.json`: all SHADOW) — the audit found no live-money exposure here; the risk was
+reputational (three stale "validated" docstrings citing t1.99/t3.88/OOS+0.199 that do not survive
+re-derivation) and one wiring gap (pullback_buy produces no shadow journal at all).
+
+Consistency check vs system priors: 6/6 audited algos land exactly on the established prior — gold
+direction is not mechanically predictable; every positive number traced to (a) long-gold drift,
+(b) window selection, or (c) a statistics bug (overlap inflation). The registry's only defensible
+survivors after AUDIT #4+#5: regime-null shadows for data collection, tsmom_d1:BTCUSD (borderline,
+frozen), and cdc_zone as a *declared* beta shadow. Everything else is graveyard material.
