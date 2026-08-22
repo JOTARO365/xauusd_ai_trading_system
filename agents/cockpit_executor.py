@@ -65,7 +65,7 @@ def place_manual(symbol, direction, lot=None, sl_atr_mult=1.5, rr=2.0):
         _lot = float(getattr(_cfg, "MIN_LOT", 0.01)) if (meta and meta.get("force_min_lot")) else lot
         # open_order = guard ครบ (LONG_ONLY_ALL/margin/cap/min-lot/DRY_RUN). min_rr ต่ำ = ยอม structural SL กว้าง
         res = open_order(direction, sl_pips, tp_pips, comment="MANUAL-cockpit", lot=_lot,
-                         symbol=broker, min_rr=0.1, magic=_manual_magic())
+                         symbol=broker, min_rr=0.1, magic=_manual_magic(), allow_short=True)  # human discretion 2 ทาง (ข้าม long-only; structural-SL+cap คงคุม)
         if res and res.get("success"):
             logger.warning(f"[COCKPIT] MANUAL {direction} {broker} @ {res.get('price')} "
                            f"SL={sl_pips:.0f}p TP={tp_pips:.0f}p lot={res.get('lot', _lot)} ticket={res.get('ticket')}")

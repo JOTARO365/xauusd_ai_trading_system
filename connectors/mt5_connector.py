@@ -886,12 +886,13 @@ def open_order(direction: str, sl_pips: float, tp_pips: float,
                confidence_scale: float = 1.0, lot: float | None = None,
                shadow: bool = False, symbol: str | None = None,
                max_open_override: int | None = None,
-               magic: int | None = None) -> dict:
+               magic: int | None = None, allow_short: bool = False) -> dict:
     """วาง market order. B11: OPEN_ORDER_FINE_LOCK=true → ปล่อย _mt5_lock ระหว่าง retry-backoff sleep
     (guardian ไม่ถูก starve). default (false) → ครอบ _mt5_lock ก้อนเดียว = พฤติกรรมเดิม (sleep ใต้ lock).
     NOTE: open_order ถูกถอดออกจาก auto-wrap list ด้านล่าง — lock จัดการที่นี่/ใน _open_order_fine."""
     # long-only guard: block SELL ทุก path (decision/pending/zre/MSE) ที่จุดเดียว. LONG_ONLY_ALL=ทุกคู่ · METALS_LONG_ONLY=โลหะ
-    if not shadow and str(direction).upper() == "SELL":
+    # allow_short=True: human discretion (cockpit) ข้าม long-only — มนุษย์มี edge 2 ทางจริง (structural-SL+cap ยังคุม). algo ไม่ส่ง=คงเดิม
+    if not shadow and not allow_short and str(direction).upper() == "SELL":
         _sym = str(symbol or SYMBOL).upper()
         _metal = _sym.startswith("XAU") or _sym.startswith("XAG") or "GOLD" in _sym or "SILVER" in _sym
         if getattr(_cfg, "LONG_ONLY_ALL", False):
