@@ -357,18 +357,13 @@ def main():
             # portfolio_replay.py → equity curve รวมทั้งระบบ (ระบบปัจจุบันทำเงินเท่าไรบน history) — โชว์อย่างเดียว
             print("     portfolio replay (system equity บน history)…")
             subprocess.call([sys.executable, os.path.join("scripts", "portfolio_replay.py")])
-            # SMC candidate backtest — ทุกคู่ผ่าน MT5 (matrix_backtest ต่อ (algo,symbol) → Shadow Matrix)
-            rc = subprocess.call([sys.executable, os.path.join("scripts", "smc_backtest.py"), "--all"])
-            print((_OK if rc == 0 else _WARN) + "smc_backtest.py --all " +
-                  ("→ data/smc_backtest.json (ทุกคู่)" if rc == 0 else f"exit {rc}"))
+            # NOTE 2026-08-22: smc_backtest.py (regime_momentum_fvg + sweep_reversal candidates) ถูกถอด
+            #   ออกจาก bootstrap — ทั้งสอง algo CUT ใน AUDIT #5 (registry 9→4). backtest_all.py ด้านบน
+            #   ครอบ matrix ที่ยังใช้อยู่แล้ว.
         else:
-            # MT5 ไม่ต่อ → SMC XAU offline อย่างเดียว (committed xau data), คู่อื่นใช้ของ owner ไปก่อน
-            rc = subprocess.call([sys.executable, os.path.join("scripts", "smc_backtest.py")])
-            print((_OK if rc == 0 else _WARN) + "smc_backtest.py (XAU offline) " +
-                  ("→ data/smc_backtest.json" if rc == 0 else f"exit {rc}"))
             print(_WARN + "MT5 ยังไม่ต่อ — backtest คู่อื่น (Shadow Matrix) ใช้ของ owner ไปก่อน. ภายหลัง: "
                   "python scripts/shadow_backtest_managed.py && python scripts/tsmom_backtest_pairs.py && "
-                  "python scripts/smc_backtest.py --all && python scripts/backtest_all.py")
+                  "python scripts/backtest_all.py")
 
     # summary + next steps
     print("\n" + "=" * 60)

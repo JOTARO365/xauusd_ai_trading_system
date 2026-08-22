@@ -2254,6 +2254,15 @@ def api_backtest_results():
             data = json.load(f)
     except Exception as e:
         return jsonify({"updated": None, "results": [], "error": str(e)})
+    try:                                                    # match system: โชว์เฉพาะ algo ที่ยังอยู่ registry (AUDIT #5 cut 5 ตัว)
+        from agents.algo_registry import ALGO_REGISTRY as _AR
+        _live_algos = set(_AR.keys())
+        _all = data.get("results") or []
+        _kept = [r for r in _all if r.get("algo") in _live_algos]
+        data["retired_count"] = len(_all) - len(_kept)     # cut algos = ไม่โชว์เป็น actionable (fvg/sweep/mean_rev/pullback/confluence)
+        data["results"] = _kept
+    except Exception:
+        pass
     try:                                                    # switch metadata ต่อ combo (route gold vs MSE ถูกจาก matrix)
         from agents.shadow_matrix import build as _sm_build
         sw = {(r["algo_id"], r["symbol"]): r for r in (_sm_build().get("rows") or [])}
@@ -3025,14 +3034,10 @@ def api_smc_monitor():
 
 @app.route("/api/smc-backtest")
 def api_smc_backtest():
-    """SMC candidate backtest results (data/smc_backtest.json จาก scripts/smc_backtest.py). display-only, 0 token."""
-    def _c():
-        try:
-            with open(os.path.join(_BASE, "..", "data", "smc_backtest.json"), encoding="utf-8") as f:
-                return {"ok": True, **json.load(f)}
-        except Exception as e:
-            return {"ok": False, "error": str(e)}
-    return jsonify(_cached("smc-backtest", _c, ttl=300))
+    """SMC candidate panel — RETIRED 2026-08-22: ทั้ง 2 candidate (regime_momentum_fvg + sweep_reversal)
+    ถูก CUT ใน AUDIT #5 (registry 9→4). คืน retired marker ให้ UI ซ่อน/ขึ้น "retired" แทน data เก่า."""
+    return jsonify({"ok": True, "retired": True, "reason": "regime_momentum_fvg + sweep_reversal cut (AUDIT #5)",
+                    "results": []})
 
 
 # ── Local-only plugins (gitignored: dashboard/local_*.py) — optional add-ons ──
