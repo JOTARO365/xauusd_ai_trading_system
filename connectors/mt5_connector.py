@@ -641,6 +641,16 @@ def _order_setup(direction, sl_pips, tp_pips, comment, min_rr, confidence_scale,
         logger.warning(f"[TRADE_CAP] {_cap_reason} — block {direction}")
         return None, {"success": False, "error": _cap_reason}
 
+    # SL-ENFORCE (08-22): refuse-to-open ถ้า SL หาย/0/แคบกว่า floor — กันไม้ un-stopped (คลาส −6,248)
+    try:
+        from agents.sl_enforce import valid as _sl_valid
+        _ok, _why = _sl_valid(sl_pips, symbol)
+        if not _ok:
+            logger.warning(f"[SL-ENFORCE] block {direction} {symbol}: {_why}")
+            return None, {"success": False, "error": _why}
+    except Exception as _e:
+        logger.debug(f"[SL-ENFORCE] check skipped (fail-open): {_e}")
+
     account = mt5.account_info()
     if account is None:
         logger.error("Cannot get account info")

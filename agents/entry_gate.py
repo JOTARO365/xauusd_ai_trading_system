@@ -9,7 +9,11 @@ P(bounce) + log-odds + EV + falling-knife veto) — **generalize เป็น fa
 
 CORE INVARIANT: entry = คำนวณจาก data (bounce_pct empirical + momentum/vol) ไม่ prediction, ไม่มี AI.
 """
+import json
 import math
+import os
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 # ── weights (ILLUSTRATIVE — NOT FITTED; เก็บ data ผ่าน journal แล้วค่อย fit) ──
 W = {
@@ -163,7 +167,7 @@ def entry_direction(sr_view, market, rsi=None, w=W):
 
 
 if __name__ == "__main__":
-    import json, sys
+    import sys
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
@@ -172,9 +176,130 @@ if __name__ == "__main__":
     v = from_live()
     print("sr_view ok:", v.get("ok"))
     if v.get("ok"):
-        import os
         st = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                           "logs", "bot_status.json"), encoding="utf-8"))
         market = st.get("market", {})
         market["fast_move_pips"] = st.get("last_signal", {}).get("fast_move_pips", 0)
         print(json.dumps(entry_direction(v, market), ensure_ascii=False, indent=2, default=str))
+
+
+# =============================================================================
+# FROZEN INTERFACE v1 — ARCHITECTURE_pipeline_rewrite §7 / §11-F2  (T-02)
+# =============================================================================
+#
+# Journal file: data/entry_gate_journal.jsonl (append-only, UTF-8, one JSON object per line)
+#
+# Schema — every line written by _write_journal():
+# {
+#   "ts":               str   — UTC ISO-8601 timestamp of the check() call
+#                               e.g. "2026-08-22T14:30:00.123456+00:00"
+#   "symbol":           str   — traded symbol, e.g. "XAUUSD"
+#   "direction":        str   — "BUY" | "SELL"  (from the algo's price computation, never LLM)
+#   "algo_id":          str   — algo identifier, e.g. "macro_momentum"
+#   "price":            float — entry price at decision time
+#   "atr":              float — ATR at decision time
+#   "tf":               str   — timeframe, e.g. "H1"
+#   "block":            bool  — final veto decision: True = do not enter
+#   "reason":           str   — first blocking veto reason, "stub" (T-02), or "pass" (all pass)
+#   "lot_mult":         float — accumulated size multiplier (≤1.0; product of soft-counter vetoes)
+#   "extra_margin_atr": float — additional break-by-more requirement in ATR units
+#   "tags":             dict  — per-veto verdicts: {"veto_name": {"block": bool, ...}}
+#                               empty dict in stub (T-02); populated by T-07 Batch-2 vetoes
+# }
+#
+# Hard rules (must survive every future edit to this section):
+#   1. check() MUST return block=False until individual vetoes are wired (T-07, Batch 2+).
+#   2. Journal IO errors are swallowed (fail-soft) — never crash a trade.
+#   3. 0 LLM calls from this module at trade time. Sentiment comes from cache only.
+#   4. Do NOT wire check() into any live order path until T-08/T-09/T-10/T-11 (Batch 2).
+# =============================================================================
+
+_JOURNAL_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data", "entry_gate_journal.jsonl",
+)
+
+
+@dataclass(frozen=True)
+class EntryContext:
+    """Input snapshot for the single entry-veto stack.
+
+    All fields must be causal (pre-decision, closed-bar data only).
+    Supplied by the calling algo; `market_state` and `bars` may be None in the
+    stub phase (T-02) and are populated from Batch 2 onwards (T-07).
+    """
+    symbol: str
+    direction: str            # "BUY" | "SELL"  (from the ALGO's price computation)
+    algo_id: str
+    price: float
+    atr: float
+    tf: str = "H1"
+    # Closed bars tuple (high[], low[], close[]) newest-last; None → gate fetches in Batch 2+.
+    bars: tuple | None = None
+    # MarketState from agents/market_state.py; None → check() builds it in Batch 2+.
+    market_state: object = None
+    sl_pips: float | None = None  # for the SL-validity precondition (veto 0, wired in T-07)
+
+
+@dataclass(frozen=True)
+class GateResult:
+    """Output of check(). Fail-open: any exception leaves block=False.
+
+    Composition rules (enforced in T-07):
+    - block short-circuits on the first blocking veto (listed order §7 table).
+    - lot_mult is the product of all soft-counter mults (≤1.0).
+    - extra_margin_atr is the max of all soft-counter requirements.
+    - tags maps each veto name to its verdict dict for shadow-tag journaling.
+    """
+    block: bool               # True → do not enter
+    reason: str               # human-readable; first blocking veto reason or "stub"/"pass"
+    lot_mult: float = 1.0     # accumulated size multiplier (≤1.0)
+    extra_margin_atr: float = 0.0  # additional break-by-more ATR requirement
+    tags: dict = field(default_factory=dict)  # per-veto verdicts for shadow-tag journaling
+
+
+def _write_journal(ctx: EntryContext, result: GateResult) -> None:
+    """Append one JSON record to the gate journal.
+
+    Fail-soft: all exceptions are swallowed — a journal write failure must never
+    block or crash a trade. The journal file is created on first write if absent.
+    """
+    try:
+        record = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "symbol": ctx.symbol,
+            "direction": ctx.direction,
+            "algo_id": ctx.algo_id,
+            "price": ctx.price,
+            "atr": ctx.atr,
+            "tf": ctx.tf,
+            "block": result.block,
+            "reason": result.reason,
+            "lot_mult": result.lot_mult,
+            "extra_margin_atr": result.extra_margin_atr,
+            "tags": result.tags,
+        }
+        with open(_JOURNAL_PATH, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except Exception:
+        pass  # fail-soft: journal errors must never crash a trade
+
+
+def check(ctx: EntryContext) -> GateResult:
+    """Entry-veto stack — stub scaffold (T-02, Batch 0).
+
+    Returns block=False unconditionally. Individual vetoes (SL-validity,
+    event-blackout, event-POST, dir-mode, sentiment, trend-align, causal-zone)
+    are composed here in T-07 (Batch 2). Until then, this is a pure pass-through
+    that journals every call for forward causal data collection.
+
+    Fail-open: any unexpected exception returns block=False without raising.
+    0 LLM calls. All inputs are pre-decision (causal).
+    """
+    try:
+        result = GateResult(block=False, reason="stub", tags={})
+        _write_journal(ctx, result)
+        return result
+    except Exception:
+        # Fail-open: bugs here must never block a legitimate trade.
+        return GateResult(block=False, reason="stub-error")

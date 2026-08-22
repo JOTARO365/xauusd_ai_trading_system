@@ -794,6 +794,17 @@ def tick(force=False):
     except Exception as _re:
         logger.debug(f"[MSE] reap fail: {_re}")
 
+    # Double-engine guard: regime_tick owns regime_momentum:XAUUSD (manages its own
+    # per-tick gold positions via ALGO-mom magic).  If MSE also iterates this combo it
+    # opens a second position on the same breakout bar under a different magic, causing
+    # two concurrent gold entries from the same signal family and two separate stack
+    # counters that cannot see each other.  Exclude the combo here so neither
+    # _manage_* nor _maybe_enter (and therefore last_bar_ts advance) ever fires for it.
+    # Only regime_momentum:XAUUSD is excluded; every non-gold combo and every other
+    # XAUUSD algo remain byte-identical.
+    _MSE_GOLD_EXCLUSIONS = {("regime_momentum", "XAUUSD")}
+    live = [(a, s) for a, s in live if (a, s) not in _MSE_GOLD_EXCLUSIONS]
+
     for algo_id, symbol in live:
         try:
             broker = bmap.get(symbol, symbol)

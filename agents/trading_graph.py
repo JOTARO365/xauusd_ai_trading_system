@@ -276,6 +276,12 @@ def node_position_mgmt(state: TradingState) -> dict:
     from utils.display import print_warning
     import config as _cfg
     chart = state.get("chart_data") or {}
+    # ROSTER-GUARD (08-22): demote LIVE combo ที่ไม่อยู่ allowlist ทุก cycle (กัน roster-drift = fvg LIVE เอง)
+    try:
+        from agents.roster_guard import assert_roster
+        assert_roster()
+    except Exception as e:
+        logger.debug(f"[GRAPH:position_mgmt] roster_guard: {e}")
     # scan manual orders every cycle (including skip_ai) so they're never missed
     try:
         scan_manual_orders(chart or None)
@@ -370,8 +376,12 @@ def node_position_mgmt(state: TradingState) -> dict:
             logger.info(f"[REC] {_rc['closed']} ไม้ปิด → real_fills (แยก algo)")
     except Exception as _rce:
         logger.error(f"[GRAPH:trade_recorder] {_rce}")
-    # multi-symbol live executor: วางออเดอร์จริงบน symbol อื่น (WTI ฯลฯ) ต่อ combo LIVE. gated MULTI_SYMBOL_LIVE
-    # (default OFF → 0 order) + ต่อ combo ต้อง toggle=LIVE. fail-soft. ทองไม่กระทบ (คนละ symbol/คนละ engine).
+    # multi-symbol live executor: วางออเดอร์จริงบน combo LIVE (WTI, BTCUSD ฯลฯ). gated MULTI_SYMBOL_LIVE
+    # (default OFF → 0 order) + ต่อ combo ต้อง toggle=LIVE. fail-soft.
+    # NOTE: MSE iterates XAUUSD combos too (macro_momentum, confluence_15m, tsmom_d1 etc.).
+    # regime_momentum:XAUUSD is explicitly excluded from the MSE combo loop (multi_symbol_executor.py
+    # _MSE_GOLD_EXCLUSIONS) because regime_tick owns that gold engine — running both would open two
+    # concurrent positions from the same breakout bar under different magics (double-engine, gap-audit A.2).
     try:
         from agents.multi_symbol_executor import tick as _mse_tick
         _me = _mse_tick()

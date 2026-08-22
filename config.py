@@ -81,6 +81,11 @@ MONEY_MANAGEMENT = {
 # RISK_PER_TRADE เท่าไร (กัน RISK สูง เช่น 2.0=200% ระเบิดพอร์ตเมื่อสลับ LOT_MODE=auto). 0 = ปิด cap
 MAX_RISK_PCT = float(os.getenv("MAX_RISK_PCT") or 0.05)
 
+# SL-ENFORCE (08-22): floor SL ขั้นต่ำ — refuse-to-open ถ้า SL หาย/0/แคบกว่านี้ (กันไม้ un-stopped คลาส −6,248).
+# 100pt=$1 = safety net เฉยๆ, ไม่กระทบ algo ทองที่ SL structural 200+; SL_BACKSTOP_PIPS = เผื่อ reconcile (ensure_sl_protection ใช้อยู่แล้ว)
+SL_MIN_PIPS = float(os.getenv("SL_MIN_PIPS") or 100)
+SL_BACKSTOP_PIPS = float(os.getenv("SL_BACKSTOP_PIPS") or 500)
+
 # ── EMA_PULLBACK toxicity gate ────────────────────────────────
 # Loss analysis 2026-06: EMA_PULLBACK entries with a wide SL (high ATR) or a
 # marginal confidence have ~0% win rate. chart_watcher blocks those deterministically.
@@ -124,22 +129,8 @@ COUNTER_SPIKE_PIPS       = float(os.getenv("COUNTER_SPIKE_PIPS") or 500)  # ห�
 # ── Ecosystem Monitor (dashboard, display-only, 0 token, ไม่ป้อน entry/gate) ──
 ECO_RSI_OB = float(os.getenv("ECO_RSI_OB") or 70)   # RSI(14) H1 ≥ นี้ = overbought → เตือนโอกาสกลับตัว
 ECO_RSI_OS = float(os.getenv("ECO_RSI_OS") or 30)   # RSI(14) H1 ≤ นี้ = oversold → เตือนโอกาสกลับตัว
-# ── NEWS_GATE (flag, default OFF) — News Impact score ปรับ "conf floor" เท่านั้น ──
-# ยังไม่ validate → เปิดด้วยความระวัง. ไม่แตะ money mgmt / HTF-direction / counter-spike.
-NEWS_GATE             = os.getenv("NEWS_GATE", "false").lower() == "true"
-NEWS_GATE_OPPOSE      = float(os.getenv("NEWS_GATE_OPPOSE") or 40)    # |score| ที่ถือว่า "แรง"
-NEWS_OPPOSE_PENALTY   = int(os.getenv("NEWS_OPPOSE_PENALTY") or 8)    # ข่าวสวน → floor +เท่านี้ (เข้มขึ้น)
-NEWS_AGREE_RELAX      = int(os.getenv("NEWS_AGREE_RELAX") or 5)       # ข่าวหนุน → floor −เท่านี้ (ผ่อน)
-NEWS_GATE_HARD_FLOOR  = int(os.getenv("NEWS_GATE_HARD_FLOOR") or 58)  # ผ่อนแล้วห้ามต่ำกว่านี้เด็ดขาด
-NEWS_GATE_MIN_N       = int(os.getenv("NEWS_GATE_MIN_N") or 3)        # ต้อง scored ≥ นี้ ไม่งั้น no-op
-NEWS_GATE_MAX_AGE_MIN = int(os.getenv("NEWS_GATE_MAX_AGE_MIN") or 60) # snapshot เก่ากว่านี้ = no-op
-
-# ── (ก) NEWS contradiction dampener (flag, default OFF) — ผ่อน oppose-penalty เมื่อ price/flow สวนข่าว ──
-# นับเสียงยืนยันทิศไม้ (momentum m15 STRONG + h1 + fast_move + volume tilt): STRONG เสียง→penalty 0, SOME→ครึ่ง
-NEWS_CONTRA_ENABLED   = os.getenv("NEWS_CONTRA_ENABLED", "false").lower() == "true"
-NEWS_CONTRA_STRONG    = int(os.getenv("NEWS_CONTRA_STRONG") or 3)     # ≥ เสียงนี้ → penalty 0 (ราคาสวนข่าวท่วมท้น)
-NEWS_CONTRA_SOME      = int(os.getenv("NEWS_CONTRA_SOME") or 2)       # ≥ เสียงนี้ → penalty ครึ่ง
-NEWS_CONTRA_FAST_PIPS = float(os.getenv("NEWS_CONTRA_FAST_PIPS") or 300)  # fast_move ต้องเกินนี้จึงนับ 1 เสียง
+# NEWS_GATE retired 2026-08-22 (T-06): was dead under REGIME_LIVE (decision_maker early-return).
+# Opposition-block intent deferred to T-17 shadow-only veto in entry_gate.
 NEWS_FIRST               = os.getenv("NEWS_FIRST", "true").lower() != "false"      # บล็อกเข้าสวนทิศข่าวชัด
 NEWS_BIAS_MIN_CONF       = float(os.getenv("NEWS_BIAS_MIN_CONF") or 55)
 HTF_FADE_BLOCK           = os.getenv("HTF_FADE_BLOCK", "true").lower() != "false"  # ห้าม SELL@D1/W1 support ฯลฯ
@@ -517,21 +508,7 @@ def reload_config():
     global ECO_RSI_OB, ECO_RSI_OS
     ECO_RSI_OB               = float(os.getenv("ECO_RSI_OB") or 70)
     ECO_RSI_OS               = float(os.getenv("ECO_RSI_OS") or 30)
-    global NEWS_GATE, NEWS_GATE_OPPOSE, NEWS_OPPOSE_PENALTY, NEWS_AGREE_RELAX
-    global NEWS_GATE_HARD_FLOOR, NEWS_GATE_MIN_N, NEWS_GATE_MAX_AGE_MIN
-    NEWS_GATE             = os.getenv("NEWS_GATE", "false").lower() == "true"
-    NEWS_GATE_OPPOSE      = float(os.getenv("NEWS_GATE_OPPOSE") or 40)
-    NEWS_OPPOSE_PENALTY   = int(os.getenv("NEWS_OPPOSE_PENALTY") or 8)
-    NEWS_AGREE_RELAX      = int(os.getenv("NEWS_AGREE_RELAX") or 5)
-    NEWS_GATE_HARD_FLOOR  = int(os.getenv("NEWS_GATE_HARD_FLOOR") or 58)
-    NEWS_GATE_MIN_N       = int(os.getenv("NEWS_GATE_MIN_N") or 3)
-    NEWS_GATE_MAX_AGE_MIN = int(os.getenv("NEWS_GATE_MAX_AGE_MIN") or 60)
-
-    global NEWS_CONTRA_ENABLED, NEWS_CONTRA_STRONG, NEWS_CONTRA_SOME, NEWS_CONTRA_FAST_PIPS
-    NEWS_CONTRA_ENABLED   = os.getenv("NEWS_CONTRA_ENABLED", "false").lower() == "true"
-    NEWS_CONTRA_STRONG    = int(os.getenv("NEWS_CONTRA_STRONG") or 3)
-    NEWS_CONTRA_SOME      = int(os.getenv("NEWS_CONTRA_SOME") or 2)
-    NEWS_CONTRA_FAST_PIPS = float(os.getenv("NEWS_CONTRA_FAST_PIPS") or 300)
+    # NEWS_GATE retired 2026-08-22 (T-06) — no reload needed.
     NEWS_FIRST               = os.getenv("NEWS_FIRST", "true").lower() != "false"
     NEWS_BIAS_MIN_CONF       = float(os.getenv("NEWS_BIAS_MIN_CONF") or 55)
     HTF_FADE_BLOCK           = os.getenv("HTF_FADE_BLOCK", "true").lower() != "false"
