@@ -62,6 +62,7 @@ _ready_state: dict = {
 _last_chart_data:     dict = {}
 _last_sentiment_data: dict = {}
 _last_weekly_pending_date: "_date | None" = None
+_last_macro_strip_date: "_date | None" = None
 _net_degraded: bool = False   # True เมื่อ ChartWatcher + MarketAdvisor ทั้งคู่ fail
 
 _BOT_STATUS_FILE = os.path.join(os.path.dirname(__file__), "logs", "bot_status.json")
@@ -707,6 +708,24 @@ async def main():
                     print_warning(f"Weekly calendar pending: ส่งคำสั่ง {wkly} orders ตามปฏิทิน")
                 else:
                     logger.info("Weekly calendar pending: ไม่ส่งคำสั่ง order (ดู system.log)")
+
+            # ── Macro strip daily refresh (DXY/10Y/real-yield) — bg thread, 1/วัน, fail-soft, 3 AlphaVantage req ──
+            global _last_macro_strip_date
+            if getattr(config, "MACRO_STRIP_AUTO_REFRESH", True) and today != _last_macro_strip_date:
+                _last_macro_strip_date = today
+
+                def _refresh_macro_strip():
+                    try:
+                        import subprocess
+                        subprocess.call(
+                            [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                          "scripts", "fetch_macro_strip.py")],
+                            timeout=90)
+                    except Exception as _me:                  # network/quota = fetch script fail-soft เอง (exit 0)
+                        logger.debug(f"[macro_strip] refresh fail-soft: {_me}")
+                import threading
+                threading.Thread(target=_refresh_macro_strip, daemon=True).start()
+                logger.info("[macro_strip] daily refresh dispatched (bg thread)")
 
             # ALGO v2 terminal panel — สถานะระบบใหม่ทุกรอบ (regime/algo/S-R/sentiment guide/journal). display-only.
             if getattr(config, "REGIME_LIVE", False):

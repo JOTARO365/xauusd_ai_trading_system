@@ -248,6 +248,9 @@ ALGO_ENTRY_HOURS      = os.getenv("ALGO_ENTRY_HOURS", "")
 MULTI_SYMBOL_LIVE     = os.getenv("MULTI_SYMBOL_LIVE", "false").lower() == "true"
 # COCKPIT_LIVE = Discretion Cockpit Phase 2: อนุญาต manual order (user กดใน dashboard → cockpit_executor). default OFF = ปฏิเสธทุก order. ⚠️ LIVE MONEY. reuse guard เดิม (LONG_ONLY_ALL/cap/structural-SL). kill = false
 COCKPIT_LIVE          = os.getenv("COCKPIT_LIVE", "false").lower() == "true"
+# MACRO_STRIP_AUTO_REFRESH = main loop refresh data/macro_strip.json (DXY/10Y/real-yield) วันละครั้ง (bg thread,
+# 3 AlphaVantage req ใน free 25/วัน, fail-soft). เดิม fetch_macro_strip.py ต้องรันเอง/cron → data ค้าง. kill = false.
+MACRO_STRIP_AUTO_REFRESH = os.getenv("MACRO_STRIP_AUTO_REFRESH", "true").lower() != "false"
 # ALGO_SL_MULT = SL multiplier ต่อ symbol "SYM:mult,..." (WTIUSD:0.7 = validated; ตัวอื่น default 1.0)
 ALGO_SL_MULT          = os.getenv("ALGO_SL_MULT", "WTIUSD:0.7")
 # MSE_MAX_POSITIONS = ไม้สูงสุดที่ multi_symbol_executor ถือพร้อมกันต่อ combo (stack ทีละไม้ต่อ signal-bar ใหม่)
@@ -458,8 +461,9 @@ def reload_config():
     global DYNAMIC_TP, TP_EXT_MAX, TP_EXT_PIPS, TP_EXT_NEAR_PIPS, STREAK_PROTECTION
     global TP_EXT_MOMENTUM_MIN, TP_EXT_COOLDOWN_SECS, TP_EXT_SL_LOCK_PIPS, SPEECH_SUMMARY
     global DB_RECONCILE_SECS, SHADOW_ENGINE, SHADOW_UNIVERSE, SHADOW_MAX_HOLD_BARS
-    global SHADOW_TSMOM, SHADOW_TSMOM_UNIVERSE
+    global SHADOW_TSMOM, SHADOW_TSMOM_UNIVERSE, MACRO_STRIP_AUTO_REFRESH
     load_dotenv(override=True)
+    MACRO_STRIP_AUTO_REFRESH = os.getenv("MACRO_STRIP_AUTO_REFRESH", "true").lower() != "false"
     SYMBOL        = os.getenv("SYMBOL", "XAUUSD")
     START_BALANCE = float(os.getenv("START_BALANCE") or 5000)
     LOT_MODE      = os.getenv("LOT_MODE",  "auto")
