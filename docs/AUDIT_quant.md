@@ -709,3 +709,41 @@ direction is not mechanically predictable; every positive number traced to (a) l
 (b) window selection, or (c) a statistics bug (overlap inflation). The registry's only defensible
 survivors after AUDIT #4+#5: regime-null shadows for data collection, tsmom_d1:BTCUSD (borderline,
 frozen), and cdc_zone as a *declared* beta shadow. Everything else is graveyard material.
+
+---
+
+## AUDIT #6 (2026-08-22) — DXY-directional-gate backtest (do-not-wire eval)
+
+**Question:** does a free cross-asset feed (US dollar index, broker `DXC`, 3349 D1 bars 2013→2026)
+carry tradeable directional information as a block-only entry gate? Gate: DXY momentum up → block
+gold BUY (USD strong = gold headwind); down → block gold SELL; WTI up-DXY → block BUY. Swept
+lookback L∈{10,20,50} D1. Engine: `scripts/dxy_gate_backtest.py` reusing `scripts/backtest_all.py`
+bt_* (the built-in `gate(h,l,i,px,d,av)` hook) + `_stats`. MT5 read-only. NOTHING WIRED.
+
+**The load-bearing test = random-block-same-rate null (300 seeds, same engine).** A gate that only
+cuts trade count can raise exp_R by luck / by trimming the drift-negative tail. If DXY-blocking is
+statistically indistinguishable from randomly blocking the same fraction of entries, the gate carries
+zero information (the p0.570 failure mode from #5).
+
+| algo | baseline | best DXY-gate | Δexp_R | Δt | p(DXY≥random) | verdict |
+|---|---|---|---|---|---|---|
+| regime_momentum:XAUUSD (H1) | exp_R 0.024 t0.38 | L20 exp_R +0.073 | +0.048 | +0.40 | **0.187** | NEUTRAL (inside random-block noise) |
+| macro_momentum:XAUUSD (H4) | exp_R 0.128 t1.87 | L20 exp_R +0.121 | −0.007 | **−0.56** | 0.327 | **HURTS** (t drops every L; DXY subtracts from the EURUSD confirm it already has) |
+| tsmom_d1:WTIUSD (D1) | exp_R 0.164 t1.23 | L50 exp_R +0.203 | +0.039 | −0.28 | 0.183 | NEUTRAL/HURTS (t drops) |
+| cdc_zone:XAUUSD (D1) | exp_R 0.773 t2.09 | L50 exp_R +0.925 | +0.152 | −0.07 | **0.023** | FALSE POSITIVE (see below) |
+
+**cdc_zone L50 is the only p<0.05 — and it does not survive scrutiny:** (a) it is 1 of 12 configs
+tested (3 lookbacks × 4 algos) → Šidák over 3 lookbacks alone lifts it to ≈0.067, over all 12 to
+≈0.24; (b) the t-stat did **not** improve (2.09→2.02); (c) the gate blocks 88.2% of entries, leaving
+n=49; (d) cdc_zone is already ruled **declared-beta-not-alpha** (#5), so "improving" a beta by
+crushing its trade count is not an edge. L10/L20 for cdc are pure no-info (p0.91/0.73).
+
+**Verdict: NO-GO for all 4 — do not wire the DXY-gate.** For 3 of 4 algos the DXY block is
+statistically indistinguishable from random-block-same-count (no directional information), and for
+macro_momentum the real DXY actively hurts a model that already encodes the USD relationship via its
+EURUSD confirm. The DXY↔gold **correlation is real but is not a tradeable entry signal** — consistent
+with the whole-session finding that gold has no directional edge. The discipline (random-block null +
+trials correction) caught a plausible-looking cdc L50 result *before* it could add a useless gate.
+
+Artifacts: `scripts/dxy_gate_backtest.py`, `data/drv_dxy_d1.json` (gitignored). No production code or
+switch changed.
